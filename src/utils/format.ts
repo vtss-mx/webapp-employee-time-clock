@@ -29,34 +29,6 @@ export function formatConfidence(value: number | null | undefined): string {
   return `${percent.toLocaleString('es-MX', { maximumFractionDigits: 3 })} %`;
 }
 
-/** Los roles de la aplicación, con su nombre oficial. */
-export const roleLabel = { ADMIN: 'Admin', COMPANY: 'Company', EMPLOYEE: 'Employee', VALIDATOR: 'Validator' } as const;
-
-/** Cómo se identificó una persona (bitácora). */
-export const methodLabel = { FACE: 'Rostro', QR: 'QR', QR_FACE: 'QR + rostro' } as const;
-
-/** Motivo de un intento fallido (códigos que registra el backend en la bitácora). */
-const FAILURE_REASONS: Record<string, string> = {
-  NO_MATCH: 'Rostro no coincide',
-  LIVENESS_FAILED: 'Prueba de vida no superada',
-  LIVENESS_MISMATCH: 'Capturas de personas distintas',
-  INVALID_FORMAT: 'QR inválido',
-  NOT_FOUND: 'QR no reconocido',
-  OTHER_COMPANY: 'QR no reconocido',
-  REVOKED: 'QR revocado',
-  EXPIRED: 'QR expirado',
-  OTHER_EMPLOYEE: 'QR de otro empleado',
-  EMPLOYEE_INACTIVE: 'Empleado desactivado',
-  FACE_NOT_REGISTERED: 'Sin rostro validado',
-  EMPTY_GALLERY: 'Sin rostros registrados',
-  AMBIGUOUS_MATCH: 'Parecido a varias personas',
-  INCONSISTENT_MATCH: 'Capturas no concluyentes',
-};
-
-export function failureReason(code: string | null | undefined): string {
-  return FAILURE_REASONS[code ?? ''] ?? 'Fallida';
-}
-
 export function initials(name: string): string {
   return name
     .split(/[\s@.]+/)

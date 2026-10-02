@@ -1,6 +1,7 @@
-import { Ban, Glasses, HardHat, ScanFace, ShieldCheck } from 'lucide-react';
+import { ScanFace, ShieldCheck } from 'lucide-react';
+import { useCatalogs } from '../hooks/useCatalogs';
 import type { FaceGuidance } from '../hooks/useFaceDetection';
-import { ACCESSORY_LABELS, type AccessoryKind } from '../utils/faceErrors';
+import { accessoryIcon } from './accessories';
 
 export type Tone = 'idle' | 'warn' | 'ok' | 'busy';
 
@@ -48,22 +49,20 @@ export function FaceGuide({ tone, message, progress = 0 }: { tone: Tone; message
   );
 }
 
-const ACCESSORY_ICONS: Record<AccessoryKind, typeof Glasses> = { GLASSES: Glasses, HEADWEAR: HardHat, MASK: Ban };
-
-/** Tarjeta animada sobre la cámara con los accesorios que deben retirarse. */
-export function AccessoryAlert({ items }: { items: AccessoryKind[] }) {
+/** Tarjeta animada sobre la cámara con los accesorios (códigos del catálogo) que deben retirarse. */
+export function AccessoryAlert({ items }: { items: string[] }) {
+  const { nameOf } = useCatalogs();
   if (items.length === 0) return null;
   return (
     <div className="accessory-alert" aria-hidden>
-      {items.map((a) => {
-        const Icon = ACCESSORY_ICONS[a];
-        const label = ACCESSORY_LABELS[a];
+      {items.map((code) => {
+        const Icon = accessoryIcon(code);
         return (
-          <span key={a}>
+          <span key={code}>
             <span>
               <Icon size={30} />
             </span>
-            {label}
+            {nameOf('accessories', code)}
           </span>
         );
       })}

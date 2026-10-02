@@ -2,14 +2,8 @@ import { RotateCcw, ScanFace } from 'lucide-react';
 import { useState } from 'react';
 import { FieldLabel } from './FormField';
 import { Modal } from './Modal';
+import { ReasonChips } from './ReasonChips';
 import { Button } from './ui/Button';
-
-const REASONS = [
-  'Actualización periódica de identidad',
-  'Cambio importante de apariencia',
-  'Fallas frecuentes al identificarse',
-  'Sospecha de suplantación de identidad',
-];
 
 interface ReverifyIdentityModalProps {
   open: boolean;
@@ -59,13 +53,7 @@ export function ReverifyIdentityModal({ open, firstName, busy, onCancel, onConfi
           Se eliminarán sus datos faciales actuales. En su próximo acceso, {firstName} deberá registrar su rostro con prueba de
           vida y tendrás que validarlo nuevamente. Mientras tanto no podrá identificarse.
         </p>
-        <div className="chips">
-          {REASONS.map((r) => (
-            <button key={r} type="button" className={`chip ${reason === r ? 'is-active' : ''}`} onClick={() => setReason(r)}>
-              {r}
-            </button>
-          ))}
-        </div>
+        <ReasonChips catalog="reverification_reasons" value={reason} onPick={setReason} />
         <div className="field">
           <FieldLabel htmlFor="reverify-reason" label="Motivo (opcional, visible para el empleado)" />
           <textarea

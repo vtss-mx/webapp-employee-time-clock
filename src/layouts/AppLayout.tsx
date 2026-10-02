@@ -7,9 +7,9 @@ import { OfflineBanner } from '../components/OfflineBanner';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../hooks/useAuth';
+import { useCatalogs } from '../hooks/useCatalogs';
 import { usePendingEnrollments } from '../hooks/usePendingEnrollments';
 import { homeForUser } from '../routes/paths';
-import { roleLabel } from '../utils/format';
 import { config } from '../utils/config';
 import { MobileTabBar } from './MobileTabBar';
 import { navFor } from './navigation';
@@ -55,6 +55,7 @@ function useSidebarCollapse() {
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const { nameOf } = useCatalogs();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { collapsed, toggleCollapsed } = useSidebarCollapse();
@@ -73,6 +74,7 @@ export function AppLayout() {
     .join('');
 
   const nav = navFor(user, pending);
+  const role = nameOf('roles', user.role);
 
   const title = TITLES.find(([re]) => re.test(location.pathname))?.[1] ?? '';
   const secure = window.location.protocol === 'https:';
@@ -90,7 +92,7 @@ export function AppLayout() {
           </span>
         </Link>
 
-        <span className="sidebar__section">{roleLabel[user.role]}</span>
+        <span className="sidebar__section">{role}</span>
         <nav style={{ display: 'grid', gap: 4 }}>
           {nav.map(({ to, label, icon: Icon, badge }) => (
             <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`} data-tooltip={label}>
@@ -106,7 +108,7 @@ export function AppLayout() {
             <span className="avatar">{initials}</span>
             <span className="user-card__info">
               <strong className="truncate">{displayName}</strong>
-              <small>{roleLabel[user.role]}</small>
+              <small>{role}</small>
             </span>
             <Button iconOnly variant="ghost" onClick={() => void logout()} aria-label="Cerrar sesión" title="Cerrar sesión">
               <LogOut size={18} />

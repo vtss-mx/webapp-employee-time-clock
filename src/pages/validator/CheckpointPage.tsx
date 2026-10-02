@@ -1,27 +1,25 @@
-import { ArrowRight, CheckCircle2, CircleSlash, History, QrCode, ScanFace, ShieldCheck, XCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, CircleSlash, History, QrCode, ScanFace, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { LiveFaceFlow } from '../../components/LiveFaceFlow';
 import { QrScanPanel } from '../../components/QrScanPanel';
 import { VerificationAttempt, type VerificationOutcome } from '../../components/VerificationAttempt';
-import { VALIDATOR_MODES, ValidatorModeBadge, availableMethods, type CheckpointMethod } from '../../components/ValidatorModes';
+import { ValidatorModeBadge, availableMethods } from '../../components/ValidatorModes';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { useErrorPopup } from '../../hooks/useFeedback';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { errorMessage } from '../../services/apiClient';
 import { checkpointService } from '../../services/checkpointService';
-import type { CheckpointEmployee, CheckpointEvent, CheckpointProfile } from '../../types';
+import type { CheckpointEmployee, CheckpointEvent, CheckpointProfile, VerificationMethod } from '../../types';
 import { config } from '../../utils/config';
-import { failureReason, methodLabel, timeAgo } from '../../utils/format';
+import { timeAgo } from '../../utils/format';
 
 type Finish = (outcome: VerificationOutcome) => void;
 
-const METHOD_CARDS: Record<CheckpointMethod, { title: string; description: string; Icon: typeof ScanFace }> = {
-  FACE: { title: 'RECONOCER ROSTRO', description: 'La persona mira a la cámara; se busca entre todo el personal', Icon: ScanFace },
-  QR: { title: 'ESCANEAR QR', description: 'Credencial impresa o en el teléfono del empleado', Icon: QrCode },
-  QR_AND_FACE: { title: 'QR + ROSTRO', description: 'Escanea su QR y confirma que el rostro es de su dueño', Icon: ShieldCheck },
-};
+/** Ícono de cada método; el título y la descripción vienen del catálogo verification_methods. */
+const METHOD_ICONS: Partial<Record<string, LucideIcon>> = { FACE: ScanFace, QR: QrCode, QR_FACE: ShieldCheck };
 const KIOSK = { autoReturnSeconds: config.checkpointResultSeconds };
 const FACE_HINT = 'Pide a la persona que mire de frente a la cámara, sin lentes ni cubrebocas';
 
@@ -89,9 +87,9 @@ function QrThenFace({ finish, onCancel }: { finish: Finish; onCancel: () => void
 }
 
 interface SessionProps {
-  method: CheckpointMethod;
+  method: VerificationMethod;
   canUseQr: boolean;
-  onSwitch: (method: CheckpointMethod) => void;
+  onSwitch: (method: VerificationMethod) => void;
   onExit: () => void;
   onOutcome: () => void;
 }
@@ -107,7 +105,7 @@ function CheckpointSession({ method, canUseQr, onSwitch, onExit, onOutcome }: Se
       failureTitle={(outcome) => (outcome.result ? 'Empleado no identificado' : 'No fue posible identificar')}
     >
       {(finish) => {
-        if (method === 'QR_AND_FACE') return <QrThenFace finish={finish} onCancel={onExit} />;
+        if (method === 'QR_FACE') return <QrThenFace finish={finish} onCancel={onExit} />;
         if (method === 'FACE') {
           return (
             <FaceStep
@@ -141,6 +139,7 @@ function CheckpointSession({ method, canUseQr, onSwitch, onExit, onOutcome }: Se
 }
 
 function RecentList({ events }: { events: CheckpointEvent[] | null }) {
+  const { nameOf } = useCatalogs();
   if (!events) return <p className="muted small">Cargando...</p>;
   if (events.length === 0) return <p className="muted small">Aún no hay identificaciones en este dispositivo.</p>;
   return (
@@ -151,7 +150,13 @@ function RecentList({ events }: { events: CheckpointEvent[] | null }) {
           <span className="recent-list__info">
             <strong className="truncate">{event.employee_name ?? 'No identificado'}</strong>
             <small className="muted">
-              {[event.employee_number, methodLabel[event.method], event.success ? null : failureReason(event.reason)].filter(Boolean).join(' · ')}
+              {[
+                event.employee_number,
+                nameOf('verification_methods', event.method),
+                event.success ? null : nameOf('verification_reasons', event.reason, 'Fallida'),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </small>
           </span>
           <time className="muted small" dateTime={event.created_at}>
@@ -168,10 +173,11 @@ function RecentList({ events }: { events: CheckpointEvent[] | null }) {
  * empresa con el modo que le asignó la empresa (QR, rostro, cualquiera de los dos o ambos).
  */
 export function CheckpointPage() {
+  const catalogs = useCatalogs();
   const [profile, setProfile] = useState<CheckpointProfile | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [events, setEvents] = useState<CheckpointEvent[] | null>(null);
-  const [method, setMethod] = useState<CheckpointMethod | null>(null);
+  const [method, setMethod] = useState<VerificationMethod | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -186,7 +192,7 @@ export function CheckpointPage() {
 
   if (!profile) return error ? <RetryState onRetry={load} /> : <SkeletonCard lines={5} />;
 
-  const methods = availableMethods(profile.mode, profile.qr_enabled);
+  const methods = availableMethods(catalogs.byCode('validator_modes', profile.mode), profile.qr_enabled);
   if (method) {
     return (
       <CheckpointSession
@@ -215,21 +221,22 @@ export function CheckpointPage() {
               </span>
               <h2>Identificación con QR desactivada</h2>
               <p className="muted">
-                Este validador identifica {VALIDATOR_MODES[profile.mode].label.toLowerCase()}, pero tu empresa desactivó la verificación con QR.
+                Este validador usa el modo “{catalogs.nameOf('validator_modes', profile.mode)}”, pero tu empresa desactivó la verificación con QR.
                 Pide a un administrador que la active o que cambie el modo del validador.
               </p>
             </div>
           ) : (
             <div className="method-grid stagger">
               {methods.map((key) => {
-                const { title, description, Icon } = METHOD_CARDS[key];
+                const Icon = METHOD_ICONS[key] ?? ShieldCheck;
+                const info = catalogs.byCode('verification_methods', key);
                 return (
                   <button key={key} type="button" className="method-card" onClick={() => setMethod(key)}>
                     <span className="method-card__icon">
                       <Icon size={42} />
                     </span>
-                    <span className="method-card__title">{title}</span>
-                    <span className="method-card__desc">{description}</span>
+                    <span className="method-card__title">{info?.name ?? key}</span>
+                    <span className="method-card__desc">{info?.description}</span>
                     <span className="method-card__cta">
                       Comenzar <ArrowRight size={18} />
                     </span>

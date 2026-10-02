@@ -8,31 +8,49 @@ import { QrCodePanel } from '../../components/QrCodePanel';
 import { FaceStatusBadge, StatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonCard } from '../../components/ui/Skeleton';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
 import { RetryState } from '../../components/ui/RetryState';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
-import type { Employee, FaceStatus, VerificationLog } from '../../types';
-import { failureReason, formatConfidence, formatDate, formatDateTime, initials, methodLabel } from '../../utils/format';
+import type { Employee, VerificationLog } from '../../types';
+import { formatConfidence, formatDate, formatDateTime, initials } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
 
 type Confirm = 'status' | 'delete' | 'resetFace' | null;
 
-const FACE_TEXT: Record<FaceStatus, string> = {
-  NOT_ENROLLED: 'El empleado aún no registra su rostro. Se le pedirá en su próximo inicio de sesión.',
-  PENDING_REVIEW: 'El empleado registró su rostro y espera tu validación.',
-  APPROVED: 'Identidad validada. Puede identificarse con su rostro o su código QR.',
-  REJECTED: 'El registro fue rechazado; el empleado deberá registrarse de nuevo.',
-};
-
 /** Dato del empleado o "Sin capturar" (empleados registrados antes de existir el campo). */
 const orMissing = (value: string | null | undefined) => value || <span className="muted">Sin capturar</span>;
+
+/** Bitácora del empleado: método y motivo de cada intento con sus nombres del catálogo. */
+function VerificationHistory({ history }: { history: VerificationLog[] }) {
+  const { nameOf } = useCatalogs();
+  if (history.length === 0) return <p className="muted">Sin registros todavía.</p>;
+  return (
+    <ul className="log-list">
+      {history.map((log) => (
+        <li key={log.id}>
+          <span className={`icon-tile ${log.success ? 'icon-tile--success' : 'icon-tile--danger'}`} style={{ width: 36, height: 36 }}>
+            {log.method === 'FACE' ? <ScanFace size={18} /> : <ShieldCheck size={18} />}
+          </span>
+          <div style={{ flex: 1 }}>
+            <strong>{nameOf('verification_methods', log.method)}</strong> ·{' '}
+            {log.success ? 'Exitosa' : nameOf('verification_reasons', log.reason, 'Fallida')}
+            {log.score != null && <span className="muted"> · Confianza {formatConfidence(log.score)}</span>}
+            <div className="muted small">{formatDateTime(log.created_at)}</div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function EmployeeDetailPage() {
   const { id } = useParams();
   const employeeId = Number(id);
   const navigate = useNavigate();
   const feedback = useFeedback();
+  const { byCode } = useCatalogs();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [history, setHistory] = useState<VerificationLog[]>([]);
   const [error, setError] = useState<unknown>(null);
@@ -165,7 +183,7 @@ export function EmployeeDetailPage() {
           </PanelSection>
 
           <PanelSection title="Registro facial" icon={<ScanFace size={20} />} aside={<FaceStatusBadge status={employee.face_status} />}>
-            <p className="muted">{FACE_TEXT[employee.face_status]}</p>
+            <p className="muted">{byCode('face_statuses', employee.face_status)?.description}</p>
             {employee.face_status === 'REJECTED' && employee.face_rejection_reason && (
               <p className="small">Motivo: “{employee.face_rejection_reason}”</p>
             )}
@@ -202,25 +220,7 @@ export function EmployeeDetailPage() {
           />
 
           <PanelSection title="Últimas verificaciones" icon={<Activity size={20} />}>
-            {history.length === 0 ? (
-              <p className="muted">Sin registros todavía.</p>
-            ) : (
-              <ul className="log-list">
-                {history.map((log) => (
-                  <li key={log.id}>
-                    <span className={`icon-tile ${log.success ? 'icon-tile--success' : 'icon-tile--danger'}`} style={{ width: 36, height: 36 }}>
-                      {log.method === 'FACE' ? <ScanFace size={18} /> : <ShieldCheck size={18} />}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <strong>{methodLabel[log.method]}</strong> ·{' '}
-                      {log.success ? 'Exitosa' : failureReason(log.reason)}
-                      {log.score != null && <span className="muted"> · Confianza {formatConfidence(log.score)}</span>}
-                      <div className="muted small">{formatDateTime(log.created_at)}</div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <VerificationHistory history={history} />
           </PanelSection>
         </PanelGrid>
 

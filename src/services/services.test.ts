@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { catalogsFixture, testCatalogs } from '../test/catalogs';
 import { apiOk, mockFetch } from '../test/http';
 import { detectedAccessories, isRetryableFaceError } from '../utils/faceErrors';
 import { ApiError } from './apiClient';
 import { authService } from './authService';
+import { catalogService } from './catalogService';
 import { employeeService } from './employeeService';
 import { enrollmentService } from './enrollmentService';
 import { meService } from './meService';
@@ -48,6 +50,7 @@ describe('servicios', () => {
     ['auth.rememberedNone', () => authService.remembered(), null, 'GET', '/api/auth/remembered'],
     ['auth.forgetRemembered', () => authService.forgetRemembered(), null, 'DELETE', '/api/auth/remembered'],
     ['me.updatePreferences', () => meService.updatePreferences({ sidebar_collapsed: true }), { sidebar_collapsed: true }, 'PATCH', '/api/users/me/preferences'],
+    ['catalogs.getAll', () => catalogService.getAll(), catalogsFixture, 'GET', '/api/catalogs'],
   ])('%s', async (_name, call, data, method, url) => {
     const { calls } = mockFetch(apiOk(data));
     await call();
@@ -59,22 +62,41 @@ describe('servicios', () => {
     mockFetch(apiOk({ id: 'sin-campos' }));
     await expect(employeeService.get(1)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
+
+  it('catálogos: exige cada lista con registros {code, name, sort_order, active}', async () => {
+    mockFetch(apiOk({ ...catalogsFixture, countries: [{ code: 'MX' }] }), apiOk({ ...catalogsFixture, roles: null }));
+    await expect(catalogService.getAll()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+    await expect(catalogService.getAll()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
 });
 
 describe('errores faciales', () => {
-  it('identifica errores corregibles y accesorios', () => {
+  const apiError = (statusCode: number, code: string) => new ApiError({ statusCode, code, message: 'x' });
+
+  it('identifica errores corregibles (catálogo face_errors) y accesorios', () => {
     const accessories = new ApiError({
       statusCode: 422,
       code: 'ACCESSORIES_DETECTED',
       message: 'Quita lentes',
-      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'm', field: null, details: { accessories: ['GLASSES'] } }],
+      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'm', field: null, details: { accessories: ['GLASSES', 7] } }],
     });
-    expect(isRetryableFaceError(accessories)).toBe(true);
+    expect(isRetryableFaceError(accessories, testCatalogs)).toBe(true);
     expect(detectedAccessories(accessories)).toEqual(['GLASSES']);
-    expect(isRetryableFaceError(new ApiError({ statusCode: 0, code: 'NETWORK_ERROR', message: 'x' }))).toBe(true);
-    expect(isRetryableFaceError(new ApiError({ statusCode: 403, code: 'FORBIDDEN', message: 'x' }))).toBe(false);
-    expect(isRetryableFaceError(new Error('x'))).toBe(false);
+    expect(isRetryableFaceError(apiError(422, 'POSE_TILTED'), testCatalogs)).toBe(true);
+    expect(isRetryableFaceError(new Error('x'), testCatalogs)).toBe(false);
     expect(detectedAccessories(new Error('x'))).toEqual([]);
     expect(detectedAccessories(new ApiError({ statusCode: 422, code: 'ACCESSORIES_DETECTED', message: 'x' }))).toEqual([]);
+  });
+
+  it('no se reintenta lo que el catálogo marca como no corregible ni lo que no conoce', () => {
+    expect(isRetryableFaceError(apiError(404, 'FACE_NOT_REGISTERED'), testCatalogs)).toBe(false);
+    expect(isRetryableFaceError(apiError(503, 'FACE_SERVICE_UNAVAILABLE'), testCatalogs)).toBe(false);
+    expect(isRetryableFaceError(apiError(403, 'FORBIDDEN'), testCatalogs)).toBe(false);
+  });
+
+  it('fallas de red o de carga siempre se reintentan (no dependen del catálogo)', () => {
+    expect(isRetryableFaceError(apiError(0, 'NETWORK_ERROR'), testCatalogs)).toBe(true);
+    expect(isRetryableFaceError(apiError(503, 'SERVER_BUSY'), testCatalogs)).toBe(true);
+    expect(isRetryableFaceError(apiError(408, 'TIMEOUT'), testCatalogs)).toBe(true);
   });
 });

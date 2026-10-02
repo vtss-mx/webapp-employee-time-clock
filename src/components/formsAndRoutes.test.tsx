@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from '../context/AuthContext';
+import { CatalogProvider } from '../context/CatalogContext';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { AppRouter } from '../routes/AppRouter';
+import { catalogsFixture } from '../test/catalogs';
 import { apiFail, apiOk, mockFetch } from '../test/http';
-import { tokenResponse } from '../test/render';
+import { tokenResponse, WithCatalogs } from '../test/render';
 import { preferenceStore } from '../utils/storage';
 import type { EmployeeFormValues } from '../types';
 import { emptyEmployeeForm, EmployeeFormFields } from './EmployeeForm';
@@ -27,7 +29,7 @@ describe('EmployeeFormFields: normaliza mientras se escribe', () => {
   }
 
   it('RFC/CURP en mayúsculas sin guiones, NSS solo dígitos y teléfono agrupado', async () => {
-    render(<Harness />);
+    render(<Harness />, { wrapper: WithCatalogs });
     await userEvent.type(screen.getByLabelText('CURP'), 'hegg-560427-mvzrrl04-extra');
     await userEvent.type(screen.getByLabelText('RFC'), 'pegj 900515 ab1');
     await userEvent.type(screen.getByLabelText('No. de Seguridad Social (NSS)'), '1234-5678-903-99');
@@ -46,13 +48,13 @@ describe('EmployeeFormFields: cuentas de personas en varias empresas', () => {
 
   it('al vincular a una persona de otra empresa no pide contraseña (conserva la suya)', () => {
     const linkable = { status: 'linkable' as const, message: 'Esta persona ya tiene cuenta en Employee Time Clock' };
-    render(<EmployeeFormFields values={values} errors={{}} onChange={vi.fn()} live={{ email: linkable }} linking />);
+    render(<EmployeeFormFields values={values} errors={{}} onChange={vi.fn()} live={{ email: linkable }} linking />, { wrapper: WithCatalogs });
     expect(screen.queryByLabelText('Contraseña')).toBeNull();
     expect(screen.getByText('Esta persona ya tiene cuenta en Employee Time Clock')).toBeInTheDocument();
   });
 
   it('cuenta compartida: correo, teléfono y contraseña bloqueados en la edición', () => {
-    render(<EmployeeFormFields values={values} errors={{}} onChange={vi.fn()} isEdit accountLocked />);
+    render(<EmployeeFormFields values={values} errors={{}} onChange={vi.fn()} isEdit accountLocked />, { wrapper: WithCatalogs });
     expect(screen.getByLabelText('Correo electrónico')).toBeDisabled();
     expect(screen.getByLabelText('Teléfono celular')).toBeDisabled();
     expect(screen.queryByLabelText('Nueva contraseña')).toBeNull();
@@ -61,10 +63,13 @@ describe('EmployeeFormFields: cuentas de personas en varias empresas', () => {
 });
 
 describe('ReverifyIdentityModal', () => {
-  it('envía el motivo elegido o escrito; sin motivo, undefined', async () => {
+  it('envía el motivo elegido (catálogo reverification_reasons) o escrito; sin motivo, undefined', async () => {
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
-    const { rerender } = render(<ReverifyIdentityModal open firstName="Ana" busy={false} onCancel={onCancel} onConfirm={onConfirm} />);
+    const { rerender } = render(<ReverifyIdentityModal open firstName="Ana" busy={false} onCancel={onCancel} onConfirm={onConfirm} />, {
+      wrapper: WithCatalogs,
+    });
+    expect(screen.getByRole('button', { name: 'Actualización periódica de identidad' })).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Solicitar nueva verificación de identidad' })).toHaveTextContent('Ana deberá registrar su rostro');
     await userEvent.click(screen.getByRole('button', { name: 'Solicitar verificación' }));
     expect(onConfirm).toHaveBeenLastCalledWith(undefined);
@@ -91,7 +96,9 @@ describe('rutas con carga diferida y guardas', () => {
       <MemoryRouter initialEntries={[route]}>
         <FeedbackProvider>
           <AuthProvider>
-            <AppRouter />
+            <CatalogProvider>
+              <AppRouter />
+            </CatalogProvider>
           </AuthProvider>
         </FeedbackProvider>
       </MemoryRouter>,
@@ -105,9 +112,14 @@ describe('rutas con carga diferida y guardas', () => {
 
   it('con sesión, /login (solo invitados) lleva al inicio del rol', async () => {
     preferenceStore.set('tc.signed-in', '1');
-    mockFetch((call) => (call.url.endsWith('/auth/refresh') ? apiOk(tokenResponse()) : apiOk({ items: [], total: 0, page: 1, size: 20 })));
+    const { calls } = mockFetch((call) => {
+      if (call.url.endsWith('/auth/refresh')) return apiOk(tokenResponse());
+      return call.url.endsWith('/catalogs') ? apiOk(catalogsFixture) : apiOk({ items: [], total: 0, page: 1, size: 20 });
+    });
     app('/login');
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).toBeNull());
     expect(await screen.findByLabelText('Navegación principal', {}, { timeout: 4000 })).toBeInTheDocument(); // ya dentro de la app
+    expect(screen.getByText('Employee', { selector: '.sidebar__section' })).toBeInTheDocument(); // rol del catálogo
+    expect(calls.filter((c) => c.url.endsWith('/catalogs'))).toHaveLength(1); // una sola carga por sesión
   });
 });

@@ -1,5 +1,6 @@
 import { Check, Clock, RefreshCw, ScanFace, UserCheck } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { FaceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { StatusMark } from '../../components/ui/StatusMark';
 import { useAuth } from '../../hooks/useAuth';
@@ -32,8 +33,8 @@ export function PendingValidationPage() {
       <div className="result-card">
         <StatusMark kind="pending" />
         <div className="stack" style={{ gap: 8 }}>
-          <span className="badge badge--warning badge--live" style={{ justifySelf: 'center' }}>
-            En validación
+          <span style={{ justifySelf: 'center' }}>
+            <FaceStatusBadge status="PENDING_REVIEW" />
           </span>
           <h1>Estamos validando tu identidad</h1>
           <p className="muted">

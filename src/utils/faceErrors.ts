@@ -1,44 +1,21 @@
 import { ApiError } from '../services/apiClient';
+import type { CatalogApi } from './catalogs';
 
-/** Errores 422 por calidad/pose/accesorios/prueba de vida: el usuario puede corregir y reintentar. */
-const RETRYABLE_FACE_CODES = new Set([
-  'NO_FACE',
-  'MULTIPLE_FACES',
-  'LOW_DETECTION_SCORE',
-  'FACE_TOO_SMALL',
-  'FACE_CUT_OFF',
-  'POSE_NOT_FRONTAL',
-  'POSE_TILTED',
-  'POSE_PITCH',
-  'TOO_DARK',
-  'TOO_BRIGHT',
-  'TOO_BLURRY',
-  'ACCESSORIES_DETECTED',
-  'ENROLL_INCONSISTENT',
-  'CHALLENGE_INVALID',
-  'LIVENESS_REQUIRED',
-  'LIVENESS_FAILED',
-  'LIVENESS_MISMATCH',
-  'INVALID_IMAGE',
-  'INVALID_IMAGE_FORMAT',
-  'IMAGE_TOO_SMALL',
-  'IMAGE_TOO_LARGE',
-  'FACE_SERVICE_BUSY',
-  'SPOOF_DETECTED',
-  'SERVER_BUSY',
-  'TIMEOUT',
-]);
+/** Fallas de red o de carga ajenas al catálogo de errores faciales: siempre se puede reintentar. */
+const TRANSIENT_CODES: ReadonlySet<string> = new Set(['SERVER_BUSY', 'TIMEOUT']);
 
-export function isRetryableFaceError(error: unknown): error is ApiError {
-  return error instanceof ApiError && (RETRYABLE_FACE_CODES.has(error.code) || error.status === 0);
+/**
+ * Error que la persona puede corregir y reintentar (calidad, pose, accesorios, prueba de vida...):
+ * lo dice el catálogo face_errors (`retryable`); además, sin conexión o servidor saturado.
+ */
+export function isRetryableFaceError(error: unknown, catalogs: Pick<CatalogApi, 'byCode'>): error is ApiError {
+  if (!(error instanceof ApiError)) return false;
+  return error.status === 0 || TRANSIENT_CODES.has(error.code) || catalogs.byCode('face_errors', error.code)?.retryable === true;
 }
 
-export type AccessoryKind = 'GLASSES' | 'HEADWEAR' | 'MASK';
-
-export const ACCESSORY_LABELS: Record<AccessoryKind, string> = { GLASSES: 'Lentes', HEADWEAR: 'Gorra', MASK: 'Cubrebocas' };
-
-export function detectedAccessories(error: unknown): AccessoryKind[] {
+/** Códigos del catálogo de accesorios que el servidor detectó en la captura. */
+export function detectedAccessories(error: unknown): string[] {
   if (!(error instanceof ApiError) || error.code !== 'ACCESSORIES_DETECTED') return [];
-  const list = (error.details as { accessories?: AccessoryKind[] } | null)?.accessories;
-  return Array.isArray(list) ? list : [];
+  const list = (error.details as { accessories?: unknown } | null)?.accessories;
+  return Array.isArray(list) ? list.filter((code): code is string => typeof code === 'string') : [];
 }

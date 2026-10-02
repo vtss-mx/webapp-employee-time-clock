@@ -9,6 +9,7 @@ import { useSearchList, type ActiveFilter, type ListQuery } from '../hooks/useSe
 import { adminService } from '../services/adminService';
 import { ApiError } from '../services/apiClient';
 import { apiFail, apiOk, mockFetch } from '../test/http';
+import { WithCatalogs } from '../test/render';
 import type { CompanyDetail, CompanyFormValues } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
 import { validateCompanyRfc, validateMaxEmployees } from '../utils/validation';
@@ -137,7 +138,7 @@ describe('CompanyForm', () => {
   }
 
   it('normaliza RFC, teléfono y límite mientras se escribe; el límite es opcional', async () => {
-    render(<Harness />);
+    render(<Harness />, { wrapper: WithCatalogs });
     await userEvent.type(screen.getByLabelText('RFC de la empresa'), 'pno-120315-ab1');
     await userEvent.type(screen.getByLabelText('Teléfono'), '(662) 123-4567');
     await userEvent.type(screen.getByLabelText('Límite de empleados'), '1a5');

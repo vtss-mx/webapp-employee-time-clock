@@ -5,17 +5,10 @@ import { AuthLayout } from '../../components/auth/AuthLayout';
 import { BrandLogo } from '../../components/ui/BrandLogo';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../hooks/useAuth';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { useFeedback } from '../../hooks/useFeedback';
 import { homeForUser } from '../../routes/paths';
-import type { FaceStatus, UserMembership } from '../../types';
-
-/** Qué le espera en cada empresa (cada una valida su identidad por separado). */
-const FACE_NOTE: Record<FaceStatus, string> = {
-  APPROVED: 'Identidad validada',
-  PENDING_REVIEW: 'Tu identidad está en validación',
-  NOT_ENROLLED: 'Registrarás tu rostro al entrar',
-  REJECTED: 'Debes registrar tu rostro de nuevo',
-};
+import type { UserMembership } from '../../types';
 
 function unavailableReason(membership: UserMembership): string | null {
   if (!membership.company.active) return 'Empresa desactivada';
@@ -33,6 +26,7 @@ const initialsOf = (name: string) =>
 /** Empleado que trabaja en varias empresas: elige a cuál entrar (o cambia de empresa). */
 export function CompanySelectPage() {
   const { user, selectCompany, logout } = useAuth();
+  const { byCode } = useCatalogs();
   const navigate = useNavigate();
   const feedback = useFeedback();
   const [entering, setEntering] = useState<number | null>(null);
@@ -65,6 +59,8 @@ export function CompanySelectPage() {
           {memberships.map((membership) => {
             const reason = unavailableReason(membership);
             const current = user.company?.id === membership.company.id;
+            // Qué le espera en cada empresa (cada una valida su identidad por separado).
+            const faceNote = byCode('face_statuses', membership.face_status)?.employee_note ?? membership.face_status;
             return (
               <li key={membership.id}>
                 <button
@@ -79,7 +75,7 @@ export function CompanySelectPage() {
                   </span>
                   <span className="company-select__info">
                     <strong>{membership.company.name}</strong>
-                    <small>{reason ?? (current ? `Empresa actual · ${FACE_NOTE[membership.face_status]}` : FACE_NOTE[membership.face_status])}</small>
+                    <small>{reason ?? (current ? `Empresa actual · ${faceNote}` : faceNote)}</small>
                   </span>
                   {entering === membership.company.id ? (
                     <Loader2 size={20} className="spin" aria-label="Entrando" />

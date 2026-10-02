@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { settingsService } from '../services/settingsService';
-import type { VerificationPolicy } from '../types';
+import type { VerificationPolicy, VerificationRules } from '../types';
 
-/** Valores seguros mientras carga o si no hay red: se asume lo más estricto. */
-export const STRICT_POLICY: VerificationPolicy = {
+/**
+ * Valores seguros mientras carga o si no hay red: se asume lo más estricto. Sin umbral de
+ * confianza: solo lo evalúa el servidor y lo edita Configuración con la política cargada.
+ */
+const STRICT_RULES: VerificationRules = {
   block_glasses: true,
   block_headwear: true,
   block_mask: true,
@@ -12,9 +15,6 @@ export const STRICT_POLICY: VerificationPolicy = {
   qr_enabled: true,
   employee_mobile_only: true,
   validator_mobile_only: true,
-  min_confidence: 0.99999,
-  updated_at: null,
-  updated_by: null,
 };
 
 const EVENT = 'tc:policy-changed';
@@ -40,8 +40,8 @@ function loadPolicy(): Promise<VerificationPolicy> {
   return inflight;
 }
 
-/** Política de verificación de la empresa (compartida entre pantallas, una sola petición). */
-export function useVerificationPolicy(): { policy: VerificationPolicy; loaded: boolean } {
+/** Reglas de la política de verificación de la empresa (compartida entre pantallas, una sola petición). */
+export function useVerificationPolicy(): { policy: VerificationRules; loaded: boolean } {
   const [policy, setPolicy] = useState<VerificationPolicy | null>(cached);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function useVerificationPolicy(): { policy: VerificationPolicy; loaded: b
     };
   }, []);
 
-  return { policy: policy ?? STRICT_POLICY, loaded: policy !== null };
+  return { policy: policy ?? STRICT_RULES, loaded: policy !== null };
 }
 
 /** Solo para pruebas. */

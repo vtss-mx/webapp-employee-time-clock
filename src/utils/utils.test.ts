@@ -20,7 +20,9 @@ import {
   validateRfc,
 } from './validation';
 import { validateEmployeeForm } from './formRules';
-import { formatPhone, joinPhone, parseInternational, splitPhone, validatePhone } from './phone';
+import { catalogsFixture, catalogsWith } from '../test/catalogs';
+import { isCatalogs } from './catalogs';
+import { countryDirectory, formatNational, formatPhone, joinPhone, validatePhone, type PhoneParts } from './phone';
 
 describe('env', () => {
   const env = { A: ' hola ', N: '42', BAD: 'x', T: 'yes', F: 'off', BOOL: true, EMPTY: '' };
@@ -185,14 +187,64 @@ describe('CURP, NSS y teléfono (mismas reglas que el backend)', () => {
   });
 
   it('teléfono: país y número ↔ E.164, también al pegar con lada', () => {
-    expect(joinPhone('MX', '662 123 4567')).toBe('+526621234567');
-    expect(joinPhone('MX', '')).toBe('');
-    expect(splitPhone('+526621234567')).toEqual({ country: 'MX', national: '6621234567' });
-    expect(splitPhone('+14165551234', 'MX')).toEqual({ country: 'CA', national: '4165551234' }); // +1 compartido
-    expect(splitPhone('+1415', 'US')).toEqual({ country: 'US', national: '415' }); // escribiendo
-    expect(splitPhone('', 'ES')).toEqual({ country: 'ES', national: '' });
-    expect(parseInternational('0034 612 34 56 78')).toEqual({ country: 'ES', national: '612345678' });
-    expect(parseInternational('hola')).toBeNull();
+    const phones = countryDirectory(catalogsFixture.countries);
+    const country = (code: string) => phones.options.find((c) => c.code === code);
+    const parts = (result: PhoneParts | null) => result && { country: result.country.code, national: result.national };
+    const mx = phones.defaultCountry;
+    expect(joinPhone(mx, '662 123 4567')).toBe('+526621234567');
+    expect(joinPhone(mx, '')).toBe('');
+    expect(formatNational(mx, '6621234567')).toBe('662 123 4567');
+    expect(parts(phones.split('+526621234567'))).toEqual({ country: 'MX', national: '6621234567' });
+    expect(parts(phones.split('+14165551234', mx))).toEqual({ country: 'CA', national: '4165551234' }); // +1 compartido
+    expect(parts(phones.split('+1415', country('US')))).toEqual({ country: 'US', national: '415' }); // escribiendo
+    expect(parts(phones.split('', country('ES')))).toEqual({ country: 'ES', national: '' });
+    expect(parts(phones.split('6621234567', country('ES')))).toEqual({ country: 'ES', national: '6621234567' }); // sin lada
+    expect(parts(phones.parse('0034 612 34 56 78'))).toEqual({ country: 'ES', national: '612345678' });
+    expect(parts(phones.parse('+1 268 464 1234', country('US')))).toEqual({ country: 'AG', national: '2684641234' }); // Antigua
+    expect(phones.parse('hola')).toBeNull();
+  });
+
+  it('teléfono: países del catálogo (activos y en su orden); por omisión, el primer frecuente', () => {
+    const phones = countryDirectory(catalogsFixture.countries);
+    expect(phones.options.map((c) => c.code)).toEqual(catalogsFixture.countries.map((c) => c.code));
+    expect(phones.defaultCountry).toMatchObject({ code: 'MX', name: 'México', dialCode: '+52', featured: true, flag: '🇲🇽' });
+
+    const [mx, us, ...rest] = catalogsFixture.countries;
+    const edited = countryDirectory([{ ...mx, active: false }, { ...us, sort_order: 0 }, { ...rest[0], code: 'XX' }, ...rest.slice(1)]);
+    expect(edited.options.map((c) => c.code)).not.toContain('MX'); // inactivo
+    expect(edited.options.map((c) => c.code)).not.toContain('XX'); // sin metadatos de libphonenumber
+    expect(edited.defaultCountry.code).toBe('US');
+    // Número de un país inactivo y sin otro con su lada: se queda el país preferido.
+    expect(edited.parse('+526621234567')?.country.code).toBe('US');
+
+    const notFeatured = countryDirectory(catalogsFixture.countries.filter((c) => !c.featured));
+    expect(notFeatured.defaultCountry.code).toBe('DE');
+    expect(() => countryDirectory([])).toThrow(/no tiene países activos/);
+  });
+});
+
+describe('catálogos', () => {
+  it('búsqueda por código (también inactivos), nombre con respaldo y listas de activos', () => {
+    const [periodic, ...others] = catalogsFixture.reverification_reasons;
+    const catalogs = catalogsWith({ reverification_reasons: [{ ...periodic, active: false }, ...others] });
+    expect(catalogs.byCode('roles', 'COMPANY')?.name).toBe('Company');
+    expect(catalogs.byCode('reverification_reasons', 'PERIODIC')?.name).toBe('Actualización periódica de identidad'); // inactivo
+    expect(catalogs.byCode('roles', null)).toBeUndefined();
+    expect(catalogs.byCode('roles', 'GUEST')).toBeUndefined();
+    expect(catalogs.nameOf('verification_methods', 'QR_FACE')).toBe('QR + rostro');
+    expect(catalogs.nameOf('roles', 'GUEST')).toBe('GUEST'); // sin registro: el código
+    expect(catalogs.nameOf('verification_reasons', null, 'Fallida')).toBe('Fallida');
+    expect(catalogs.nameOf('roles', undefined)).toBe('');
+    expect(catalogs.active('reverification_reasons').map((r) => r.code)).toEqual(others.map((r) => r.code));
+    expect(catalogs.active('roles')).toBe(catalogs.active('roles')); // calculada una vez
+    expect(catalogs.countries).toBe(catalogsFixture.countries);
+  });
+
+  it('valida la forma de GET /api/catalogs', () => {
+    expect(isCatalogs(catalogsFixture)).toBe(true);
+    expect(isCatalogs({ ...catalogsFixture, face_errors: undefined })).toBe(false);
+    expect(isCatalogs({ ...catalogsFixture, roles: [{ code: 'ADMIN' }] })).toBe(false);
+    expect(isCatalogs([])).toBe(false);
   });
 });
 

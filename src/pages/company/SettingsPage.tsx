@@ -1,5 +1,6 @@
-import { Ban, Fingerprint, Gauge, Glasses, HardHat, QrCode, ScanFace, ScanLine, ShieldCheck, Smartphone } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fingerprint, Gauge, QrCode, ScanFace, ScanLine, ShieldCheck, Smartphone } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ruledAccessories, type AccessoryRule } from '../../components/accessories';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
 import { formatConfidence } from '../../utils/format';
 import { ConfirmDialog } from '../../components/Modal';
@@ -7,10 +8,11 @@ import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { Switch } from '../../components/ui/Switch';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
 import { publishPolicy } from '../../hooks/useVerificationPolicy';
 import { settingsService } from '../../services/settingsService';
-import type { VerificationPolicy } from '../../types';
+import type { AccessoryItem, VerificationPolicy } from '../../types';
 
 type PolicyKey =
   | 'block_glasses'
@@ -37,23 +39,39 @@ interface Option {
 const SPOOFING_WARNING =
   'Esto reduce la protección contra suplantación de identidad (fotos, pantallas o videos). ¿Deseas continuar?';
 
-const SECTIONS: Array<{ title: string; icon: ReactNode; hint: string; options: Option[] }> = [
-  {
+interface Section {
+  title: string;
+  icon: ReactNode;
+  hint: string;
+  options: Option[];
+}
+
+/** Efecto de cada regla de accesorios; el nombre del interruptor y su ícono salen del catálogo. */
+const ACCESSORY_EFFECT: Record<AccessoryRule, Pick<Option, 'on' | 'off'>> = {
+  block_glasses: { on: 'Se pedirá quitarse lentes (incluidos los de sol).', off: 'Se permite identificarse con lentes.' },
+  block_headwear: {
+    on: 'Se pedirá quitarse gorras, sombreros y viseras (salvo empleados exentos por motivos religiosos o médicos).',
+    off: 'Se permite identificarse con prendas en la cabeza.',
+  },
+  block_mask: { on: 'Se pedirá quitarse el cubrebocas (verificación física de nariz y mejillas).', off: 'Se permite identificarse con cubrebocas (menor precisión).' },
+};
+
+/** Requisitos del rostro: un interruptor por accesorio activo del catálogo ("Retirar los lentes"). */
+function faceSection(accessories: AccessoryItem[]): Section {
+  return {
     title: 'Requisitos del rostro',
     icon: <ScanFace size={20} />,
     hint: 'Qué debe retirarse la persona antes de escanear. Lo que ocultes reduce la precisión del reconocimiento.',
-    options: [
-      { key: 'block_glasses', icon: <Glasses size={20} />, label: 'Retirar lentes', on: 'Se pedirá quitarse lentes (incluidos los de sol).', off: 'Se permite identificarse con lentes.' },
-      {
-        key: 'block_headwear',
-        icon: <HardHat size={20} />,
-        label: 'Retirar gorra o sombrero',
-        on: 'Se pedirá quitarse gorras, sombreros y viseras (salvo empleados exentos por motivos religiosos o médicos).',
-        off: 'Se permite identificarse con prendas en la cabeza.',
-      },
-      { key: 'block_mask', icon: <Ban size={20} />, label: 'Retirar cubrebocas', on: 'Se pedirá quitarse el cubrebocas (verificación física de nariz y mejillas).', off: 'Se permite identificarse con cubrebocas (menor precisión).' },
-    ],
-  },
+    options: ruledAccessories(accessories).map(({ item, rule, icon: Icon }) => ({
+      key: rule,
+      icon: <Icon size={20} />,
+      label: `Retirar ${item.phrase}`,
+      ...ACCESSORY_EFFECT[rule],
+    })),
+  };
+}
+
+const POLICY_SECTIONS: Section[] = [
   {
     title: 'Seguridad',
     icon: <ShieldCheck size={20} />,
@@ -101,6 +119,8 @@ const SECTIONS: Array<{ title: string; icon: ReactNode; hint: string; options: O
 /** COMPANY: política de verificación (se aplica en segundos a toda la empresa). */
 export function SettingsPage() {
   const feedback = useFeedback();
+  const { accessories } = useCatalogs();
+  const sections = useMemo(() => [faceSection(accessories), ...POLICY_SECTIONS], [accessories]);
   const [policy, setPolicy] = useState<VerificationPolicy | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
@@ -184,7 +204,7 @@ export function SettingsPage() {
           </PanelSection>
         )}
         {policy &&
-          SECTIONS.map((section) => (
+          sections.map((section) => (
             <PanelSection key={section.title} title={section.title} icon={section.icon}>
               <p className="muted small">{section.hint}</p>
               {section.options.map((option) => (

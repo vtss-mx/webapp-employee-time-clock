@@ -6,8 +6,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { useFeedback } from '../hooks/useFeedback';
 import { apiFail, apiOk, mockFetch } from '../test/http';
-import { renderWithProviders } from '../test/render';
+import { catalogsFixture, catalogsWith } from '../test/catalogs';
+import { renderWithProviders, WithCatalogs } from '../test/render';
 import type { EmployeeFormValues, VerificationResult } from '../types';
+import { Ban, Glasses } from 'lucide-react';
+import { accessoryIcon, ruledAccessories } from './accessories';
 import { CountUp } from './CountUp';
 import { EmployeeFormFields, emptyEmployeeForm, HeadwearExemptField } from './EmployeeForm';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -20,7 +23,7 @@ import { PageHeader } from './PageHeader';
 import { QrCodePanel } from './QrCodePanel';
 import { describeDevice } from './SessionsPanel';
 import { PageLoader } from './Spinner';
-import { EnrollmentBadge, FaceStatusBadge, StatusBadge } from './StatusBadge';
+import { Badge, EnrollmentBadge, FaceStatusBadge, StatusBadge } from './StatusBadge';
 import { Button } from './ui/Button';
 import { SkeletonCard, SkeletonRows } from './ui/Skeleton';
 import { StatusMark } from './ui/StatusMark';
@@ -55,8 +58,6 @@ describe('componentes de presentación', () => {
     render(
       <MemoryRouter>
         <StatusBadge active={false} />
-        <FaceStatusBadge status="PENDING_REVIEW" />
-        <EnrollmentBadge status="REJECTED" />
         <FaceRequirements policy={{ block_glasses: true, block_headwear: true, block_mask: false, anti_spoofing: true }} headwearExempt />
         <PageHeader title="Título" subtitle="Sub" backTo="/" actions={<span>acción</span>} />
         <PageLoader text="Cargando datos" />
@@ -64,13 +65,56 @@ describe('componentes de presentación', () => {
         <SkeletonRows rows={1} />
         <StatusMark kind="pending" />
       </MemoryRouter>,
+      { wrapper: WithCatalogs },
     );
     expect(screen.getByText('Título')).toBeInTheDocument();
-    expect(screen.getByText('Sin lentes')).toBeInTheDocument();
+    expect(screen.getByText('Sin lentes')).toBeInTheDocument(); // nombre del catálogo de accesorios
     expect(screen.queryByText('Sin cubrebocas')).toBeNull(); // la empresa lo permite
-    expect(screen.queryByText('Sin gorra ni sombrero')).toBeNull(); // empleado exento
+    expect(screen.queryByText('Sin gorra')).toBeNull(); // empleado exento
+    expect(screen.getByText('Tu rostro real, sin fotos')).toBeInTheDocument();
     expect(screen.getByText('Cargando datos')).toBeInTheDocument();
     expect(screen.getByText('acción')).toBeInTheDocument();
+  });
+
+  it('estados del registro facial y de las solicitudes: nombre y tono del catálogo', () => {
+    render(
+      <>
+        <FaceStatusBadge status="PENDING_REVIEW" />
+        <FaceStatusBadge status="APPROVED" />
+        <EnrollmentBadge status="REJECTED" />
+        <EnrollmentBadge status={'ARCHIVED' as 'PENDING'} />
+        <Badge ok yes="Con QR" no="Sin QR" />
+        <Badge ok={false} yes="Con rostro" no="Sin rostro" />
+      </>,
+      { wrapper: WithCatalogs },
+    );
+    expect(screen.getByText('En validación')).toHaveClass('badge--warning', 'badge--live');
+    expect(screen.getByText('Validado')).toHaveClass('badge--success');
+    expect(screen.getByText('Rechazado')).toHaveClass('badge--danger');
+    expect(screen.getByText('ARCHIVED')).toHaveClass('badge--muted'); // código sin registro en el catálogo
+    expect(screen.getByText('Con QR')).toHaveClass('badge--info');
+    expect(screen.getByText('Sin rostro')).toHaveClass('badge--warning');
+  });
+
+  it('accesorios: ícono y regla de la política por código del catálogo', () => {
+    expect(accessoryIcon('GLASSES')).toBe(Glasses);
+    expect(accessoryIcon('SCARF')).toBe(Ban); // accesorio nuevo en el catálogo: ícono genérico
+    const [glasses, headwear] = catalogsFixture.accessories;
+    const scarf = { ...glasses, code: 'SCARF', name: 'Bufanda', phrase: 'la bufanda' };
+    expect(ruledAccessories([glasses, { ...headwear, active: false }, scarf]).map(({ item, rule }) => [item.code, rule])).toEqual([
+      ['GLASSES', 'block_glasses'],
+    ]);
+  });
+
+  it('requisitos del rostro: solo accesorios activos del catálogo que la política exige', () => {
+    const accessories = catalogsFixture.accessories.map((a) => (a.code === 'MASK' ? { ...a, active: false } : a));
+    render(
+      <WithCatalogs catalogs={catalogsWith({ accessories })}>
+        <FaceRequirements policy={{ block_glasses: false, block_headwear: true, block_mask: true, anti_spoofing: false }} />
+      </WithCatalogs>,
+    );
+    const items = within(screen.getByRole('list', { name: 'Requisitos para la captura' })).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent?.trim())).toEqual(['Sin gorra', 'Buena iluminación']);
   });
 
   it('CountUp termina en el valor final', async () => {
@@ -129,7 +173,7 @@ describe('formulario de empleado', () => {
     );
   }
   it('actualiza valores y muestra errores', async () => {
-    render(<Harness />);
+    render(<Harness />, { wrapper: WithCatalogs });
     await userEvent.type(screen.getByLabelText('Nombres'), 'Ana');
     await userEvent.click(screen.getByRole('checkbox'));
     expect(document.querySelector('output')?.textContent).toContain('"first_name":"Ana"');

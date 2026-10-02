@@ -1,7 +1,8 @@
-import { ArrowRight, CheckCircle2, ClipboardCheck, Clock, ShieldCheck, XCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ClipboardCheck, Clock, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { useErrorPopup } from '../../hooks/useFeedback';
 import { RetryState } from '../../components/ui/RetryState';
 import { Pagination } from '../../components/ui/ListControls';
@@ -12,14 +13,12 @@ import { enrollmentService } from '../../services/enrollmentService';
 import type { EnrollmentStatus, FaceEnrollmentList } from '../../types';
 import { formatDateTime, initials, timeAgo } from '../../utils/format';
 
-const TABS: Array<{ status: EnrollmentStatus; label: string; icon: typeof Clock }> = [
-  { status: 'PENDING', label: 'Pendientes', icon: Clock },
-  { status: 'APPROVED', label: 'Aceptados', icon: CheckCircle2 },
-  { status: 'REJECTED', label: 'Rechazados', icon: XCircle },
-];
+/** Ícono de cada pestaña; las pestañas (códigos, orden y nombre) vienen del catálogo enrollment_statuses. */
+const TAB_ICONS: Partial<Record<string, LucideIcon>> = { PENDING: Clock, APPROVED: CheckCircle2, REJECTED: XCircle };
 
 /** Bandeja de validación de identidad (registros faciales hechos por los empleados). */
 export function ValidationsPage() {
+  const { active } = useCatalogs();
   const [status, setStatus] = useState<EnrollmentStatus>('PENDING');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<FaceEnrollmentList | null>(null);
@@ -56,21 +55,24 @@ export function ValidationsPage() {
         />
         <PanelSection>
           <div className="tabs" role="tablist">
-            {TABS.map(({ status: s, label, icon: Icon }) => (
-              <button
-                key={s}
-                role="tab"
-                aria-selected={status === s}
-                className={`tab ${status === s ? 'is-active' : ''}`}
-                onClick={() => {
-                  setStatus(s);
-                  setPage(1);
-                }}
-              >
-                <Icon size={16} /> {label}
-                {s === 'PENDING' && pendingTotal ? <span className="tab__count">{pendingTotal}</span> : null}
-              </button>
-            ))}
+            {active('enrollment_statuses').map(({ code, name }) => {
+              const Icon = TAB_ICONS[code] ?? ClipboardCheck;
+              return (
+                <button
+                  key={code}
+                  role="tab"
+                  aria-selected={status === code}
+                  className={`tab ${status === code ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setStatus(code);
+                    setPage(1);
+                  }}
+                >
+                  <Icon size={16} /> {name}
+                  {code === 'PENDING' && pendingTotal ? <span className="tab__count">{pendingTotal}</span> : null}
+                </button>
+              );
+            })}
           </div>
 
           {Boolean(error) && !data && <RetryState onRetry={retry} />}

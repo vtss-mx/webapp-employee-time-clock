@@ -2,8 +2,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CapturedFace, FlowAlternative } from '../../components/LiveFaceFlow';
-import { resetPolicyCache, STRICT_POLICY } from '../../hooks/useVerificationPolicy';
-import { identifiedResult, sampleCheckpoint } from '../../test/fixtures';
+import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
+import { identifiedResult, sampleCheckpoint, samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import type { CheckpointProfile } from '../../types';
@@ -40,7 +40,7 @@ function server(profile: CheckpointProfile, overrides: Record<string, () => Resp
     if (overrides[path]) return overrides[path]();
     if (path === '/api/checkpoint/me') return apiOk(profile);
     if (path === '/api/checkpoint/recent') return apiOk(events);
-    if (path === '/api/settings/verification') return apiOk(STRICT_POLICY);
+    if (path === '/api/settings/verification') return apiOk(samplePolicy);
     if (path === '/api/checkpoint/qr/inspect') return apiOk({ employee_id: 7, name: 'Ana Ruiz', employee_number: 'EMP-7' });
     return apiOk(identifiedResult);
   });
@@ -48,14 +48,21 @@ function server(profile: CheckpointProfile, overrides: Record<string, () => Resp
 
 afterEach(() => resetPolicyCache());
 
+// Tarjetas de método: título y descripción del catálogo verification_methods.
+const FACE_CARD = /Rostro.*se busca entre todo el personal/;
+const QR_CARD = /QR.*Credencial impresa o en el teléfono/;
+const QR_FACE_CARD = /QR \+ rostro.*confirma que el rostro es de su dueño/;
+
 describe('CheckpointPage (VALIDATOR)', () => {
   it('inicio: empresa, validador, métodos de su modo y últimas identificaciones', async () => {
     server(sampleCheckpoint);
     renderWithProviders(<CheckpointPage />);
     expect(await screen.findByRole('heading', { name: 'Recepción planta 1' })).toBeInTheDocument();
     expect(screen.getAllByText('Mi empresa').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: /RECONOCER ROSTRO/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ESCANEAR QR/ })).toBeInTheDocument();
+    expect(screen.getByText('QR o rostro')).toBeInTheDocument(); // modo del validador
+    expect(screen.getAllByRole('button', { name: /Comenzar/ })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: FACE_CARD })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: QR_CARD })).toBeInTheDocument();
     expect(await screen.findByText('Ana Ruiz')).toBeInTheDocument();
     expect(screen.getByText('No identificado')).toBeInTheDocument();
     expect(screen.getByText('Rostro · Rostro no coincide')).toBeInTheDocument();
@@ -64,19 +71,19 @@ describe('CheckpointPage (VALIDATOR)', () => {
   it('QR: identifica, muestra el resultado para el operador y refresca la bitácora', async () => {
     const { calls } = server(sampleCheckpoint);
     renderWithProviders(<CheckpointPage />);
-    await userEvent.click(await screen.findByRole('button', { name: /ESCANEAR QR/ }));
+    await userEvent.click(await screen.findByRole('button', { name: QR_CARD }));
     await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
     expect(await screen.findByText('Empleado identificado')).toBeInTheDocument();
     expect(calls.find((c) => c.url === '/api/checkpoint/identify/qr')?.init.body).toBe(JSON.stringify({ qr_content: 'TCQR1:abc' }));
     await waitFor(() => expect(calls.filter((c) => c.url.startsWith('/api/checkpoint/recent'))).toHaveLength(2));
     await userEvent.click(screen.getByRole('button', { name: /Siguiente persona/ }));
-    expect(await screen.findByRole('button', { name: /ESCANEAR QR/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: QR_CARD })).toBeInTheDocument();
   });
 
   it('rostro: puede cambiar a QR; un QR rechazado muestra el motivo', async () => {
     server(sampleCheckpoint, { '/api/checkpoint/identify/qr': () => apiFail(403, 'QR_DISABLED', 'La verificación con QR está desactivada') });
     renderWithProviders(<CheckpointPage />);
-    await userEvent.click(await screen.findByRole('button', { name: /RECONOCER ROSTRO/ }));
+    await userEvent.click(await screen.findByRole('button', { name: FACE_CARD }));
     expect(screen.getByRole('heading', { name: 'Reconocer rostro' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Usar su código QR' }));
     await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
@@ -87,7 +94,7 @@ describe('CheckpointPage (VALIDATOR)', () => {
   it('QR y rostro: primero el QR (de quién es) y luego su rostro con ese QR', async () => {
     const { calls } = server({ ...sampleCheckpoint, mode: 'QR_AND_FACE' });
     renderWithProviders(<CheckpointPage />);
-    await userEvent.click(await screen.findByRole('button', { name: /QR \+ ROSTRO/ }));
+    await userEvent.click(await screen.findByRole('button', { name: QR_FACE_CARD }));
     expect(screen.getByRole('heading', { name: 'Paso 1 de 2 · Código QR' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
     expect(await screen.findByRole('heading', { name: 'Paso 2 de 2 · Ana Ruiz' })).toBeInTheDocument();
@@ -101,7 +108,8 @@ describe('CheckpointPage (VALIDATOR)', () => {
     server({ ...sampleCheckpoint, mode: 'QR', qr_enabled: false });
     renderWithProviders(<CheckpointPage />);
     expect(await screen.findByText('Identificación con QR desactivada')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /ESCANEAR QR/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/usa el modo “Solo QR”/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: QR_CARD })).not.toBeInTheDocument();
   });
 
   it('sin conexión al cargar: ofrece reintentar', async () => {

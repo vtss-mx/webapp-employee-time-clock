@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { GlobalErrorHandler } from './components/GlobalErrorHandler';
 import { AuthProvider } from './context/AuthContext';
+import { CatalogProvider } from './context/CatalogContext';
 import { DeviceGate } from './routes/DeviceGate';
 import { VersionWatcher } from './components/VersionWatcher';
 import { FeedbackProvider } from './context/FeedbackContext';
@@ -15,9 +16,11 @@ export default function App() {
           <GlobalErrorHandler />
           <VersionWatcher />
           <AuthProvider>
-            <DeviceGate>
-              <AppRouter />
-            </DeviceGate>
+            <CatalogProvider>
+              <DeviceGate>
+                <AppRouter />
+              </DeviceGate>
+            </CatalogProvider>
           </AuthProvider>
         </FeedbackProvider>
       </BrowserRouter>

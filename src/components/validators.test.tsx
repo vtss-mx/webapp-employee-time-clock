@@ -6,15 +6,20 @@ import { FeedbackProvider } from '../context/FeedbackContext';
 import { useCountdown } from '../hooks/useCountdown';
 import { checkpointService } from '../services/checkpointService';
 import { validatorService } from '../services/validatorService';
+import { catalogsFixture, catalogsWith, testCatalogs } from '../test/catalogs';
 import { identifiedResult as identified, sampleValidator } from '../test/fixtures';
 import { apiFail, apiOk, mockFetch } from '../test/http';
+import { WithCatalogs } from '../test/render';
 import type { ValidatorMode } from '../types';
-import { failureReason, methodLabel } from '../utils/format';
 import { ValidatorModal, type ValidatorDialog } from './ValidatorModal';
-import { VALIDATOR_MODES, ValidatorModeBadge, ValidatorModePicker, availableMethods } from './ValidatorModes';
+import { ValidatorModeBadge, ValidatorModePicker, availableMethods } from './ValidatorModes';
 import { VerificationResultCard } from './VerificationResultCard';
 
-const wrapper = ({ children }: { children: ReactNode }) => <FeedbackProvider>{children}</FeedbackProvider>;
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <FeedbackProvider>
+    <WithCatalogs>{children}</WithCatalogs>
+  </FeedbackProvider>
+);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -53,13 +58,31 @@ describe('validatorService y checkpointService', () => {
 });
 
 describe('modos del validador', () => {
-  it('métodos disponibles según el modo y si la empresa permite QR', () => {
-    expect(availableMethods('QR_OR_FACE', true)).toEqual(['FACE', 'QR']);
-    expect(availableMethods('QR_OR_FACE', false)).toEqual(['FACE']);
-    expect(availableMethods('QR', false)).toEqual([]);
-    expect(availableMethods('QR_AND_FACE', true)).toEqual(['QR_AND_FACE']);
-    expect(availableMethods('QR_AND_FACE', false)).toEqual([]);
-    expect(Object.keys(VALIDATOR_MODES)).toHaveLength(4);
+  const mode = (code: ValidatorMode) => testCatalogs.byCode('validator_modes', code);
+
+  it('métodos disponibles: los del catálogo según el modo, sin QR si la empresa lo desactivó', () => {
+    expect(availableMethods(mode('QR_OR_FACE'), true)).toEqual(['FACE', 'QR']);
+    expect(availableMethods(mode('QR_OR_FACE'), false)).toEqual(['FACE']);
+    expect(availableMethods(mode('QR'), false)).toEqual([]);
+    expect(availableMethods(mode('QR_AND_FACE'), true)).toEqual(['QR_FACE']);
+    expect(availableMethods(mode('QR_AND_FACE'), false)).toEqual([]);
+    expect(availableMethods(undefined, true)).toEqual([]); // modo que el catálogo no tiene
+  });
+
+  it('solo ofrece los modos activos; la insignia nombra también uno inactivo o desconocido', () => {
+    const catalogs = catalogsWith({
+      validator_modes: catalogsFixture.validator_modes.map((m) => (m.code === 'QR' ? { ...m, active: false } : m)),
+    });
+    render(
+      <WithCatalogs catalogs={catalogs}>
+        <ValidatorModePicker value="FACE" onChange={vi.fn()} />
+        <ValidatorModeBadge mode="QR" />
+        <ValidatorModeBadge mode={'KIOSK' as ValidatorMode} />
+      </WithCatalogs>,
+    );
+    expect(screen.getAllByRole('radio').map((r) => (r as HTMLInputElement).value)).toEqual(['QR_OR_FACE', 'FACE', 'QR_AND_FACE']);
+    expect(screen.getByText('Solo QR')).toHaveClass('mode-badge');
+    expect(screen.getByText('KIOSK')).toHaveClass('mode-badge');
   });
 
   it('insignia y selección con tarjetas (grupo de radio)', async () => {
@@ -72,18 +95,18 @@ describe('modos del validador', () => {
         </>
       );
     }
-    render(<Harness />);
+    render(<Harness />, { wrapper });
     expect(screen.getByRole('radio', { name: /QR o rostro/ })).toBeChecked();
     await userEvent.click(screen.getByText('QR y rostro'));
     expect(screen.getByRole('radio', { name: /QR y rostro/ })).toBeChecked();
     expect(screen.getAllByText('QR y rostro')).toHaveLength(2); // tarjeta e insignia
   });
 
-  it('etiquetas de la bitácora', () => {
-    expect(methodLabel.QR_FACE).toBe('QR + rostro');
-    expect(failureReason('AMBIGUOUS_MATCH')).toBe('Parecido a varias personas');
-    expect(failureReason('OTHER_COMPANY')).toBe('QR no reconocido');
-    expect(failureReason(null)).toBe('Fallida');
+  it('etiquetas de la bitácora desde el catálogo', () => {
+    expect(testCatalogs.nameOf('verification_methods', 'QR_FACE')).toBe('QR + rostro');
+    expect(testCatalogs.nameOf('verification_reasons', 'AMBIGUOUS_MATCH', 'Fallida')).toBe('Parecido a varias personas');
+    expect(testCatalogs.nameOf('verification_reasons', 'OTHER_COMPANY', 'Fallida')).toBe('QR no reconocido');
+    expect(testCatalogs.nameOf('verification_reasons', null, 'Fallida')).toBe('Fallida');
   });
 });
 

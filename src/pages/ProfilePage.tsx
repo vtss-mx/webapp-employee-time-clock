@@ -6,12 +6,14 @@ import { SessionsPanel } from '../components/SessionsPanel';
 import { FaceStatusBadge, StatusBadge } from '../components/StatusBadge';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../hooks/useAuth';
+import { useCatalogs } from '../hooks/useCatalogs';
 import { useErrorPopup } from '../hooks/useFeedback';
-import { formatDateTime, initials, roleLabel } from '../utils/format';
+import { formatDateTime, initials } from '../utils/format';
 import { formatPhone } from '../utils/phone';
 
 export function ProfilePage() {
   const { user, refreshUser, logout } = useAuth();
+  const { nameOf } = useCatalogs();
   const [error, setError] = useState<unknown>(null);
   const [sessionsVersion, setSessionsVersion] = useState(0);
 
@@ -36,7 +38,7 @@ export function ProfilePage() {
               <div className="stack" style={{ gap: 6 }}>
                 <h2>{name}</h2>
                 <div className="row">
-                  <span className="badge badge--info">{roleLabel[user.role]}</span>
+                  <span className="badge badge--info">{nameOf('roles', user.role)}</span>
                   <StatusBadge active={user.active} />
                   {employee && <FaceStatusBadge status={employee.face_status} />}
                 </div>

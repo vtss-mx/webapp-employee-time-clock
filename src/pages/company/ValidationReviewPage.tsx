@@ -3,35 +3,28 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ConfirmDialog, Modal } from '../../components/Modal';
 import { FieldLabel } from '../../components/FormField';
+import { ReasonChips } from '../../components/ReasonChips';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { EnrollmentBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { SkeletonRows } from '../../components/ui/Skeleton';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { notifyEnrollmentsChanged } from '../../hooks/usePendingEnrollments';
 import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
 import { RetryState } from '../../components/ui/RetryState';
 import { paths } from '../../routes/paths';
 import { enrollmentService } from '../../services/enrollmentService';
 import type { FaceEnrollmentDetail } from '../../types';
+import type { CatalogApi } from '../../utils/catalogs';
 import { ageFrom, formatDate, formatDateTime, formatPercent } from '../../utils/format';
-import { ACCESSORY_LABELS, type AccessoryKind } from '../../utils/faceErrors';
 
-const REASONS = [
-  'La persona de la foto no corresponde al empleado',
-  'La fotografía no es clara',
-  'Se detecta suplantación (foto de foto o pantalla)',
-  'Datos del empleado incorrectos',
-];
-
-/** Motivos del análisis automático por los que conviene revisar la foto con atención. */
-function flaggedReasons(flags: string[]): string[] {
-  const accessories = flags.filter((f): f is AccessoryKind => f in ACCESSORY_LABELS);
-  return [
-    ...(accessories.length
-      ? [`El sistema detectó posible ${accessories.map((a) => ACCESSORY_LABELS[a].toLowerCase()).join(' y ')} y el empleado indicó que no lo usa.`]
-      : []),
-    ...(flags.includes('SPOOF') ? ['El anti-spoofing sugiere que las capturas podrían ser de una foto o una pantalla.'] : []),
-  ];
+/** Marcas del análisis automático (catálogo enrollment_flags): nombre corto y explicación para el revisor. */
+function describeFlags(flags: string[], { byCode }: CatalogApi): Array<{ code: string; name: string; detail: string }> {
+  return flags.map((code) => {
+    const flag = byCode('enrollment_flags', code);
+    const name = flag?.name ?? code;
+    return { code, name, detail: flag?.description ?? name };
+  });
 }
 
 /** Revisión de identidad: foto de referencia vs. datos del empleado → Aceptar / Rechazar. */
@@ -40,6 +33,7 @@ export function ValidationReviewPage() {
   const enrollmentId = Number(id);
   const navigate = useNavigate();
   const feedback = useFeedback();
+  const catalogs = useCatalogs();
   const [item, setItem] = useState<FaceEnrollmentDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
@@ -55,19 +49,20 @@ export function ValidationReviewPage() {
   useErrorPopup(error, { title: 'No se pudo cargar la solicitud', retry: () => setReload((n) => n + 1) });
 
   const flags = item?.flagged_accessories ?? [];
-  const accessoryFlags = flags.filter((f): f is AccessoryKind => f in ACCESSORY_LABELS);
+  const flagged = describeFlags(flags, catalogs);
+  const accessoryFlagged = flags.some((code) => catalogs.byCode('accessories', code));
   const spoofFlag = flags.includes('SPOOF');
 
   // Alertas del análisis automático: se avisan en un popup al abrir una solicitud pendiente.
   useEffect(() => {
     if (item?.status !== 'PENDING') return;
-    const reasons = flaggedReasons(item.flagged_accessories ?? []);
+    const reasons = describeFlags(item.flagged_accessories ?? [], catalogs).map((flag) => flag.detail);
     if (reasons.length === 0) return;
     void feedback.warning('Revisa la fotografía con atención', 'Acepta solo si la foto muestra claramente el rostro descubierto de la persona.', {
       details: reasons,
       key: `review-flags-${item.id}`,
     });
-  }, [item, feedback]);
+  }, [item, feedback, catalogs]);
 
   const approve = async () => {
     setBusy('approve');
@@ -129,14 +124,9 @@ export function ValidationReviewPage() {
   }
 
   const pending = item.status === 'PENDING';
-  // Lo que el análisis marcó para revisar (dato de la solicitud, no un aviso).
-  const warnings = [
-    ...accessoryFlags.map((a) => `Posible ${ACCESSORY_LABELS[a].toLowerCase()} (el empleado indicó que no lo usa)`),
-    ...(spoofFlag ? ['Posible foto o pantalla (anti-spoofing)'] : []),
-  ];
   const checks = [
     'Un solo rostro detectado',
-    accessoryFlags.length ? null : 'Sin accesorios que oculten el rostro (según la política vigente)',
+    accessoryFlagged ? null : 'Sin accesorios que oculten el rostro (según la política vigente)',
     spoofFlag ? null : 'Rostro real frente a la cámara (anti-spoofing)',
     `${item.samples} muestras consistentes entre sí`,
     item.liveness_passed ? 'Prueba de vida superada (giro de cabeza)' : null,
@@ -213,9 +203,10 @@ export function ValidationReviewPage() {
               <CheckCircle2 size={20} /> Verificaciones automáticas
             </h3>
             <ul className="checklist stagger">
-              {warnings.map((w) => (
-                <li key={w} className="checklist__warn">
-                  <AlertTriangle size={18} /> {w}
+              {/* Lo que el análisis marcó para revisar (dato de la solicitud, no un aviso). */}
+              {flagged.map((flag) => (
+                <li key={flag.code} className="checklist__warn" title={flag.detail}>
+                  <AlertTriangle size={18} /> {flag.name}
                 </li>
               ))}
               {checks.map((c) => (
@@ -230,7 +221,7 @@ export function ValidationReviewPage() {
                 <div>
                   <dt>Resolución</dt>
                   <dd>
-                    {item.status === 'APPROVED' ? 'Aceptado' : 'Rechazado'} por {item.reviewed_by ?? '—'}
+                    {catalogs.nameOf('enrollment_statuses', item.status)} por {item.reviewed_by ?? '—'}
                   </dd>
                 </div>
                 <div>
@@ -305,13 +296,7 @@ export function ValidationReviewPage() {
             Se eliminarán la fotografía y los datos biométricos de este registro. El empleado verá el motivo y deberá
             registrarse de nuevo.
           </p>
-          <div className="chips">
-            {REASONS.map((r) => (
-              <button key={r} type="button" className={`chip ${reason === r ? 'is-active' : ''}`} onClick={() => setReason(r)}>
-                {r}
-              </button>
-            ))}
-          </div>
+          <ReasonChips catalog="enrollment_rejection_reasons" value={reason} onPick={setReason} />
           <div className="field">
             <FieldLabel htmlFor="reject-reason" label="Motivo (visible para el empleado)" required />
             <textarea

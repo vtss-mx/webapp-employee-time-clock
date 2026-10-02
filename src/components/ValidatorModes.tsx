@@ -1,55 +1,30 @@
 import { QrCode, ScanFace, ShieldCheck, SplitSquareHorizontal, type LucideIcon } from 'lucide-react';
-import type { ValidatorMode } from '../types';
+import { useCatalogs } from '../hooks/useCatalogs';
+import type { ValidatorMode, ValidatorModeItem, VerificationMethod } from '../types';
 
-/** Forma de identificar del punto de control (la misma regla que aplica el backend). */
-export type CheckpointMethod = 'QR' | 'FACE' | 'QR_AND_FACE';
-
-interface ModeInfo {
-  label: string;
-  description: string;
-  icon: LucideIcon;
-  methods: CheckpointMethod[];
-}
-
-export const VALIDATOR_MODES: Record<ValidatorMode, ModeInfo> = {
-  QR_OR_FACE: {
-    label: 'QR o rostro',
-    description: 'El operador elige en cada identificación: credencial QR o reconocimiento facial.',
-    icon: SplitSquareHorizontal,
-    methods: ['FACE', 'QR'],
-  },
-  QR: {
-    label: 'Solo QR',
-    description: 'Escanea el código QR de la credencial del empleado (impresa o en su teléfono).',
-    icon: QrCode,
-    methods: ['QR'],
-  },
-  FACE: {
-    label: 'Solo rostro',
-    description: 'Reconoce al empleado por su rostro entre todo el personal, sin credencial.',
-    icon: ScanFace,
-    methods: ['FACE'],
-  },
-  QR_AND_FACE: {
-    label: 'QR y rostro',
-    description: 'Máxima seguridad: escanea el QR y el rostro debe ser el de su dueño.',
-    icon: ShieldCheck,
-    methods: ['QR_AND_FACE'],
-  },
+/** Ícono de cada modo; el nombre, la descripción y los métodos vienen del catálogo validator_modes. */
+const MODE_ICONS: Partial<Record<string, LucideIcon>> = {
+  QR_OR_FACE: SplitSquareHorizontal,
+  QR: QrCode,
+  FACE: ScanFace,
+  QR_AND_FACE: ShieldCheck,
 };
+const modeIcon = (code: string): LucideIcon => MODE_ICONS[code] ?? ShieldCheck;
 
-const MODE_ORDER = Object.keys(VALIDATOR_MODES) as ValidatorMode[];
-
-/** Métodos disponibles hoy: los del modo, sin los que usan QR si la empresa lo desactivó. */
-export function availableMethods(mode: ValidatorMode, qrEnabled: boolean): CheckpointMethod[] {
-  return VALIDATOR_MODES[mode].methods.filter((method) => qrEnabled || method === 'FACE');
+/**
+ * Métodos disponibles hoy: los del modo (catálogo, en su orden), sin los que usan QR si la
+ * empresa lo desactivó (la misma regla que aplica el backend).
+ */
+export function availableMethods(mode: ValidatorModeItem | undefined, qrEnabled: boolean): VerificationMethod[] {
+  return (mode?.methods ?? []).filter((method) => qrEnabled || method === 'FACE');
 }
 
 export function ValidatorModeBadge({ mode }: { mode: ValidatorMode }) {
-  const { label, icon: Icon } = VALIDATOR_MODES[mode];
+  const { nameOf } = useCatalogs();
+  const Icon = modeIcon(mode);
   return (
     <span className="badge badge--info badge--plain mode-badge">
-      <Icon size={14} aria-hidden /> {label}
+      <Icon size={14} aria-hidden /> {nameOf('validator_modes', mode)}
     </span>
   );
 }
@@ -60,21 +35,22 @@ interface ValidatorModePickerProps {
   disabled?: boolean;
 }
 
-/** Selección del modo con tarjetas (grupo de radio accesible). */
+/** Selección del modo con tarjetas (grupo de radio accesible): solo los modos activos del catálogo. */
 export function ValidatorModePicker({ value, onChange, disabled = false }: ValidatorModePickerProps) {
+  const { active } = useCatalogs();
   return (
     <fieldset className="mode-picker" disabled={disabled}>
       <legend className="mode-picker__legend">Cómo identifica</legend>
-      {MODE_ORDER.map((mode) => {
-        const { label, description, icon: Icon } = VALIDATOR_MODES[mode];
+      {active('validator_modes').map(({ code, name, description }) => {
+        const Icon = modeIcon(code);
         return (
-          <label key={mode} className={`mode-option ${value === mode ? 'is-selected' : ''}`}>
-            <input type="radio" name="validator-mode" value={mode} checked={value === mode} onChange={() => onChange(mode)} />
+          <label key={code} className={`mode-option ${value === code ? 'is-selected' : ''}`}>
+            <input type="radio" name="validator-mode" value={code} checked={value === code} onChange={() => onChange(code)} />
             <span className="mode-option__icon">
               <Icon size={22} />
             </span>
             <span className="mode-option__text">
-              <strong>{label}</strong>
+              <strong>{name}</strong>
               <small>{description}</small>
             </span>
           </label>

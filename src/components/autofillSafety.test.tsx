@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { LoginPage } from '../pages/LoginPage';
 import { AuthProvider } from '../context/AuthContext';
+import { WithCatalogs } from '../test/render';
 import { ChangePasswordSection } from './ChangePasswordSection';
 import { emptyEmployeeForm, EmployeeFormFields } from './EmployeeForm';
 
@@ -32,7 +33,9 @@ describe('etiquetas a salvo del autollenado de tarjetas de Chrome', () => {
   ])('%s', (_, ui) => {
     const { container } = render(
       <MemoryRouter>
-        <FeedbackProvider>{ui}</FeedbackProvider>
+        <FeedbackProvider>
+          <WithCatalogs>{ui}</WithCatalogs>
+        </FeedbackProvider>
       </MemoryRouter>,
     );
     const found = labels(container);

@@ -320,13 +320,16 @@ export interface VerificationPolicy {
   employee_mobile_only: boolean;
   /** Los validadores de identidad solo operan desde una tableta o un teléfono. */
   validator_mobile_only: boolean;
-  /** Confianza mínima (0.80-0.999) para aceptar el reconocimiento facial. */
+  /** Confianza mínima: exactamente el `value` de un nivel activo del catálogo confidence_levels. */
   min_confidence: number;
   updated_at: string | null;
   updated_by: string | null;
 }
 
 export type VerificationPolicyUpdate = Partial<Omit<VerificationPolicy, 'updated_at' | 'updated_by'>>;
+
+/** Reglas que la app aplica en pantalla (el umbral de confianza solo lo evalúa el servidor). */
+export type VerificationRules = Omit<VerificationPolicy, 'min_confidence' | 'updated_at' | 'updated_by'>;
 
 // ---------- Validadores de identidad (VALIDATOR) ----------
 
@@ -378,3 +381,85 @@ export interface CheckpointEvent {
   employee_name: string | null;
   employee_number: string | null;
 }
+
+// ---------- Catálogos de la BD (GET /api/catalogs) ----------
+
+/**
+ * Registro de un catálogo. Las listas llegan ordenadas por `sort_order` e incluyen los inactivos,
+ * que solo sirven para nombrar registros históricos (nunca se ofrecen en listas de selección).
+ */
+export interface CatalogItem<Code extends string = string> {
+  code: Code;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  active: boolean;
+}
+
+/** Tono visual de un estado; la clase CSS de cada tono vive en el código. */
+export type StatusTone = 'muted' | 'info' | 'success' | 'warning' | 'danger';
+
+export interface StatusItem<Code extends string = string> extends CatalogItem<Code> {
+  tone: StatusTone;
+}
+
+/** `description` es el texto para la empresa; `employee_note`, el del propio empleado. */
+export interface FaceStatusItem extends StatusItem<FaceStatus> {
+  employee_note: string;
+}
+
+export interface ValidatorModeItem extends CatalogItem<ValidatorMode> {
+  /** Métodos de identificación que permite el modo, en orden (códigos de verification_methods). */
+  methods: VerificationMethod[];
+}
+
+/** `name` es la etiqueta corta de la bitácora; `message`, lo que ve la persona. */
+export interface ReasonItem extends CatalogItem {
+  message: string;
+}
+
+export interface AccessoryItem extends CatalogItem {
+  /** Con artículo, para armar frases: "los lentes", "la gorra o sombrero". */
+  phrase: string;
+}
+
+export interface CountryItem extends CatalogItem {
+  /** Lada con "+": "+52". `code` es el ISO alfa-2. */
+  dial_code: string;
+  /** País frecuente: va primero en el selector de lada. */
+  featured: boolean;
+}
+
+/** Nivel de confianza; `sort_order` es su posición en el control (80 … 100). */
+export interface ConfidenceLevelItem extends CatalogItem {
+  value: number;
+  similarity: number;
+  /** % de impostores aceptados y % de capturas legítimas rechazadas (medidos en LFW). */
+  false_accept_rate: number;
+  rejection_rate: number;
+}
+
+export interface FaceErrorItem extends ReasonItem {
+  /** La persona puede corregir (luz, pose, accesorios...) y volver a intentar. */
+  retryable: boolean;
+}
+
+export interface Catalogs {
+  roles: CatalogItem<Role>[];
+  verification_methods: CatalogItem<VerificationMethod>[];
+  validator_modes: ValidatorModeItem[];
+  face_statuses: FaceStatusItem[];
+  enrollment_statuses: StatusItem<EnrollmentStatus>[];
+  verification_reasons: ReasonItem[];
+  accessories: AccessoryItem[];
+  countries: CountryItem[];
+  enrollment_rejection_reasons: CatalogItem[];
+  reverification_reasons: CatalogItem[];
+  confidence_levels: ConfidenceLevelItem[];
+  face_errors: FaceErrorItem[];
+  /** Marcas del registro facial para el revisor (códigos de `flagged_accessories`). */
+  enrollment_flags: CatalogItem[];
+}
+
+export type CatalogKey = keyof Catalogs;
+export type CatalogEntry<K extends CatalogKey> = Catalogs[K][number];

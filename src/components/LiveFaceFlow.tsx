@@ -1,13 +1,14 @@
 import { ArrowLeft, ArrowRight, Camera, ShieldCheck, UserCheck, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useCamera } from '../hooks/useCamera';
+import { useCatalogs } from '../hooks/useCatalogs';
 import { FACE_GUIDANCE_MESSAGES, useFaceAutoCapture, useFaceDetector, type DetectionMode, type FaceGuidance } from '../hooks/useFaceDetection';
 import { ApiError, errorMessage } from '../services/apiClient';
 import type { FaceChallengeCapture } from '../services/http/faceUpload';
 import { faceService } from '../services/verificationService';
-import type { FaceChallenge, VerificationPolicy } from '../types';
+import type { FaceChallenge, VerificationRules } from '../types';
 import { config } from '../utils/config';
-import { ACCESSORY_LABELS, detectedAccessories, isRetryableFaceError, type AccessoryKind } from '../utils/faceErrors';
+import { detectedAccessories, isRetryableFaceError } from '../utils/faceErrors';
 import { CameraCapture } from './CameraCapture';
 import { AccessoryAlert, FaceGuide, guidanceTone, type Tone } from './FaceGuide';
 import { FaceRequirements } from './FaceRequirements';
@@ -35,7 +36,7 @@ interface LiveFaceFlowProps {
   finalStep: string;
   submittingMessage: string;
   /** Política de la empresa: accesorios exigidos y prueba de vida. */
-  policy: VerificationPolicy;
+  policy: VerificationRules;
   headwearExempt?: boolean;
   /** Registro: si el sistema insiste en un accesorio que el empleado no usa, puede enviarlo a revisión. */
   allowAccessoryReview?: boolean;
@@ -60,7 +61,8 @@ type Phase = 'frontal' | 'checking' | 'blocked' | 'challenge' | 'submitting';
 
 interface Blocked {
   message: string;
-  accessories: AccessoryKind[];
+  /** Códigos del catálogo de accesorios detectados. */
+  accessories: string[];
 }
 
 const REVIEW_AFTER_ATTEMPTS = 2;
@@ -136,8 +138,9 @@ export function flowStatus(input: FlowStatusInput): { message: string; tone: Ton
 }
 
 /** Propuesta de revisión humana cuando el detector insiste en un accesorio que el empleado no usa. */
-export function AccessoryReviewPrompt({ accessories, onConfirm }: { accessories: AccessoryKind[]; onConfirm: () => void }) {
-  const names = accessories.map((a) => ACCESSORY_LABELS[a].toLowerCase()).join(' ni ');
+export function AccessoryReviewPrompt({ accessories, onConfirm }: { accessories: string[]; onConfirm: () => void }) {
+  const { byCode } = useCatalogs();
+  const names = accessories.map((code) => byCode('accessories', code)?.phrase ?? code).join(' ni ');
   return (
     <div className="review-prompt" role="note">
       <strong>¿No estás usando {names}?</strong>
@@ -153,7 +156,7 @@ export function AccessoryReviewPrompt({ accessories, onConfirm }: { accessories:
 }
 
 /** Indicaciones sobre el rostro: flecha de giro (reto) o accesorios a retirar (bloqueo). */
-function ScannerHints({ phase, guidance, pointsLeft, accessories }: { phase: Phase; guidance: FaceGuidance; pointsLeft: boolean; accessories: AccessoryKind[] }) {
+function ScannerHints({ phase, guidance, pointsLeft, accessories }: { phase: Phase; guidance: FaceGuidance; pointsLeft: boolean; accessories: string[] }) {
   if (phase === 'blocked') return <AccessoryAlert items={accessories} />;
   if (phase === 'challenge' && guidance !== 'hold_still' && guidance !== 'ready') return <TurnArrow pointsLeft={pointsLeft} />;
   return null;
@@ -164,10 +167,10 @@ interface FlowPanelProps {
   description: string;
   steps: string[];
   currentStep: number;
-  policy: VerificationPolicy;
+  policy: VerificationRules;
   headwearExempt: boolean;
   /** Accesorios a proponer para revisión humana (null = no se ofrece). */
-  reviewAccessories: AccessoryKind[] | null;
+  reviewAccessories: string[] | null;
   reviewRequested: boolean;
   onReview: () => void;
   /** Captura manual cuando la detección automática no está disponible. */
@@ -226,12 +229,13 @@ export function LiveFaceFlow({
   onCancel,
 }: LiveFaceFlowProps) {
   const camera = useCamera({ facing: 'user' });
+  const catalogs = useCatalogs();
   const { detector, error: detectorError } = useFaceDetector();
   const [phase, setPhase] = useState<Phase>('frontal');
   const [blocked, setBlocked] = useState<Blocked | null>(null);
   const [challenge, setChallenge] = useState<FaceChallenge | null>(null);
   const [capture, setCapture] = useState<{ current: number; total: number } | null>(null);
-  const [accessoryStreak, setAccessoryStreak] = useState<{ count: number; accessories: AccessoryKind[] }>({ count: 0, accessories: [] });
+  const [accessoryStreak, setAccessoryStreak] = useState<{ count: number; accessories: string[] }>({ count: 0, accessories: [] });
   const [reviewRequested, setReviewRequested] = useState(false);
   const frontalRef = useRef<Blob[]>([]);
   const mounted = useRef(true);
@@ -240,7 +244,7 @@ export function LiveFaceFlow({
   const block = useCallback(
     async (error: unknown) => {
       if (!mounted.current) return;
-      if (!isRetryableFaceError(error)) {
+      if (!isRetryableFaceError(error, catalogs)) {
         onFatal(error);
         return;
       }
@@ -257,7 +261,7 @@ export function LiveFaceFlow({
         setPhase('frontal');
       }
     },
-    [onFatal],
+    [catalogs, onFatal],
   );
 
   const submit = useCallback(

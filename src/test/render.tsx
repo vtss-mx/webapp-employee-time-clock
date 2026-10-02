@@ -1,16 +1,26 @@
 import { render, type RenderResult } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import type { User } from '../types';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
+import { CatalogContext } from '../context/CatalogContext';
 import { FeedbackProvider } from '../context/FeedbackContext';
+import type { CatalogApi } from '../utils/catalogs';
+import { testCatalogs } from './catalogs';
 
-/** Renderiza con router en memoria, mensajes (popup) y (opcional) sesión. */
-export function renderWithProviders(ui: ReactElement, { route = '/', auth = false } = {}): RenderResult {
+/** Catálogos ya cargados (los de prueba u otros), como los deja CatalogProvider tras la carga. */
+export function WithCatalogs({ children, catalogs = testCatalogs }: { children: ReactNode; catalogs?: CatalogApi }) {
+  return <CatalogContext.Provider value={{ status: 'ready', catalogs }}>{children}</CatalogContext.Provider>;
+}
+
+/** Renderiza con router en memoria, mensajes (popup), catálogos de prueba y (opcional) sesión. */
+export function renderWithProviders(ui: ReactElement, { route = '/', auth = false, catalogs = testCatalogs } = {}): RenderResult {
   const content = auth ? <AuthProvider>{ui}</AuthProvider> : ui;
   return render(
     <MemoryRouter initialEntries={[route]}>
-      <FeedbackProvider>{content}</FeedbackProvider>
+      <FeedbackProvider>
+        <WithCatalogs catalogs={catalogs}>{content}</WithCatalogs>
+      </FeedbackProvider>
     </MemoryRouter>,
   );
 }

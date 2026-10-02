@@ -33,6 +33,7 @@ npm run quality      # anomalías: tipado, obsoletos, duplicidad (jscpd), depend
 | `services/apiClient.ts` + `services/http/envelope.ts` | Cliente HTTP: normaliza CUALQUIER respuesta al contrato único, timeouts, reintentos con jitter/`Retry-After`, renovación automática del token. |
 | `hooks/useQrScanner.ts` | Lectura de QR con jsQR. |
 | `context/AuthContext.tsx` | Access token solo en memoria; refresh con cookie HttpOnly (restaura la sesión al recargar), renovación proactiva y cierre ante sesión revocada. |
+| `context/CatalogContext.tsx` + `hooks/useCatalogs.ts` | Catálogos de la BD (`GET /api/catalogs`): roles, estados, motivos, accesorios, países, niveles de confianza… Única fuente de listas y etiquetas; se cargan una vez por sesión y viven solo en memoria. `useCatalogs()` da las listas, `byCode`, `nameOf` y `active` (solo activos, para elegir). |
 | `routes/ProtectedRoute.tsx` | Protección de rutas por rol: un EMPLOYEE que entra a `/company/*` ve **Acceso denegado**. |
 
 ## Rutas

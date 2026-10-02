@@ -1,4 +1,4 @@
-import type { CheckpointProfile, Validator, VerificationResult } from '../types';
+import type { CheckpointProfile, Validator, VerificationPolicy, VerificationResult } from '../types';
 
 export const sampleValidator: Validator = {
   id: 3,
@@ -29,4 +29,19 @@ export const identifiedResult: VerificationResult = {
   name: 'Ana Ruiz',
   confidence: 0.9999,
   verified_at: '2026-10-01T10:00:00Z',
+};
+
+/** Política de la empresa como la devuelve GET /api/settings/verification (lo más estricto). */
+export const samplePolicy: VerificationPolicy = {
+  block_glasses: true,
+  block_headwear: true,
+  block_mask: true,
+  liveness_challenge: true,
+  anti_spoofing: true,
+  qr_enabled: true,
+  employee_mobile_only: true,
+  validator_mobile_only: true,
+  min_confidence: 0.99999,
+  updated_at: null,
+  updated_by: null,
 };

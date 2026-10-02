@@ -1,8 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resetPolicyCache, STRICT_POLICY } from '../../hooks/useVerificationPolicy';
-import { sampleValidator } from '../../test/fixtures';
+import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
+import { samplePolicy, sampleValidator } from '../../test/fixtures';
 import { apiOk, mockFetch } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import type { Validator } from '../../types';
@@ -13,7 +13,7 @@ const busy: Validator = { ...sampleValidator, id: 4, name: 'Comedor', email: 'co
 function server(list: Validator[]) {
   return mockFetch((call) => {
     const method = call.init.method ?? 'GET';
-    if (call.url === '/api/settings/verification') return apiOk(STRICT_POLICY);
+    if (call.url === '/api/settings/verification') return apiOk(samplePolicy);
     if (method === 'GET') return apiOk(list);
     if (method === 'PATCH') return apiOk({ ...sampleValidator, active: (JSON.parse(call.init.body as string) as { active: boolean }).active });
     if (method === 'DELETE') return apiOk(null);

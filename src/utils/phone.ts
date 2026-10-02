@@ -1,19 +1,17 @@
-import { AsYouType, getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import { AsYouType, isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import type { CountryItem } from '../types';
 
 /**
- * Teléfonos internacionales con libphonenumber (metadatos completos: valida igual que el backend).
+ * Teléfonos internacionales. Los países (nombre, lada, frecuentes y orden) vienen del catálogo
+ * de la BD; libphonenumber (metadatos completos) da el formato y valida igual que el backend.
  * El valor de los formularios y de la API es E.164: `+<lada><número>` (p. ej. +526621234567).
  * Este módulo solo lo cargan las pantallas con teléfonos (no el login).
  */
-export type { CountryCode };
-
-export const DEFAULT_COUNTRY: CountryCode = 'MX';
-/** Primero, los países más frecuentes para las empresas de la plataforma. */
-const FEATURED: CountryCode[] = ['MX', 'US', 'CA', 'GT', 'SV', 'HN', 'CR', 'PA', 'CO', 'ES'];
 
 export interface CountryOption {
   code: CountryCode;
   name: string;
+  /** Lada con "+" ("+52"). */
   dialCode: string;
   flag: string;
   featured: boolean;
@@ -21,7 +19,23 @@ export interface CountryOption {
   search: string;
 }
 
-const regionNames = new Intl.DisplayNames(['es'], { type: 'region' });
+export interface PhoneParts {
+  country: CountryOption;
+  national: string;
+}
+
+/** Países del selector de lada y lectura de números con lada. */
+export interface CountryDirectory {
+  /** Países activos del catálogo, en su orden (los frecuentes primero). */
+  options: CountryOption[];
+  /** País por omisión: el primer frecuente activo. */
+  defaultCountry: CountryOption;
+  /** Texto con lada (`+…` o `00…`) → país y número nacional; null si no se reconoce. */
+  parse: (text: string, preferred?: CountryOption) => PhoneParts | null;
+  /** Valor E.164 → país y número nacional para el control. */
+  split: (value: string, preferred?: CountryOption) => PhoneParts;
+}
+
 export const foldText = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 /** Bandera como emoji (indicadores regionales). */
@@ -29,53 +43,47 @@ export function flagOf(code: string): string {
   return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0)));
 }
 
-export const countryName = (code: CountryCode) => regionNames.of(code) ?? code;
-export const dialCodeOf = (code: CountryCode) => `+${getCountryCallingCode(code)}`;
+/** Del catálogo, solo los activos que libphonenumber sabe formatear y validar. */
+const isUsable = (item: CountryItem): item is CountryItem & { code: CountryCode } => item.active && isSupportedCountry(item.code);
 
-function option(code: CountryCode, featured: boolean): CountryOption {
-  const name = countryName(code);
-  const dialCode = dialCodeOf(code);
+function toOption({ code, name, dial_code: dialCode, featured }: CountryItem & { code: CountryCode }): CountryOption {
   return { code, name, dialCode, flag: flagOf(code), featured, search: foldText(`${name} ${code} ${dialCode}`) };
 }
 
-/** Frecuentes primero; después todos los países en orden alfabético (español). */
-export const COUNTRY_OPTIONS: CountryOption[] = [
-  ...FEATURED.map((code) => option(code, true)),
-  ...getCountries()
-    .filter((code) => !FEATURED.includes(code))
-    .map((code) => option(code, false))
-    .sort((a, b) => a.name.localeCompare(b.name, 'es')),
-];
+export function countryDirectory(countries: CountryItem[]): CountryDirectory {
+  const options = countries.filter(isUsable).map(toOption);
+  const defaultCountry = options.find((country) => country.featured) ?? options.at(0);
+  if (!defaultCountry) throw new Error('El catálogo de países no tiene países activos');
+  const byCode = new Map(options.map((country) => [country.code, country]));
 
-/** País de una lada (si la comparten varios, como +1, el más frecuente). */
-function countryForCallingCode(callingCode: string, preferred: CountryCode): CountryCode {
-  if (getCountryCallingCode(preferred) === callingCode) return preferred;
-  return COUNTRY_OPTIONS.find((c) => c.dialCode === `+${callingCode}`)?.code ?? preferred;
-}
+  /** País de una lada: el preferido si la comparte (como +1); si no, el primero del catálogo. */
+  const forDialCode = (dialCode: string, preferred: CountryOption) =>
+    preferred.dialCode === dialCode ? preferred : (options.find((country) => country.dialCode === dialCode) ?? preferred);
 
-/** Texto con lada (`+…` o `00…`) → país y número nacional; null si no se reconoce. */
-export function parseInternational(text: string, preferred: CountryCode = DEFAULT_COUNTRY): { country: CountryCode; national: string } | null {
-  const parsed = parsePhoneNumberFromString(text.trim().replace(/^00/, '+'));
-  if (!parsed) return null;
-  return { country: parsed.country ?? countryForCallingCode(parsed.countryCallingCode, preferred), national: parsed.nationalNumber };
-}
+  const parse = (text: string, preferred = defaultCountry): PhoneParts | null => {
+    const parsed = parsePhoneNumberFromString(text.trim().replace(/^00/, '+'));
+    if (!parsed) return null;
+    const country = (parsed.country && byCode.get(parsed.country)) ?? forDialCode(`+${parsed.countryCallingCode}`, preferred);
+    return { country, national: parsed.nationalNumber };
+  };
 
-/** Valor E.164 → país y número nacional para el control. */
-export function splitPhone(value: string, preferred: CountryCode = DEFAULT_COUNTRY): { country: CountryCode; national: string } {
-  if (!value) return { country: preferred, national: '' };
-  const prefix = dialCodeOf(preferred);
-  if (value.startsWith(prefix)) return { country: preferred, national: value.slice(prefix.length) };
-  return parseInternational(value, preferred) ?? { country: preferred, national: value.replace(/\D/g, '') };
+  const split = (value: string, preferred = defaultCountry): PhoneParts => {
+    if (!value) return { country: preferred, national: '' };
+    if (value.startsWith(preferred.dialCode)) return { country: preferred, national: value.slice(preferred.dialCode.length) };
+    return parse(value, preferred) ?? { country: preferred, national: value.replace(/\D/g, '') };
+  };
+
+  return { options, defaultCountry, parse, split };
 }
 
 /** País + número nacional → E.164 ("" si no hay número). */
-export function joinPhone(country: CountryCode, national: string): string {
+export function joinPhone(country: CountryOption, national: string): string {
   const digits = national.replace(/\D/g, '');
-  return digits ? `${dialCodeOf(country)}${digits}` : '';
+  return digits ? `${country.dialCode}${digits}` : '';
 }
 
 /** Número nacional con el formato del país mientras se escribe ("662 123 4567"). */
-export const formatNational = (country: CountryCode, national: string) => new AsYouType(country).input(national);
+export const formatNational = (country: CountryOption, national: string) => new AsYouType(country.code).input(national);
 
 export function validatePhone(value: string): string | undefined {
   if (!value) return 'El teléfono es obligatorio';

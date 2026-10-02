@@ -2,6 +2,7 @@ import { act, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EmployeeFormFields, emptyEmployeeForm } from '../components/EmployeeForm';
 import * as availabilityService from '../services/availabilityService';
+import { WithCatalogs } from '../test/render';
 import { useAvailability } from './useAvailability';
 
 const result = (code: string, message: string) => ({
@@ -61,6 +62,7 @@ describe('EmployeeFormFields en vivo', () => {
   it('muestra verificando, disponible o el error de duplicado', () => {
     const { rerender } = render(
       <EmployeeFormFields values={emptyEmployeeForm} errors={{}} onChange={vi.fn()} live={{ employee_number: { status: 'checking' } }} />,
+      { wrapper: WithCatalogs },
     );
     expect(screen.getByText('Verificando disponibilidad…')).toBeInTheDocument();
     rerender(

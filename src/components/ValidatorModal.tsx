@@ -1,5 +1,6 @@
 import { KeyRound, Mail, MapPin, Pencil, ScanLine } from 'lucide-react';
 import { useState } from 'react';
+import { useCatalogs } from '../hooks/useCatalogs';
 import { useFeedback } from '../hooks/useFeedback';
 import { ApiError } from '../services/apiClient';
 import { validatorService } from '../services/validatorService';
@@ -60,7 +61,9 @@ interface Values {
 /** Valores del formulario, qué campos pide cada diálogo y sus errores visibles. */
 function useValidatorForm(dialog: ValidatorDialog) {
   const current = dialog.kind === 'create' ? null : dialog.validator;
-  const [values, setValues] = useState<Values>({ name: current?.name ?? '', email: '', password: '', mode: current?.mode ?? 'QR_OR_FACE' });
+  // Alta: el primer modo activo del catálogo (por su orden).
+  const [firstMode] = useCatalogs().active('validator_modes');
+  const [values, setValues] = useState<Values>(() => ({ name: current?.name ?? '', email: '', password: '', mode: current?.mode ?? firstMode.code }));
   const [touched, setTouched] = useState<Record<Field, boolean>>({ name: false, email: false, password: false });
   const [emailTaken, setEmailTaken] = useState<string>();
   const asks: Record<Field, boolean> = { name: dialog.kind !== 'password', email: dialog.kind === 'create', password: dialog.kind !== 'edit' };

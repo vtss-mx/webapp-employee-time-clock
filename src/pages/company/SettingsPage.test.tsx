@@ -1,13 +1,16 @@
 import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
+import { ConfidenceSlider } from '../../components/ConfidenceSlider';
 import { AccessoryReviewPrompt } from '../../components/LiveFaceFlow';
-import { publishPolicy, resetPolicyCache, STRICT_POLICY, useVerificationPolicy } from '../../hooks/useVerificationPolicy';
+import { catalogsFixture, catalogsWith } from '../../test/catalogs';
+import { publishPolicy, resetPolicyCache, useVerificationPolicy } from '../../hooks/useVerificationPolicy';
+import { samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import { SettingsPage } from './SettingsPage';
 
-const policy = { ...STRICT_POLICY, updated_at: '2026-10-01T10:00:00Z', updated_by: 'admin@empresa.com' };
+const policy = { ...samplePolicy, updated_at: '2026-10-01T10:00:00Z', updated_by: 'admin@empresa.com' };
 
 afterEach(() => resetPolicyCache());
 
@@ -81,7 +84,9 @@ describe('SettingsPage (COMPANY)', () => {
       call.init.method === 'PUT' ? apiOk({ ...policy, block_mask: false }) : apiOk(policy),
     );
     renderWithProviders(<SettingsPage />);
-    const mask = await screen.findByRole('switch', { name: 'Retirar cubrebocas' });
+    // Un interruptor por accesorio del catálogo, nombrado con su frase.
+    expect(await screen.findByRole('switch', { name: 'Retirar la gorra o sombrero' })).toBeInTheDocument();
+    const mask = screen.getByRole('switch', { name: 'Retirar el cubrebocas' });
     expect(mask).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByText(/Última modificación/)).toBeNull(); // etiqueta retirada a pedido del usuario
 
@@ -89,7 +94,7 @@ describe('SettingsPage (COMPANY)', () => {
     await waitFor(() => expect(mask).toHaveAttribute('aria-checked', 'false'));
     const put = calls.find((c) => c.init.method === 'PUT');
     expect(JSON.parse(put?.init.body as string)).toEqual({ block_mask: false });
-    expect(await screen.findByText('Retirar cubrebocas: desactivado')).toBeInTheDocument();
+    expect(await screen.findByText('Retirar el cubrebocas: desactivado')).toBeInTheDocument();
   });
 
   it('pide confirmación para desactivar una protección de seguridad', async () => {
@@ -107,7 +112,7 @@ describe('SettingsPage (COMPANY)', () => {
   it('revierte el interruptor si el guardado falla', async () => {
     mockFetch((call) => (call.init.method === 'PUT' ? apiFail(503, 'SERVER_BUSY', 'Ocupado') : apiOk(policy)));
     renderWithProviders(<SettingsPage />);
-    const glasses = await screen.findByRole('switch', { name: 'Retirar lentes' });
+    const glasses = await screen.findByRole('switch', { name: 'Retirar los lentes' });
     await userEvent.click(glasses);
     expect(await screen.findByText('No se pudo guardar')).toBeInTheDocument();
     expect(glasses).toHaveAttribute('aria-checked', 'true');
@@ -117,6 +122,32 @@ describe('SettingsPage (COMPANY)', () => {
     mockFetch(apiFail(403, 'FORBIDDEN', 'Sin permisos'));
     renderWithProviders(<SettingsPage />);
     expect(await screen.findByText('Sin permisos')).toBeInTheDocument();
+  });
+});
+
+describe('ConfidenceSlider: niveles del catálogo confidence_levels', () => {
+  it('solo niveles activos; una posición sin nivel se ajusta al más cercano', () => {
+    const confidence_levels = catalogsFixture.confidence_levels.map((l) => (l.code === '85' || l.code === '100' ? { ...l, active: false } : l));
+    const { container } = renderWithProviders(<ConfidenceSlider value={0.99999} onSave={() => undefined} />, {
+      catalogs: catalogsWith({ confidence_levels }),
+    });
+    const slider = screen.getByRole('slider', { name: 'Nivel de confianza requerido' });
+    expect(slider).toHaveAttribute('max', '99'); // el máximo activo
+    expect(slider).toHaveAttribute('aria-valuetext', '99 % (Estricto)'); // valor guardado ya inactivo: el más cercano
+    expect(container.querySelectorAll('.confidence__tick')).toHaveLength(19);
+    fireEvent.change(slider, { target: { value: '85' } });
+    expect(slider).toHaveAttribute('aria-valuetext', '84 % (Flexible)');
+    expect(slider).toHaveValue('84');
+
+    fireEvent.click(screen.getByText('90')); // marca del control
+    expect(slider).toHaveAttribute('aria-valuetext', '90 % (Equilibrado)');
+    fireEvent.click(screen.getByRole('button', { name: 'Restablecer' }));
+    expect(slider).toHaveAttribute('aria-valuetext', '99 % (Estricto)');
+  });
+
+  it('sin niveles activos no muestra el control', () => {
+    renderWithProviders(<ConfidenceSlider value={0.9} onSave={() => undefined} />, { catalogs: catalogsWith({ confidence_levels: [] }) });
+    expect(screen.queryByRole('slider')).toBeNull();
   });
 });
 
@@ -136,8 +167,8 @@ describe('AccessoryReviewPrompt', () => {
   it('ofrece enviar a revisión con los accesorios detectados', async () => {
     let confirmed = false;
     renderWithProviders(<AccessoryReviewPrompt accessories={['MASK']} onConfirm={() => (confirmed = true)} />);
-    expect(screen.getByText('¿No estás usando cubrebocas?')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /No uso cubrebocas/ }));
+    expect(screen.getByText('¿No estás usando el cubrebocas?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /No uso el cubrebocas/ }));
     expect(confirmed).toBe(true);
   });
 });
