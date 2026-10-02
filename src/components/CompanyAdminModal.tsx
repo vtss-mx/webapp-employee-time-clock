@@ -39,10 +39,7 @@ export function CompanyAdminModal({ open, company, admin, onClose, onSaved }: Co
   const [serverError, setServerError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const live = liveFeedback(
-    useAvailability('company_admin_email', email, {
-      enabled: open && !isReset && !validateEmail(email),
-      check: (value) => adminService.availability('admin_email', value),
-    }),
+    useAvailability('company_admin_email', email, { enabled: open && !isReset && !validateEmail(email) }),
   );
   const emailError = serverError ?? (touched.email ? validateEmail(email) : undefined) ?? live.error;
   const passwordError = touched.password ? validatePassword(password) : undefined;

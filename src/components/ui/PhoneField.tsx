@@ -83,6 +83,7 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
           <span className="phone-field__flag" aria-hidden>
             {country.flag}
           </span>
+          <span className="phone-field__iso">{country.code}</span>
           <span>{country.dialCode}</span>
           <ChevronDown size={16} className={open ? 'is-flipped' : undefined} aria-hidden />
         </button>
@@ -103,7 +104,7 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
           onBlur={onBlur}
         />
         {open && (
-          <Floating anchorRef={controlRef} floatingRef={menuRef} className="phone-field__menu" matchWidth>
+          <Floating anchorRef={toggleRef} floatingRef={menuRef} className="phone-field__menu" matchWidth>
             <CountryMenu
               options={directory.options}
               selected={country}
@@ -172,7 +173,7 @@ function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuP
           aria-expanded
           aria-controls={listId}
           aria-activedescendant={options.length ? `${listId}-${active}` : undefined}
-          placeholder="Buscar país o lada"
+          placeholder="País o lada"
           autoComplete="off"
           // El menú se abre a petición del usuario: el foco va a la búsqueda.
           autoFocus
@@ -199,8 +200,10 @@ function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuP
             <span className="phone-field__flag" aria-hidden>
               {c.flag}
             </span>
-            <span className="truncate">{c.name}</span>
-            <small>{c.dialCode}</small>
+            <span className="phone-field__option">
+              <strong>{c.dialCode}</strong>
+              <small className="truncate">{c.name}</small>
+            </span>
           </li>
         ))}
         {options.length === 0 && <li className="phone-field__empty">Sin resultados para “{query}”</li>}

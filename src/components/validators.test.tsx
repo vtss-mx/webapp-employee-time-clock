@@ -8,7 +8,7 @@ import { checkpointService } from '../services/checkpointService';
 import { validatorService } from '../services/validatorService';
 import { catalogsFixture, catalogsWith, testCatalogs } from '../test/catalogs';
 import { identifiedResult as identified, sampleValidator } from '../test/fixtures';
-import { apiFail, apiOk, mockFetch } from '../test/http';
+import { apiFail, apiOk, liveCheck, mockFetch } from '../test/http';
 import { WithCatalogs } from '../test/render';
 import type { ValidatorMode } from '../types';
 import { ValidatorModal, type ValidatorDialog } from './ValidatorModal';
@@ -119,7 +119,12 @@ describe('ValidatorModal', () => {
   }
 
   it('alta: nombre, correo, contraseña y modo; correo repetido se marca en el campo', async () => {
-    const { calls } = mockFetch(apiFail(409, 'EMAIL_TAKEN', 'Ese correo ya está registrado'), apiOk(sampleValidator));
+    let posts = 0;
+    const { calls } = mockFetch((call) => {
+      if (call.url.startsWith('/api/validation')) return liveCheck();
+      posts += 1;
+      return posts === 1 ? apiFail(409, 'EMAIL_TAKEN', 'Ese correo ya está registrado') : apiOk(sampleValidator);
+    });
     const { onSaved, onClose } = open({ kind: 'create' });
     const add = screen.getByRole('button', { name: 'Agregar' });
     expect(add).toBeDisabled();
@@ -130,6 +135,7 @@ describe('ValidatorModal', () => {
     await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'recepcion@empresa.com');
     await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
     await userEvent.click(screen.getByText('Solo QR'));
+    await waitFor(() => expect(add).toBeEnabled());
     await userEvent.click(add);
 
     const dialog = await screen.findByRole('alertdialog');
@@ -138,11 +144,23 @@ describe('ValidatorModal', () => {
     expect(screen.getByText('Ese correo ya está registrado')).toBeInTheDocument();
     expect(add).toBeDisabled(); // hasta que cambie el correo
     await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'x');
-    expect(add).toBeEnabled();
+    await waitFor(() => expect(add).toBeEnabled());
     await userEvent.click(add);
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(sampleValidator));
     expect(onClose).toHaveBeenCalled();
-    expect(JSON.parse(calls[1].init.body as string)).toMatchObject({ name: 'Recepción planta 1', mode: 'QR', password: 'Valida1234' });
+    const create = calls.filter((c) => c.init.method === 'POST').at(-1);
+    expect(JSON.parse(create?.init.body as string)).toMatchObject({ name: 'Recepción planta 1', mode: 'QR', password: 'Valida1234' });
+    expect(calls.some((c) => c.url.startsWith('/api/validation?field=validator_email'))).toBe(true);
+  });
+
+  it('el correo de acceso se verifica en vivo: uno ya registrado se marca y bloquea el alta', async () => {
+    mockFetch(() => liveCheck('TAKEN', 'El correo ya está registrado en la plataforma', 'validator_email'));
+    open({ kind: 'create' });
+    await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Recepción');
+    await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'admin@empresa.com');
+    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
+    expect(await screen.findByText('El correo ya está registrado en la plataforma')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Agregar' })).toBeDisabled();
   });
 
   it('edición: solo nombre y modo; restablecer: solo la contraseña', async () => {

@@ -1,5 +1,4 @@
 import { ApiError } from '../services/apiClient';
-import { adminService } from '../services/adminService';
 import type { CompanyFormValues } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
 import { normalizeRfc, validateEmail, type FieldErrors } from '../utils/validation';
@@ -45,23 +44,26 @@ export function useCompanyForm({ withAdmin, excludeId, originalRfc }: CompanyFor
   });
   const { values } = form;
   const rfcLength = normalizeRfc(values.rfc).length;
+  // Validación en vivo por el canal del backend: RFC y correo del administrador (únicos) y los
+  // datos de contacto (formato, con la misma regla que al guardar).
   const live = {
     rfc: useAvailability('company_rfc', values.rfc, {
       excludeId,
       unchangedValue: originalRfc,
       enabled: rfcLength === 12 || rfcLength === 13,
-      check: (value, id) => adminService.availability('rfc', value, id),
     }),
     admin_email: useAvailability('company_admin_email', values.admin_email, {
       enabled: withAdmin && !validateEmail(values.admin_email),
-      check: (value) => adminService.availability('admin_email', value),
     }),
+    contact_email: useAvailability('company_contact_email', values.contact_email, { enabled: !validateEmail(values.contact_email) }),
+    phone: useAvailability('company_phone', values.phone, { enabled: values.phone.length > 4 }),
   };
 
   const clientErrors = validateCompanyForm(values, { withAdmin });
   const errors = form.visibleErrors(clientErrors);
-  for (const field of ['rfc', 'admin_email'] as const) errors[field] ??= liveMessage(live[field]);
-  const canSubmit = Object.keys(clientErrors).length === 0 && !blocking(live.rfc) && !blocking(live.admin_email) && !form.saving;
+  const liveFields = ['rfc', 'admin_email', 'contact_email', 'phone'] as const;
+  for (const field of liveFields) errors[field] ??= liveMessage(live[field]);
+  const canSubmit = Object.keys(clientErrors).length === 0 && !liveFields.some((field) => blocking(live[field])) && !form.saving;
 
   return {
     values,

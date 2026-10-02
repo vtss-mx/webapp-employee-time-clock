@@ -1,12 +1,10 @@
 import type { CompanyDetail, CompanyFormValues, CompanyList, CompanyListParams, PlatformStats } from '../types';
 import { hasKeys, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
-import type { AvailabilityResult } from '../hooks/useAvailability';
 
 const isCompany = hasKeys<CompanyDetail>('id', 'name', 'active', 'employee_count');
 const isDetail = hasKeys<CompanyDetail>('id', 'name', 'admins');
 const isStats = hasKeys<PlatformStats>('companies', 'active_companies', 'employees', 'company_admins');
-const isAvailability = hasKeys<AvailabilityResult>('code', 'message');
 
 type CompanyData = Omit<CompanyFormValues, 'admin_email' | 'admin_password'>;
 
@@ -73,14 +71,6 @@ export const adminService = {
       method: 'PUT',
       body: { admin_password: password },
       validate: isDetail,
-    });
-  },
-
-  /** Validación en tiempo real del RFC de la empresa o del correo de su administrador. */
-  availability(field: 'rfc' | 'admin_email', value: string, excludeId?: number): Promise<AvailabilityResult> {
-    return apiRequest<AvailabilityResult>('/admin/companies/availability', {
-      query: { field, value, exclude_id: excludeId },
-      validate: isAvailability,
     });
   },
 };

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -123,5 +123,16 @@ describe('PhoneField: teléfono con lada internacional', () => {
     expect(screen.getByRole('listbox', { name: 'Países' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'cargar' }));
     expect(screen.queryByRole('listbox', { name: 'Países' })).toBeNull(); // tocar fuera la cierra
+  });
+
+  it('la lista mide exactamente lo mismo que el selector de lada y queda alineada con él', async () => {
+    render(<Harness />, { wrapper: WithCatalogs });
+    const toggle = countryButton();
+    toggle.getBoundingClientRect = () => ({ left: 40, top: 100, bottom: 148, right: 190, width: 150, height: 48, x: 40, y: 100, toJSON: () => ({}) });
+    await userEvent.click(toggle);
+    const surface = screen.getByRole('listbox', { name: 'Países' }).closest<HTMLElement>('.floating');
+    await waitFor(() => expect(surface?.style.width).toBe('150px'));
+    expect(surface?.style.left).toBe('40px');
+    expect(toggle).toHaveTextContent('MX');
   });
 });

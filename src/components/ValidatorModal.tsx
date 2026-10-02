@@ -1,12 +1,13 @@
 import { KeyRound, Mail, MapPin, Pencil, ScanLine } from 'lucide-react';
 import { useState } from 'react';
+import { useAvailability } from '../hooks/useAvailability';
 import { useCatalogs } from '../hooks/useCatalogs';
 import { useFeedback } from '../hooks/useFeedback';
 import { ApiError } from '../services/apiClient';
 import { validatorService } from '../services/validatorService';
 import type { Validator, ValidatorMode } from '../types';
 import { validateEmail, validatePassword } from '../utils/validation';
-import { FormField } from './FormField';
+import { FormField, liveFeedback } from './FormField';
 import { Modal } from './Modal';
 import { Button } from './ui/Button';
 import { ValidatorModePicker } from './ValidatorModes';
@@ -67,17 +68,20 @@ function useValidatorForm(dialog: ValidatorDialog) {
   const [touched, setTouched] = useState<Record<Field, boolean>>({ name: false, email: false, password: false });
   const [emailTaken, setEmailTaken] = useState<string>();
   const asks: Record<Field, boolean> = { name: dialog.kind !== 'password', email: dialog.kind === 'create', password: dialog.kind !== 'edit' };
+  // Correo de acceso: único en la plataforma, verificado en vivo por el canal del backend.
+  const live = liveFeedback(useAvailability('validator_email', values.email, { enabled: asks.email && !validateEmail(values.email) }));
   const problems: Record<Field, string | undefined> = {
     name: asks.name ? validateValidatorName(values.name) : undefined,
-    email: asks.email ? (emailTaken ?? validateEmail(values.email)) : undefined,
+    email: asks.email ? (emailTaken ?? validateEmail(values.email) ?? live.error) : undefined,
     password: asks.password ? validatePassword(values.password) : undefined,
   };
   return {
     current,
     values,
     asks,
-    valid: !problems.name && !problems.email && !problems.password,
-    shown: (field: Field) => (touched[field] || (field === 'email' && emailTaken) ? problems[field] : undefined),
+    valid: !problems.name && !problems.email && !problems.password && live.status?.tone !== 'checking',
+    emailStatus: live.status,
+    shown: (field: Field) => (touched[field] || (field === 'email' && (emailTaken ?? live.error)) ? problems[field] : undefined),
     touch: (field: Field) => setTouched((t) => ({ ...t, [field]: true })),
     set: <K extends keyof Values>(key: K, value: Values[K]) => {
       setValues((v) => ({ ...v, [key]: value }));
@@ -166,6 +170,7 @@ export function ValidatorModal({ dialog, onClose, onSaved }: ValidatorModalProps
             required
             value={values.email}
             error={shown('email')}
+            status={form.emailStatus}
             hint="Con este correo iniciará sesión en la tableta o el teléfono"
             onBlur={() => touch('email')}
             onChange={(e) => set('email', e.target.value)}

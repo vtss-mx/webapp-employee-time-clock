@@ -51,3 +51,9 @@ export function mockFetch(...responders: Array<Response | Responder>) {
   vi.stubGlobal('fetch', fn);
   return { calls, fn };
 }
+
+/** Respuesta de la validación en vivo (`GET /api/validation`, respaldo HTTP del canal). */
+export function liveCheck(code = 'AVAILABLE', message = 'Disponible', field = 'email'): Response {
+  const valid = code !== 'INVALID_FORMAT' && code !== 'EMPTY';
+  return apiOk({ field, value: '', normalized: null, valid, available: valid && code !== 'TAKEN', code, message });
+}

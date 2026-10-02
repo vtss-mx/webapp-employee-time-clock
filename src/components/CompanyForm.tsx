@@ -13,7 +13,8 @@ interface CompanyFieldsProps {
   errors: FieldErrors<CompanyFormValues>;
   onChange: (values: CompanyFormValues) => void;
   onTouch: (field: Field) => void;
-  live: { rfc: AvailabilityState; admin_email: AvailabilityState };
+  /** Validación en vivo (canal del backend) de los campos que la tienen. */
+  live: Partial<Record<Field, AvailabilityState>>;
   disabled?: boolean;
 }
 
@@ -25,7 +26,7 @@ const NORMALIZE: Partial<Record<Field, (value: string) => string>> = {
 
 function makeBinder({ values, errors, onChange, onTouch, live, disabled }: CompanyFieldsProps) {
   return (name: Field, required = true) => {
-    const feedback = name === 'rfc' || name === 'admin_email' ? liveFeedback(live[name]) : {};
+    const feedback = liveFeedback(live[name]);
     const normalize = NORMALIZE[name];
     return {
       name,
@@ -64,7 +65,8 @@ export function CompanyDataFields(props: CompanyFieldsProps) {
         value={props.values.phone}
         onChange={(phone) => props.onChange({ ...props.values, phone })}
         onBlur={() => props.onTouch('phone')}
-        error={props.errors.phone}
+        error={props.errors.phone ?? liveFeedback(props.live.phone).error}
+        status={liveFeedback(props.live.phone).status}
         disabled={props.disabled}
         required
         hint="Elige el país y escribe el número"

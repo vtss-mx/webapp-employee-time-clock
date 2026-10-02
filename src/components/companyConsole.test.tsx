@@ -7,8 +7,9 @@ import { FeedbackProvider } from '../context/FeedbackContext';
 import { companyServerErrors, emptyCompanyForm, useCompanyForm } from '../hooks/useCompanyForm';
 import { useSearchList, type ActiveFilter, type ListQuery } from '../hooks/useSearchList';
 import { adminService } from '../services/adminService';
+import { checkAvailability } from '../services/availabilityService';
 import { ApiError } from '../services/apiClient';
-import { apiFail, apiOk, mockFetch } from '../test/http';
+import { apiFail, apiOk, liveCheck, mockFetch } from '../test/http';
 import { WithCatalogs, renderWithProviders } from '../test/render';
 import type { CompanyDetail, CompanyFormValues } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
@@ -47,7 +48,7 @@ const validCompany: CompanyFormValues = {
   admin_email: 'admin@pan.com',
   admin_password: 'Empresa1234',
 };
-const available = () => apiOk({ code: 'AVAILABLE', message: 'Disponible' });
+const available = () => liveCheck();
 
 describe('adminService', () => {
   it.each([
@@ -56,7 +57,7 @@ describe('adminService', () => {
     ['get', () => adminService.get(4), company, 'GET', '/api/admin/companies/4'],
     ['setStatus', () => adminService.setStatus(4, false), company, 'PATCH', '/api/admin/companies/4/status'],
     ['setAdminStatus', () => adminService.setAdminStatus(4, 9, true), company, 'PATCH', '/api/admin/companies/4/admins/9/status'],
-    ['availability', () => adminService.availability('rfc', 'PNO120315AB1', 4), { code: 'AVAILABLE', message: 'ok' }, 'GET', '/api/admin/companies/availability?field=rfc&value=PNO120315AB1&exclude_id=4'],
+    ['validación en vivo (respaldo HTTP del canal)', () => checkAvailability('company_rfc', 'PNO120315AB1', 4), { field: 'company_rfc', valid: true, available: true, code: 'AVAILABLE', message: 'ok' }, 'GET', '/api/validation?field=company_rfc&value=PNO120315AB1&exclude_id=4'],
   ])('%s', async (_name, call, data, method, url) => {
     const { calls } = mockFetch(apiOk(data));
     await call();
@@ -104,11 +105,22 @@ describe('useCompanyForm', () => {
   });
 
   it('un RFC ya registrado bloquea el envío y se muestra en el campo', async () => {
-    mockFetch((call) => (call.url.includes('field=rfc') ? apiOk({ code: 'TAKEN', message: 'RFC ya registrado' }) : available()));
+    mockFetch((call) => (call.url.includes('field=company_rfc') ? liveCheck('TAKEN', 'RFC ya registrado', 'company_rfc') : available()));
     const { result } = renderHook(() => useCompanyForm({ withAdmin: true }), { wrapper });
     act(() => result.current.setValues(validCompany));
     await waitFor(() => expect(result.current.errors.rfc).toBe('RFC ya registrado'));
     expect(result.current.canSubmit).toBe(false);
+  });
+
+  it('correo y teléfono de contacto también se validan en vivo (canal del backend)', async () => {
+    const { calls } = mockFetch((call) =>
+      call.url.includes('field=company_phone') ? liveCheck('INVALID_FORMAT', 'Número inválido para México', 'company_phone') : available(),
+    );
+    const { result } = renderHook(() => useCompanyForm({ withAdmin: true }), { wrapper });
+    act(() => result.current.setValues(validCompany));
+    await waitFor(() => expect(result.current.errors.phone).toBe('Número inválido para México'));
+    expect(result.current.canSubmit).toBe(false);
+    expect(calls.some((c) => c.url.includes('field=company_contact_email'))).toBe(true);
   });
 
   it('errores del servidor por campo; cambiar el campo los descarta; la edición marca lo cargado', async () => {
@@ -233,7 +245,7 @@ describe('CompanyAdminModal', () => {
   it('agrega el administrador solo con correo disponible y contraseña segura', async () => {
     const onAdded = vi.fn();
     const onClose = vi.fn();
-    mockFetch((call) => (call.url.includes('availability') ? available() : apiOk({ ...company, admin_count: 2 })));
+    mockFetch((call) => (call.url.includes('/validation') ? available() : apiOk({ ...company, admin_count: 2 })));
     renderModal(onAdded, onClose);
     const add = screen.getByRole('button', { name: 'Agregar' });
     expect(add).toBeDisabled();
@@ -250,7 +262,7 @@ describe('CompanyAdminModal', () => {
   });
 
   it('un correo ya registrado se marca en el campo y se explica en popup', async () => {
-    mockFetch((call) => (call.url.includes('availability') ? available() : apiFail(409, 'EMAIL_TAKEN', 'El correo ya está registrado')));
+    mockFetch((call) => (call.url.includes('/validation') ? available() : apiFail(409, 'EMAIL_TAKEN', 'El correo ya está registrado')));
     renderModal();
     await userEvent.type(screen.getByLabelText('Correo del administrador'), 'rh@pan.com');
     await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos123');

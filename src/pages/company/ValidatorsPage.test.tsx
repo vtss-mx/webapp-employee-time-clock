@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
 import { samplePolicy, sampleValidator } from '../../test/fixtures';
-import { apiOk, mockFetch } from '../../test/http';
+import { apiOk, liveCheck, mockFetch } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import type { Validator } from '../../types';
 import { ValidatorsPage } from './ValidatorsPage';
@@ -14,6 +14,7 @@ function server(list: Validator[]) {
   return mockFetch((call) => {
     const method = call.init.method ?? 'GET';
     if (call.url === '/api/settings/verification') return apiOk(samplePolicy);
+    if (call.url.startsWith('/api/validation')) return liveCheck();
     if (method === 'GET') return apiOk(list);
     if (method === 'PATCH') return apiOk({ ...sampleValidator, active: (JSON.parse(call.init.body as string) as { active: boolean }).active });
     if (method === 'DELETE') return apiOk(null);
@@ -44,7 +45,9 @@ describe('ValidatorsPage (COMPANY)', () => {
     await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Planta 2');
     await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'planta2@empresa.com');
     await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
-    await userEvent.click(screen.getByRole('button', { name: 'Agregar' }));
+    const add = screen.getByRole('button', { name: 'Agregar' });
+    await waitFor(() => expect(add).toBeEnabled()); // correo verificado en vivo
+    await userEvent.click(add);
     expect(await screen.findByText('Validador agregado')).toBeInTheDocument();
     expect(screen.getByText('Planta 2')).toBeInTheDocument();
   });

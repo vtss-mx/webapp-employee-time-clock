@@ -108,6 +108,6 @@ describe('checkAvailability', () => {
     const { calls } = mockFetch(apiOk(availability('AVAILABLE', true)));
     const result = await checkAvailability('employee_number', 'EMP-9', 7);
     expect(result).toMatchObject({ code: 'AVAILABLE', via: 'http' });
-    expect(calls[0].url).toBe('/api/employees/availability?field=employee_number&value=EMP-9&exclude_id=7');
+    expect(calls[0].url).toBe('/api/validation?field=employee_number&value=EMP-9&exclude_id=7');
   });
 });

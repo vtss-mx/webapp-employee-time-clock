@@ -2,7 +2,23 @@ import { hasKeys } from '../utils/guards';
 import { apiRequest, type ApiEnvelope } from './apiClient';
 import { validationSocket } from './realtime/validationSocket';
 
-export type AvailabilityField = 'employee_number' | 'rfc' | 'curp' | 'nss' | 'email' | 'phone';
+/**
+ * Campos que se validan mientras se escriben. El backend decide quién puede validar cada uno (según
+ * las pantallas de su rol): datos del empleado (COMPANY), correo del validador (COMPANY) y datos
+ * de las empresas en la consola de la plataforma (ADMIN).
+ */
+export type AvailabilityField =
+  | 'employee_number'
+  | 'rfc'
+  | 'curp'
+  | 'nss'
+  | 'email'
+  | 'phone'
+  | 'validator_email'
+  | 'company_rfc'
+  | 'company_admin_email'
+  | 'company_contact_email'
+  | 'company_phone';
 
 export interface Availability {
   field: AvailabilityField;
@@ -10,7 +26,7 @@ export interface Availability {
   normalized: string | null;
   valid: boolean;
   available: boolean;
-  /** AVAILABLE | LINKABLE (persona de otra empresa: se vincula) | TAKEN | INVALID_FORMAT | EMPTY */
+  /** AVAILABLE | LINKABLE (persona de otra empresa: se vincula) | TAKEN | VALID (dato de contacto) | INVALID_FORMAT | EMPTY */
   code: string;
   message: string;
   /** Canal que respondió (útil para diagnóstico). */
@@ -34,7 +50,7 @@ export async function checkAvailability(field: AvailabilityField, value: string,
       /* respaldo HTTP */
     }
   }
-  const data = await apiRequest('/employees/availability', {
+  const data = await apiRequest('/validation', {
     query: { field, value, exclude_id: excludeId },
     validate: isAvailability,
   });

@@ -44,6 +44,8 @@ identificadores en inglés; comentarios, textos de la interfaz y documentación 
 - **Reutilizar antes de crear**: popups solo con `Overlay`/`Modal`/`ConfirmDialog`; superficies
   flotantes de campos solo con `Floating` (portal: ningún panel las recorta); formularios con
   `useFormState`; listas con `useSearchList` + `ListControls`. Código repetido se extrae.
+- Correos, teléfonos y datos únicos se validan en vivo con `useAvailability(field, value)` (canal
+  WebSocket del backend con respaldo HTTP); no se crean verificaciones propias por formulario.
 - Catálogos (estados, motivos, países...) se leen de `useCatalogs()` (vienen de la BD), nunca se
   escriben en el código.
 - Errores: `ApiError` con `code` estable y `useFeedback()` para mostrarlos (popups).

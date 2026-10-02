@@ -4542,8 +4542,13 @@ label.is-required::after {
 .phone-field {
   position: relative;
 }
+.phone-field {
+  /* Ancho del selector de lada; la lista de países mide exactamente lo mismo (Floating). Crece
+     con el campo (nombres de país completos) sin dejar al número sin espacio en teléfonos. */
+  --lada-w: clamp(150px, 42%, 280px);
+}
 .phone-field .field__control > input {
-  padding-left: 112px;
+  padding-left: calc(var(--lada-w) + 14px);
 }
 /* La búsqueda del menú no hereda el estado de error del campo. */
 .phone-field__menu .input {
@@ -4559,7 +4564,7 @@ label.is-required::after {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  width: 98px;
+  width: var(--lada-w);
   padding: 0 8px 0 10px;
   border: 0;
   border-right: 1px solid var(--border);
@@ -4595,12 +4600,16 @@ label.is-required::after {
   font-size: 1.15rem;
   line-height: 1;
 }
+.phone-field__iso {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
 .phone-field__menu {
   display: grid;
   gap: 8px;
-  /* El ancho lo fija Floating: el mismo que el campo completo (lada + número). */
-  max-width: calc(100vw - 32px);
-  padding: 10px;
+  /* El ancho lo fija Floating: el mismo que el selector de lada. */
+  padding: 8px;
 }
 .phone-field__options {
   max-height: 264px;
@@ -4612,10 +4621,10 @@ label.is-required::after {
 }
 .phone-field__options li {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+  gap: 8px;
+  padding: 7px 8px;
   border-radius: var(--radius-xs);
   cursor: pointer;
 }
@@ -4630,9 +4639,17 @@ label.is-required::after {
   margin-bottom: 6px;
   box-shadow: 0 7px 0 -6px var(--border);
 }
-.phone-field__options small {
-  color: var(--muted);
+/* Cada país en dos líneas: la lada arriba y el nombre abajo (cabe en el ancho del selector). */
+.phone-field__option {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+.phone-field__option strong {
   font-variant-numeric: tabular-nums;
+}
+.phone-field__option small {
+  color: var(--muted);
 }
 .phone-field__options .phone-field__empty {
   display: block;
