@@ -1,4 +1,4 @@
-import { Lock, LogOut, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageLoader } from '../components/Spinner';
@@ -11,26 +11,9 @@ import { useCatalogs } from '../hooks/useCatalogs';
 import { usePendingEnrollments } from '../hooks/usePendingEnrollments';
 import { homeForUser } from '../routes/paths';
 import { config } from '../utils/config';
-import { MobileTabBar } from './MobileTabBar';
-import { navFor } from './navigation';
-
-const TITLES: Array<[RegExp, string]> = [
-  [/^\/admin\/dashboard/, 'Panel de la plataforma'],
-  [/^\/admin\/companies\/new/, 'Registrar empresa'],
-  [/^\/admin\/companies/, 'Empresas'],
-  [/^\/company\/dashboard/, 'Dashboard'],
-  [/^\/company\/employees\/new/, 'Registrar empleado'],
-  [/^\/company\/employees/, 'Empleados'],
-  [/^\/company\/validations/, 'Validaciones de identidad'],
-  [/^\/company\/validators/, 'Validadores de identidad'],
-  [/^\/company\/settings/, 'Configuración'],
-  [/^\/employee\/enroll/, 'Registro facial'],
-  [/^\/employee\/pending/, 'Validación en curso'],
-  [/^\/employee\/qr/, 'Mi código QR'],
-  [/^\/employee/, 'Identificación'],
-  [/^\/validator/, 'Punto de control'],
-  [/^\/profile/, 'Mi perfil'],
-];
+import { MobileBar, useDrawer } from './MobileBar';
+import { MOBILE_MENU } from './mobileMenu';
+import { navFor, usesBadge } from './navigation';
 
 /** Menú contraído (escritorio): preferencia del usuario en la BD y atajo Ctrl/⌘ + B. */
 function useSidebarCollapse() {
@@ -58,11 +41,15 @@ export function AppLayout() {
   const { nameOf } = useCatalogs();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  useDrawer(menuOpen, closeMenu);
   const { collapsed, toggleCollapsed } = useSidebarCollapse();
-  const pending = usePendingEnrollments(user?.role === 'COMPANY');
+  const pending = usePendingEnrollments(usesBadge(user, 'PENDING_ENROLLMENTS'));
 
-  // En móvil, el menú lateral se cierra al navegar.
-  useEffect(() => setMenuOpen(false), [location.pathname]);
+  // En móvil, el menú lateral se cierra al navegar (configurable).
+  useEffect(() => {
+    if (MOBILE_MENU.closeOnNavigate) setMenuOpen(false);
+  }, [location.pathname]);
 
   if (!user) return null;
   const displayName = user.employee?.full_name ?? user.email;
@@ -73,16 +60,18 @@ export function AppLayout() {
     .map((p) => p[0]?.toUpperCase())
     .join('');
 
-  const nav = navFor(user, pending);
+  const nav = navFor(user, { PENDING_ENROLLMENTS: pending });
   const role = nameOf('roles', user.role);
-
-  const title = TITLES.find(([re]) => re.test(location.pathname))?.[1] ?? '';
-  const secure = window.location.protocol === 'https:';
 
   return (
     <div className={`shell ${collapsed ? 'is-collapsed' : ''}`}>
-      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
-      <aside id="app-sidebar" className={`sidebar ${menuOpen ? 'is-open' : ''}`} aria-label="Navegación principal">
+      <MobileBar nav={nav} home={homeForUser(user)} open={menuOpen} onToggle={() => setMenuOpen((v) => !v)} config={MOBILE_MENU} />
+      {menuOpen && <div className="sidebar-overlay" onClick={closeMenu} />}
+      <aside
+        id="app-sidebar"
+        className={`sidebar sidebar--${MOBILE_MENU.side} ${menuOpen ? 'is-open' : ''}`}
+        aria-label="Navegación principal"
+      >
         <Link to={homeForUser(user)} className="sidebar__brand">
           <BrandLogo />
           <span className="brand-name">
@@ -91,6 +80,10 @@ export function AppLayout() {
             <small className="truncate">{user.company?.name ?? (user.role === 'ADMIN' ? 'Consola de la plataforma' : 'Identidad verificada')}</small>
           </span>
         </Link>
+        {/* Teléfonos: el menú se cierra desde dentro (la barra queda detrás del fondo oscuro). */}
+        <Button iconOnly variant="ghost" className="sidebar__close" aria-label="Cerrar menú" onClick={closeMenu}>
+          <X size={20} />
+        </Button>
 
         <span className="sidebar__section">{role}</span>
         <nav style={{ display: 'grid', gap: 4 }}>
@@ -104,6 +97,18 @@ export function AppLayout() {
         </nav>
 
         <div className="sidebar__footer">
+          <button
+            type="button"
+            className="nav-item sidebar__collapse"
+            aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+            aria-controls="app-sidebar"
+            aria-expanded={!collapsed}
+            data-tooltip={collapsed ? 'Expandir menú' : 'Contraer menú'}
+            onClick={toggleCollapsed}
+          >
+            {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+            <span className="nav-item__label">Contraer menú</span>
+          </button>
           <div className="user-card">
             <span className="avatar">{initials}</span>
             <span className="user-card__info">
@@ -118,41 +123,6 @@ export function AppLayout() {
       </aside>
 
       <div className="main">
-        <header className="topbar">
-          <Button
-            iconOnly
-            variant="ghost"
-            className="topbar__menu"
-            aria-label="Abrir menú"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <Menu size={20} />
-          </Button>
-          <Button
-            iconOnly
-            variant="ghost"
-            className="topbar__collapse"
-            aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
-            aria-controls="app-sidebar"
-            aria-expanded={!collapsed}
-            title={`${collapsed ? 'Expandir' : 'Contraer'} menú (Ctrl/⌘ + B)`}
-            onClick={toggleCollapsed}
-          >
-            {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
-          </Button>
-          <span className="topbar__brand">
-            <BrandLogo size={30} />
-          </span>
-          <span className="topbar__title">{title}</span>
-          <div className="topbar__right">
-            {secure && (
-              <span className="secure-chip" title="La conexión con el servidor está cifrada (HTTPS)">
-                <Lock size={14} /> Conexión segura
-              </span>
-            )}
-          </div>
-        </header>
         <main className="content">
           {/* La key reinicia la animación de entrada en cada cambio de ruta. */}
           <div key={location.pathname} className="page-transition">
@@ -166,7 +136,6 @@ export function AppLayout() {
           </div>
         </main>
       </div>
-      <MobileTabBar nav={nav} onMore={() => setMenuOpen(true)} />
       <OfflineBanner />
     </div>
   );

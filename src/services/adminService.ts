@@ -49,6 +49,11 @@ export const adminService = {
     return apiRequest<CompanyDetail>(`/admin/companies/${id}/status`, { method: 'PATCH', body: { active }, validate: isDetail });
   },
 
+  /** Solo una empresa sin empleados (con empleados, el backend responde 409 y se desactiva). */
+  remove(id: number): Promise<void> {
+    return apiRequest<null>(`/admin/companies/${id}`, { method: 'DELETE' }).then(() => undefined);
+  },
+
   addAdmin(id: number, email: string, password: string): Promise<CompanyDetail> {
     const body = { admin_email: email.trim(), admin_password: password };
     return apiRequest<CompanyDetail>(`/admin/companies/${id}/admins`, { method: 'POST', body, validate: isDetail });

@@ -13,7 +13,7 @@ export function PendingValidationPage() {
   const { user, refreshUser } = useAuth();
   const [checking, setChecking] = useState(false);
 
-  // EmployeeFaceGate redirige automáticamente cuando cambia el estado.
+  // Al aprobarse, el backend cambia las pantallas del empleado y la ruta lleva a su nuevo inicio.
   const poll = useCallback(() => refreshUser(), [refreshUser]);
   usePolling(poll, { intervalMs: config.validationStatusPollMs, immediate: false });
 

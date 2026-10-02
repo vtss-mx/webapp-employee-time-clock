@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { homeForUser, needsCompanySelection, paths } from '../../routes/paths';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders, sampleUser, tokenResponse } from '../../test/render';
+import { withScreens } from '../../test/screens';
 import type { User, UserMembership } from '../../types';
 import { CompanySelectPage } from './CompanySelectPage';
 
@@ -22,7 +23,7 @@ const memberships = [
   membership(2, 'Logística Sonora', { face_status: 'NOT_ENROLLED' }),
   membership(3, 'Cerrada SA', { company: { id: 3, name: 'Cerrada SA', active: false } }),
 ];
-const multiUser: User = { ...sampleUser, employee: null, company: null, memberships };
+const multiUser: User = withScreens({ ...sampleUser, employee: null, company: null, memberships });
 
 function SignIn() {
   const { login } = useAuth();
@@ -50,12 +51,12 @@ describe('Selección de empresa (persona en varias empresas)', () => {
     expect(needsCompanySelection(multiUser)).toBe(true);
     expect(homeForUser(multiUser)).toBe(paths.selectCompany);
     expect(needsCompanySelection(sampleUser)).toBe(false);
-    expect(homeForUser({ ...sampleUser, role: 'COMPANY', employee: null })).toBe(paths.company.dashboard);
+    expect(homeForUser(withScreens({ ...sampleUser, role: 'COMPANY', employee: null }))).toBe(paths.company.dashboard);
   });
 
   it('lista sus empresas, bloquea las no disponibles y entra a la elegida', async () => {
     const calls = renderSelect(() =>
-      apiOk({ ...multiUser, company: memberships[1].company, employee: { ...sampleUser.employee, id: 20 } }),
+      apiOk(withScreens({ ...multiUser, company: memberships[1].company, employee: sampleUser.employee && { ...sampleUser.employee, id: 20 } })),
     );
     expect(await screen.findByRole('heading', { name: 'Elige tu empresa' })).toBeInTheDocument();
     expect(screen.getByText(/Trabajas en 3 empresas/)).toHaveTextContent('ana@empresa.com');

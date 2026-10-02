@@ -104,12 +104,13 @@ describe('AuthProvider', () => {
     expect(result.current.isAuthenticated).toBe(false);
   });
 
-  it('logout en todos los dispositivos', async () => {
+  it('logout en todos los dispositivos: sin aviso en este (el usuario ya lo confirmó)', async () => {
     mockFetch(route({ '/auth/login': () => apiOk(tokenResponse()), '/auth/logout-all': () => apiOk({ revoked: 2 }) }));
     const { result } = renderHook(() => useAuth(), { wrapper });
     await act(() => result.current.login('ana@empresa.com', 'x'));
     await act(() => result.current.logoutEverywhere());
-    expect(result.current.logoutReason).toMatch(/todos tus dispositivos/);
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(result.current.logoutReason).toBeNull();
   });
 
   it('al vencer la sesión la cierra sola (vuelve al login) sin renovarla', async () => {

@@ -9,11 +9,13 @@ import { useSearchList, type ActiveFilter, type ListQuery } from '../hooks/useSe
 import { adminService } from '../services/adminService';
 import { ApiError } from '../services/apiClient';
 import { apiFail, apiOk, mockFetch } from '../test/http';
-import { WithCatalogs } from '../test/render';
+import { WithCatalogs, renderWithProviders } from '../test/render';
 import type { CompanyDetail, CompanyFormValues } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
 import { validateCompanyRfc, validateMaxEmployees } from '../utils/validation';
 import { CompanyAdminModal } from './CompanyAdminModal';
+import { CompanyDetailPage } from '../pages/admin/CompanyDetailPage';
+import { Route, Routes } from 'react-router-dom';
 import { CompanyAdminFields, CompanyDataFields } from './CompanyForm';
 import { KpiCard } from './ui/KpiCard';
 import { ListToolbar } from './ui/ListControls';
@@ -278,5 +280,38 @@ describe('CompanyAdminModal', () => {
     expect(calls[0].init.method).toBe('PUT');
     expect(JSON.parse(calls[0].init.body as string)).toEqual({ admin_password: 'Nueva12345' });
     expect(await screen.findByText('Contraseña restablecida')).toBeInTheDocument();
+  });
+});
+
+describe('CompanyDetailPage: eliminar empresa', () => {
+  const renderDetail = (detail: CompanyDetail) => {
+    const mock = mockFetch((call) => (call.init.method === 'DELETE' ? apiOk(null) : apiOk(detail)));
+    renderWithProviders(
+      <Routes>
+        <Route path="/admin/companies/:id" element={<CompanyDetailPage />} />
+        <Route path="/admin/companies" element={<p>Listado de empresas</p>} />
+      </Routes>,
+      { route: `/admin/companies/${detail.id}` },
+    );
+    return mock.calls;
+  };
+
+  it('con empleados no se puede eliminar (se desactiva)', async () => {
+    renderDetail(company);
+    const remove = await screen.findByRole('button', { name: 'Eliminar' });
+    expect(remove).toBeDisabled();
+    expect(remove).toHaveAttribute('title', expect.stringMatching(/desactívala/));
+  });
+
+  it('sin empleados se elimina escribiendo su nombre para confirmar', async () => {
+    const calls = renderDetail({ ...company, employee_count: 0 });
+    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Eliminar Panificadora' });
+    const confirm = within(dialog).getByRole('button', { name: 'Eliminar empresa' });
+    expect(confirm).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText(/Escribe «Panificadora»/), 'Panificadora');
+    await userEvent.click(confirm);
+    expect(await screen.findByText('Listado de empresas')).toBeInTheDocument();
+    expect(calls.find((c) => c.init.method === 'DELETE')?.url).toBe('/api/admin/companies/4');
   });
 });

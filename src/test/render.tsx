@@ -7,6 +7,7 @@ import { CatalogContext } from '../context/CatalogContext';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import type { CatalogApi } from '../utils/catalogs';
 import { testCatalogs } from './catalogs';
+import { withScreens } from './screens';
 
 /** Catálogos ya cargados (los de prueba u otros), como los deja CatalogProvider tras la carga. */
 export function WithCatalogs({ children, catalogs = testCatalogs }: { children: ReactNode; catalogs?: CatalogApi }) {
@@ -25,7 +26,7 @@ export function renderWithProviders(ui: ReactElement, { route = '/', auth = fals
   );
 }
 
-export const sampleUser: User = {
+export const sampleUser: User = withScreens({
   id: 1,
   email: 'ana@empresa.com',
   role: 'EMPLOYEE',
@@ -43,15 +44,16 @@ export const sampleUser: User = {
     face_status: 'APPROVED',
     face_rejection_reason: null,
   },
-};
+});
 
-export function tokenResponse(user: User = sampleUser, expiresIn = 43_200) {
+/** Respuesta de login/renovación; las pantallas del usuario se calculan como en el backend. */
+export function tokenResponse(user: Omit<User, 'screens' | 'home'> = sampleUser, expiresIn = 43_200) {
   return {
     access_token: `token-${Math.random()}`,
     token_type: 'Bearer',
     expires_in: expiresIn,
     expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
     session_id: 'sid-1',
-    user,
+    user: withScreens(user),
   };
 }

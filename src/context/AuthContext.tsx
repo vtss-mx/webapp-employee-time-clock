@@ -226,7 +226,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutEverywhere = useCallback(async () => {
     await authService.logoutAll();
-    clear('Cerraste sesión en todos tus dispositivos.');
+    // El usuario ya lo confirmó: aquí no se avisa. Los demás dispositivos sí reciben el motivo.
+    clear();
   }, [clear]);
 
 

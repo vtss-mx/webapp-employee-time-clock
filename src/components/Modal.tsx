@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, HelpCircle } from 'lucide-react';
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { MessageVariant } from '../utils/errorPresentation';
+import { FormField } from './FormField';
 import { Button } from './ui/Button';
 import { DialogHero } from './ui/DialogHero';
 import { Overlay } from './ui/Overlay';
@@ -44,6 +45,11 @@ interface ConfirmDialogProps {
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * Acciones irreversibles: la persona escribe este texto (p. ej. el nombre de la empresa) para
+   * habilitar el botón. Evita confirmar por inercia.
+   */
+  confirmText?: string;
 }
 
 const TONES = {
@@ -53,8 +59,12 @@ const TONES = {
 } as const;
 
 /** Confirmación de una acción (eliminar, desactivar, aceptar...). Misma base que todos los popups. */
-export function ConfirmDialog({
-  open,
+export function ConfirmDialog({ open, ...props }: ConfirmDialogProps) {
+  // Montada solo mientras está abierta: el texto escrito para confirmar empieza vacío cada vez.
+  return open ? <ConfirmDialogBody {...props} /> : null;
+}
+
+function ConfirmDialogBody({
   title,
   message,
   confirmLabel = 'Confirmar',
@@ -62,10 +72,12 @@ export function ConfirmDialog({
   loading = false,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
+  confirmText,
+}: Omit<ConfirmDialogProps, 'open'>) {
   const titleId = useId();
   const textId = useId();
-  if (!open) return null;
+  const [typed, setTyped] = useState('');
+  const confirmed = !confirmText || typed.trim() === confirmText.trim();
   const style = TONES[tone];
   return (
     <Overlay
@@ -87,13 +99,23 @@ export function ConfirmDialog({
         <div id={textId} className="msg__text">
           {message}
         </div>
+        {confirmText && (
+          <FormField
+            label={`Escribe «${confirmText}» para confirmar`}
+            value={typed}
+            autoComplete="off"
+            disabled={loading}
+            data-autofocus=""
+            onChange={(e) => setTyped(e.target.value)}
+          />
+        )}
       </div>
       <div className="msg__footer">
         <div className="msg__actions">
           <Button variant="ghost" size="lg" onClick={onCancel} disabled={loading}>
             Cancelar
           </Button>
-          <Button variant={style.button} size="lg" onClick={onConfirm} loading={loading} data-primary="">
+          <Button variant={style.button} size="lg" onClick={onConfirm} loading={loading} disabled={!confirmed} data-primary="">
             {confirmLabel}
           </Button>
         </div>

@@ -5,6 +5,7 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
 import { describedBy, FieldLabel, FieldMessage, type FieldStatus } from '../FormField';
+import { Floating } from './Floating';
 
 interface PhoneFieldProps {
   label: string;
@@ -35,7 +36,8 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
   const directory = useMemo(() => countryDirectory(countries), [countries]);
   const [country, setCountry] = useState<CountryOption>(() => directory.split(value).country);
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const controlRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
 
@@ -43,7 +45,7 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
   // escribe el usuario el país no cambia (el número ya lleva la lada elegida).
   useSyncOnChange(value, (next) => setCountry((current) => directory.split(next, current).country));
 
-  useDismissOnOutsidePointer(rootRef, open, () => setOpen(false));
+  useDismissOnOutsidePointer([controlRef, menuRef], open, () => setOpen(false));
 
   const national = directory.split(value, country).national;
   const emit = (nextCountry: CountryOption, digits: string) => {
@@ -65,9 +67,9 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
   };
 
   return (
-    <div className={`field phone-field ${error ? 'field--error' : status ? `field--${status.tone}` : ''}`} ref={rootRef}>
+    <div className={`field phone-field ${error ? 'field--error' : status ? `field--${status.tone}` : ''}`}>
       <FieldLabel htmlFor={id} label={label} required={required} />
-      <div className="field__control">
+      <div className="field__control" ref={controlRef}>
         <button
           ref={toggleRef}
           type="button"
@@ -101,15 +103,17 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
           onBlur={onBlur}
         />
         {open && (
-          <CountryMenu
-            options={directory.options}
-            selected={country}
-            onSelect={choose}
-            onClose={() => {
-              setOpen(false);
-              toggleRef.current?.focus();
-            }}
-          />
+          <Floating anchorRef={controlRef} floatingRef={menuRef} className="phone-field__menu" matchWidth>
+            <CountryMenu
+              options={directory.options}
+              selected={country}
+              onSelect={choose}
+              onClose={() => {
+                setOpen(false);
+                toggleRef.current?.focus();
+              }}
+            />
+          </Floating>
         )}
       </div>
       <FieldMessage id={id} error={error} hint={status?.text ?? hint} />
@@ -157,7 +161,7 @@ function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuP
   };
 
   return (
-    <div className="phone-field__menu">
+    <>
       <div className="search">
         <Search size={16} />
         <input
@@ -201,6 +205,6 @@ function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuP
         ))}
         {options.length === 0 && <li className="phone-field__empty">Sin resultados para “{query}”</li>}
       </ul>
-    </div>
+    </>
   );
 }

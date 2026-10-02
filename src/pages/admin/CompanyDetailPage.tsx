@@ -1,6 +1,6 @@
-import { Building2, Gauge, KeyRound, Pencil, Power, PowerOff, UserCog, UserPlus } from 'lucide-react';
+import { Building2, Gauge, KeyRound, Pencil, Power, PowerOff, Trash2, UserCog, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { CompanyAdminModal } from '../../components/CompanyAdminModal';
 import { ConfirmDialog } from '../../components/Modal';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -15,12 +15,50 @@ import type { CompanyAdmin, CompanyDetail } from '../../types';
 import { formatDate, formatDateTime } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
 
-type Pending = { kind: 'company' } | { kind: 'admin'; admin: CompanyAdmin } | null;
+type Pending = { kind: 'company' } | { kind: 'delete' } | { kind: 'admin'; admin: CompanyAdmin } | null;
 const orMissing = (value: string | null | undefined) => value || <span className="muted">Sin capturar</span>;
+
+interface CompanyActionsProps {
+  company: CompanyDetail;
+  busy: boolean;
+  toggling: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+}
+
+/** Editar, activar o desactivar y eliminar (solo sin empleados: con empleados, se desactiva). */
+function CompanyActions({ company, busy, toggling, onToggle, onDelete }: CompanyActionsProps) {
+  const removable = company.employee_count === 0;
+  return (
+    <>
+      <ButtonLink to={paths.admin.editCompany(company.id)} variant="secondary" icon={<Pencil size={18} />}>
+        Editar
+      </ButtonLink>
+      <Button
+        variant={company.active ? 'danger-outline' : 'success'}
+        icon={company.active ? <PowerOff size={18} /> : <Power size={18} />}
+        loading={toggling}
+        onClick={onToggle}
+      >
+        {company.active ? 'Desactivar' : 'Activar'}
+      </Button>
+      <Button
+        variant="danger-outline"
+        icon={<Trash2 size={18} />}
+        disabled={!removable || busy}
+        title={removable ? undefined : 'Tiene empleados registrados: desactívala en lugar de eliminarla'}
+        onClick={onDelete}
+      >
+        Eliminar
+      </Button>
+    </>
+  );
+}
 
 /** Detalle de una empresa: datos, uso del plan, administradores y estado. */
 export function CompanyDetailPage() {
   const companyId = Number(useParams().id);
+  const navigate = useNavigate();
   const feedback = useFeedback();
   const [company, setCompany] = useState<CompanyDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -68,6 +106,18 @@ export function CompanyDetailPage() {
     company.active
       ? setConfirm({ kind: 'company' })
       : void run(() => adminService.setStatus(company.id, true), 'Empresa activada', 'Su personal ya puede iniciar sesión.');
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await adminService.remove(company.id);
+      void navigate(paths.admin.companies, { replace: true });
+      feedback.success('Empresa eliminada', `${company.name} y sus cuentas de acceso se eliminaron.`);
+    } catch (e) {
+      setBusy(false);
+      setConfirm(null);
+      void feedback.fromError(e, { title: 'No se pudo eliminar la empresa' });
+    }
+  };
   const usage = company.max_employees ? Math.min(100, Math.round((company.employee_count / company.max_employees) * 100)) : null;
 
   return (
@@ -83,19 +133,13 @@ export function CompanyDetailPage() {
             </>
           }
           actions={
-            <>
-              <ButtonLink to={paths.admin.editCompany(company.id)} variant="secondary" icon={<Pencil size={18} />}>
-                Editar
-              </ButtonLink>
-              <Button
-                variant={company.active ? 'danger-outline' : 'success'}
-                icon={company.active ? <PowerOff size={18} /> : <Power size={18} />}
-                loading={busy && confirm === null}
-                onClick={toggleCompany}
-              >
-                {company.active ? 'Desactivar' : 'Activar'}
-              </Button>
-            </>
+            <CompanyActions
+              company={company}
+              busy={busy}
+              toggling={busy && confirm === null}
+              onToggle={toggleCompany}
+              onDelete={() => setConfirm({ kind: 'delete' })}
+            />
           }
         />
 
@@ -200,6 +244,17 @@ export function CompanyDetailPage() {
         loading={busy}
         onCancel={() => setConfirm(null)}
         onConfirm={() => void run(() => adminService.setStatus(company.id, false), 'Empresa desactivada', 'Su personal ya no puede iniciar sesión.')}
+      />
+      <ConfirmDialog
+        open={confirm?.kind === 'delete'}
+        title={`Eliminar ${company.name}`}
+        message="Se eliminan la empresa, sus administradores, sus validadores y su configuración. No se puede deshacer."
+        confirmLabel="Eliminar empresa"
+        confirmText={company.name}
+        tone="danger"
+        loading={busy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void remove()}
       />
       <ConfirmDialog
         open={confirm?.kind === 'admin'}

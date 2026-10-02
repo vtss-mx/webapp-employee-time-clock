@@ -316,7 +316,7 @@ describe('rutas protegidas', () => {
       <MemoryRouter initialEntries={['/privado']}>
         <AuthProvider>
           <Routes>
-            <Route element={<ProtectedRoute roles={['COMPANY']} />}>
+            <Route element={<ProtectedRoute />}>
               <Route path="/privado" element={<span>secreto</span>} />
             </Route>
             <Route path="/login" element={<span>pantalla de login</span>} />

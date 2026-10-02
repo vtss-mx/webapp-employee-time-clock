@@ -39,6 +39,27 @@ export interface User {
   memberships?: UserMembership[];
   /** Preferencias de la interfaz guardadas en la BD (siguen al usuario en cualquier dispositivo). */
   preferences?: UserPreferences;
+  /**
+   * Pantallas del usuario, en orden: las decide el backend (permiso del rol en la BD y estado del
+   * usuario). El menú y las rutas se arman solo con ellas.
+   */
+  screens: Screen[];
+  /** Inicio del usuario (su primera pantalla); null si no tiene ninguna. */
+  home: string | null;
+}
+
+/** Pantalla del usuario, tal como la envía el backend (catalog.screens). */
+export interface Screen {
+  code: string;
+  name: string;
+  /** Etiqueta corta: título de la barra superior en teléfonos (si no hay, `name`). */
+  short_name: string | null;
+  /** Ruta base: la opción del menú lleva aquí. */
+  path: string;
+  /** Nombre del ícono (lucide). */
+  icon: string;
+  /** Contador que acompaña la opción (p. ej. PENDING_ENROLLMENTS). */
+  badge: string | null;
 }
 
 export interface UserPreferences {

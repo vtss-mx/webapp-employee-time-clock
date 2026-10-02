@@ -105,7 +105,9 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --sidebar-w: 264px;
   --sidebar-w-collapsed: 84px;
-  --topbar-h: 64px;
+  /* Teléfonos y tabletas: alto de la barra superior y ancho del menú (cajón). */
+  --mobilebar-h: 56px;
+  --drawer-w: min(86vw, 320px);
   /* Fondo de TODAS las ventanas emergentes y del menú lateral en móvil */
   --scrim: rgba(8, 15, 35, 0.52);
   --scrim-blur: blur(6px);
@@ -274,14 +276,6 @@ img {
   }
   to {
     opacity: 1;
-    transform: none;
-  }
-}
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
     transform: none;
   }
 }
@@ -963,11 +957,23 @@ img {
 }
 
 /* ==========================================================================
-   Layout (sidebar + topbar)
+   Layout (menú lateral + contenido sobre fondo blanco)
    ========================================================================== */
+/* El área de trabajo es blanca (tapa el degradado azul del body, que queda para el login).
+   Lo que antes iba "sobre el azul" usa aquí el color de texto normal, y los paneles se
+   separan del fondo con borde y sombra suaves. */
 .shell {
+  --on-app: var(--text);
+  --on-app-muted: var(--muted);
+  --shadow-panel: var(--shadow);
   min-height: 100vh;
   min-height: 100dvh;
+  background: var(--surface);
+}
+.shell .panel,
+.shell .center-page,
+.shell .verify-screen {
+  border-color: var(--border);
 }
 
 .sidebar {
@@ -1017,7 +1023,6 @@ img {
 }
 /* Sobre superficies azules oscuras: halo claro sutil para que el ícono (azul marino) se distinga. */
 .sidebar .brand-logo,
-.topbar .brand-logo,
 .auth__header .brand-logo {
   filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.55)) drop-shadow(0 2px 10px rgba(147, 197, 253, 0.45));
 }
@@ -1142,56 +1147,17 @@ img {
 .main {
   min-width: 0;
 }
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: calc(var(--topbar-h) + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) 16px 0;
-  background: var(--glass-bg);
-  backdrop-filter: saturate(160%) blur(16px);
-  -webkit-backdrop-filter: saturate(160%) blur(16px);
-  border-bottom: 1px solid var(--glass-border);
-  color: var(--on-app);
-}
-/* Botones sobre superficies de cristal azul (barra superior y encabezado del login). */
-.topbar .btn--ghost,
+/* Botones sobre el encabezado de cristal azul del login. */
 .auth__header .btn--ghost {
   --btn-bg: rgba(255, 255, 255, 0.08);
   --btn-fg: var(--on-app);
   --btn-border: rgba(255, 255, 255, 0.2);
   --btn-shadow: none;
 }
-.topbar .btn--ghost:hover:not(:disabled),
 .auth__header .btn--ghost:hover:not(:disabled) {
   --btn-bg: rgba(255, 255, 255, 0.16);
   --btn-fg: var(--on-app);
   --btn-border: rgba(255, 255, 255, 0.34);
-}
-.topbar__title {
-  font-weight: 700;
-  color: var(--on-app);
-  letter-spacing: 0.01em;
-}
-.topbar__right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.secure-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--success-soft);
-  color: var(--success);
-  font-size: 0.8rem;
-  font-weight: 700;
 }
 /* Área de contenido: ocupa todo el ancho disponible con 32 px de margen en los 4 lados
    (en todas las pantallas). En teléfonos se reduce a 16 px para no perder espacio útil. */
@@ -1205,27 +1171,26 @@ img {
   }
 }
 
-.topbar__collapse {
+/* Contraer/expandir el menú: solo en escritorio (en móvil el menú se abre con "Más"). */
+.sidebar__collapse {
   display: none;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 @media (min-width: 1024px) {
   .sidebar {
     transform: none;
     box-shadow: none;
-    border-right: 1px solid var(--glass-border);
-    background:
-      radial-gradient(120% 50% at 0% 0%, rgba(59, 130, 246, 0.22), transparent 60%),
-      linear-gradient(180deg, rgba(5, 14, 40, 0.66), rgba(5, 14, 40, 0.5));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
     transition: width 0.25s var(--ease), padding 0.25s var(--ease);
   }
-  .sidebar-overlay,
-  .topbar__menu {
+  .sidebar-overlay {
     display: none;
   }
-  .topbar__collapse {
-    display: inline-flex;
+  .sidebar__collapse {
+    display: flex;
   }
   .main {
     margin-left: var(--sidebar-w);
@@ -2493,7 +2458,7 @@ a.kpi:hover {
   display: grid;
   gap: 18px;
   grid-template-rows: minmax(0, 1fr) auto;
-  height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - 48px);
+  height: calc(100dvh - env(safe-area-inset-top) - 48px);
   min-height: 540px;
   animation: fade-in 0.4s;
 }
@@ -2516,14 +2481,11 @@ a.kpi:hover {
   }
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  :root {
-    --topbar-h: 52px;
-  }
   .content {
     padding-top: 10px;
   }
   .verify-screen {
-    height: calc(100dvh - var(--topbar-h) - 24px);
+    height: calc(100dvh - 24px);
   }
   .verify-screen__panel .requirements,
   .verify-screen__panel h1 {
@@ -3100,8 +3062,7 @@ a.kpi:hover {
 /* ---------- Visor de escaneo: diseño enterprise (móvil primero) ---------- */
 .camera {
   container-type: size; /* el óvalo se dimensiona con el visor (cqw/cqh) */
-  /* scrollIntoView deja el visor debajo del encabezado fijo, no detrás. */
-  scroll-margin-top: calc(var(--topbar-h) + env(safe-area-inset-top) + 8px);
+  scroll-margin-top: calc(env(safe-area-inset-top) + 8px);
   scroll-margin-bottom: 8px;
 }
 .face-scan {
@@ -3332,7 +3293,7 @@ a.kpi:hover {
 /* ---------- Escáner (rostro/QR): cámara e información en UN solo contenedor ---------- */
 .verify-screen {
   gap: 0;
-  height: calc(100dvh - var(--topbar-h) - env(safe-area-inset-top) - 64px);
+  height: calc(100dvh - env(safe-area-inset-top) - 64px);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: var(--radius-xl);
@@ -3596,12 +3557,12 @@ a.kpi:hover {
   opacity: 0.7;
 }
 
-/* ---------- Superficie flotante bajo un campo (calendario, selector de país) ---------- */
-.datepicker,
-.phone-field__menu {
-  position: absolute;
-  left: 0;
-  z-index: 30;
+/* ---------- Superficie flotante de un campo (calendario, selector de país) ----------
+   Vive en un portal (componente Floating) con posición fija: ningún panel la recorta ni la tapa.
+   Queda sobre el menú lateral y la barra inferior, y bajo las ventanas emergentes (1200). */
+.floating {
+  position: fixed;
+  z-index: 1100;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -3609,10 +3570,12 @@ a.kpi:hover {
   animation: scale-in 0.18s var(--ease);
   transform-origin: top left;
 }
+.floating--above {
+  transform-origin: bottom left;
+}
 
 /* ---------- Calendario personalizado ---------- */
 .datepicker {
-  top: calc(100% + 8px);
   width: min(330px, calc(100vw - 32px));
   padding: 14px;
 }
@@ -4633,10 +4596,10 @@ label.is-required::after {
   line-height: 1;
 }
 .phone-field__menu {
-  top: calc(100% + 6px);
   display: grid;
   gap: 8px;
-  width: min(340px, calc(100vw - 32px));
+  /* El ancho lo fija Floating: el mismo que el campo completo (lada + número). */
+  max-width: calc(100vw - 32px);
   padding: 10px;
 }
 .phone-field__options {
@@ -4753,81 +4716,40 @@ label.is-required::after {
 }
 
 /* ==========================================================================
-   Teléfonos: barra de navegación inferior (al alcance del pulgar)
+   Teléfonos y tabletas: barra superior con menú hamburguesa (el menú lateral entra como cajón).
+   Personalizable con los tokens --mobilebar-h y --drawer-w, y con src/layouts/mobileMenu.ts.
    ========================================================================== */
-.tabbar {
+.mobilebar,
+.sidebar__close {
   display: none;
 }
 @media (max-width: 1023px) {
-  .tabbar {
-    position: fixed;
-    inset: auto 0 0;
-    z-index: 35;
+  .mobilebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
     display: flex;
-    justify-content: space-around;
-    gap: 4px;
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--border);
+    align-items: center;
+    gap: 12px;
+    height: calc(var(--mobilebar-h) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 16px 0;
+    border-bottom: 1px solid var(--border);
     background: rgba(255, 255, 255, 0.94);
     backdrop-filter: saturate(180%) blur(16px);
-    box-shadow: 0 -8px 24px -18px rgba(15, 23, 42, 0.35);
-    animation: slide-up 0.35s var(--ease) both;
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
   }
-  .tabbar__item {
+  /* Menú a la derecha: el botón también. */
+  .mobilebar--right {
+    flex-direction: row-reverse;
+  }
+  .mobilebar__toggle {
     position: relative;
-    display: grid;
-    flex: 1;
-    justify-items: center;
-    gap: 2px;
-    min-width: 0;
-    min-height: 54px;
-    padding: 6px 4px;
-    border: 0;
-    border-radius: 14px;
-    background: transparent;
-    color: var(--muted);
-    font: inherit;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    transition:
-      color 0.2s var(--ease),
-      background 0.2s var(--ease),
-      transform 0.15s var(--ease);
+    flex-shrink: 0;
   }
-  .tabbar__item:active {
-    transform: scale(0.94);
-  }
-  .tabbar__item.is-active {
-    color: var(--primary);
-  }
-  .tabbar__item.is-active .tabbar__icon {
-    background: var(--primary-soft);
-    transform: translateY(-1px);
-  }
-  .tabbar__icon {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: 52px;
-    height: 30px;
-    border-radius: 999px;
-    transition:
-      background 0.25s var(--ease),
-      transform 0.25s var(--ease-spring);
-  }
-  .tabbar__label {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .tabbar__badge {
+  .mobilebar__badge {
     position: absolute;
-    top: -2px;
-    right: 6px;
+    top: -4px;
+    right: -4px;
     min-width: 18px;
     height: 18px;
     padding: 0 5px;
@@ -4835,15 +4757,46 @@ label.is-required::after {
     background: var(--danger);
     color: #fff;
     font-size: 0.68rem;
+    font-weight: 700;
     line-height: 18px;
     text-align: center;
   }
-  /* El contenido no queda debajo de la barra; el menú lateral solo se abre con "Más". */
-  .content {
-    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  .mobilebar__brand {
+    display: inline-flex;
+    flex-shrink: 0;
   }
-  .topbar__menu {
-    display: none;
+  .mobilebar__title {
+    min-width: 0;
+    color: var(--text);
+    font-weight: 700;
+  }
+  .sidebar {
+    width: var(--drawer-w);
+  }
+  .sidebar--right {
+    inset: 0 0 0 auto;
+    transform: translateX(100%);
+  }
+  .sidebar__close {
+    position: absolute;
+    top: calc(18px + env(safe-area-inset-top));
+    right: 12px;
+    display: inline-flex;
+    --btn-bg: transparent;
+    --btn-fg: #c8d6fb;
+    --btn-border: rgba(255, 255, 255, 0.16);
+    --btn-shadow: none;
+  }
+  /* El nombre de la aplicación no queda debajo del botón de cerrar. */
+  .sidebar__brand {
+    padding-right: 52px;
+  }
+  /* Las pantallas de cámara descuentan la barra superior. */
+  .verify-screen {
+    height: calc(100dvh - var(--mobilebar-h) - env(safe-area-inset-top) - 32px);
+  }
+  .camera {
+    scroll-margin-top: calc(var(--mobilebar-h) + env(safe-area-inset-top) + 8px);
   }
 }
 
@@ -4908,16 +4861,6 @@ label.is-required::after {
   text-decoration: none;
 }
 
-/* Teléfonos: la marca en la barra superior (el menú vive en la barra inferior). */
-.topbar__brand {
-  display: none;
-}
-@media (max-width: 1023px) {
-  .topbar__brand {
-    display: block;
-    flex-shrink: 0;
-  }
-}
 /* Teléfonos: indicadores en dos columnas compactas (menos desplazamiento, lectura de un vistazo). */
 @media (max-width: 599px) {
   .kpis {

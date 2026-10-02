@@ -97,7 +97,7 @@ export function ProfilePage() {
             variant="danger-outline"
             size="lg"
             icon={<LogOut size={18} />}
-            onClick={() => void logout('Cerraste sesión. Tu token de acceso ya no es válido.')}
+            onClick={() => void logout()}
           >
             Cerrar sesión
           </Button>

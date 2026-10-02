@@ -1,4 +1,4 @@
-import type { Role, User } from '../types';
+import type { User } from '../types';
 
 export const paths = {
   login: '/login',
@@ -39,25 +39,14 @@ export const paths = {
   },
 } as const;
 
-const HOMES: Record<Role, string> = {
-  ADMIN: paths.admin.dashboard,
-  COMPANY: paths.company.dashboard,
-  EMPLOYEE: paths.employee.dashboard,
-  VALIDATOR: paths.validator.checkpoint,
-};
+type HomeUser = Pick<User, 'home'>;
 
-export function homeFor(role: Role): string {
-  return HOMES[role];
+/** Inicio del usuario: lo decide el backend (su primera pantalla). */
+export function homeForUser(user: HomeUser): string {
+  return user.home ?? paths.profile;
 }
-
-type HomeUser = Pick<User, 'role' | 'employee'>;
 
 /** Empleado que trabaja en varias empresas y aún no elige a cuál entrar. */
-export function needsCompanySelection(user: HomeUser): boolean {
+export function needsCompanySelection(user: Pick<User, 'role' | 'employee'>): boolean {
   return user.role === 'EMPLOYEE' && !user.employee;
-}
-
-/** Inicio del usuario: el de su rol o, si aún debe elegir empresa, el selector. */
-export function homeForUser(user: HomeUser): string {
-  return needsCompanySelection(user) ? paths.selectCompany : homeFor(user.role);
 }

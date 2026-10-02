@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
+import { Floating } from './Floating';
 
 /**
  * Campo de fecha propio (no el nativo del navegador): mismo alto y estilo que los demás
@@ -297,7 +298,8 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
   const id = useId();
   const [text, setText] = useState(() => isoToDisplay(value) || value);
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const controlRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const minDate = parseIso(min);
   const maxDate = parseIso(max);
 
@@ -306,12 +308,12 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
     if (displayToValue(text) !== next) setText(isoToDisplay(next) || (next.includes('/') ? next : ''));
   });
 
-  useDismissOnOutsidePointer(rootRef, open, () => setOpen(false));
+  useDismissOnOutsidePointer([controlRef, calendarRef], open, () => setOpen(false));
 
   return (
-    <div className={`field field--with-icon ${error ? 'field--error' : ''}`} ref={rootRef}>
+    <div className={`field field--with-icon ${error ? 'field--error' : ''}`}>
       <FieldLabel htmlFor={id} label={label} required={required} />
-      <div className="field__control">
+      <div className="field__control" ref={controlRef}>
         <span className="field__icon">
           <CalendarDays size={18} />
         </span>
@@ -344,19 +346,21 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
           <ChevronDown size={18} className={open ? 'is-flipped' : ''} />
         </button>
         {open && (
-          <Calendar
-            selected={parseIso(value)}
-            initial={parseIso(openTo)}
-            min={minDate}
-            max={maxDate}
-            onClose={() => setOpen(false)}
-            onSelect={(date) => {
-              const iso = toIso(date);
-              setText(isoToDisplay(iso));
-              onChange(iso);
-              setOpen(false);
-            }}
-          />
+          <Floating anchorRef={controlRef} floatingRef={calendarRef} className="datepicker-layer">
+            <Calendar
+              selected={parseIso(value)}
+              initial={parseIso(openTo)}
+              min={minDate}
+              max={maxDate}
+              onClose={() => setOpen(false)}
+              onSelect={(date) => {
+                const iso = toIso(date);
+                setText(isoToDisplay(iso));
+                onChange(iso);
+                setOpen(false);
+              }}
+            />
+          </Floating>
         )}
       </div>
       <FieldMessage id={id} error={error} hint={hint} />

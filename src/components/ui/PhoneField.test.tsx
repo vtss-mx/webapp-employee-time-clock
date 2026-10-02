@@ -107,4 +107,21 @@ describe('PhoneField: teléfono con lada internacional', () => {
     expect(options.join()).not.toContain('México');
     expect(options).toHaveLength(catalogsFixture.countries.length - 1);
   });
+
+  it('la lista de países se abre fuera del formulario: ningún panel la recorta ni la tapa', async () => {
+    render(
+      <div className="panel" data-testid="panel">
+        <Harness />
+      </div>,
+      { wrapper: WithCatalogs },
+    );
+    await userEvent.click(countryButton());
+    const list = screen.getByRole('listbox', { name: 'Países' });
+    expect(screen.getByTestId('panel')).not.toContainElement(list);
+    expect(list.closest('.floating')?.parentElement).toBe(document.body);
+    await userEvent.click(list); // tocar la lista no la cierra (vive fuera del campo, pero es suya)
+    expect(screen.getByRole('listbox', { name: 'Países' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'cargar' }));
+    expect(screen.queryByRole('listbox', { name: 'Países' })).toBeNull(); // tocar fuera la cierra
+  });
 });
