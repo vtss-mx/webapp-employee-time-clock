@@ -1,0 +1,11 @@
+{
+  "threshold": 2,
+  "minLines": 6,
+  "minTokens": 60,
+  "reporters": ["console", "json"],
+  "output": "./coverage/jscpd",
+  "ignore": ["**/*.test.ts", "**/*.test.tsx", "**/node_modules/**", "**/dist/**"],
+  "format": ["typescript", "tsx", "css"],
+  "absolute": false,
+  "gitignore": false
+}

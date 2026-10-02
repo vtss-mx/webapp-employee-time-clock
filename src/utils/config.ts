@@ -1,0 +1,80 @@
+import { envBoolean, envNumber, envString } from './env';
+
+/**
+ * Configuración centralizada del frontend: ÚNICA fuente de valores configurables.
+ * Se definen en `frontend/.env` (único archivo de configuración del frontend; solo variables con
+ * valor) y se validan aquí con valores por defecto seguros. Ningún otro módulo lee `import.meta.env`.
+ */
+const env = import.meta.env as unknown as Record<string, string | boolean | undefined>;
+const base = import.meta.env.BASE_URL;
+const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+const seconds = (key: string, fallback: number, min: number, max: number) => envNumber(env, key, fallback, min, max) * 1000;
+
+export const config = {
+  appName: envString(env, 'VITE_APP_NAME', 'Employee Time Clock'),
+  appTagline: envString(env, 'VITE_APP_TAGLINE', 'Control de asistencia y jornada laboral.'),
+  /** Compilación en ejecución y dónde consultar la publicada (detección de versiones nuevas). */
+  buildId: __APP_BUILD_ID__,
+  versionUrl: `${base}version.json`,
+  versionCheckMs: seconds('VITE_VERSION_CHECK_SECONDS', 60, 15, 3600),
+
+  // --- API ---
+  apiUrl: stripTrailingSlash(envString(env, 'VITE_API_URL', '/api')),
+  apiTimeoutMs: seconds('VITE_API_TIMEOUT_SECONDS', 30, 5, 300),
+  /** Envío de imágenes (registro y verificación facial). */
+  apiUploadTimeoutMs: seconds('VITE_API_UPLOAD_TIMEOUT_SECONDS', 60, 10, 600),
+  /** Reintentos automáticos de lecturas (GET) ante errores transitorios. */
+  apiGetRetries: envNumber(env, 'VITE_API_GET_RETRIES', 2, 0, 5),
+  apiMaxRetryAfterMs: seconds('VITE_API_MAX_RETRY_AFTER_SECONDS', 10, 1, 60),
+
+  // --- Tiempo real (WebSocket de validación) ---
+  realtimeEnabled: envBoolean(env, 'VITE_REALTIME_ENABLED', true),
+  /** Espera máxima por respuesta del canal antes de usar el respaldo HTTP. */
+  realtimeTimeoutMs: seconds('VITE_REALTIME_TIMEOUT_SECONDS', 4, 1, 30),
+  /** El socket se cierra tras este tiempo sin validaciones (ahorra conexiones en el servidor). */
+  realtimeIdleMs: seconds('VITE_REALTIME_IDLE_SECONDS', 60, 10, 600),
+  /** Pausa tras la última tecla antes de validar. */
+  availabilityDebounceMs: envNumber(env, 'VITE_AVAILABILITY_DEBOUNCE_MS', 350, 100, 2000),
+
+  // --- Actualización periódica (con jitter, pausada si la pestaña está oculta) ---
+  pendingEnrollmentsPollMs: seconds('VITE_POLL_PENDING_ENROLLMENTS_SECONDS', 45, 10, 3600),
+  validationStatusPollMs: seconds('VITE_POLL_VALIDATION_STATUS_SECONDS', 30, 10, 3600),
+
+  // --- Reconocimiento facial ---
+  enrollmentFrames: envNumber(env, 'VITE_FACE_ENROLLMENT_FRAMES', 5, 1, 5),
+  verificationFrames: envNumber(env, 'VITE_FACE_VERIFICATION_FRAMES', 3, 1, 3),
+  faceFrameGapMs: envNumber(env, 'VITE_FACE_FRAME_GAP_MS', 380, 100, 2000),
+  faceResumeAfterBlockMs: seconds('VITE_FACE_RESUME_AFTER_BLOCK_SECONDS', 3, 1, 30),
+  faceChallengeTimeoutMs: seconds('VITE_FACE_CHALLENGE_TIMEOUT_SECONDS', 20, 5, 85),
+  faceDetectorTimeoutMs: seconds('VITE_FACE_DETECTOR_TIMEOUT_SECONDS', 20, 5, 120),
+  faceDetectionMinScore: envNumber(env, 'VITE_FACE_DETECTION_MIN_SCORE', 0.6, 0.1, 1),
+  faceDetectionIntervalMs: envNumber(env, 'VITE_FACE_DETECTION_INTERVAL_MS', 110, 50, 1000),
+  /** Giro extra que exige el navegador sobre el mínimo del servidor: MediaPipe (cliente) y YuNet
+   *  (servidor) miden distinto; con margen, la captura enviada siempre supera la prueba de vida. */
+  faceTurnMargin: envNumber(env, 'VITE_FACE_TURN_MARGIN', 0.04, 0, 0.3),
+  mediapipeWasmUrl: envString(env, 'VITE_MEDIAPIPE_WASM_URL', `${base}mediapipe/wasm`),
+  faceModelUrl: envString(env, 'VITE_FACE_MODEL_URL', `${base}mediapipe/blaze_face_short_range.tflite`),
+  faceModelFallbackUrl: envString(
+    env,
+    'VITE_FACE_MODEL_FALLBACK_URL',
+    'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
+  ),
+  /** Permitir el respaldo remoto del modelo si el local no carga. */
+  faceModelFallbackEnabled: envBoolean(env, 'VITE_FACE_MODEL_FALLBACK_ENABLED', true),
+
+  // --- QR ---
+  /** Debe coincidir con el prefijo que genera el backend. */
+  qrPrefix: envString(env, 'VITE_QR_PREFIX', 'TCQR1:'),
+  qrScanIntervalMs: envNumber(env, 'VITE_QR_SCAN_INTERVAL_MS', 150, 50, 1000),
+
+  // --- Punto de control (validador en tableta o teléfono) ---
+  /** Segundos que el resultado queda en pantalla antes de volver a esperar a la siguiente persona. */
+  checkpointResultSeconds: envNumber(env, 'VITE_CHECKPOINT_RESULT_SECONDS', 6, 2, 60),
+  checkpointRecentItems: envNumber(env, 'VITE_CHECKPOINT_RECENT_ITEMS', 8, 1, 50),
+
+  // --- Formularios y listados ---
+  minEmployeeAge: envNumber(env, 'VITE_MIN_EMPLOYEE_AGE', 16, 14, 100),
+  employeesPageSize: envNumber(env, 'VITE_EMPLOYEES_PAGE_SIZE', 10, 5, 100),
+} as const;
+
+export type AppConfig = typeof config;

@@ -1,0 +1,286 @@
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { describe, expect, it, vi } from 'vitest';
+import { FeedbackProvider } from '../context/FeedbackContext';
+import { useFeedback } from '../hooks/useFeedback';
+import { apiFail, apiOk, mockFetch } from '../test/http';
+import { renderWithProviders } from '../test/render';
+import type { EmployeeFormValues, VerificationResult } from '../types';
+import { CountUp } from './CountUp';
+import { EmployeeFormFields, emptyEmployeeForm, HeadwearExemptField } from './EmployeeForm';
+import { ErrorBoundary } from './ErrorBoundary';
+import { FaceRequirements } from './FaceRequirements';
+import { GlobalErrorHandler } from './GlobalErrorHandler';
+import { flowStatus, FlowSteps } from './LiveFaceFlow';
+import { ConfirmDialog, Modal } from './Modal';
+import { OfflineBanner } from './OfflineBanner';
+import { PageHeader } from './PageHeader';
+import { QrCodePanel } from './QrCodePanel';
+import { describeDevice } from './SessionsPanel';
+import { PageLoader } from './Spinner';
+import { EnrollmentBadge, FaceStatusBadge, StatusBadge } from './StatusBadge';
+import { Button } from './ui/Button';
+import { SkeletonCard, SkeletonRows } from './ui/Skeleton';
+import { StatusMark } from './ui/StatusMark';
+import { VerificationAttempt } from './VerificationAttempt';
+import { VerificationResultCard } from './VerificationResultCard';
+
+const verified: VerificationResult = {
+  verified: true,
+  method: 'FACE',
+  message: 'Identificación exitosa',
+  employee_id: 1,
+  employee_number: 'EMP-1',
+  name: 'Ana Ruiz',
+  confidence: 0.91,
+  verified_at: '2026-10-01T10:00:00Z',
+};
+
+describe('Button', () => {
+  it('ejecuta onClick con efecto ripple y bloquea mientras carga', async () => {
+    const onClick = vi.fn();
+    const { rerender } = render(<Button onClick={onClick}>Guardar</Button>);
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(document.querySelector('.ripple')).not.toBeNull();
+    rerender(<Button onClick={onClick} loading>Guardar</Button>);
+    expect(screen.getByRole('button')).toBeDisabled();
+  });
+});
+
+describe('componentes de presentación', () => {
+  it('renderizan su contenido', () => {
+    render(
+      <MemoryRouter>
+        <StatusBadge active={false} />
+        <FaceStatusBadge status="PENDING_REVIEW" />
+        <EnrollmentBadge status="REJECTED" />
+        <FaceRequirements policy={{ block_glasses: true, block_headwear: true, block_mask: false, anti_spoofing: true }} headwearExempt />
+        <PageHeader title="Título" subtitle="Sub" backTo="/" actions={<span>acción</span>} />
+        <PageLoader text="Cargando datos" />
+        <SkeletonCard lines={2} />
+        <SkeletonRows rows={1} />
+        <StatusMark kind="pending" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Título')).toBeInTheDocument();
+    expect(screen.getByText('Sin lentes')).toBeInTheDocument();
+    expect(screen.queryByText('Sin cubrebocas')).toBeNull(); // la empresa lo permite
+    expect(screen.queryByText('Sin gorra ni sombrero')).toBeNull(); // empleado exento
+    expect(screen.getByText('Cargando datos')).toBeInTheDocument();
+    expect(screen.getByText('acción')).toBeInTheDocument();
+  });
+
+  it('CountUp termina en el valor final', async () => {
+    render(<CountUp value={42} duration={10} />);
+    await waitFor(() => expect(screen.getByText('42')).toBeInTheDocument());
+  });
+
+  it('OfflineBanner aparece sin conexión', () => {
+    render(<OfflineBanner />);
+    expect(screen.queryByRole('status')).toBeNull();
+    act(() => void window.dispatchEvent(new Event('offline')));
+    expect(screen.getByRole('status')).toHaveTextContent('Sin conexión');
+    act(() => void window.dispatchEvent(new Event('online')));
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe('Modal y ConfirmDialog', () => {
+  it('cierra con Escape, con el botón y al hacer clic fuera', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<Modal open title="Detalle" onClose={onClose} footer={<span>pie</span>}>cuerpo</Modal>);
+    expect(screen.getByRole('dialog', { name: 'Detalle' })).toBeInTheDocument();
+    expect(document.body).toHaveClass('no-scroll');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByLabelText('Cerrar'));
+    // El fondo cubre toda la pantalla y se monta en <body> (portal), fuera de la página.
+    const backdrop = document.body.querySelector(':scope > .msg-layer');
+    expect(backdrop).not.toBeNull();
+    if (backdrop) fireEvent.mouseDown(backdrop);
+    expect(onClose).toHaveBeenCalledTimes(3);
+    rerender(<Modal open={false} title="Detalle" onClose={onClose}>cuerpo</Modal>);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('confirma o cancela', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    render(<ConfirmDialog open title="¿Seguro?" message="Se eliminará" confirmLabel="Eliminar" tone="danger" onConfirm={onConfirm} onCancel={onCancel} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe('formulario de empleado', () => {
+  function Harness() {
+    const [values, setValues] = useState<EmployeeFormValues>(emptyEmployeeForm);
+    const [exempt, setExempt] = useState(false);
+    return (
+      <>
+        <EmployeeFormFields values={values} errors={{ email: 'Correo inválido' }} onChange={setValues} isEdit />
+        <HeadwearExemptField checked={exempt} onChange={setExempt} />
+        <output>{JSON.stringify({ values, exempt })}</output>
+      </>
+    );
+  }
+  it('actualiza valores y muestra errores', async () => {
+    render(<Harness />);
+    await userEvent.type(screen.getByLabelText('Nombres'), 'Ana');
+    await userEvent.click(screen.getByRole('checkbox'));
+    expect(document.querySelector('output')?.textContent).toContain('"first_name":"Ana"');
+    expect(document.querySelector('output')?.textContent).toContain('"exempt":true');
+    expect(screen.getByText('Correo inválido')).toBeInTheDocument();
+    expect(screen.getByText('Déjala vacía para no cambiarla')).toBeInTheDocument();
+  });
+});
+
+describe('verificación', () => {
+  it('VerificationResultCard muestra éxito y fallo', () => {
+    const onRetry = vi.fn();
+    const { rerender } = render(<VerificationResultCard result={verified} failureTitle="No" onRetry={onRetry} onBack={vi.fn()} />);
+    expect(screen.getByText('Identificación exitosa')).toBeInTheDocument();
+    expect(screen.getByText('Ana Ruiz')).toBeInTheDocument();
+    rerender(<VerificationResultCard result={null} error="Sin red" failureTitle="No fue posible" onRetry={onRetry} onBack={vi.fn()} />);
+    expect(screen.getByText('No fue posible')).toBeInTheDocument();
+    expect(screen.getByText('Sin red')).toBeInTheDocument();
+  });
+
+  it('VerificationAttempt reinicia la captura al reintentar', async () => {
+    const mounts = vi.fn();
+    function Capture({ finish }: { finish: (o: { result: VerificationResult | null; error: string | null }) => void }) {
+      mounts();
+      return <button onClick={() => finish({ result: null, error: 'Rostro no reconocido' })}>capturar</button>;
+    }
+    renderWithProviders(<VerificationAttempt failureTitle={() => 'Falló'}>{(finish) => <Capture finish={finish} />}</VerificationAttempt>);
+    await userEvent.click(screen.getByText('capturar'));
+    expect(screen.getByText('Falló')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Intentar|Reintentar/ }));
+    expect(screen.getByText('capturar')).toBeInTheDocument();
+    expect(mounts).toHaveBeenCalledTimes(2);
+  });
+
+  it('flowStatus y FlowSteps describen cada fase', () => {
+    const base = { guidance: 'off_center' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false };
+    expect(flowStatus({ ...base, phase: 'checking' }).tone).toBe('busy');
+    expect(flowStatus({ ...base, phase: 'checking', capture: { current: 2, total: 5 } }).message).toBe('Capturando 2 de 5...');
+    expect(flowStatus({ ...base, phase: 'submitting' }).message).toBe('Enviando');
+    expect(flowStatus({ ...base, phase: 'blocked', blockedMessage: 'Quita lentes' })).toEqual({ message: 'Quita lentes', tone: 'warn' });
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'hold_still' }).tone).toBe('ok');
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'turn', instruction: 'Gira a la derecha' }).message).toBe('Gira a la derecha');
+    expect(flowStatus({ ...base, phase: 'frontal', detectorFailed: true }).message).toMatch(/Capturar/);
+    expect(flowStatus({ ...base, phase: 'frontal', detectorReady: false }).message).toBeTruthy();
+    render(<FlowSteps labels={['A', 'B', 'C']} current={1} />);
+    expect(screen.getByText('A')).toHaveClass('is-done');
+    expect(screen.getByText('B')).toHaveClass('is-current');
+  });
+});
+
+describe('sesiones', () => {
+  it('describeDevice reconoce navegador, sistema y móvil', () => {
+    expect(describeDevice(null).label).toBe('Dispositivo desconocido');
+    expect(describeDevice('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile Safari/604.1')).toEqual({ label: 'Safari · iOS', mobile: true });
+    expect(describeDevice('Mozilla/5.0 (Windows NT 10.0) Chrome/120 Edg/120').label).toBe('Edge · Windows');
+    expect(describeDevice('Mozilla/5.0 (X11; Linux) Firefox/120').label).toBe('Firefox · Linux');
+    expect(describeDevice('Mozilla/5.0 (Linux; Android 14) Chrome/120 Mobile').label).toBe('Chrome · Android');
+    expect(describeDevice('Mozilla/5.0 (Macintosh; Mac OS X) Chrome/120').label).toBe('Chrome · macOS');
+    expect(describeDevice('curl/8').label).toBe('Navegador · Sistema desconocido');
+  });
+});
+
+describe('QrCodePanel', () => {
+  const qr = { id: 1, employee_id: 5, employee_number: 'EMP-5', active: true, created_at: '2026-01-01T00:00:00Z', expires_at: null, image_base64: 'data:image/png;base64,AAA', file_name: 'qr.png' };
+
+  it('muestra, descarga y regenera el QR', async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const onChanged = vi.fn();
+    mockFetch((call) => (call.url.endsWith('/regenerate') ? apiOk({ ...qr, id: 2 }) : apiOk(qr)));
+    renderWithProviders(<QrCodePanel employeeId={5} employeeName="Ana" hasActiveQr onChanged={onChanged} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Ver QR' }));
+    expect(await screen.findByAltText(/EMP-5/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Descargar' }));
+    expect(click).toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole('dialog')).getByLabelText('Cerrar'));
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerar QR' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerar' }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  it('informa errores del servidor', async () => {
+    mockFetch(apiFail(404, 'QR_NOT_FOUND', 'Sin QR'));
+    renderWithProviders(<QrCodePanel employeeId={5} employeeName="Ana" hasActiveQr onChanged={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Descargar QR' }));
+    expect(await screen.findByText('Sin QR')).toBeInTheDocument();
+  });
+});
+
+describe('manejo global de errores', () => {
+  it('ErrorBoundary muestra el fallback y permite reintentar', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let explode = true;
+    function Bomb() {
+      if (explode) throw new Error('boom');
+      return <span>recuperado</span>;
+    }
+    render(<ErrorBoundary><Bomb /></ErrorBoundary>);
+    expect(screen.getByRole('alert')).toHaveTextContent('Algo no salió como esperábamos');
+    explode = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(screen.getByText('recuperado')).toBeInTheDocument();
+  });
+
+  it('GlobalErrorHandler notifica promesas rechazadas e ignora cancelaciones', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <FeedbackProvider>
+        <GlobalErrorHandler />
+      </FeedbackProvider>,
+    );
+    const reject = (reason: unknown) => {
+      const event = new Event('unhandledrejection') as PromiseRejectionEvent;
+      Object.defineProperty(event, 'reason', { value: reason });
+      window.dispatchEvent(event);
+    };
+    act(() => reject(new DOMException('x', 'AbortError')));
+    expect(screen.queryByRole('alert')).toBeNull();
+    act(() => reject(new Error('falla')));
+    expect(await screen.findByRole('alertdialog', { name: 'Ocurrió un problema' })).toBeInTheDocument();
+  });
+
+  it('las confirmaciones de éxito son breves y se pueden cerrar', async () => {
+    function Trigger() {
+      const feedback = useFeedback();
+      return <button onClick={() => feedback.success('Guardado', 'detalle')}>guardar</button>;
+    }
+    render(<FeedbackProvider><Trigger /></FeedbackProvider>);
+    await userEvent.click(screen.getByText('guardar'));
+    expect(screen.getByRole('status')).toHaveTextContent('Guardado');
+    await userEvent.click(screen.getByLabelText('Cerrar'));
+    await waitFor(() => expect(screen.queryByText('Guardado')).toBeNull());
+  });
+});
+
+describe('rutas protegidas', () => {
+  it('redirige al login sin sesión', async () => {
+    const { ProtectedRoute } = await import('../routes/ProtectedRoute');
+    const { AuthProvider } = await import('../context/AuthContext');
+    render(
+      <MemoryRouter initialEntries={['/privado']}>
+        <AuthProvider>
+          <Routes>
+            <Route element={<ProtectedRoute roles={['COMPANY']} />}>
+              <Route path="/privado" element={<span>secreto</span>} />
+            </Route>
+            <Route path="/login" element={<span>pantalla de login</span>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('pantalla de login')).toBeInTheDocument();
+    expect(screen.queryByText('secreto')).toBeNull();
+  });
+});
