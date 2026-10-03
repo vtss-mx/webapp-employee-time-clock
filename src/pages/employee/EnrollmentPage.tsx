@@ -1,7 +1,8 @@
-import { AlertTriangle, ArrowRight, Fingerprint, ScanFace, ShieldCheck, UserCheck } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaceRequirements } from '../../components/FaceRequirements';
+import { scanStages, ScanStagesPreview } from '../../components/FaceScan';
 import { LiveFaceFlow } from '../../components/LiveFaceFlow';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
@@ -12,12 +13,6 @@ import { paths } from '../../routes/paths';
 import { enrollmentService } from '../../services/enrollmentService';
 import { config } from '../../utils/config';
 
-const STEPS = [
-  { icon: ScanFace, title: 'Captura tu rostro', text: 'Mira de frente a la cámara; tomamos 5 muestras automáticamente.' },
-  { icon: Fingerprint, title: 'Prueba de vida', text: 'Gira la cabeza cuando se te indique para confirmar que eres tú.' },
-  { icon: UserCheck, title: 'Validación', text: 'Tu empresa revisa y aprueba tu identidad.' },
-];
-
 /** Primer inicio de sesión (o registro rechazado): el empleado registra su rostro. */
 export function EnrollmentPage() {
   const { user, refreshUser } = useAuth();
@@ -25,6 +20,8 @@ export function EnrollmentPage() {
   const feedback = useFeedback();
   const [started, setStarted] = useState(false);
   const { policy } = useVerificationPolicy();
+  // Las mismas etapas que contará el escáner ("n / N"): cinco con prueba de vida, cuatro sin ella.
+  const stages = scanStages(policy.liveness_challenge);
   const employee = user?.employee;
   const rejected = employee?.face_status === 'REJECTED';
   const rejectionReason = employee?.face_rejection_reason;
@@ -53,17 +50,14 @@ export function EnrollmentPage() {
     return (
       <LiveFaceFlow
         title="Registro facial"
-        description="Mira de frente a la cámara en un lugar iluminado. Después gira la cabeza cuando se te indique."
         frontalFrames={config.enrollmentFrames}
-        finalStep="Envío"
         submittingMessage="Enviando registro seguro..."
         policy={policy}
-        headwearExempt={employee?.headwear_exempt}
         allowAccessoryReview
-        onSubmit={async ({ frontal, challenge, accessoryReview }) => {
-          await enrollmentService.submit(frontal, challenge, accessoryReview);
+        onSubmit={async (captured) => {
+          await enrollmentService.submit(captured, captured.accessoryReview);
           await refreshUser();
-          feedback.success('Registro enviado', 'Tu empresa validará tu identidad en breve.');
+          void feedback.success('Registro enviado', 'Tu empresa validará tu identidad en breve.');
           void navigate(paths.employee.pending, { replace: true });
         }}
         onFatal={(error) => {
@@ -79,26 +73,27 @@ export function EnrollmentPage() {
     <div className="page page-transition">
       <Panel>
         <PanelHero
-          eyebrow="Paso único · 1 minuto"
+          eyebrow={`${stages.length} pasos · 1 minuto`}
           title={rejected || reverify ? 'Registra tu rostro nuevamente' : `Bienvenido, ${employee?.first_name ?? ''}`}
         >
           <p className="muted">Para proteger tu identidad, registra tu rostro. Solo se hace una vez y tu empresa lo validará.</p>
         </PanelHero>
 
         <PanelSection>
-          <ol className="timeline stagger">
-            {STEPS.filter((step) => policy.liveness_challenge || step.title !== 'Prueba de vida').map(({ icon: Icon, title, text }) => (
-              <li key={title}>
-                <span className="timeline__dot" style={{ background: 'var(--blue-50)', color: 'var(--primary)' }}>
-                  <Icon size={16} />
+          <ScanStagesPreview
+            stages={stages}
+            after={
+              <li>
+                <span className="timeline__dot" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
+                  <UserCheck size={16} />
                 </span>
                 <div>
-                  <strong>{title}</strong>
-                  <span className="muted small">{text}</span>
+                  <strong>Después: validación de tu empresa</strong>
+                  <span className="muted small">Tu empresa revisa y aprueba tu identidad; te avisamos al terminar.</span>
                 </div>
               </li>
-            ))}
-          </ol>
+            }
+          />
           <div className="stack" style={{ gap: 10 }}>
             <span className="inline-note small muted">
               <AlertTriangle size={16} /> Antes de comenzar:

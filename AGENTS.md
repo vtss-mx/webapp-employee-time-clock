@@ -43,12 +43,40 @@ identificadores en inglés; comentarios, textos de la interfaz y documentación 
 
 - **Reutilizar antes de crear**: popups solo con `Overlay`/`Modal`/`ConfirmDialog`; superficies
   flotantes de campos solo con `Floating` (portal: ningún panel las recorta); formularios con
-  `useFormState`; listas con `useSearchList` + `ListControls`. Código repetido se extrae.
+  `useFormState`; listas desplegables solo con `Select` (lista propia, nunca `<select>` nativo).
+  Código repetido se extrae.
+- **Todo listado se pagina en el backend** y se muestra con el paginador único `Paginator`
+  (`ListPaginator` para conectarlo a una lista): `usePagedList` (página, tamaño, cancelación,
+  "Reintentar") o `useSearchList` (además búsqueda y filtro) + `ListToolbar`/`ListResults`. Por
+  omisión 10 por página con opciones 10/20/30/40/50 (`config.pageSizes`/`config.pageSize`). Se
+  personaliza con props (`noun`, `labels`, `show`, `siblings`, `sizes`, `variant`) y tokens
+  `--pager-*`; no se crean paginadores propios ni listas que carguen todo.
+- Tareas asíncronas que actualizan estado tras esperar (peticiones, `sleep`) consultan
+  `useMountedRef()`; nunca `useRef(true)` apagado solo al desmontar: en desarrollo StrictMode
+  desmonta y vuelve a montar, y la marca quedaría en `false` (el flujo ignoraría las respuestas).
 - Correos, teléfonos y datos únicos se validan en vivo con `useAvailability(field, value)` (canal
   WebSocket del backend con respaldo HTTP); no se crean verificaciones propias por formulario.
 - Catálogos (estados, motivos, países...) se leen de `useCatalogs()` (vienen de la BD), nunca se
   escriben en el código.
-- Errores: `ApiError` con `code` estable y `useFeedback()` para mostrarlos (popups).
+- **Todo formulario es una pantalla** (ruta propia con `Panel` + `PanelFooter`): alta, edición,
+  contraseñas, motivos... Los popups (`Modal`/`ConfirmDialog`) son solo para mensajes,
+  confirmaciones de una acción y vistas ampliadas (p. ej. el QR), nunca para capturar datos.
+  Reutilizar `NewPasswordFields` (contraseña escrita dos veces) y `ReasonField` (motivo con
+  sugerencias del catálogo).
+- **Capturas faciales solo con `LiveFaceFlow`** y se envían como `FaceCaptures` (frontales, una
+  captura por giro del reto y el nombre de la cámara) con `postFaceCaptures`. La app no captura
+  con una cámara virtual (`isVirtualCamera` con la lista de la política).
+- Dispositivos de validadores: la llave vive en `utils/deviceKey.ts` (WebCrypto, no exportable);
+  el login firma el reto cuando el backend lo pide (`AuthContext`), nunca de otra forma.
+- Mensajes: **solo popups** (`useFeedback()`: `fromError`, `show`, `success`, `warning`...). La app
+  **no usa toasts** ni avisos en línea; cada popup se personaliza con `MessageInput`.
+- Errores: `ApiError` con `code` estable y `useFeedback().fromError` para mostrarlos.
+- El permiso de la cámara es el **aviso nativo** del navegador (sin popup previo propio). Igual la
+  ubicación: `currentLocation()` (`utils/geolocation.ts`) y sus problemas con `locationProblemMessage`.
+- **Google Maps solo por `services/maps/googleMaps.ts`** (carga del SDK, geocodificación, lugares) y
+  se dibuja solo en `components/location/MapCanvas.tsx`. Domicilios: `AddressFields` +
+  `LocationPicker` y las reglas puras de `utils/address.ts`. Una API de Google no habilitada se
+  explica con `mapsProblemMessage` (una vez) y el formulario sigue funcionando a mano.
 
 ## 3. Calidad (obligatoria antes de dar algo por terminado)
 
@@ -67,3 +95,7 @@ identificadores en inglés; comentarios, textos de la interfaz y documentación 
 - Área de trabajo blanca; paneles con borde y sombra suaves; sin encabezado superior.
 - Accesibilidad: roles y `aria-*` correctos, foco gestionado en popups, navegación con teclado.
 - Acciones que el usuario ya confirmó no generan avisos redundantes después.
+- Toda contraseña que se asigna (alta, restablecer, cambiar) se escribe dos veces:
+  `ConfirmPasswordField` + `validatePasswordConfirm`. La confirmación nunca se envía al backend.
+- No se piden datos repetidos: el alta de empresa pide un solo correo (el del administrador, que
+  también queda como contacto).

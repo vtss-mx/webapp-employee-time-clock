@@ -1,20 +1,34 @@
 import type {
   Employee,
+  EnrollmentSubmitResponse,
   EmployeeCreatePayload,
   EmployeeList,
   EmployeeListParams,
   EmployeeQr,
   EmployeeUpdatePayload,
-  VerificationLog,
+  PageQuery,
+  VerificationLogList,
+  VerificationResult,
 } from '../types';
-import { hasKeys, isArrayOf, isNothing, isPage } from '../utils/guards';
+import { hasKeys, isNothing, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
+import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
+import { isVerificationResult } from './verificationService';
 
 const isEmployee = hasKeys<Employee>('id', 'employee_number', 'first_name', 'last_name');
 const isQr = hasKeys<EmployeeQr>('image_base64', 'employee_number');
-const isHistory = isArrayOf<VerificationLog[]>(hasKeys('id', 'method', 'success'));
 
 export const employeeService = {
+  /** Registro asistido: la empresa captura el rostro del empleado presente (queda aprobado al momento). */
+  enrollFaceInPerson(id: number, captures: FaceCaptures): Promise<EnrollmentSubmitResponse> {
+    return postFaceCaptures(`/employees/${id}/face/enroll`, captures, hasKeys<EnrollmentSubmitResponse>('enrollment_id', 'face_status'));
+  },
+
+  /** Verificación en persona: el rostro del empleado presente contra su registro aprobado (1:1). */
+  verifyFaceInPerson(id: number, captures: FaceCaptures): Promise<VerificationResult> {
+    return postFaceCaptures(`/employees/${id}/face/verify`, captures, isVerificationResult);
+  },
+
   list(params: EmployeeListParams = {}, signal?: AbortSignal): Promise<EmployeeList> {
     return apiRequest<EmployeeList>('/employees', { query: { ...params }, signal, validate: isPage(isEmployee) });
   },
@@ -60,7 +74,12 @@ export const employeeService = {
     return apiRequest<EmployeeQr>(`/employees/${id}/qr/regenerate`, { method: 'POST', validate: isQr });
   },
 
-  history(id: number, limit = 10): Promise<VerificationLog[]> {
-    return apiRequest<VerificationLog[]>(`/employees/${id}/verifications`, { query: { limit }, validate: isHistory });
+  /** Bitácora de verificaciones del empleado, paginada (la más reciente primero). */
+  history(id: number, query: PageQuery, signal?: AbortSignal): Promise<VerificationLogList> {
+    return apiRequest<VerificationLogList>(`/employees/${id}/verifications`, {
+      query: { ...query },
+      signal,
+      validate: isPage(hasKeys('id', 'method', 'success')),
+    });
   },
 };

@@ -85,7 +85,21 @@ export function AppLayout() {
           <X size={20} />
         </Button>
 
-        <span className="sidebar__section">{role}</span>
+        {/* Rol y botón para contraer el menú (escritorio), al inicio de las opciones. */}
+        <div className="sidebar__toolbar">
+          <span className="sidebar__section">{role}</span>
+          <button
+            type="button"
+            className="sidebar__collapse"
+            aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+            aria-controls="app-sidebar"
+            aria-expanded={!collapsed}
+            title={`${collapsed ? 'Expandir' : 'Contraer'} menú (Ctrl/⌘ + B)`}
+            onClick={toggleCollapsed}
+          >
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
         <nav style={{ display: 'grid', gap: 4 }}>
           {nav.map(({ to, label, icon: Icon, badge }) => (
             <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`} data-tooltip={label}>
@@ -97,18 +111,6 @@ export function AppLayout() {
         </nav>
 
         <div className="sidebar__footer">
-          <button
-            type="button"
-            className="nav-item sidebar__collapse"
-            aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
-            aria-controls="app-sidebar"
-            aria-expanded={!collapsed}
-            data-tooltip={collapsed ? 'Expandir menú' : 'Contraer menú'}
-            onClick={toggleCollapsed}
-          >
-            {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
-            <span className="nav-item__label">Contraer menú</span>
-          </button>
           <div className="user-card">
             <span className="avatar">{initials}</span>
             <span className="user-card__info">

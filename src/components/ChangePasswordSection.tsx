@@ -3,8 +3,8 @@ import { useState, type FormEvent } from 'react';
 import { useFeedback } from '../hooks/useFeedback';
 import { ApiError } from '../services/apiClient';
 import { authService } from '../services/authService';
-import { validatePassword } from '../utils/validation';
-import { FormField } from './FormField';
+import { validatePassword, validatePasswordConfirm } from '../utils/validation';
+import { ConfirmPasswordField, FormField } from './FormField';
 import { Button } from './ui/Button';
 import { PanelSection } from './ui/Panel';
 
@@ -15,7 +15,7 @@ function validate(values: Record<Field, string>): Partial<Record<Field, string>>
   const errors: Partial<Record<Field, string>> = {
     current: values.current ? undefined : 'Escribe tu contraseña actual',
     next: validatePassword(values.next) ?? (values.next === values.current ? 'Debe ser distinta de la actual' : undefined),
-    confirm: values.confirm === values.next ? undefined : 'Las contraseñas no coinciden',
+    confirm: validatePasswordConfirm(values.next, values.confirm),
   };
   return Object.fromEntries(Object.entries(errors).filter(([, v]) => v));
 }
@@ -63,7 +63,7 @@ export function ChangePasswordSection({ onChanged }: { onChanged?: () => void })
     setSaving(true);
     try {
       const { revoked_sessions: revoked } = await authService.changePassword(values.current, values.next);
-      feedback.success(
+      void feedback.success(
         'Contraseña actualizada',
         revoked ? `Se cerró la sesión en ${revoked} dispositivo(s) más.` : 'Tu sesión actual sigue activa.',
       );
@@ -90,7 +90,7 @@ export function ChangePasswordSection({ onChanged }: { onChanged?: () => void })
           hint="Mínimo 8 caracteres, con mayúscula, minúscula y número"
           {...bind('next')}
         />
-        <FormField label="Confirmar nueva contraseña" type="password" autoComplete="new-password" {...bind('confirm')} />
+        <ConfirmPasswordField label="Confirmar nueva contraseña" {...bind('confirm')} />
         <Button
           type="submit"
           variant="primary"

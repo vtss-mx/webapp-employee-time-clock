@@ -6,7 +6,7 @@ import type { VerificationPolicy, VerificationRules } from '../types';
  * Valores seguros mientras carga o si no hay red: se asume lo más estricto. Sin umbral de
  * confianza: solo lo evalúa el servidor y lo edita Configuración con la política cargada.
  */
-const STRICT_RULES: VerificationRules = {
+export const STRICT_RULES: VerificationRules = {
   block_glasses: true,
   block_headwear: true,
   block_mask: true,
@@ -15,6 +15,21 @@ const STRICT_RULES: VerificationRules = {
   qr_enabled: true,
   employee_mobile_only: true,
   validator_mobile_only: true,
+  anti_spoofing_level: 'STANDARD',
+  liveness_steps: 2,
+  block_virtual_cameras: true,
+  reject_foreign_images: true,
+  detect_static_captures: true,
+  detect_replays: true,
+  check_capture_continuity: true,
+  enforce_human_timing: true,
+  detect_duplicate_faces: true,
+  lockout_enabled: true,
+  lockout_max_failures: 5,
+  lockout_minutes: 15,
+  validator_device_approval: true,
+  // Sin la lista del servidor no se bloquea ninguna en pantalla (el backend la exige igual).
+  blocked_cameras: [],
 };
 
 const EVENT = 'tc:policy-changed';

@@ -1,4 +1,4 @@
-import { CheckCircle2, RefreshCw, X } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { createContext, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MessageDialog, type MessageAction, type MessageInput } from '../components/MessageDialog';
 import { describeError, isHandledGlobally } from '../utils/errorPresentation';
@@ -24,8 +24,8 @@ export interface FeedbackApi {
   fromError: (error: unknown, options?: ErrorMessageOptions) => Promise<string | null>;
   /** Formulario con campos inválidos: resumen en popup (los campos siguen marcados). */
   invalidForm: (errors: Record<string, string | undefined>) => Promise<string | null>;
-  /** Confirmación breve que se cierra sola (no interrumpe el trabajo). */
-  success: (title: string, text?: string) => void;
+  /** Confirmación de que algo salió bien: popup de éxito, personalizable como los demás. */
+  success: Shortcut;
   /** Cierra (o saca de la cola) el mensaje con esa clave. */
   dismiss: (key: string) => void;
 }
@@ -39,14 +39,6 @@ interface QueuedMessage extends MessageInput {
   resolve: (actionId: string | null) => void;
 }
 
-interface Toast {
-  id: number;
-  title: string;
-  text?: string;
-  leaving?: boolean;
-}
-
-const TOAST_MS = 4200;
 const RETRY_ACTIONS: MessageAction[] = [
   { id: 'close', label: 'Cerrar', variant: 'ghost' },
   { id: 'retry', label: 'Reintentar', variant: 'primary', icon: <RefreshCw size={18} /> },
@@ -55,14 +47,14 @@ const RETRY_ACTIONS: MessageAction[] = [
 const textKey = (text: ReactNode) => (typeof text === 'string' || typeof text === 'number' ? String(text) : '');
 
 /**
- * Único punto de salida de los mensajes de la aplicación:
- * - Error, advertencia e información → popup (uno a la vez, en cola, sin duplicados).
- * - Confirmaciones de éxito → notificación breve que se cierra sola.
+ * Único punto de salida de los mensajes de la aplicación: TODO es un popup (error, advertencia,
+ * información y éxito), uno a la vez, en cola y sin duplicados. La aplicación no usa toasts.
+ * Cada popup se personaliza con `MessageInput`: variante, ícono, etiqueta, detalles (viñetas,
+ * pasos o palomitas), contenido propio, acciones, nota al pie y si se puede cerrar.
  */
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const queueRef = useRef<QueuedMessage[]>([]);
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
 
   const update = useCallback((next: (list: QueuedMessage[]) => QueuedMessage[]) => {
@@ -131,20 +123,6 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     [show],
   );
 
-  const dismissToast = useCallback((id: number) => {
-    setToasts((list) => list.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
-    window.setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 220);
-  }, []);
-
-  const success = useCallback(
-    (title: string, text?: string) => {
-      const id = nextId.current++;
-      setToasts((list) => [...list.slice(-2), { id, title, text }]);
-      window.setTimeout(() => dismissToast(id), TOAST_MS);
-    },
-    [dismissToast],
-  );
-
   const api = useMemo<FeedbackApi>(() => {
     const shortcut =
       (variant: MessageInput['variant']): Shortcut =>
@@ -155,12 +133,12 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       error: shortcut('error'),
       warning: shortcut('warning'),
       info: shortcut('info'),
+      success: shortcut('success'),
       fromError,
       invalidForm,
-      success,
       dismiss,
     };
-  }, [show, fromError, invalidForm, success, dismiss]);
+  }, [show, fromError, invalidForm, dismiss]);
 
   const current = queue[0];
 
@@ -177,23 +155,6 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
           onClose={() => close(current.id, null)}
         />
       )}
-      <div className="toaster" aria-live="polite" aria-atomic="false">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast toast--success ${t.leaving ? 'is-leaving' : ''}`} role="status">
-            <span className="toast__icon">
-              <CheckCircle2 size={18} />
-            </span>
-            <div className="toast__body">
-              <span className="toast__title">{t.title}</span>
-              {t.text && <span className="toast__text">{t.text}</span>}
-            </div>
-            <button type="button" className="toast__close" onClick={() => dismissToast(t.id)} aria-label="Cerrar">
-              <X size={16} />
-            </button>
-            <span className="toast__progress" style={{ animationDuration: `${TOAST_MS}ms` }} />
-          </div>
-        ))}
-      </div>
     </FeedbackContext.Provider>
   );
 }

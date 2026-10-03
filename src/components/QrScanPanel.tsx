@@ -1,7 +1,8 @@
 import { ShieldCheck, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useCamera } from '../hooks/useCamera';
 import { useQrScanner } from '../hooks/useQrScanner';
+import { useMountedRef } from '../hooks/useMountedRef';
 import { config } from '../utils/config';
 import { CameraCapture } from './CameraCapture';
 import { QrGuide } from './FaceGuide';
@@ -36,8 +37,7 @@ export function QrScanPanel({
 }: QrScanPanelProps) {
   const camera = useCamera({ facing: 'environment' });
   const [phase, setPhase] = useState<Phase>('scanning');
-  const mounted = useRef(true);
-  useEffect(() => () => void (mounted.current = false), []);
+  const mounted = useMountedRef();
 
   const onDetect = useCallback(
     async (content: string) => {
@@ -50,7 +50,7 @@ export function QrScanPanel({
       await onScan(content);
       if (mounted.current) setPhase('scanning');
     },
-    [onScan],
+    [mounted, onScan],
   );
 
   useQrScanner({ videoRef: camera.videoRef, enabled: camera.status === 'active' && phase === 'scanning', onDetect });

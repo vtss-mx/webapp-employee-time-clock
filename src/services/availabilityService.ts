@@ -17,7 +17,6 @@ export type AvailabilityField =
   | 'validator_email'
   | 'company_rfc'
   | 'company_admin_email'
-  | 'company_contact_email'
   | 'company_phone';
 
 export interface Availability {
@@ -26,7 +25,10 @@ export interface Availability {
   normalized: string | null;
   valid: boolean;
   available: boolean;
-  /** AVAILABLE | LINKABLE (persona de otra empresa: se vincula) | TAKEN | VALID (dato de contacto) | INVALID_FORMAT | EMPTY */
+  /**
+   * AVAILABLE | LINKABLE (persona de otra empresa: se vincula) | TAKEN | MISMATCH (el teléfono no es
+   * el de la cuenta del correo escrito) | VALID (dato no único con formato correcto) | INVALID_FORMAT | EMPTY
+   */
   code: string;
   message: string;
   /** Canal que respondió (útil para diagnóstico). */
@@ -40,18 +42,22 @@ function fromEnvelope(envelope: ApiEnvelope): Omit<Availability, 'via'> {
   throw new Error(envelope.message);
 }
 
-/** Valida en tiempo real por WebSocket; si el canal no está disponible, por HTTP. */
-export async function checkAvailability(field: AvailabilityField, value: string, excludeId?: number): Promise<Availability> {
+/**
+ * Valida en tiempo real por WebSocket; si el canal no está disponible, por HTTP. `related`: otro
+ * valor del formulario que la regla necesita (el correo, al validar el teléfono de un empleado
+ * nuevo: si ya trabaja en otra empresa, ambos deben ser de la misma persona).
+ */
+export async function checkAvailability(field: AvailabilityField, value: string, excludeId?: number, related?: string): Promise<Availability> {
   if (validationSocket.available) {
     try {
-      const envelope = await validationSocket.request({ type: 'validate', field, value, excludeId: excludeId ?? null });
+      const envelope = await validationSocket.request({ type: 'validate', field, value, excludeId: excludeId ?? null, related: related ?? null });
       return { ...fromEnvelope(envelope), via: 'websocket' };
     } catch {
       /* respaldo HTTP */
     }
   }
   const data = await apiRequest('/validation', {
-    query: { field, value, exclude_id: excludeId },
+    query: { field, value, exclude_id: excludeId, related },
     validate: isAvailability,
   });
   return { ...data, via: 'http' };

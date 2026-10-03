@@ -167,6 +167,26 @@ function evaluate(detections: Detection[], video: HTMLVideoElement, mode: Detect
   return 'hold_still';
 }
 
+/**
+ * Avance del giro (0..1) hacia lo que exige el reto: alimenta la barra y el anillo para que la
+ * persona sepa cuánto le falta. null si no hay un único rostro que medir.
+ */
+export function turnProgress(detections: Detection[], video: HTMLVideoElement, mode: DetectionMode): number | null {
+  if (mode.kind !== 'turn') return null;
+  const faces = detections.filter((d) => (d.categories?.[0]?.score ?? 0) >= config.faceDetectionMinScore);
+  if (faces.length !== 1) return null;
+  const yaw = yawRatio(faces[0], video);
+  if (yaw === null) return null;
+  const sign = mode.direction === 'TURN_LEFT' ? 1 : -1;
+  return Math.max(0, Math.min(1, (sign * yaw) / (mode.minYawRatio + config.faceTurnMargin)));
+}
+
+/**
+ * Durante el giro el detector del navegador puede perder el rostro un instante (perfil): esas
+ * lecturas no reinician el avance mientras no sean más de estas seguidas.
+ */
+const TURN_MISSES_TOLERATED = 3;
+
 interface AutoCaptureOptions {
   detector: FaceDetector | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -192,6 +212,8 @@ export function useFaceAutoCapture({
   const [guidance, setGuidance] = useState<FaceGuidance>('loading');
   /** 0..1: avance hacia la captura automática (rostro estable). Alimenta el anillo de progreso. */
   const [progress, setProgress] = useState(0);
+  /** 0..1: cuánto ha girado la cabeza respecto a lo que pide el reto (solo en modo turn). */
+  const [turn, setTurn] = useState(0);
   const onStableRef = useRef(onStable);
   onStableRef.current = onStable;
   const modeKey = mode.kind === 'frontal' ? 'frontal' : `${mode.direction}:${mode.minYawRatio}`;
@@ -201,9 +223,11 @@ export function useFaceAutoCapture({
     let raf = 0;
     let last = 0;
     let stable = 0;
+    let misses = 0;
     let fired = false;
     setGuidance(mode.kind === 'turn' ? 'turn' : 'no_face');
     setProgress(0);
+    setTurn(0);
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
@@ -213,11 +237,22 @@ export function useFaceAutoCapture({
       if (!video || video.readyState < 2 || !video.videoWidth) return;
 
       let next: FaceGuidance;
+      let turned: number | null = null;
       try {
-        next = evaluate(detector.detectForVideo(video, now).detections, video, mode);
+        const { detections } = detector.detectForVideo(video, now);
+        next = evaluate(detections, video, mode);
+        turned = turnProgress(detections, video, mode);
       } catch {
         return;
       }
+      if (turned !== null) setTurn((prev) => (Math.abs(prev - turned) < 0.02 ? prev : turned));
+
+      // Giro: un rostro perdido un instante no borra lo avanzado (se conserva la guía anterior).
+      if (mode.kind === 'turn' && next === 'no_face' && misses < TURN_MISSES_TOLERATED) {
+        misses++;
+        return;
+      }
+      misses = 0;
 
       if (next === 'hold_still') {
         stable++;
@@ -240,5 +275,5 @@ export function useFaceAutoCapture({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detector, enabled, videoRef, modeKey, stableFrames]);
 
-  return { guidance, progress };
+  return { guidance, progress, turnProgress: turn };
 }

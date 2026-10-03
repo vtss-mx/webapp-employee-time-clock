@@ -16,12 +16,12 @@ import { EmployeeFormFields, emptyEmployeeForm, HeadwearExemptField } from './Em
 import { ErrorBoundary } from './ErrorBoundary';
 import { FaceRequirements } from './FaceRequirements';
 import { GlobalErrorHandler } from './GlobalErrorHandler';
-import { flowStatus, FlowSteps } from './LiveFaceFlow';
+import { challengeActions, flowStatus, introFor, scannerView } from './LiveFaceFlow';
 import { ConfirmDialog, Modal } from './Modal';
 import { OfflineBanner } from './OfflineBanner';
 import { PageHeader } from './PageHeader';
 import { QrCodePanel } from './QrCodePanel';
-import { describeDevice } from './SessionsPanel';
+import { describeDevice } from '../utils/userAgent';
 import { PageLoader } from './Spinner';
 import { Badge, EnrollmentBadge, FaceStatusBadge, StatusBadge } from './StatusBadge';
 import { Button } from './ui/Button';
@@ -208,7 +208,7 @@ describe('verificación', () => {
     expect(mounts).toHaveBeenCalledTimes(2);
   });
 
-  it('flowStatus y FlowSteps describen cada fase', () => {
+  it('flowStatus describe cada fase', () => {
     const base = { guidance: 'off_center' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false };
     expect(flowStatus({ ...base, phase: 'checking' }).tone).toBe('busy');
     expect(flowStatus({ ...base, phase: 'checking', capture: { current: 2, total: 5 } }).message).toBe('Capturando 2 de 5...');
@@ -216,11 +216,42 @@ describe('verificación', () => {
     expect(flowStatus({ ...base, phase: 'blocked', blockedMessage: 'Quita lentes' })).toEqual({ message: 'Quita lentes', tone: 'warn' });
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'hold_still' }).tone).toBe('ok');
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'turn', instruction: 'Gira a la derecha' }).message).toBe('Gira a la derecha');
+    // A medio giro se anima a terminarlo.
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'turn', instruction: 'Gira a la derecha', turnProgress: 0.6 }).message).toBe('Un poco más...');
     expect(flowStatus({ ...base, phase: 'frontal', detectorFailed: true }).message).toMatch(/Capturar/);
     expect(flowStatus({ ...base, phase: 'frontal', detectorReady: false }).message).toBeTruthy();
-    render(<FlowSteps labels={['A', 'B', 'C']} current={1} />);
-    expect(screen.getByText('A')).toHaveClass('is-done');
-    expect(screen.getByText('B')).toHaveClass('is-current');
+    // Entre dos giros: de vuelta al frente.
+    expect(flowStatus({ ...base, phase: 'recenter' })).toEqual({ message: 'Vuelve a mirar al frente', tone: 'idle' });
+    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'ready' }).tone).toBe('ok');
+  });
+
+  it('reto de uno o dos giros: orden, título, flecha y cámara virtual', () => {
+    const challenge = {
+      liveness_required: true,
+      challenge_id: 'c1',
+      action: 'TURN_LEFT' as const,
+      instruction: 'Gira a tu izquierda',
+      actions: ['TURN_LEFT' as const, 'TURN_RIGHT' as const],
+      instructions: ['Gira a tu izquierda', 'Gira a tu derecha'],
+      min_yaw_ratio: 0.18,
+      expires_in: 90,
+    };
+    expect(challengeActions(challenge)).toEqual(['TURN_LEFT', 'TURN_RIGHT']);
+    expect(challengeActions({ ...challenge, actions: [] })).toEqual(['TURN_LEFT']); // reto de una versión anterior
+    expect(challengeActions({ ...challenge, actions: [], action: null })).toEqual([]);
+    expect(challengeActions(null)).toEqual([]);
+
+    const base = { guidance: 'turn' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false, progress: 0.3, turnProgress: 0.7, challenge, virtualCamera: false, mirrored: true };
+    const second = scannerView({ ...base, phase: 'challenge', step: 1 });
+    expect(second.message).toBe('Un poco más...');
+    expect(second.intro).toEqual({ title: 'Sigue la indicación · giro 2 de 2', text: 'Gira a tu derecha' });
+    expect(second.pointsLeft).toBe(false); // derecha con espejo
+    expect(second.ringProgress).toBe(0.7);
+    expect(scannerView({ ...base, phase: 'challenge', step: 0 }).pointsLeft).toBe(true);
+    expect(scannerView({ ...base, phase: 'recenter', step: 1 }).intro.text).toBe('Vuelve a mirar al frente para el siguiente giro.');
+    expect(scannerView({ ...base, phase: 'frontal', step: 0, guidance: 'ready' }).ringProgress).toBe(0.3);
+    expect(scannerView({ ...base, phase: 'frontal', step: 0, virtualCamera: true })).toMatchObject({ tone: 'warn', message: expect.stringMatching(/Cámara virtual/) as string });
+    expect(introFor({ phase: 'challenge', stage: 'liveness', instruction: null, submittingMessage: '', step: { current: 1, total: 1 } }).title).toBe('Sigue la indicación');
   });
 });
 
@@ -248,6 +279,7 @@ describe('QrCodePanel', () => {
     expect(await screen.findByAltText(/EMP-5/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Descargar' }));
     expect(click).toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'QR descargado' })).getByRole('button', { name: 'Entendido' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByLabelText('Cerrar'));
     await userEvent.click(screen.getByRole('button', { name: 'Regenerar QR' }));
     await userEvent.click(screen.getByRole('button', { name: 'Regenerar' }));
@@ -295,15 +327,19 @@ describe('manejo global de errores', () => {
     expect(await screen.findByRole('alertdialog', { name: 'Ocurrió un problema' })).toBeInTheDocument();
   });
 
-  it('las confirmaciones de éxito son breves y se pueden cerrar', async () => {
+  it('las confirmaciones de éxito son popups (la app no usa toasts) y se pueden personalizar', async () => {
     function Trigger() {
       const feedback = useFeedback();
-      return <button onClick={() => feedback.success('Guardado', 'detalle')}>guardar</button>;
+      return <button onClick={() => void feedback.success('Guardado', 'detalle', { details: ['Paso listo'], detailsStyle: 'checks' })}>guardar</button>;
     }
     render(<FeedbackProvider><Trigger /></FeedbackProvider>);
     await userEvent.click(screen.getByText('guardar'));
-    expect(screen.getByRole('status')).toHaveTextContent('Guardado');
-    await userEvent.click(screen.getByLabelText('Cerrar'));
+    const popup = screen.getByRole('dialog', { name: 'Guardado' });
+    expect(popup).toHaveClass('msg--success');
+    expect(within(popup).getByText('detalle')).toBeInTheDocument();
+    expect(within(popup).getByText('Paso listo')).toBeInTheDocument();
+    expect(document.querySelector('.toast, .toaster')).toBeNull();
+    await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
     await waitFor(() => expect(screen.queryByText('Guardado')).toBeNull());
   });
 });

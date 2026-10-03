@@ -1,7 +1,8 @@
-import { Fingerprint, Gauge, QrCode, ScanFace, ScanLine, ShieldCheck, Smartphone } from 'lucide-react';
+import { Film, Fingerprint, Gauge, History, ImageOff, Images, Lock, LockKeyhole, MonitorSmartphone, QrCode, ScanFace, ScanLine, ShieldCheck, SlidersHorizontal, Smartphone, Timer, Users, VideoOff } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ruledAccessories, type AccessoryRule } from '../../components/accessories';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
+import { PolicyTuning, type TuningKey } from '../../components/settings/PolicyTuning';
 import { formatConfidence } from '../../utils/format';
 import { ConfirmDialog } from '../../components/Modal';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
@@ -12,7 +13,7 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
 import { publishPolicy } from '../../hooks/useVerificationPolicy';
 import { settingsService } from '../../services/settingsService';
-import type { AccessoryItem, VerificationPolicy } from '../../types';
+import type { AccessoryItem, VerificationPolicy, VerificationPolicyUpdate } from '../../types';
 
 type PolicyKey =
   | 'block_glasses'
@@ -22,7 +23,16 @@ type PolicyKey =
   | 'anti_spoofing'
   | 'qr_enabled'
   | 'employee_mobile_only'
-  | 'validator_mobile_only';
+  | 'validator_mobile_only'
+  | 'block_virtual_cameras'
+  | 'reject_foreign_images'
+  | 'detect_static_captures'
+  | 'detect_replays'
+  | 'check_capture_continuity'
+  | 'enforce_human_timing'
+  | 'detect_duplicate_faces'
+  | 'lockout_enabled'
+  | 'validator_device_approval';
 
 interface Option {
   key: PolicyKey;
@@ -82,6 +92,21 @@ const POLICY_SECTIONS: Section[] = [
     ],
   },
   {
+    title: 'Candados contra suplantación',
+    icon: <LockKeyhole size={20} />,
+    hint: 'Cada candado cierra una forma distinta de engañar al reconocimiento facial. Recomendado mantenerlos todos activos.',
+    options: [
+      { key: 'block_virtual_cameras', icon: <VideoOff size={20} />, label: 'Bloquear cámaras virtuales', on: 'Se rechazan programas que fingen ser una cámara (OBS, ManyCam...) para transmitir un video o una foto.', off: 'Se acepta cualquier cámara, incluidas las virtuales.', security: true },
+      { key: 'reject_foreign_images', icon: <ImageOff size={20} />, label: 'Solo capturas en vivo', on: 'Se rechazan imágenes de la galería o editadas (traen datos de otra cámara o de un editor).', off: 'Se aceptan imágenes con datos de otra cámara o de un editor.', security: true },
+      { key: 'detect_static_captures', icon: <Images size={20} />, label: 'Detectar fotos fijas', on: 'Se rechaza un intento si sus capturas son idénticas (una foto enviada varias veces).', off: 'No se comparan las capturas entre sí.', security: true },
+      { key: 'detect_replays', icon: <History size={20} />, label: 'Detectar capturas reutilizadas', on: 'Cada captura sirve una sola vez: reenviar capturas guardadas o interceptadas se rechaza.', off: 'No se recuerdan las capturas recibidas.', security: true },
+      { key: 'check_capture_continuity', icon: <Film size={20} />, label: 'Exigir una sola toma', on: 'Todas las capturas deben salir de la misma cámara, con el rostro y la luz continuos al girar.', off: 'No se compara la cámara, el encuadre ni la luz entre capturas.', security: true },
+      { key: 'enforce_human_timing', icon: <Timer size={20} />, label: 'Tiempo humano en la prueba de vida', on: 'Se rechazan respuestas al reto más rápidas de lo que tarda una persona (programas automáticos).', off: 'No se mide cuánto tarda la respuesta al reto.', security: true },
+      { key: 'detect_duplicate_faces', icon: <Users size={20} />, label: 'Detectar rostros duplicados', on: 'Al registrar un rostro ya aprobado en otro empleado: se marca para revisión o, en persona, se bloquea.', off: 'No se compara el registro con los demás empleados.', security: true },
+      { key: 'lockout_enabled', icon: <Lock size={20} />, label: 'Bloqueo por intentos fallidos', on: 'Tras varios intentos fallidos o sospechosos seguidos se bloquea temporalmente (ajústalo abajo).', off: 'Se puede intentar sin límite (solo el límite general de peticiones).', security: true },
+    ],
+  },
+  {
     title: 'Métodos de identificación',
     icon: <QrCode size={20} />,
     hint: 'Formas en que los empleados pueden identificarse.',
@@ -101,6 +126,16 @@ const POLICY_SECTIONS: Section[] = [
         security: true,
         confirmMessage:
           'Los empleados podrán registrar su asistencia desde computadoras y tabletas compartidas, donde es más fácil suplantar a otra persona. ¿Deseas continuar?',
+      },
+      {
+        key: 'validator_device_approval',
+        icon: <MonitorSmartphone size={20} />,
+        label: 'Autorizar dispositivos de validadores',
+        on: 'Cada tableta o teléfono en que inicia sesión un validador queda por autorizar (Validadores › Dispositivos) y se verifica con su llave en cada inicio de sesión.',
+        off: 'Los validadores pueden iniciar sesión en cualquier dispositivo con su correo y contraseña.',
+        security: true,
+        confirmMessage:
+          'Cualquier persona con el correo y la contraseña de un validador podrá operar desde cualquier dispositivo. ¿Deseas continuar?',
       },
       {
         key: 'validator_mobile_only',
@@ -126,7 +161,7 @@ export function SettingsPage() {
   const [reload, setReload] = useState(0);
   const retry = () => setReload((n) => n + 1);
   useErrorPopup(error, { title: 'No se pudo cargar la configuración', retry });
-  const [saving, setSaving] = useState<PolicyKey | 'min_confidence' | null>(null);
+  const [saving, setSaving] = useState<PolicyKey | TuningKey | 'min_confidence' | null>(null);
   const [confirm, setConfirm] = useState<Option | null>(null);
 
   useEffect(() => {
@@ -148,7 +183,7 @@ export function SettingsPage() {
       const updated = await settingsService.updateVerificationPolicy({ [option.key]: value });
       setPolicy(updated);
       publishPolicy(updated);
-      feedback.success(value ? `${option.label}: activado` : `${option.label}: desactivado`, value ? option.on : option.off);
+      void feedback.success(value ? `${option.label}: activado` : `${option.label}: desactivado`, value ? option.on : option.off);
     } catch (e) {
       setPolicy(previous);
       void feedback.fromError(e, { title: 'No se pudo guardar' });
@@ -166,7 +201,25 @@ export function SettingsPage() {
       const updated = await settingsService.updateVerificationPolicy({ min_confidence: value });
       setPolicy(updated);
       publishPolicy(updated);
-      feedback.success('Nivel de confianza actualizado', `Se exigirá ${formatConfidence(value)} en cada verificación facial.`);
+      void feedback.success('Nivel de confianza actualizado', `Se exigirá ${formatConfidence(value)} en cada verificación facial.`);
+    } catch (e) {
+      setPolicy(previous);
+      void feedback.fromError(e, { title: 'No se pudo guardar' });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const saveTuning = async (key: TuningKey, changes: VerificationPolicyUpdate, title: string, detail: string) => {
+    if (!policy) return;
+    const previous = policy;
+    setPolicy({ ...policy, ...changes }); // optimista
+    setSaving(key);
+    try {
+      const updated = await settingsService.updateVerificationPolicy(changes);
+      setPolicy(updated);
+      publishPolicy(updated);
+      void feedback.success(title, detail);
     } catch (e) {
       setPolicy(previous);
       void feedback.fromError(e, { title: 'No se pudo guardar' });
@@ -221,6 +274,12 @@ export function SettingsPage() {
               ))}
             </PanelSection>
           ))}
+        {policy && (
+          <PanelSection title="Ajustes de los candados" icon={<SlidersHorizontal size={20} />}>
+            <p className="muted small">Qué tan estricto es cada candado. Valores más estrictos protegen más, pero pueden pedir repetir la captura con más frecuencia.</p>
+            <PolicyTuning policy={policy} saving={saving} onSave={(key, changes, title, detail) => void saveTuning(key, changes, title, detail)} />
+          </PanelSection>
+        )}
       </Panel>
       <ConfirmDialog
         open={confirm !== null}

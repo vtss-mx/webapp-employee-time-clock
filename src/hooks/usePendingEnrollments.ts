@@ -15,7 +15,7 @@ export function usePendingEnrollments(enabled: boolean): number | null {
   const [count, setCount] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    const res = await enrollmentService.list('PENDING', 1, 1);
+    const res = await enrollmentService.list('PENDING', { page: 1, size: 1 });
     setCount(res.total);
   }, []);
 

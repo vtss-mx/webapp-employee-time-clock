@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -8,10 +8,9 @@ import { checkpointService } from '../services/checkpointService';
 import { validatorService } from '../services/validatorService';
 import { catalogsFixture, catalogsWith, testCatalogs } from '../test/catalogs';
 import { identifiedResult as identified, sampleValidator } from '../test/fixtures';
-import { apiFail, apiOk, liveCheck, mockFetch } from '../test/http';
+import { apiOk, mockFetch } from '../test/http';
 import { WithCatalogs } from '../test/render';
 import type { ValidatorMode } from '../types';
-import { ValidatorModal, type ValidatorDialog } from './ValidatorModal';
 import { ValidatorModeBadge, ValidatorModePicker, availableMethods } from './ValidatorModes';
 import { VerificationResultCard } from './VerificationResultCard';
 
@@ -28,7 +27,7 @@ afterEach(() => {
 
 describe('validatorService y checkpointService', () => {
   it.each([
-    ['list', () => validatorService.list(), [sampleValidator], 'GET', '/api/validators'],
+    ['list', () => validatorService.list({ page: 2, size: 20 }), { items: [sampleValidator], total: 21, page: 2, size: 20 }, 'GET', '/api/validators?page=2&size=20'],
     ['update', () => validatorService.update(3, { mode: 'QR' }), sampleValidator, 'PUT', '/api/validators/3'],
     ['setStatus', () => validatorService.setStatus(3, false), sampleValidator, 'PATCH', '/api/validators/3/status'],
     ['resetPassword', () => validatorService.resetPassword(3, 'Nueva1234'), sampleValidator, 'PUT', '/api/validators/3/password'],
@@ -46,14 +45,17 @@ describe('validatorService y checkpointService', () => {
 
   it('alta con datos limpios y rostro con el QR del modo "QR y rostro"', async () => {
     const { calls } = mockFetch(apiOk(sampleValidator), apiOk(identified));
-    await validatorService.create({ name: '  Recepción ', email: ' Recepcion@Empresa.com ', password: 'Valida1234', mode: 'FACE' });
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Recepción', email: 'recepcion@empresa.com', password: 'Valida1234', mode: 'FACE' });
-    await checkpointService.identifyFace([new Blob(['x'])], { id: 'c1', image: new Blob(['y']) }, 'TCQR1:abc');
+    const settings = { address: sampleValidator.address!, location_required: true, location_radius_m: 120 };
+    await validatorService.create({ name: '  Recepción ', email: ' Recepcion@Empresa.com ', password: 'Valida1234', mode: 'FACE', ...settings });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Recepción', email: 'recepcion@empresa.com', password: 'Valida1234', mode: 'FACE', ...settings });
+    await checkpointService.identifyFace({ frontal: [new Blob(['x'])], challenge: { id: 'c1', images: [new Blob(['y']), new Blob(['z'])] }, camera: 'FaceTime HD Camera' }, 'TCQR1:abc');
     const form = calls[1].init.body as FormData;
     expect(calls[1].url).toBe('/api/checkpoint/identify/face');
     expect(form.get('qr_content')).toBe('TCQR1:abc');
     expect(form.get('challenge_id')).toBe('c1');
     expect(form.getAll('images')).toHaveLength(1);
+    expect(form.getAll('challenge_image')).toHaveLength(2); // una captura por giro, en orden
+    expect(form.get('camera_label')).toBe('FaceTime HD Camera');
   });
 });
 
@@ -107,84 +109,6 @@ describe('modos del validador', () => {
     expect(testCatalogs.nameOf('verification_reasons', 'AMBIGUOUS_MATCH', 'Fallida')).toBe('Parecido a varias personas');
     expect(testCatalogs.nameOf('verification_reasons', 'OTHER_COMPANY', 'Fallida')).toBe('QR no reconocido');
     expect(testCatalogs.nameOf('verification_reasons', null, 'Fallida')).toBe('Fallida');
-  });
-});
-
-describe('ValidatorModal', () => {
-  function open(dialog: ValidatorDialog) {
-    const onSaved = vi.fn();
-    const onClose = vi.fn();
-    render(<ValidatorModal dialog={dialog} onSaved={onSaved} onClose={onClose} />, { wrapper });
-    return { onSaved, onClose };
-  }
-
-  it('alta: nombre, correo, contraseña y modo; correo repetido se marca en el campo', async () => {
-    let posts = 0;
-    const { calls } = mockFetch((call) => {
-      if (call.url.startsWith('/api/validation')) return liveCheck();
-      posts += 1;
-      return posts === 1 ? apiFail(409, 'EMAIL_TAKEN', 'Ese correo ya está registrado') : apiOk(sampleValidator);
-    });
-    const { onSaved, onClose } = open({ kind: 'create' });
-    const add = screen.getByRole('button', { name: 'Agregar' });
-    expect(add).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'R');
-    await userEvent.tab();
-    expect(screen.getByText(/Escribe un nombre o ubicación/)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'ecepción planta 1');
-    await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'recepcion@empresa.com');
-    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
-    await userEvent.click(screen.getByText('Solo QR'));
-    await waitFor(() => expect(add).toBeEnabled());
-    await userEvent.click(add);
-
-    const dialog = await screen.findByRole('alertdialog');
-    expect(within(dialog).getByText('No se pudo agregar el validador')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Entendido' }));
-    expect(screen.getByText('Ese correo ya está registrado')).toBeInTheDocument();
-    expect(add).toBeDisabled(); // hasta que cambie el correo
-    await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'x');
-    await waitFor(() => expect(add).toBeEnabled());
-    await userEvent.click(add);
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(sampleValidator));
-    expect(onClose).toHaveBeenCalled();
-    const create = calls.filter((c) => c.init.method === 'POST').at(-1);
-    expect(JSON.parse(create?.init.body as string)).toMatchObject({ name: 'Recepción planta 1', mode: 'QR', password: 'Valida1234' });
-    expect(calls.some((c) => c.url.startsWith('/api/validation?field=validator_email'))).toBe(true);
-  });
-
-  it('el correo de acceso se verifica en vivo: uno ya registrado se marca y bloquea el alta', async () => {
-    mockFetch(() => liveCheck('TAKEN', 'El correo ya está registrado en la plataforma', 'validator_email'));
-    open({ kind: 'create' });
-    await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Recepción');
-    await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'admin@empresa.com');
-    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
-    expect(await screen.findByText('El correo ya está registrado en la plataforma')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Agregar' })).toBeDisabled();
-  });
-
-  it('edición: solo nombre y modo; restablecer: solo la contraseña', async () => {
-    const { calls } = mockFetch(apiOk({ ...sampleValidator, mode: 'FACE' }), apiOk(sampleValidator));
-    open({ kind: 'edit', validator: sampleValidator });
-    expect(screen.queryByLabelText(/Correo de acceso/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Contraseña/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByText('Solo rostro'));
-    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
-    await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0].url).toBe('/api/validators/3');
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Recepción planta 1', mode: 'FACE' });
-    expect(await screen.findByText('Validador actualizado')).toBeInTheDocument();
-  });
-
-  it('restablecer contraseña', async () => {
-    const { calls } = mockFetch(apiOk(sampleValidator));
-    const { onSaved } = open({ kind: 'password', validator: sampleValidator });
-    expect(screen.queryByLabelText(/Nombre o ubicación/)).not.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/Contraseña nueva/), 'Nueva1234');
-    await userEvent.click(screen.getByRole('button', { name: 'Restablecer' }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(calls[0].url).toBe('/api/validators/3/password');
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ password: 'Nueva1234' });
   });
 });
 

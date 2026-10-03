@@ -9,15 +9,11 @@ import { useSearchList } from '../../hooks/useSearchList';
 import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
 import { formatDate } from '../../utils/format';
-import { config } from '../../utils/config';
-
-const PAGE_SIZE = config.employeesPageSize;
 
 /** Empresas de la plataforma: búsqueda por nombre, razón social o RFC; uso de su plan. */
 export function CompaniesListPage() {
   const navigate = useNavigate();
   const list = useSearchList((query, signal) => adminService.list(query, signal), {
-    pageSize: PAGE_SIZE,
     errorTitle: 'No se pudieron cargar las empresas',
   });
   const { data } = list;
@@ -48,6 +44,7 @@ export function CompaniesListPage() {
 
           <ListResults
             list={list}
+            pager={{ noun: { one: 'empresa', other: 'empresas' } }}
             columns={['Empresa', 'Empleados', 'Administradores', 'Alta', 'Estado']}
             onOpen={(c) => open(c.id)}
             empty={{

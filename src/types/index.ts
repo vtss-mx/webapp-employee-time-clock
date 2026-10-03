@@ -86,6 +86,22 @@ export interface UserMembership {
   face_status: FaceStatus;
 }
 
+// ---------- Listados paginados ----------
+
+/** Contrato único de todo listado paginado del backend (`total` sin paginar; `size` = por página). */
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+/** Página que se pide: número (desde 1) y elementos por página. */
+export interface PageQuery {
+  page: number;
+  size: number;
+}
+
 // ---------- Plataforma (ADMIN) ----------
 
 export interface Company {
@@ -93,7 +109,6 @@ export interface Company {
   name: string;
   legal_name: string | null;
   rfc: string | null;
-  contact_email: string | null;
   phone: string | null;
   active: boolean;
   max_employees: number | null;
@@ -115,12 +130,7 @@ export interface CompanyDetail extends Company {
   admins: CompanyAdmin[];
 }
 
-export interface CompanyList {
-  items: Company[];
-  total: number;
-  page: number;
-  size: number;
-}
+export type CompanyList = Page<Company>;
 
 export interface CompanyListParams {
   search?: string;
@@ -134,13 +144,14 @@ export interface CompanyFormValues {
   name: string;
   legal_name: string;
   rfc: string;
-  contact_email: string;
   /** 10 dígitos. */
   phone: string;
   /** Vacío = sin límite. */
   max_employees: string;
   admin_email: string;
   admin_password: string;
+  /** Solo en el cliente: la contraseña repetida (no se envía). */
+  admin_password_confirm: string;
 }
 
 export interface PlatformStats {
@@ -207,12 +218,7 @@ export interface Employee {
   updated_at: string;
 }
 
-export interface EmployeeList {
-  items: Employee[];
-  total: number;
-  page: number;
-  size: number;
-}
+export type EmployeeList = Page<Employee>;
 
 export interface EmployeeListParams {
   search?: string;
@@ -233,11 +239,13 @@ export interface EmployeeFormValues {
   phone: string;
   email: string;
   password: string;
+  /** Solo en el cliente: la contraseña repetida (no se envía). */
+  password_confirm: string;
 }
 
 export type EmployeeUpdatePayload = Partial<EmployeeFormValues> & { headwear_exempt?: boolean };
 /** Sin `password` cuando se vincula a una persona que ya tiene cuenta (conserva la suya). */
-export type EmployeeCreatePayload = Omit<EmployeeFormValues, 'password'> & { password?: string; headwear_exempt: boolean };
+export type EmployeeCreatePayload = Omit<EmployeeFormValues, 'password' | 'password_confirm'> & { password?: string; headwear_exempt: boolean };
 
 export interface EnrollmentSubmitResponse {
   enrollment_id: number;
@@ -269,12 +277,7 @@ export interface FaceEnrollmentDetail extends FaceEnrollment {
   photo: string | null;
 }
 
-export interface FaceEnrollmentList {
-  items: FaceEnrollment[];
-  total: number;
-  page: number;
-  size: number;
-}
+export type FaceEnrollmentList = Page<FaceEnrollment>;
 
 export interface EmployeeQr {
   id: number;
@@ -295,8 +298,12 @@ export type TurnAction = 'TURN_LEFT' | 'TURN_RIGHT';
 export interface FaceChallenge {
   liveness_required: boolean;
   challenge_id: string | null;
+  /** Primer giro (igual a `actions[0]`). */
   action: TurnAction | null;
   instruction: string | null;
+  /** Giros en orden (uno o dos, según la empresa): una captura por giro. */
+  actions: TurnAction[];
+  instructions: string[];
   min_yaw_ratio: number | null;
   expires_in: number | null;
 }
@@ -330,6 +337,8 @@ export interface VerificationLog {
   created_at: string;
 }
 
+export type VerificationLogList = Page<VerificationLog>;
+
 /** Política de verificación de la empresa (editable por COMPANY en Configuración). */
 export interface VerificationPolicy {
   block_glasses: boolean;
@@ -343,11 +352,30 @@ export interface VerificationPolicy {
   validator_mobile_only: boolean;
   /** Confianza mínima: exactamente el `value` de un nivel activo del catálogo confidence_levels. */
   min_confidence: number;
+  // --- Candados contra engaños (cada uno lo activa o desactiva la empresa) ---
+  /** Sensibilidad del anti-spoofing: código del catálogo antispoof_levels. */
+  anti_spoofing_level: string;
+  /** Giros aleatorios de la prueba de vida (1 o 2). */
+  liveness_steps: number;
+  block_virtual_cameras: boolean;
+  reject_foreign_images: boolean;
+  detect_static_captures: boolean;
+  detect_replays: boolean;
+  check_capture_continuity: boolean;
+  enforce_human_timing: boolean;
+  detect_duplicate_faces: boolean;
+  lockout_enabled: boolean;
+  lockout_max_failures: number;
+  lockout_minutes: number;
+  /** Cada dispositivo de un validador lo autoriza la empresa antes de operar. */
+  validator_device_approval: boolean;
+  /** Nombres de cámaras virtuales que no se aceptan (la app avisa antes de capturar). */
+  blocked_cameras: string[];
   updated_at: string | null;
   updated_by: string | null;
 }
 
-export type VerificationPolicyUpdate = Partial<Omit<VerificationPolicy, 'updated_at' | 'updated_by'>>;
+export type VerificationPolicyUpdate = Partial<Omit<VerificationPolicy, 'updated_at' | 'updated_by' | 'blocked_cameras'>>;
 
 /** Reglas que la app aplica en pantalla (el umbral de confianza solo lo evalúa el servidor). */
 export type VerificationRules = Omit<VerificationPolicy, 'min_confidence' | 'updated_at' | 'updated_by'>;
@@ -366,13 +394,63 @@ export interface Validator {
   last_login_at: string | null;
   identifications_today: number;
   created_at: string;
+  /** null: dado de alta antes de pedir el domicilio (se completa al editarlo). */
+  address: Address | null;
+  location_required: boolean;
+  location_radius_m: number | null;
+  /** Dispositivos por autorizar y autorizados. */
+  devices_pending: number;
+  devices_approved: number;
 }
 
-export interface ValidatorFormValues {
+export type ValidatorList = Page<Validator>;
+
+/** Estado de un dispositivo de validador (catálogo device_statuses). */
+export type DeviceStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVOKED';
+
+/** Tableta o teléfono en que inició sesión un validador (la empresa lo autoriza). */
+export interface ValidatorDevice {
+  id: number;
   name: string;
+  user_agent: string | null;
+  status: DeviceStatus;
+  created_at: string;
+  last_seen_at: string | null;
+  last_ip: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
+export type ValidatorDeviceList = Page<ValidatorDevice>;
+
+/** Domicilio con su punto en el mapa (contrato del backend: `app/schemas/address.py`). */
+export interface Address {
+  street: string;
+  exterior_number: string;
+  interior_number: string | null;
+  postal_code: string;
+  /** ISO 3166-1 alfa-2 (catálogo de países). */
+  country_code: string;
+  state: string;
+  municipality: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/** Datos del validador que se guardan en el alta y la edición (sin la cuenta). */
+export interface ValidatorSettings {
+  name: string;
+  mode: ValidatorMode;
+  address: Address;
+  /** Solo inicia sesión a no más de `location_radius_m` metros del punto del domicilio. */
+  location_required: boolean;
+  location_radius_m: number | null;
+}
+
+export interface ValidatorCreatePayload extends ValidatorSettings {
   email: string;
   password: string;
-  mode: ValidatorMode;
 }
 
 /** Configuración del validador autenticado. */
@@ -460,6 +538,14 @@ export interface ConfidenceLevelItem extends CatalogItem {
   rejection_rate: number;
 }
 
+/** Sensibilidad del anti-spoofing que la empresa puede exigir. */
+export interface AntispoofLevelItem extends CatalogItem {
+  /** Probabilidad de rostro real por debajo de la cual una captura parece foto, pantalla o video. */
+  threshold: number;
+  /** Basta una sola captura sospechosa para rechazar (si no, decide la mayoría). */
+  any_frame: boolean;
+}
+
 export interface FaceErrorItem extends ReasonItem {
   /** La persona puede corregir (luz, pose, accesorios...) y volver a intentar. */
   retryable: boolean;
@@ -471,12 +557,14 @@ export interface Catalogs {
   validator_modes: ValidatorModeItem[];
   face_statuses: FaceStatusItem[];
   enrollment_statuses: StatusItem<EnrollmentStatus>[];
+  device_statuses: StatusItem<DeviceStatus>[];
   verification_reasons: ReasonItem[];
   accessories: AccessoryItem[];
   countries: CountryItem[];
   enrollment_rejection_reasons: CatalogItem[];
   reverification_reasons: CatalogItem[];
   confidence_levels: ConfidenceLevelItem[];
+  antispoof_levels: AntispoofLevelItem[];
   face_errors: FaceErrorItem[];
   /** Marcas del registro facial para el revisor (códigos de `flagged_accessories`). */
   enrollment_flags: CatalogItem[];

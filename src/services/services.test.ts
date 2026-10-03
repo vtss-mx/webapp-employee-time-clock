@@ -29,20 +29,20 @@ describe('servicios', () => {
     ['employees.resetFace', () => employeeService.resetFace(1), employee, 'POST', '/api/employees/1/face/reset'],
     ['employees.getQr', () => employeeService.getQr(1), qr, 'GET', '/api/employees/1/qr'],
     ['employees.regenerateQr', () => employeeService.regenerateQr(1), qr, 'POST', '/api/employees/1/qr/regenerate'],
-    ['employees.history', () => employeeService.history(1, 5), [{ id: 1, method: 'QR', success: true }], 'GET', '/api/employees/1/verifications?limit=5'],
-    ['enrollments.submit', () => enrollmentService.submit([new Blob(['a'])]), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
-    ['enrollments.list', () => enrollmentService.list('PENDING'), { items: [detail], total: 1 }, 'GET', '/api/enrollments?status=PENDING&page=1&size=20'],
+    ['employees.history', () => employeeService.history(1, { page: 1, size: 10 }), { items: [{ id: 1, method: 'QR', success: true }], total: 1, page: 1, size: 10 }, 'GET', '/api/employees/1/verifications?page=1&size=10'],
+    ['enrollments.submit', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
+    ['enrollments.list', () => enrollmentService.list('PENDING', { page: 1, size: 10 }), { items: [detail], total: 1 }, 'GET', '/api/enrollments?status=PENDING&page=1&size=10'],
     ['enrollments.get', () => enrollmentService.get(3), detail, 'GET', '/api/enrollments/3'],
     ['enrollments.approve', () => enrollmentService.approve(3), detail, 'POST', '/api/enrollments/3/approve'],
     ['enrollments.reject', () => enrollmentService.reject(3, 'foto borrosa'), detail, 'POST', '/api/enrollments/3/reject'],
-    ['verification.face', () => verificationService.verifyFace([new Blob(['a'])], { id: 'c', image: new Blob(['t']) }), result, 'POST', '/api/verification/face'],
+    ['verification.face', () => verificationService.verifyFace({ frontal: [new Blob(['a'])], challenge: { id: 'c', images: [new Blob(['t'])] } }), result, 'POST', '/api/verification/face'],
     ['verification.qr', () => verificationService.verifyQr('TCQR1:x'), result, 'POST', '/api/verification/qr'],
     ['face.challenge', () => faceService.getChallenge(), { liveness_required: true }, 'POST', '/api/face/challenge'],
     ['face.check', () => faceService.check([new Blob(['a']), new Blob(['b'])], true), { detection_score: 0.9 }, 'POST', '/api/face/check'],
     ['me.qr', () => meService.getMyQr(), qr, 'GET', '/api/users/me/qr'],
     ['settings.get', () => settingsService.getVerificationPolicy(), policy, 'GET', '/api/settings/verification'],
     ['settings.update', () => settingsService.updateVerificationPolicy({ block_mask: false }), policy, 'PUT', '/api/settings/verification'],
-    ['enrollments.submitReview', () => enrollmentService.submit([new Blob(['a'])], undefined, true), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
+    ['enrollments.submitReview', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }, true), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
     ['auth.sessions', () => authService.sessions(), [{ id: 's', created_at: 'x', current: true }], 'GET', '/api/auth/sessions'],
     ['auth.revokeSession', () => authService.revokeSession('s/1'), null, 'DELETE', '/api/auth/sessions/s%2F1'],
     ['auth.logoutAll', () => authService.logoutAll(), { revoked: 1 }, 'POST', '/api/auth/logout-all'],
@@ -98,5 +98,23 @@ describe('errores faciales', () => {
     expect(isRetryableFaceError(apiError(0, 'NETWORK_ERROR'), testCatalogs)).toBe(true);
     expect(isRetryableFaceError(apiError(503, 'SERVER_BUSY'), testCatalogs)).toBe(true);
     expect(isRetryableFaceError(apiError(408, 'TIMEOUT'), testCatalogs)).toBe(true);
+  });
+});
+
+describe('rostro en persona (la empresa con el empleado presente)', () => {
+  it('registra (aprobado al momento) y verifica con las capturas y el reto de la empresa', async () => {
+    const { calls } = mockFetch((call) =>
+      call.url.endsWith('/enroll')
+        ? apiOk({ enrollment_id: 9, face_status: 'APPROVED', message: 'ok' })
+        : apiOk({ verified: true, method: 'FACE', message: 'Identificación exitosa' }),
+    );
+    const frame = new Blob(['f'], { type: 'image/jpeg' });
+    const challenge = { id: 'ch-1', images: [new Blob(['t'], { type: 'image/jpeg' })] };
+    expect((await employeeService.enrollFaceInPerson(5, { frontal: [frame, frame], challenge })).face_status).toBe('APPROVED');
+    expect((await employeeService.verifyFaceInPerson(5, { frontal: [frame], challenge })).verified).toBe(true);
+    expect(calls.map((c) => c.url)).toEqual(['/api/employees/5/face/enroll', '/api/employees/5/face/verify']);
+    const form = calls[0].init.body as FormData;
+    expect(form.getAll('images')).toHaveLength(2);
+    expect(form.get('challenge_id')).toBe('ch-1');
   });
 });

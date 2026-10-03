@@ -28,10 +28,13 @@ export const EmployeesListPage = page(() => import('../pages/company/EmployeesLi
 export const EmployeeCreatePage = page(() => import('../pages/company/EmployeeCreatePage'), 'EmployeeCreatePage');
 export const EmployeeDetailPage = page(() => import('../pages/company/EmployeeDetailPage'), 'EmployeeDetailPage');
 export const EmployeeEditPage = page(() => import('../pages/company/EmployeeEditPage'), 'EmployeeEditPage');
+export const EmployeeFacePage = page(() => import('../pages/company/EmployeeFacePage'), 'EmployeeFacePage');
 export const ValidationsPage = page(() => import('../pages/company/ValidationsPage'), 'ValidationsPage');
 export const ValidationReviewPage = page(() => import('../pages/company/ValidationReviewPage'), 'ValidationReviewPage');
 export const SettingsPage = page(() => import('../pages/company/SettingsPage'), 'SettingsPage');
 export const ValidatorsPage = page(() => import('../pages/company/ValidatorsPage'), 'ValidatorsPage');
+export const ValidatorFormPage = page(() => import('../pages/company/ValidatorFormPage'), 'ValidatorFormPage');
+export const ValidatorDevicesPage = page(() => import('../pages/company/ValidatorDevicesPage'), 'ValidatorDevicesPage');
 
 // VALIDATOR (punto de control)
 export const CheckpointPage = page(() => import('../pages/validator/CheckpointPage'), 'CheckpointPage');
@@ -44,3 +47,7 @@ export const VerificationMenuPage = page(() => import('../pages/employee/Verific
 export const FaceVerificationPage = page(() => import('../pages/employee/FaceVerificationPage'), 'FaceVerificationPage');
 export const QrVerificationPage = page(() => import('../pages/employee/QrVerificationPage'), 'QrVerificationPage');
 export const MyQrPage = page(() => import('../pages/employee/MyQrPage'), 'MyQrPage');
+export const ValidatorPasswordPage = page(() => import('../pages/company/ValidatorPasswordPage'), 'ValidatorPasswordPage');
+export const ReverifyIdentityPage = page(() => import('../pages/company/ReverifyIdentityPage'), 'ReverifyIdentityPage');
+export const RejectEnrollmentPage = page(() => import('../pages/company/RejectEnrollmentPage'), 'RejectEnrollmentPage');
+export const CompanyAdminFormPage = page(() => import('../pages/admin/CompanyAdminFormPage'), 'CompanyAdminFormPage');

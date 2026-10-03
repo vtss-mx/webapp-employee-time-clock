@@ -50,7 +50,7 @@ export function MyQrPage() {
 
   const download = (qr: EmployeeQr) => {
     downloadUrl(qr.image_base64, qr.file_name);
-    feedback.success('QR descargado', qr.file_name);
+    void feedback.success('QR descargado', qr.file_name);
   };
 
   const fullName = user?.employee?.full_name ?? user?.email ?? '';

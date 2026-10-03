@@ -2,6 +2,7 @@ import { Check, KeyRound, LogIn, Mail } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/auth/AuthLayout';
+import { loginRuleMessage } from '../components/auth/loginMessages';
 import { FormField } from '../components/FormField';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { Button } from '../components/ui/Button';
@@ -35,6 +36,7 @@ export function LoginPage() {
   // Entrar solo con correo válido y contraseña escrita.
   const canSubmit = !validateEmail(email) && Boolean(password);
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
   const feedback = useFeedback();
 
   // Sesión cerrada por el sistema (expiró, se revocó, se cambió la contraseña): se explica al llegar.
@@ -65,13 +67,20 @@ export function LoginPage() {
     }
     try {
       // El servidor recuerda (o deja de recordar) la cuenta en este dispositivo según la casilla.
-      const loggedUser = await login(email, password, remember);
+      const loggedUser = await login(email, password, remember, { onLocating: () => setLocating(true) });
       const from = (location.state as { from?: string } | null)?.from;
       const home = homeForUser(loggedUser);
       const resume = !needsCompanySelection(loggedUser) && from?.startsWith(home.split('/').slice(0, 2).join('/'));
       void navigate(resume && from ? from : home, { replace: true });
     } catch (err) {
       setLoading(false);
+      setLocating(false);
+      // Reglas del validador (dispositivo por autorizar, ubicación...): su propio aviso.
+      const ruleMessage = loginRuleMessage(err);
+      if (ruleMessage) {
+        void feedback.show(ruleMessage);
+        return;
+      }
       // Credenciales o cuenta desactivada (401) sí se muestran aquí; el dispositivo no
       // permitido lo presenta la app con su propio aviso.
       void feedback.fromError(err, { title: 'No se pudo iniciar sesión', showAuthErrors: true });
@@ -175,7 +184,7 @@ export function LoginPage() {
             title={canSubmit ? undefined : 'Escribe tu correo y tu contraseña'}
             icon={<LogIn size={20} />}
           >
-            Iniciar sesión
+            {locating ? 'Verificando tu ubicación...' : 'Iniciar sesión'}
           </Button>
         </form>
       </div>

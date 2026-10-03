@@ -27,6 +27,12 @@ export function validatePassword(value: string): string | undefined {
   return undefined;
 }
 
+/** Repetir la contraseña (toda contraseña que se asigna se confirma: evita errores de dedo). */
+export function validatePasswordConfirm(password: string, confirm: string): string | undefined {
+  if (!confirm) return 'Repite la contraseña';
+  return confirm === password ? undefined : 'Las contraseñas no coinciden';
+}
+
 export function validateName(value: string, label: string): string | undefined {
   const v = value.trim();
   if (!v) return `${label} es obligatorio`;
@@ -68,17 +74,28 @@ function rfcDateIsValid(yy: number, mm: number, dd: number): boolean {
   });
 }
 
+/** Fecha aammdd de un RFC o una CURP como dd/mm/aaaa (con el siglo de la fecha capturada). */
+function documentDate(yymmdd: string, birthIso: string): string {
+  return `${yymmdd.slice(4, 6)}/${yymmdd.slice(2, 4)}/${birthIso.slice(0, 2)}${yymmdd.slice(0, 2)}`;
+}
+
+/** "El RFC indica nacimiento el 01/09/2003, pero la fecha de nacimiento es 03/09/2003" (mismo texto que el backend). */
+function birthDateMismatch(document: 'El RFC' | 'La CURP', yymmdd: string, birthIso: string): string {
+  const [year, month, day] = birthIso.split('-');
+  return `${document} indica nacimiento el ${documentDate(yymmdd, birthIso)}, pero la fecha de nacimiento es ${day}/${month}/${year}`;
+}
+
 /** Mismas reglas que el backend; con `birthDate` (ISO) verifica también que coincida la fecha. */
 export function validateRfc(value: string, birthDate?: string): string | undefined {
   const rfc = normalizeRfc(value);
   if (!rfc) return 'El RFC es obligatorio';
   if (GENERIC_RFCS.has(rfc)) return 'Captura el RFC personal del empleado; el RFC genérico no es válido';
-  if (rfc.length !== RFC_LENGTH) return `El RFC de una persona física tiene ${RFC_LENGTH} caracteres`;
+  if (rfc.length !== RFC_LENGTH) return `El RFC de una persona física tiene ${RFC_LENGTH} caracteres; llevas ${rfc.length}`;
   const match = RFC_RE.exec(rfc);
   if (!match) return 'El RFC no tiene un formato válido (p. ej. PEGJ900515AB1)';
   if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha del RFC (aammdd) no es válida';
   const birth = /^\d{2}(\d{2})-(\d{2})-(\d{2})$/.exec(birthDate ?? '');
-  if (birth && rfc.slice(4, 10) !== `${birth[1]}${birth[2]}${birth[3]}`) return 'El RFC no coincide con la fecha de nacimiento';
+  if (birth && rfc.slice(4, 10) !== `${birth[1]}${birth[2]}${birth[3]}`) return birthDateMismatch('El RFC', rfc.slice(4, 10), birthDate ?? '');
   return undefined;
 }
 
@@ -101,15 +118,17 @@ export function curpCheckDigit(first17: string): string {
 export function validateCurp(value: string, birthDate?: string): string | undefined {
   const curp = normalizeCurp(value);
   if (!curp) return 'La CURP es obligatoria';
-  if (curp.length !== CURP_LENGTH) return `La CURP tiene ${CURP_LENGTH} caracteres`;
+  if (curp.length !== CURP_LENGTH) return `La CURP tiene ${CURP_LENGTH} caracteres; llevas ${curp.length}`;
   const match = CURP_RE.exec(curp);
   if (!match) return 'La CURP no tiene un formato válido (p. ej. HEGG560427MVZRRL04)';
   if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha de la CURP (aammdd) no es válida';
   if (curpCheckDigit(curp.slice(0, 17)) !== curp[17]) return 'La CURP no es válida: el dígito verificador no corresponde';
   const birth = /^(\d{2})(\d{2})-(\d{2})-(\d{2})$/.exec(birthDate ?? '');
   if (birth) {
-    const centuryOk = /\d/.test(curp[16]) === Number(`${birth[1]}${birth[2]}`) < 2000;
-    if (curp.slice(4, 10) !== `${birth[2]}${birth[3]}${birth[4]}` || !centuryOk) return 'La CURP no coincide con la fecha de nacimiento';
+    if (curp.slice(4, 10) !== `${birth[2]}${birth[3]}${birth[4]}`) return birthDateMismatch('La CURP', curp.slice(4, 10), birthDate ?? '');
+    if (/\d/.test(curp[16]) !== Number(`${birth[1]}${birth[2]}`) < 2000) {
+      return 'La CURP no corresponde al siglo de la fecha de nacimiento: su carácter 17 es un número para quienes nacieron antes de 2000 y una letra a partir de 2000';
+    }
   }
   return undefined;
 }

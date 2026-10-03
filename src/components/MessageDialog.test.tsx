@@ -7,7 +7,7 @@ import { useErrorPopup, useFeedback } from '../hooks/useFeedback';
 import { ApiError, MOBILE_DEVICE_REQUIRED } from '../services/apiClient';
 import { describeError, isHandledGlobally } from '../utils/errorPresentation';
 import { lockScroll } from '../utils/scrollLock';
-import { cameraConsentMessage, cameraProblemMessage } from './cameraMessages';
+import { cameraProblemMessage } from './cameraMessages';
 
 const wrapper = ({ children }: { children: ReactNode }) => <FeedbackProvider>{children}</FeedbackProvider>;
 const setup = () => renderHook(() => useFeedback(), { wrapper }).result;
@@ -184,13 +184,6 @@ describe('lockScroll', () => {
 });
 
 describe('mensajes de la cámara', () => {
-  it('permiso previo: propósito, garantías y acciones', () => {
-    const message = cameraConsentMessage('environment');
-    expect(message.text).toMatch(/código QR/);
-    expect(message.details).toHaveLength(3);
-    expect(message.actions?.map((a) => a.id)).toEqual(['later', 'allow']);
-  });
-
   it('fallas: tono según la causa y versión segura cuando aplica', () => {
     const insecure = cameraProblemMessage({ kind: 'insecure', title: 't', message: 'm', steps: ['a'], secureUrl: 'https://x' });
     expect(insecure.variant).toBe('warning');

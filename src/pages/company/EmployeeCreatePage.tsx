@@ -21,8 +21,9 @@ export function EmployeeCreatePage() {
     if (!validate()) return;
     await save(async () => {
       // Persona de otra empresa: se vincula su cuenta y conserva su contraseña (no se envía).
+      const { password_confirm: _confirm, ...data } = values;
       const employee = await employeeService.create({
-        ...values,
+        ...data,
         password: linking ? undefined : values.password,
         headwear_exempt: headwearExempt,
       });

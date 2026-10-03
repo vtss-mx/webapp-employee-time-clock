@@ -1,6 +1,14 @@
 import type { AuthTokenResponse, DeviceSession, RememberedAccount, User } from '../types';
 import { hasKeys, isArrayOf, isNothing } from '../utils/guards';
 import { apiRequest } from './apiClient';
+import type { DeviceProof } from '../utils/deviceKey';
+import type { DeviceLocation } from '../utils/geolocation';
+
+/** Pruebas adicionales del inicio de sesión de un validador (las pide el backend). */
+export interface LoginProofs {
+  location?: DeviceLocation;
+  device?: DeviceProof;
+}
 
 const isUser = hasKeys<User>('id', 'email', 'role');
 const isTokenResponse = (value: unknown): value is AuthTokenResponse =>
@@ -14,11 +22,15 @@ const isRememberedOrNothing = (value: unknown): value is RememberedAccount | nul
  * cookie HttpOnly del refresh token, que el navegador envía solo a /api/auth.
  */
 export const authService = {
-  /** `remember`: la sesión sobrevive al cierre del navegador (cookie persistente, máx. 12 h). */
-  login(email: string, password: string, remember = false): Promise<AuthTokenResponse> {
+  /**
+   * `remember`: la sesión sobrevive al cierre del navegador (cookie persistente, máx. 12 h).
+   * `proofs`: solo cuando el backend las pide a un validador — la ubicación del dispositivo y la firma
+   * del reto con la llave del dispositivo.
+   */
+  login(email: string, password: string, remember = false, proofs: LoginProofs = {}): Promise<AuthTokenResponse> {
     return apiRequest<AuthTokenResponse>('/auth/login', {
       method: 'POST',
-      body: { email: email.trim().toLowerCase(), password, remember },
+      body: { email: email.trim().toLowerCase(), password, remember, ...proofs },
       auth: false,
       validate: isTokenResponse,
     });

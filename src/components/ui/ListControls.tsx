@@ -1,6 +1,5 @@
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { ActiveFilter } from '../../hooks/useSearchList';
-import { Button } from './Button';
 import { Select } from './Select';
 
 interface ListToolbarProps {
@@ -22,36 +21,16 @@ export function ListToolbar({ search, onSearch, placeholder, label, filter, onFi
         <Search size={18} />
         <input type="search" className="input" placeholder={placeholder} value={search} onChange={(e) => onSearch(e.target.value)} aria-label={label} />
       </div>
-      <Select value={filter} onChange={(e) => onFilter(e.target.value as ActiveFilter)} aria-label="Filtrar por estado">
-        <option value="all">Todos los estados</option>
-        <option value="active">{labels?.active ?? 'Activos'}</option>
-        <option value="inactive">{labels?.inactive ?? 'Inactivos'}</option>
-      </Select>
-    </div>
-  );
-}
-
-interface PaginationProps {
-  page: number;
-  totalPages: number;
-  loading?: boolean;
-  onPage: (page: number) => void;
-}
-
-/** Paginación de los listados (solo si hay más de una página). */
-export function Pagination({ page, totalPages, loading = false, onPage }: PaginationProps) {
-  if (totalPages <= 1) return null;
-  return (
-    <div className="pagination">
-      <Button size="sm" icon={<ChevronLeft size={16} />} disabled={page <= 1 || loading} onClick={() => onPage(page - 1)}>
-        Anterior
-      </Button>
-      <span>
-        Página {page} de {totalPages}
-      </span>
-      <Button size="sm" iconRight={<ChevronRight size={16} />} disabled={page >= totalPages || loading} onClick={() => onPage(page + 1)}>
-        Siguiente
-      </Button>
+      <Select<ActiveFilter>
+        value={filter}
+        onChange={onFilter}
+        aria-label="Filtrar por estado"
+        options={[
+          { value: 'all', label: 'Todos los estados' },
+          { value: 'active', label: labels?.active ?? 'Activos' },
+          { value: 'inactive', label: labels?.inactive ?? 'Inactivos' },
+        ]}
+      />
     </div>
   );
 }

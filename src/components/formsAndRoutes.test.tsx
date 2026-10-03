@@ -13,7 +13,6 @@ import { tokenResponse, WithCatalogs } from '../test/render';
 import { preferenceStore } from '../utils/storage';
 import type { EmployeeFormValues } from '../types';
 import { emptyEmployeeForm, EmployeeFormFields } from './EmployeeForm';
-import { ReverifyIdentityModal } from './ReverifyIdentityModal';
 
 describe('EmployeeFormFields: normaliza mientras se escribe', () => {
   function Harness() {
@@ -59,34 +58,6 @@ describe('EmployeeFormFields: cuentas de personas en varias empresas', () => {
     expect(screen.getByLabelText('Teléfono celular')).toBeDisabled();
     expect(screen.queryByLabelText('Nueva contraseña')).toBeNull();
     expect(screen.getAllByText(/Cuenta compartida con otra empresa/)).toHaveLength(2);
-  });
-});
-
-describe('ReverifyIdentityModal', () => {
-  it('envía el motivo elegido (catálogo reverification_reasons) o escrito; sin motivo, undefined', async () => {
-    const onConfirm = vi.fn();
-    const onCancel = vi.fn();
-    const { rerender } = render(<ReverifyIdentityModal open firstName="Ana" busy={false} onCancel={onCancel} onConfirm={onConfirm} />, {
-      wrapper: WithCatalogs,
-    });
-    expect(screen.getByRole('button', { name: 'Actualización periódica de identidad' })).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'Solicitar nueva verificación de identidad' })).toHaveTextContent('Ana deberá registrar su rostro');
-    await userEvent.click(screen.getByRole('button', { name: 'Solicitar verificación' }));
-    expect(onConfirm).toHaveBeenLastCalledWith(undefined);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Cambio importante de apariencia' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Solicitar verificación' }));
-    expect(onConfirm).toHaveBeenLastCalledWith('Cambio importante de apariencia');
-
-    await userEvent.clear(screen.getByLabelText('Motivo (opcional, visible para el empleado)'));
-    await userEvent.type(screen.getByLabelText('Motivo (opcional, visible para el empleado)'), '  Revisión anual  ');
-    await userEvent.click(screen.getByRole('button', { name: 'Solicitar verificación' }));
-    expect(onConfirm).toHaveBeenLastCalledWith('Revisión anual');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    expect(onCancel).toHaveBeenCalled();
-    rerender(<ReverifyIdentityModal open firstName="Ana" busy onCancel={onCancel} onConfirm={onConfirm} />);
-    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
   });
 });
 

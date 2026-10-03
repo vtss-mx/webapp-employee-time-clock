@@ -1,5 +1,5 @@
 import { useCatalogs } from '../hooks/useCatalogs';
-import type { EnrollmentStatus, FaceStatus, StatusTone } from '../types';
+import type { DeviceStatus, EnrollmentStatus, FaceStatus, StatusTone } from '../types';
 
 export function StatusBadge({ active }: { active: boolean }) {
   return <span className={`badge ${active ? 'badge--success' : 'badge--muted'}`}>{active ? 'Activo' : 'Inactivo'}</span>;
@@ -19,7 +19,7 @@ const TONE_CLASS: Record<StatusTone, string> = {
 };
 
 /** Estado de un catálogo con tono (registro facial o solicitud): nombre y tono vienen de la BD. */
-function CatalogStatusBadge({ catalog, code }: { catalog: 'face_statuses' | 'enrollment_statuses'; code: string }) {
+function CatalogStatusBadge({ catalog, code }: { catalog: 'face_statuses' | 'enrollment_statuses' | 'device_statuses'; code: string }) {
   const { byCode } = useCatalogs();
   const status = byCode(catalog, code);
   return <span className={`badge ${TONE_CLASS[status?.tone ?? 'muted']}`}>{status?.name ?? code}</span>;
@@ -31,4 +31,8 @@ export function FaceStatusBadge({ status }: { status: FaceStatus }) {
 
 export function EnrollmentBadge({ status }: { status: EnrollmentStatus }) {
   return <CatalogStatusBadge catalog="enrollment_statuses" code={status} />;
+}
+
+export function DeviceStatusBadge({ status }: { status: DeviceStatus }) {
+  return <CatalogStatusBadge catalog="device_statuses" code={status} />;
 }

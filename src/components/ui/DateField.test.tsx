@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { DateField, displayToValue, isoToDisplay, maskDate, parseIso, toIso } from './DateField';
-import { Select } from './Select';
 
 function Harness({ initial = '', min = '1920-01-01', max = '2010-06-15' }: { initial?: string; min?: string; max?: string }) {
   const [value, setValue] = useState(initial);
@@ -122,17 +121,3 @@ describe('DateField', () => {
   });
 });
 
-describe('Select', () => {
-  it('renderiza el select nativo con ícono y chevron', async () => {
-    let value = '';
-    render(
-      <Select aria-label="Estado" icon={<span>i</span>} onChange={(e) => (value = e.target.value)} defaultValue="a">
-        <option value="a">A</option>
-        <option value="b">B</option>
-      </Select>,
-    );
-    await userEvent.selectOptions(screen.getByLabelText('Estado'), 'b');
-    expect(value).toBe('b');
-    expect(document.querySelector('.select--with-icon .select__chevron')).not.toBeNull();
-  });
-});

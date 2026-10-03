@@ -6,7 +6,7 @@ const isCompany = hasKeys<CompanyDetail>('id', 'name', 'active', 'employee_count
 const isDetail = hasKeys<CompanyDetail>('id', 'name', 'admins');
 const isStats = hasKeys<PlatformStats>('companies', 'active_companies', 'employees', 'company_admins');
 
-type CompanyData = Omit<CompanyFormValues, 'admin_email' | 'admin_password'>;
+type CompanyData = Omit<CompanyFormValues, 'admin_email' | 'admin_password' | 'admin_password_confirm'>;
 
 /** Datos de la empresa como los espera la API (sin espacios sobrantes, límite numérico o null). */
 function companyBody(values: Partial<CompanyData>): Record<string, unknown> {
@@ -34,7 +34,7 @@ export const adminService = {
 
   /** Empresa + su primer administrador en una sola operación. */
   create(values: CompanyFormValues): Promise<CompanyDetail> {
-    const { admin_email, admin_password, ...company } = values;
+    const { admin_email, admin_password, admin_password_confirm: _confirm, ...company } = values;
     const body = { ...companyBody(company), admin_email: admin_email.trim(), admin_password };
     return apiRequest<CompanyDetail>('/admin/companies', { method: 'POST', body, validate: isDetail });
   },

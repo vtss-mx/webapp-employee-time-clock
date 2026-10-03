@@ -31,7 +31,7 @@ export const preferenceStore = createStore(() => window.localStorage);
 export const tabStore = createStore(() => window.sessionStorage);
 
 /** Datos de usuario que versiones anteriores guardaban en el navegador y ahora viven en la BD. */
-const LEGACY_USER_DATA_KEYS = ['tc.login.email', 'tc.sidebar.collapsed'];
+const LEGACY_USER_DATA_KEYS = ['tc.login.email', 'tc.sidebar.collapsed', 'tc.camera.granted'];
 
 export function purgeLegacyUserData(): void {
   LEGACY_USER_DATA_KEYS.forEach((key) => preferenceStore.remove(key));

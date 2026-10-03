@@ -104,10 +104,18 @@ describe('utilidades de transporte', () => {
     expect(retryDelay(2, null)).toBeGreaterThanOrEqual(1200);
   });
   it('arma el multipart facial', () => {
-    const form = buildFaceForm([new Blob(['a']), new Blob(['b'])], { id: 'c1', image: new Blob(['t']) });
+    const form = buildFaceForm(
+      { frontal: [new Blob(['a']), new Blob(['b'])], challenge: { id: 'c1', images: [new Blob(['l']), new Blob(['r'])] }, camera: 'Cámara '.repeat(40) },
+      { qr_content: 'TCQR1:x' },
+    );
     expect(form.getAll('images')).toHaveLength(2);
     expect(form.get('challenge_id')).toBe('c1');
-    expect(buildFaceForm([new Blob(['a'])]).get('challenge_id')).toBeNull();
+    expect(form.getAll('challenge_image')).toHaveLength(2);
+    expect((form.get('camera_label') as string).length).toBe(200); // acotado
+    expect(form.get('qr_content')).toBe('TCQR1:x');
+    const bare = buildFaceForm({ frontal: [new Blob(['a'])] });
+    expect(bare.get('challenge_id')).toBeNull();
+    expect(bare.get('camera_label')).toBeNull();
   });
 });
 

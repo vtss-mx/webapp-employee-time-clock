@@ -6,36 +6,11 @@ import { RetryState } from './ui/RetryState';
 import { authService } from '../services/authService';
 import type { DeviceSession } from '../types';
 import { formatDateTime, timeAgo } from '../utils/format';
+import { describeDevice } from '../utils/userAgent';
 import { ConfirmDialog } from './Modal';
 import { SkeletonRows } from './ui/Skeleton';
 import { Button } from './ui/Button';
 import { PanelSection } from './ui/Panel';
-
-/** Descripción legible del navegador y sistema a partir del User-Agent. */
-export function describeDevice(userAgent: string | null): { label: string; mobile: boolean } {
-  if (!userAgent) return { label: 'Dispositivo desconocido', mobile: false };
-  const browser = /Edg\//.test(userAgent)
-    ? 'Edge'
-    : /Chrome\//.test(userAgent)
-      ? 'Chrome'
-      : /Firefox\//.test(userAgent)
-        ? 'Firefox'
-        : /Safari\//.test(userAgent)
-          ? 'Safari'
-          : 'Navegador';
-  const os = /Android/.test(userAgent)
-    ? 'Android'
-    : /iPhone|iPad/.test(userAgent)
-      ? 'iOS'
-      : /Mac OS X/.test(userAgent)
-        ? 'macOS'
-        : /Windows/.test(userAgent)
-          ? 'Windows'
-          : /Linux/.test(userAgent)
-            ? 'Linux'
-            : 'Sistema desconocido';
-  return { label: `${browser} · ${os}`, mobile: /Mobile|Android|iPhone|iPad/.test(userAgent) };
-}
 
 /** Sección "Sesiones activas" (dispositivos) con revocación individual o total. */
 export function SessionsPanel() {
@@ -64,7 +39,7 @@ export function SessionsPanel() {
     setBusy(id);
     try {
       await authService.revokeSession(id);
-      feedback.success('Sesión cerrada', 'Ese dispositivo deberá iniciar sesión de nuevo.');
+      void feedback.success('Sesión cerrada', 'Ese dispositivo deberá iniciar sesión de nuevo.');
       await load();
     } catch (e) {
       void feedback.fromError(e, { title: 'No se pudo cerrar la sesión' });

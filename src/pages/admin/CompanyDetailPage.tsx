@@ -1,14 +1,14 @@
 import { Building2, Gauge, KeyRound, Pencil, Power, PowerOff, Trash2, UserCog, UserPlus } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CompanyAdminModal } from '../../components/CompanyAdminModal';
 import { ConfirmDialog } from '../../components/Modal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
-import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
+import { useFeedback } from '../../hooks/useFeedback';
+import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
 import type { CompanyAdmin, CompanyDetail } from '../../types';
@@ -60,25 +60,15 @@ export function CompanyDetailPage() {
   const companyId = Number(useParams().id);
   const navigate = useNavigate();
   const feedback = useFeedback();
-  const [company, setCompany] = useState<CompanyDetail | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  const { data: company, setData: setCompany, error, retry: load } = useResource(() => adminService.get(companyId), companyId, 'No se pudo cargar la empresa');
   const [confirm, setConfirm] = useState<Pending>(null);
-  // Modal de administradores: agregar (admin null) o restablecer la contraseña de uno.
-  const [adminModal, setAdminModal] = useState<{ admin: CompanyAdmin | null } | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(() => {
-    setError(null);
-    adminService.get(companyId).then(setCompany).catch(setError);
-  }, [companyId]);
-  useEffect(load, [load]);
-  useErrorPopup(error, { title: 'No se pudo cargar la empresa', retry: load });
 
   const run = async (action: () => Promise<CompanyDetail>, success: string, detail?: string) => {
     setBusy(true);
     try {
       setCompany(await action());
-      feedback.success(success, detail);
+      void feedback.success(success, detail);
     } catch (e) {
       void feedback.fromError(e, { title: 'No se pudo completar la acción' });
     } finally {
@@ -111,7 +101,7 @@ export function CompanyDetailPage() {
     try {
       await adminService.remove(company.id);
       void navigate(paths.admin.companies, { replace: true });
-      feedback.success('Empresa eliminada', `${company.name} y sus cuentas de acceso se eliminaron.`);
+      void feedback.success('Empresa eliminada', `${company.name} y sus cuentas de acceso se eliminaron.`);
     } catch (e) {
       setBusy(false);
       setConfirm(null);
@@ -155,10 +145,6 @@ export function CompanyDetailPage() {
                 <dd>{orMissing(company.rfc)}</dd>
               </div>
               <div>
-                <dt>Correo de contacto</dt>
-                <dd>{orMissing(company.contact_email)}</dd>
-              </div>
-              <div>
                 <dt>Teléfono</dt>
                 <dd>{orMissing(company.phone && formatPhone(company.phone))}</dd>
               </div>
@@ -198,9 +184,9 @@ export function CompanyDetailPage() {
           title="Administradores"
           icon={<UserCog size={20} />}
           aside={
-            <Button size="sm" variant="primary" icon={<UserPlus size={16} />} onClick={() => setAdminModal({ admin: null })}>
+            <ButtonLink to={paths.admin.newCompanyAdmin(company.id)} size="sm" variant="primary" icon={<UserPlus size={16} />}>
               Agregar administrador
-            </Button>
+            </ButtonLink>
           }
         >
           <ul className="company-admins">
@@ -214,9 +200,9 @@ export function CompanyDetailPage() {
                   </small>
                 </span>
                 <StatusBadge active={admin.active} />
-                <Button size="sm" variant="ghost" icon={<KeyRound size={16} />} disabled={busy} onClick={() => setAdminModal({ admin })}>
+                <ButtonLink to={paths.admin.companyAdminPassword(company.id, admin.id)} size="sm" variant="ghost" icon={<KeyRound size={16} />}>
                   Restablecer contraseña
-                </Button>
+                </ButtonLink>
                 <Button
                   size="sm"
                   variant={admin.active ? 'ghost' : 'secondary'}
@@ -265,13 +251,6 @@ export function CompanyDetailPage() {
         loading={busy}
         onCancel={() => setConfirm(null)}
         onConfirm={() => confirm?.kind === 'admin' && void run(() => adminService.setAdminStatus(company.id, confirm.admin.id, false), 'Administrador desactivado')}
-      />
-      <CompanyAdminModal
-        open={adminModal !== null}
-        company={company}
-        admin={adminModal?.admin}
-        onClose={() => setAdminModal(null)}
-        onSaved={setCompany}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { envBoolean, envNumber, envString } from './env';
+import { envBoolean, envNumber, envNumberList, envString } from './env';
 
 /**
  * Configuración centralizada del frontend: ÚNICA fuente de valores configurables.
@@ -9,6 +9,10 @@ const env = import.meta.env as unknown as Record<string, string | boolean | unde
 const base = import.meta.env.BASE_URL;
 const stripTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 const seconds = (key: string, fallback: number, min: number, max: number) => envNumber(env, key, fallback, min, max) * 1000;
+
+const pageSizes = envNumberList(env, 'VITE_PAGE_SIZES', [10, 20, 30, 40, 50], 1, 50);
+const wantedPageSize = envNumber(env, 'VITE_PAGE_SIZE', 10, 1, 50);
+const defaultPageSize = pageSizes.includes(wantedPageSize) ? wantedPageSize : pageSizes[0];
 
 export const config = {
   appName: envString(env, 'VITE_APP_NAME', 'Employee Time Clock'),
@@ -72,9 +76,24 @@ export const config = {
   checkpointResultSeconds: envNumber(env, 'VITE_CHECKPOINT_RESULT_SECONDS', 6, 2, 60),
   checkpointRecentItems: envNumber(env, 'VITE_CHECKPOINT_RECENT_ITEMS', 8, 1, 50),
 
+  // --- Google Maps (domicilio y ubicación de los validadores) ---
+  maps: {
+    /** Clave de navegador (restringida por dominio en Google Cloud). Vacía = domicilio solo a mano, sin mapa. */
+    apiKey: envString(env, 'VITE_GOOGLE_MAPS_API_KEY', ''),
+    /** Búsqueda de lugares y direcciones (Places API (New)). */
+    places: envBoolean(env, 'VITE_GOOGLE_PLACES', false),
+    /** Llenar el domicilio al marcar un punto y ubicar en el mapa la dirección escrita (Geocoding API). */
+    geocoding: envBoolean(env, 'VITE_GOOGLE_GEOCODING', false),
+    /** "Mi ubicación": si el navegador no la da, se estima con Geolocation API de Google (menos precisa). */
+    geolocation: envBoolean(env, 'VITE_GOOGLE_GEOLOCATION', false),
+  },
+
   // --- Formularios y listados ---
   minEmployeeAge: envNumber(env, 'VITE_MIN_EMPLOYEE_AGE', 16, 14, 100),
-  employeesPageSize: envNumber(env, 'VITE_EMPLOYEES_PAGE_SIZE', 10, 5, 100),
+  /** Opciones de "por página" de todos los listados (el backend acepta hasta 50). */
+  pageSizes,
+  /** Elementos por página al abrir cualquier listado (una de las opciones). */
+  pageSize: defaultPageSize,
 } as const;
 
 export type AppConfig = typeof config;

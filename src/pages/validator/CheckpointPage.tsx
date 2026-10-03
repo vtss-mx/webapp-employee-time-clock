@@ -21,11 +21,9 @@ type Finish = (outcome: VerificationOutcome) => void;
 /** Ícono de cada método; el título y la descripción vienen del catálogo verification_methods. */
 const METHOD_ICONS: Partial<Record<string, LucideIcon>> = { FACE: ScanFace, QR: QrCode, QR_FACE: ShieldCheck };
 const KIOSK = { autoReturnSeconds: config.checkpointResultSeconds };
-const FACE_HINT = 'Pide a la persona que mire de frente a la cámara, sin lentes ni cubrebocas';
 
 interface FaceStepProps {
   title: string;
-  description: string;
   finish: Finish;
   onCancel: () => void;
   /** QR y rostro: el rostro debe ser del dueño de este QR. */
@@ -34,20 +32,16 @@ interface FaceStepProps {
 }
 
 /** Captura facial guiada del punto de control (prueba de vida según la política de la empresa). */
-function FaceStep({ title, description, finish, onCancel, qrContent, onUseQr }: FaceStepProps) {
+function FaceStep({ title, finish, onCancel, qrContent, onUseQr }: FaceStepProps) {
   const { policy } = useVerificationPolicy();
   return (
     <LiveFaceFlow
       title={title}
-      description={description}
       frontalFrames={config.verificationFrames}
-      finalStep="Identificación"
       submittingMessage="Identificando..."
       policy={policy}
-      // La gorra se decide después de saber quién es (algunos empleados están exentos).
-      headwearExempt
       alternative={onUseQr && { label: 'Usar su código QR', icon: <QrCode size={18} />, onSelect: onUseQr }}
-      onSubmit={async ({ frontal, challenge }) => finish({ result: await checkpointService.identifyFace(frontal, challenge, qrContent), error: null })}
+      onSubmit={async (captured) => finish({ result: await checkpointService.identifyFace(captured, qrContent), error: null })}
       onFatal={(error) => finish({ result: null, error: errorMessage(error) })}
       onCancel={onCancel}
     />
@@ -61,7 +55,6 @@ function QrThenFace({ finish, onCancel }: { finish: Finish; onCancel: () => void
     return (
       <FaceStep
         title={`Paso 2 de 2 · ${holder.employee.name}`}
-        description={`QR de ${holder.employee.name} (${holder.employee.employee_number}). ${FACE_HINT}: su rostro debe coincidir.`}
         qrContent={holder.qr}
         finish={finish}
         onCancel={onCancel}
@@ -110,7 +103,6 @@ function CheckpointSession({ method, canUseQr, onSwitch, onExit, onOutcome }: Se
           return (
             <FaceStep
               title="Reconocer rostro"
-              description={`${FACE_HINT}; después deberá girar la cabeza si se le indica.`}
               finish={finish}
               onCancel={onExit}
               onUseQr={canUseQr ? () => onSwitch('QR') : undefined}

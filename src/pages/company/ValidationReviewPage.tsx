@@ -1,12 +1,10 @@
-import { AlertTriangle, Camera, Check, CheckCircle2, ImageOff, ShieldCheck, UserCheck, UserX, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, CheckCircle2, ImageOff, ShieldCheck, UserCheck, UserX } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ConfirmDialog, Modal } from '../../components/Modal';
-import { FieldLabel } from '../../components/FormField';
-import { ReasonChips } from '../../components/ReasonChips';
+import { ConfirmDialog } from '../../components/Modal';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { EnrollmentBadge } from '../../components/StatusBadge';
-import { Button } from '../../components/ui/Button';
+import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { notifyEnrollmentsChanged } from '../../hooks/usePendingEnrollments';
@@ -38,9 +36,7 @@ export function ValidationReviewPage() {
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
   const [confirmApprove, setConfirmApprove] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const [busy, setBusy] = useState<'approve' | null>(null);
 
   useEffect(() => {
     setError(null);
@@ -69,26 +65,11 @@ export function ValidationReviewPage() {
     try {
       const res = await enrollmentService.approve(enrollmentId);
       notifyEnrollmentsChanged();
-      feedback.success('Usuario aceptado', `${res.full_name} ya puede identificarse.`);
+      void feedback.success('Usuario aceptado', `${res.full_name} ya puede identificarse.`);
       void navigate(paths.company.validations);
     } catch (e) {
       void feedback.fromError(e, { title: 'No se pudo aceptar' });
       setConfirmApprove(false);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const reject = async () => {
-    if (reason.trim().length < 3) return;
-    setBusy('reject');
-    try {
-      const res = await enrollmentService.reject(enrollmentId, reason.trim());
-      notifyEnrollmentsChanged();
-      void feedback.info('Usuario rechazado', `${res.full_name} deberá registrar su rostro nuevamente.`);
-      void navigate(paths.company.validations);
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo rechazar' });
     } finally {
       setBusy(null);
     }
@@ -241,9 +222,9 @@ export function ValidationReviewPage() {
 
         {pending && (
           <PanelFooter>
-            <Button variant="danger-outline" size="lg" icon={<UserX size={20} />} onClick={() => setRejectOpen(true)}>
+            <ButtonLink to={paths.company.rejectValidation(item.id)} variant="danger-outline" size="lg" icon={<UserX size={20} />}>
               Rechazar usuario
-            </Button>
+            </ButtonLink>
             <Button variant="success" size="lg" icon={<UserCheck size={20} />} onClick={() => setConfirmApprove(true)}>
               Aceptar usuario
             </Button>
@@ -267,49 +248,6 @@ export function ValidationReviewPage() {
         onCancel={() => setConfirmApprove(false)}
       />
 
-      <Modal
-        open={rejectOpen}
-        title="Rechazar usuario"
-        variant="error"
-        icon={<UserX size={30} />}
-        eyebrow="Validación de identidad"
-        onClose={() => busy === null && setRejectOpen(false)}
-        footer={
-          <>
-            <Button variant="ghost" icon={<X size={18} />} onClick={() => setRejectOpen(false)} disabled={busy !== null}>
-              Cancelar
-            </Button>
-            <Button
-              variant="danger"
-              icon={<UserX size={18} />}
-              loading={busy === 'reject'}
-              disabled={reason.trim().length < 3}
-              onClick={reject}
-            >
-              Rechazar
-            </Button>
-          </>
-        }
-      >
-        <div className="stack">
-          <p className="muted">
-            Se eliminarán la fotografía y los datos biométricos de este registro. El empleado verá el motivo y deberá
-            registrarse de nuevo.
-          </p>
-          <ReasonChips catalog="enrollment_rejection_reasons" value={reason} onPick={setReason} />
-          <div className="field">
-            <FieldLabel htmlFor="reject-reason" label="Motivo (visible para el empleado)" required />
-            <textarea
-              id="reject-reason"
-              className="textarea"
-              maxLength={500}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Describe por qué se rechaza el registro"
-            />
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

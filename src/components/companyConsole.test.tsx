@@ -5,16 +5,15 @@ import { useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { companyServerErrors, emptyCompanyForm, useCompanyForm } from '../hooks/useCompanyForm';
-import { useSearchList, type ActiveFilter, type ListQuery } from '../hooks/useSearchList';
+import { useSearchList, type ListQuery } from '../hooks/useSearchList';
 import { adminService } from '../services/adminService';
 import { checkAvailability } from '../services/availabilityService';
 import { ApiError } from '../services/apiClient';
-import { apiFail, apiOk, liveCheck, mockFetch } from '../test/http';
+import { apiOk, liveCheck, mockFetch } from '../test/http';
 import { WithCatalogs, renderWithProviders } from '../test/render';
-import type { CompanyDetail, CompanyFormValues } from '../types';
+import type { CompanyDetail, CompanyFormValues, Page } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
 import { validateCompanyRfc, validateMaxEmployees } from '../utils/validation';
-import { CompanyAdminModal } from './CompanyAdminModal';
 import { CompanyDetailPage } from '../pages/admin/CompanyDetailPage';
 import { Route, Routes } from 'react-router-dom';
 import { CompanyAdminFields, CompanyDataFields } from './CompanyForm';
@@ -28,7 +27,6 @@ const company: CompanyDetail = {
   name: 'Panificadora',
   legal_name: 'Panificadora del Norte SA de CV',
   rfc: 'PNO120315AB1',
-  contact_email: 'contacto@pan.com',
   phone: '+526621234567',
   active: true,
   max_employees: 50,
@@ -42,11 +40,11 @@ const validCompany: CompanyFormValues = {
   name: 'Panificadora',
   legal_name: 'Panificadora del Norte',
   rfc: 'PNO120315AB1',
-  contact_email: 'contacto@pan.com',
   phone: '+526621234567',
   max_employees: '',
   admin_email: 'admin@pan.com',
   admin_password: 'Empresa1234',
+  admin_password_confirm: 'Empresa1234',
 };
 const available = () => liveCheck();
 
@@ -112,7 +110,7 @@ describe('useCompanyForm', () => {
     expect(result.current.canSubmit).toBe(false);
   });
 
-  it('correo y teléfono de contacto también se validan en vivo (canal del backend)', async () => {
+  it('el teléfono de la empresa también se valida en vivo; la empresa tiene un solo correo', async () => {
     const { calls } = mockFetch((call) =>
       call.url.includes('field=company_phone') ? liveCheck('INVALID_FORMAT', 'Número inválido para México', 'company_phone') : available(),
     );
@@ -120,7 +118,13 @@ describe('useCompanyForm', () => {
     act(() => result.current.setValues(validCompany));
     await waitFor(() => expect(result.current.errors.phone).toBe('Número inválido para México'));
     expect(result.current.canSubmit).toBe(false);
-    expect(calls.some((c) => c.url.includes('field=company_contact_email'))).toBe(true);
+    // Un solo correo: el del administrador (no hay correo de contacto aparte).
+    expect(calls.filter((c) => c.url.includes('@')).every((c) => c.url.includes('field=company_admin_email'))).toBe(true);
+  });
+
+  it('alta: la contraseña del administrador se repite y deben coincidir', () => {
+    expect(validateCompanyForm({ ...validCompany, admin_password_confirm: 'Otra1234' }).admin_password_confirm).toBe('Las contraseñas no coinciden');
+    expect(validateCompanyForm({ ...validCompany, admin_password_confirm: '' }).admin_password_confirm).toBe('Repite la contraseña');
   });
 
   it('errores del servidor por campo; cambiar el campo los descarta; la edición marca lo cargado', async () => {
@@ -168,7 +172,7 @@ describe('CompanyForm', () => {
 
 describe('useSearchList + ListControls', () => {
   type Row = { id: number; name: string };
-  type RowPage = { items: Row[]; total: number };
+  type RowPage = Page<Row>;
   function Listado({ fetchPage, onOpen = vi.fn() }: { fetchPage: (query: ListQuery, signal: AbortSignal) => Promise<RowPage>; onOpen?: (row: Row) => void }) {
     const list = useSearchList(fetchPage, { pageSize: 2, errorTitle: 'No se pudo cargar' });
     return (
@@ -187,7 +191,7 @@ describe('useSearchList + ListControls', () => {
   }
 
   it('busca con pausa, filtra, pagina y vuelve a la página 1 al cambiar el filtro', async () => {
-    const fetchPage = vi.fn((query: ListQuery) => Promise.resolve({ items: [{ id: query.page, name: `Empresa ${query.page}` }], total: 5 }));
+    const fetchPage = vi.fn((query: ListQuery) => Promise.resolve({ items: [{ id: query.page, name: `Empresa ${query.page}` }], total: 5, page: query.page, size: query.size }));
     const onOpen = vi.fn();
     render(
       <FeedbackProvider>
@@ -200,18 +204,20 @@ describe('useSearchList + ListControls', () => {
     screen.getByText('Empresa 1').closest('tr')?.focus();
     await userEvent.keyboard('{Enter}');
     expect(onOpen).toHaveBeenCalledTimes(2);
-    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-    await waitFor(() => expect(screen.getByText('Página 2 de 3')).toBeInTheDocument());
-    await userEvent.selectOptions(screen.getByLabelText('Filtrar por estado'), 'inactive' satisfies ActiveFilter);
+    expect(screen.getByText('Mostrando', { exact: false })).toHaveTextContent('Mostrando 1–2 de 5 resultados');
+    await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Página 2' })).toHaveAttribute('aria-current', 'page'));
+    await userEvent.click(screen.getByRole('button', { name: /Filtrar por estado/ }));
+    await userEvent.click(screen.getByRole('option', { name: /^Inactiv/ }));
     await waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith(expect.objectContaining({ active: false, page: 1 }), expect.any(AbortSignal)));
     await userEvent.type(screen.getByLabelText('Buscar empresas'), ' pan ');
     await waitFor(() => expect(fetchPage).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'pan' }), expect.any(AbortSignal)));
     expect(screen.getByTestId('state')).toHaveTextContent('true');
-    await userEvent.click(screen.getByRole('button', { name: 'Anterior' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Página anterior' }));
   });
 
   it('un error se muestra en popup con "Reintentar"', async () => {
-    const fetchPage = vi.fn().mockRejectedValueOnce(new Error('caído')).mockResolvedValue({ items: [], total: 0 });
+    const fetchPage = vi.fn().mockRejectedValueOnce(new Error('caído')).mockResolvedValue({ items: [], total: 0, page: 1, size: 2 });
     render(
       <FeedbackProvider>
         <Listado fetchPage={fetchPage} />
@@ -222,7 +228,7 @@ describe('useSearchList + ListControls', () => {
     await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('No se encontraron empresas')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Registrar la primera' })).toBeInTheDocument(); // sin filtros
-    expect(screen.queryByRole('button', { name: 'Siguiente' })).toBeNull(); // una sola página
+    expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull(); // sin resultados no hay paginador
   });
 
   it('KpiCard: esqueleto mientras carga y luego el valor', () => {
@@ -231,67 +237,6 @@ describe('useSearchList + ListControls', () => {
     rerender(<KpiCard label="Empresas" icon={Building2} value={0} tile="icon-tile--success" />);
     expect(screen.getByText('Empresas')).toBeInTheDocument();
     expect(container.querySelector('.icon-tile--success')).not.toBeNull();
-  });
-});
-
-describe('CompanyAdminModal', () => {
-  const renderModal = (onAdded = vi.fn(), onClose = vi.fn()) =>
-    render(
-      <FeedbackProvider>
-        <CompanyAdminModal open company={company} onClose={onClose} onSaved={onAdded} />
-      </FeedbackProvider>,
-    );
-
-  it('agrega el administrador solo con correo disponible y contraseña segura', async () => {
-    const onAdded = vi.fn();
-    const onClose = vi.fn();
-    mockFetch((call) => (call.url.includes('/validation') ? available() : apiOk({ ...company, admin_count: 2 })));
-    renderModal(onAdded, onClose);
-    const add = screen.getByRole('button', { name: 'Agregar' });
-    expect(add).toBeDisabled();
-    await userEvent.type(screen.getByLabelText('Correo del administrador'), 'rh@pan.com');
-    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'corta');
-    await userEvent.tab();
-    expect(screen.getByText(/Mínimo 8 caracteres|al menos 8/)).toBeInTheDocument();
-    await userEvent.clear(screen.getByLabelText('Contraseña inicial'));
-    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos123');
-    await waitFor(() => expect(add).toBeEnabled());
-    await userEvent.click(add);
-    await waitFor(() => expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ admin_count: 2 })));
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it('un correo ya registrado se marca en el campo y se explica en popup', async () => {
-    mockFetch((call) => (call.url.includes('/validation') ? available() : apiFail(409, 'EMAIL_TAKEN', 'El correo ya está registrado')));
-    renderModal();
-    await userEvent.type(screen.getByLabelText('Correo del administrador'), 'rh@pan.com');
-    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos123');
-    const add = screen.getByRole('button', { name: 'Agregar' });
-    await waitFor(() => expect(add).toBeEnabled());
-    await userEvent.click(add);
-    expect(await screen.findByRole('alertdialog', { name: 'No se pudo agregar el administrador' })).toBeInTheDocument();
-    expect(screen.getAllByText('El correo ya está registrado').length).toBeGreaterThan(0);
-  });
-
-  it('restablece la contraseña de un administrador (solo pide la contraseña nueva)', async () => {
-    const onSaved = vi.fn();
-    const { calls } = mockFetch(apiOk(company));
-    render(
-      <FeedbackProvider>
-        <CompanyAdminModal open company={company} admin={company.admins[0]} onClose={vi.fn()} onSaved={onSaved} />
-      </FeedbackProvider>,
-    );
-    expect(screen.getByRole('dialog', { name: 'Restablecer contraseña' })).toHaveTextContent('admin@pan.com');
-    expect(screen.queryByLabelText('Correo del administrador')).toBeNull();
-    const reset = screen.getByRole('button', { name: 'Restablecer' });
-    expect(reset).toBeDisabled();
-    await userEvent.type(screen.getByLabelText('Contraseña nueva'), 'Nueva12345');
-    await userEvent.click(reset);
-    await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(calls[0].url).toBe('/api/admin/companies/4/admins/9/password');
-    expect(calls[0].init.method).toBe('PUT');
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ admin_password: 'Nueva12345' });
-    expect(await screen.findByText('Contraseña restablecida')).toBeInTheDocument();
   });
 });
 

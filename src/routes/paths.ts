@@ -12,6 +12,8 @@ export const paths = {
     newCompany: '/admin/companies/new',
     company: (id: number | string) => `/admin/companies/${id}`,
     editCompany: (id: number | string) => `/admin/companies/${id}/edit`,
+    newCompanyAdmin: (id: number | string) => `/admin/companies/${id}/admins/new`,
+    companyAdminPassword: (id: number | string, adminId: number | string) => `/admin/companies/${id}/admins/${adminId}/password`,
   },
   company: {
     dashboard: '/company/dashboard',
@@ -19,9 +21,17 @@ export const paths = {
     newEmployee: '/company/employees/new',
     employee: (id: number | string) => `/company/employees/${id}`,
     editEmployee: (id: number | string) => `/company/employees/${id}/edit`,
+    reverifyEmployee: (id: number | string) => `/company/employees/${id}/reverify`,
+    /** Rostro en persona: registrar (enroll) o verificar (verify) con el empleado presente. */
+    employeeFace: (id: number | string, mode: 'enroll' | 'verify' | ':mode') => `/company/employees/${id}/face/${mode}`,
     validations: '/company/validations',
     validation: (id: number | string) => `/company/validations/${id}`,
+    rejectValidation: (id: number | string) => `/company/validations/${id}/reject`,
     validators: '/company/validators',
+    newValidator: '/company/validators/new',
+    editValidator: (id: number | string) => `/company/validators/${id}/edit`,
+    validatorDevices: (id: number | string) => `/company/validators/${id}/devices`,
+    validatorPassword: (id: number | string) => `/company/validators/${id}/password`,
     settings: '/company/settings',
   },
   /** Validador de identidad (tableta o teléfono en un acceso). */

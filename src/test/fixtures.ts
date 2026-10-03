@@ -1,4 +1,5 @@
 import type { CheckpointProfile, Validator, VerificationPolicy, VerificationResult } from '../types';
+import { STRICT_RULES } from '../hooks/useVerificationPolicy';
 
 export const sampleValidator: Validator = {
   id: 3,
@@ -9,6 +10,22 @@ export const sampleValidator: Validator = {
   last_login_at: null,
   identifications_today: 0,
   created_at: '2026-10-01T00:00:00Z',
+  address: {
+    street: 'Calle Dr. Paliza',
+    exterior_number: '71',
+    interior_number: null,
+    postal_code: '83000',
+    country_code: 'MX',
+    state: 'Sonora',
+    municipality: 'Hermosillo',
+    city: 'Hermosillo',
+    latitude: 29.0729,
+    longitude: -110.9559,
+  },
+  location_required: false,
+  location_radius_m: null,
+  devices_pending: 0,
+  devices_approved: 1,
 };
 
 export const sampleCheckpoint: CheckpointProfile = {
@@ -33,14 +50,8 @@ export const identifiedResult: VerificationResult = {
 
 /** Política de la empresa como la devuelve GET /api/settings/verification (lo más estricto). */
 export const samplePolicy: VerificationPolicy = {
-  block_glasses: true,
-  block_headwear: true,
-  block_mask: true,
-  liveness_challenge: true,
-  anti_spoofing: true,
-  qr_enabled: true,
-  employee_mobile_only: true,
-  validator_mobile_only: true,
+  ...STRICT_RULES,
+  blocked_cameras: ['virtual', 'manycam', 'obs virtual'],
   min_confidence: 0.99999,
   updated_at: null,
   updated_by: null,

@@ -1,9 +1,9 @@
-import { Building2, IdCard, KeyRound, Landmark, Mail, UserCog, Users } from 'lucide-react';
+import { Building2, IdCard, KeyRound, Landmark, UserCog, Users } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import type { AvailabilityState } from '../hooks/useAvailability';
 import type { CompanyFormValues } from '../types';
 import { normalizeRfc, type FieldErrors } from '../utils/validation';
-import { FormField, liveFeedback } from './FormField';
+import { ConfirmPasswordField, FormField, liveFeedback } from './FormField';
 import { PhoneField } from './ui/PhoneField';
 
 type Field = keyof CompanyFormValues;
@@ -58,7 +58,6 @@ export function CompanyDataFields(props: CompanyFieldsProps) {
         hint="12 caracteres (persona moral) o 13 (persona física)"
         {...bind('rfc')}
       />
-      <FormField label="Correo de contacto" icon={<Mail size={18} />} type="email" inputMode="email" autoComplete="off" {...bind('contact_email')} />
       <PhoneField
         label="Teléfono"
         name="phone"
@@ -95,7 +94,7 @@ export function CompanyAdminFields(props: CompanyFieldsProps) {
         type="email"
         inputMode="email"
         autoComplete="off"
-        hint="Con este correo iniciará sesión"
+        hint="Con este correo iniciará sesión; es también el correo de la empresa"
         {...bind('admin_email')}
       />
       <FormField
@@ -106,6 +105,7 @@ export function CompanyAdminFields(props: CompanyFieldsProps) {
         hint="Mínimo 8 caracteres, con mayúscula, minúscula y número"
         {...bind('admin_password')}
       />
+      <ConfirmPasswordField {...bind('admin_password_confirm')} />
     </div>
   );
 }

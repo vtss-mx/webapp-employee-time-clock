@@ -1,4 +1,4 @@
-import { CheckCircle2, Eye, EyeOff, Info, Loader2 } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2 } from 'lucide-react';
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type Ref } from 'react';
 import type { AvailabilityState } from '../hooks/useAvailability';
 
@@ -16,6 +16,14 @@ interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   status?: FieldStatus;
   /** Acceso al <input> (p. ej. para enfocarlo cuando llega un dato del servidor). */
   inputRef?: Ref<HTMLInputElement>;
+}
+
+/**
+ * "Confirmar contraseña": toda contraseña que se asigna (alta, restablecer, cambiar) se escribe dos
+ * veces. Misma apariencia en todos los formularios; la regla es `validatePasswordConfirm`.
+ */
+export function ConfirmPasswordField({ label = 'Confirmar contraseña', ...props }: Omit<FormFieldProps, 'label' | 'type'> & { label?: string }) {
+  return <FormField label={label} icon={<KeyRound size={18} />} type="password" autoComplete="new-password" {...props} />;
 }
 
 export function FormField({ label, error, hint, icon, type, id, status, inputRef, ...inputProps }: FormFieldProps) {

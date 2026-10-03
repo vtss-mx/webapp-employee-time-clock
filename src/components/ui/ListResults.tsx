@@ -1,18 +1,14 @@
 import type { ReactNode } from 'react';
-import { Pagination } from './ListControls';
+import { ListPaginator, type PagerState, type PaginatorOptions } from './Paginator';
 import { RetryState } from './RetryState';
 import { SkeletonRows } from './Skeleton';
 
-/** Lo que el listado necesita de `useSearchList`. */
-interface ListState<T> {
+/** Lo que el listado necesita de `usePagedList` / `useSearchList`. */
+interface ListState<T> extends PagerState {
   data: { items: T[] } | null;
-  loading: boolean;
   /** Error de la última carga: si aún no hay datos, se ofrece "Reintentar". */
   error: unknown;
   retry: () => void;
-  page: number;
-  totalPages: number;
-  setPage: (page: number) => void;
 }
 
 interface ListResultsProps<T extends { id: number }> {
@@ -23,10 +19,12 @@ interface ListResultsProps<T extends { id: number }> {
   onOpen: (item: T) => void;
   /** Sin resultados: ícono, título y (sin filtros) la acción para crear el primero. */
   empty: { icon: ReactNode; title: string; action?: ReactNode };
+  /** Personalización del paginador (nombre de los elementos, textos, partes visibles...). */
+  pager?: PaginatorOptions;
 }
 
 /** Resultados de un listado: carga, error, vacío o tabla (filas navegables por teclado) con paginación. */
-export function ListResults<T extends { id: number }>({ list, columns, renderCells, onOpen, empty }: ListResultsProps<T>) {
+export function ListResults<T extends { id: number }>({ list, columns, renderCells, onOpen, empty, pager }: ListResultsProps<T>) {
   const { loading, error } = list;
   const items = list.data?.items;
   if (!items) {
@@ -68,7 +66,7 @@ export function ListResults<T extends { id: number }>({ list, columns, renderCel
           </tbody>
         </table>
       </div>
-      <Pagination page={list.page} totalPages={list.totalPages} loading={loading} onPage={list.setPage} />
+      <ListPaginator list={list} {...pager} />
     </>
   );
 }

@@ -11,6 +11,7 @@ import {
   validateName,
   validateNss,
   validatePassword,
+  validatePasswordConfirm,
   validateRfc,
   type FieldErrors,
 } from './validation';
@@ -25,10 +26,15 @@ export function validateCompanyForm(values: CompanyFormValues, { withAdmin = tru
     name: validateCompanyName(values.name, 'El nombre comercial'),
     legal_name: validateCompanyName(values.legal_name, 'La razón social'),
     rfc: validateCompanyRfc(values.rfc),
-    contact_email: validateEmail(values.contact_email),
     phone: validatePhone(values.phone),
     max_employees: validateMaxEmployees(values.max_employees),
-    ...(withAdmin ? { admin_email: validateEmail(values.admin_email), admin_password: validatePassword(values.admin_password) } : {}),
+    ...(withAdmin
+      ? {
+          admin_email: validateEmail(values.admin_email),
+          admin_password: validatePassword(values.admin_password),
+          admin_password_confirm: validatePasswordConfirm(values.admin_password, values.admin_password_confirm),
+        }
+      : {}),
   };
   return Object.fromEntries(Object.entries(errors).filter(([, v]) => v));
 }
@@ -49,6 +55,7 @@ export function validateEmployeeForm(
     phone: validatePhone(values.phone),
     email: validateEmail(values.email),
     password: passwordOptional && !values.password ? undefined : validatePassword(values.password),
+    password_confirm: passwordOptional && !values.password ? undefined : validatePasswordConfirm(values.password, values.password_confirm),
   };
   return Object.fromEntries(Object.entries(errors).filter(([, v]) => v));
 }

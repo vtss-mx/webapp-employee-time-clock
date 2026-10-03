@@ -14,6 +14,18 @@ export function envNumber(env: RawEnv, key: string, fallback: number, min = -Inf
   return Math.min(max, Math.max(min, value));
 }
 
+/** Lista de números separados por comas (ordenada, sin repetidos y dentro de los límites). */
+export function envNumberList(env: RawEnv, key: string, fallback: number[], min = -Infinity, max = Infinity): number[] {
+  const raw = env[key];
+  if (typeof raw !== 'string') return fallback;
+  const values = raw
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((n) => Number.isInteger(n) && n >= min && n <= max);
+  const unique = [...new Set(values)].sort((a, b) => a - b);
+  return unique.length ? unique : fallback;
+}
+
 export function envBoolean(env: RawEnv, key: string, fallback: boolean): boolean {
   const raw = env[key];
   if (typeof raw === 'boolean') return raw;

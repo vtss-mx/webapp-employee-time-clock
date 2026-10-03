@@ -12,7 +12,7 @@ import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
 import type { CompanyDetail, CompanyFormValues } from '../../types';
 
-const EDITABLE = ['name', 'legal_name', 'rfc', 'contact_email', 'phone', 'max_employees'] as const;
+const EDITABLE = ['name', 'legal_name', 'rfc', 'phone', 'max_employees'] as const;
 
 function toForm(company: CompanyDetail): CompanyFormValues {
   return {
@@ -20,7 +20,6 @@ function toForm(company: CompanyDetail): CompanyFormValues {
     name: company.name,
     legal_name: company.legal_name ?? '',
     rfc: company.rfc ?? '',
-    contact_email: company.contact_email ?? '',
     phone: company.phone ?? '',
     max_employees: company.max_employees ? String(company.max_employees) : '',
   };
@@ -57,7 +56,7 @@ export function CompanyEditPage() {
     if (!form.canSubmit || !dirty) return;
     await form.save(async () => {
       await adminService.update(companyId, changes);
-      form.feedback.success('Cambios guardados');
+      void form.feedback.success('Cambios guardados');
       void navigate(paths.admin.company(companyId));
     });
   };

@@ -53,6 +53,7 @@ export function EmployeeEditPage() {
           phone: emp.phone ?? '',
           email: emp.email,
           password: '',
+          password_confirm: '',
         });
       })
       .catch(setLoadError);
@@ -65,6 +66,7 @@ export function EmployeeEditPage() {
   const payload: EmployeeUpdatePayload = {};
   if (original) {
     (Object.keys(values) as Array<keyof EmployeeFormValues>).forEach((key) => {
+      if (key === 'password_confirm') return; // solo en el cliente
       const value = key === 'password' ? values[key] : values[key].trim();
       if (key === 'password' ? value : value !== String(original[key as keyof Employee] ?? '')) {
         payload[key] = value;
@@ -80,7 +82,7 @@ export function EmployeeEditPage() {
 
     await save(async () => {
       await employeeService.update(employeeId, payload);
-      feedback.success('Cambios guardados');
+      void feedback.success('Cambios guardados');
       void navigate(paths.company.employee(employeeId));
     });
   };

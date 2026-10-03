@@ -20,13 +20,17 @@ interface Options {
   /** Valor original: si no cambió, no se consulta. */
   unchangedValue?: string;
   enabled?: boolean;
+  /** Otro valor del formulario que la regla necesita (p. ej. el correo al validar el teléfono). */
+  related?: string;
 }
 
 const STATUS_BY_CODE: Record<string, AvailabilityStatus> = {
   AVAILABLE: 'available',
   LINKABLE: 'linkable',
-  // Dato de contacto (no único) con formato correcto.
+  // Dato no único con formato correcto (teléfono de la empresa).
   VALID: 'available',
+  // El teléfono no es el de la persona del correo escrito: bloquea como un duplicado.
+  MISMATCH: 'taken',
   TAKEN: 'taken',
   INVALID_FORMAT: 'invalid',
   EMPTY: 'idle',
@@ -38,7 +42,7 @@ const STATUS_BY_CODE: Record<string, AvailabilityStatus> = {
  * verificar, no bloquea: el servidor valida al guardar.
  */
 export function useAvailability(field: AvailabilityField, value: string, options: Options = {}): AvailabilityState {
-  const { excludeId, unchangedValue, enabled = true } = options;
+  const { excludeId, unchangedValue, enabled = true, related } = options;
   const [state, setState] = useState<AvailabilityState>({ status: 'idle' });
   const sequence = useRef(0);
 
@@ -52,7 +56,7 @@ export function useAvailability(field: AvailabilityField, value: string, options
     }
     setState({ status: 'checking' });
     const timer = window.setTimeout(() => {
-      checkAvailability(field, trimmed, excludeId)
+      checkAvailability(field, trimmed, excludeId, related)
         .then((result) => {
           if (current !== sequence.current) return; // llegó la respuesta de un valor anterior
           setState({ status: STATUS_BY_CODE[result.code] ?? 'unknown', message: result.message, result });
@@ -60,7 +64,7 @@ export function useAvailability(field: AvailabilityField, value: string, options
         .catch(() => current === sequence.current && setState({ status: 'unknown' }));
     }, config.availabilityDebounceMs);
     return () => window.clearTimeout(timer);
-  }, [field, value, excludeId, unchangedValue, enabled]);
+  }, [field, value, excludeId, unchangedValue, enabled, related]);
 
   return state;
 }

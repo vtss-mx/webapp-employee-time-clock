@@ -1,16 +1,16 @@
 import { ArrowRight, CheckCircle2, ClipboardCheck, Clock, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { useCatalogs } from '../../hooks/useCatalogs';
-import { useErrorPopup } from '../../hooks/useFeedback';
+import { usePagedList } from '../../hooks/usePagedList';
 import { RetryState } from '../../components/ui/RetryState';
-import { Pagination } from '../../components/ui/ListControls';
+import { ListPaginator } from '../../components/ui/Paginator';
 import { EnrollmentBadge } from '../../components/StatusBadge';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { paths } from '../../routes/paths';
 import { enrollmentService } from '../../services/enrollmentService';
-import type { EnrollmentStatus, FaceEnrollmentList } from '../../types';
+import type { EnrollmentStatus } from '../../types';
 import { formatDateTime, initials, timeAgo } from '../../utils/format';
 
 /** Ícono de cada pestaña; las pestañas (códigos, orden y nombre) vienen del catálogo enrollment_statuses. */
@@ -20,31 +20,16 @@ const TAB_ICONS: Partial<Record<string, LucideIcon>> = { PENDING: Clock, APPROVE
 export function ValidationsPage() {
   const { active } = useCatalogs();
   const [status, setStatus] = useState<EnrollmentStatus>('PENDING');
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<FaceEnrollmentList | null>(null);
   const [pendingTotal, setPendingTotal] = useState<number | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [reload, setReload] = useState(0);
-  const retry = () => setReload((n) => n + 1);
-  useErrorPopup(error, { title: 'No se pudieron cargar las validaciones', retry });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    enrollmentService
-      .list(status, page, 12, controller.signal)
-      .then((res) => {
-        setData(res);
-        if (status === 'PENDING') setPendingTotal(res.total);
-      })
-      .catch((e) => !controller.signal.aborted && setError(e))
-      .finally(() => !controller.signal.aborted && setLoading(false));
-    return () => controller.abort();
-  }, [status, page, reload]);
-
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.size)) : 1;
+  const list = usePagedList(
+    async (page, signal) => {
+      const res = await enrollmentService.list(status, page, signal);
+      if (status === 'PENDING') setPendingTotal(res.total);
+      return res;
+    },
+    { errorTitle: 'No se pudieron cargar las validaciones', filterKey: status },
+  );
+  const { data, loading, error } = list;
 
   return (
     <div className="page">
@@ -63,10 +48,7 @@ export function ValidationsPage() {
                   role="tab"
                   aria-selected={status === code}
                   className={`tab ${status === code ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setStatus(code);
-                    setPage(1);
-                  }}
+                  onClick={() => setStatus(code)}
                 >
                   <Icon size={16} /> {name}
                   {code === 'PENDING' && pendingTotal ? <span className="tab__count">{pendingTotal}</span> : null}
@@ -75,7 +57,7 @@ export function ValidationsPage() {
             })}
           </div>
 
-          {Boolean(error) && !data && <RetryState onRetry={retry} />}
+          {Boolean(error) && !data && <RetryState onRetry={list.retry} />}
 
           {loading && !data ? (
             <SkeletonRows rows={4} />
@@ -142,7 +124,7 @@ export function ValidationsPage() {
             )
           )}
 
-          <Pagination page={page} totalPages={totalPages} loading={loading} onPage={setPage} />
+          <ListPaginator list={list} noun={{ one: 'registro', other: 'registros' }} />
         </PanelSection>
       </Panel>
     </div>

@@ -32,7 +32,7 @@ export function QrCodePanel({ employeeId, employeeName, hasActiveQr, onChanged }
 
   const download = (data: EmployeeQr) => {
     downloadUrl(data.image_base64, data.file_name);
-    feedback.success('QR descargado', data.file_name);
+    void feedback.success('QR descargado', data.file_name);
   };
 
   const run = async (kind: 'view' | 'download', action: (data: EmployeeQr) => void) => {
@@ -52,7 +52,7 @@ export function QrCodePanel({ employeeId, employeeName, hasActiveQr, onChanged }
       const data = await employeeService.regenerateQr(employeeId);
       setQr(data);
       setConfirmOpen(false);
-      feedback.success('Nuevo QR generado', 'El código anterior ya no es válido.');
+      void feedback.success('Nuevo QR generado', 'El código anterior ya no es válido.');
       setViewOpen(true);
       onChanged();
     } catch (e) {

@@ -1,15 +1,16 @@
 import type { FaceChallenge, FaceCheckResult, VerificationResult } from '../types';
 import { hasKeys } from '../utils/guards';
 import { apiRequest } from './apiClient';
-import { postFaceCaptures, type FaceChallengeCapture } from './http/faceUpload';
+import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 
-const isResult = hasKeys<VerificationResult>('verified', 'method', 'message');
+export const isVerificationResult = hasKeys<VerificationResult>('verified', 'method', 'message');
+const isResult = isVerificationResult;
 const isChallenge = hasKeys<FaceChallenge>('liveness_required');
 const isCheck = hasKeys<FaceCheckResult>('detection_score');
 
 export const verificationService = {
-  verifyFace(frontal: Blob[], challenge?: FaceChallengeCapture): Promise<VerificationResult> {
-    return postFaceCaptures('/verification/face', frontal, challenge, isResult);
+  verifyFace(captures: FaceCaptures): Promise<VerificationResult> {
+    return postFaceCaptures('/verification/face', captures, isResult);
   },
 
   verifyQr(qrContent: string): Promise<VerificationResult> {

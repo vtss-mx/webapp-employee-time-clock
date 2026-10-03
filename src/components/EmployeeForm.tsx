@@ -12,7 +12,7 @@ import {
   RFC_LENGTH,
   type FieldErrors,
 } from '../utils/validation';
-import { FormField, liveFeedback } from './FormField';
+import { ConfirmPasswordField, FormField, liveFeedback } from './FormField';
 import { DateField } from './ui/DateField';
 import { PhoneField } from './ui/PhoneField';
 
@@ -55,6 +55,7 @@ export const emptyEmployeeForm: EmployeeFormValues = {
   phone: '',
   email: '',
   password: '',
+  password_confirm: '',
 };
 
 /**
@@ -84,7 +85,7 @@ export function EmployeeFormFields({
       error: errors[name] ?? feedback.error,
       status: feedback.status,
       disabled,
-      required: name !== 'password' || !isEdit,
+      required: (name !== 'password' && name !== 'password_confirm') || !isEdit,
       onBlur: () => onTouch?.(name),
       onChange: (e: ChangeEvent<HTMLInputElement>) =>
         onChange({ ...values, [name]: normalize ? normalize(e.target.value) : e.target.value }),
@@ -180,6 +181,7 @@ export function EmployeeFormFields({
           {...bind('password')}
         />
       )}
+      {!linking && !accountLocked && (isEdit ? values.password !== '' : true) && <ConfirmPasswordField {...bind('password_confirm')} />}
     </div>
   );
 }

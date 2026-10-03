@@ -1,7 +1,7 @@
 import type { CheckpointEmployee, CheckpointEvent, CheckpointProfile, VerificationResult } from '../types';
 import { hasKeys, isArrayOf } from '../utils/guards';
 import { apiRequest } from './apiClient';
-import { postFaceCaptures, type FaceChallengeCapture } from './http/faceUpload';
+import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 
 const isProfile = hasKeys<CheckpointProfile>('id', 'name', 'mode', 'company');
 const isHolder = hasKeys<CheckpointEmployee>('employee_id', 'name', 'employee_number');
@@ -36,7 +36,7 @@ export const checkpointService = {
   },
 
   /** Rostro: busca a la persona entre los empleados (1:N) o confirma al dueño del QR. */
-  identifyFace(frontal: Blob[], challenge?: FaceChallengeCapture, qrContent?: string): Promise<VerificationResult> {
-    return postFaceCaptures('/checkpoint/identify/face', frontal, challenge, isResult, qrContent ? { qr_content: qrContent } : {});
+  identifyFace(captures: FaceCaptures, qrContent?: string): Promise<VerificationResult> {
+    return postFaceCaptures('/checkpoint/identify/face', captures, isResult, qrContent ? { qr_content: qrContent } : {});
   },
 };

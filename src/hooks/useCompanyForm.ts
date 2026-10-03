@@ -9,11 +9,11 @@ export const emptyCompanyForm: CompanyFormValues = {
   name: '',
   legal_name: '',
   rfc: '',
-  contact_email: '',
   phone: '',
   max_employees: '',
   admin_email: '',
   admin_password: '',
+  admin_password_confirm: '',
 };
 
 /** Errores del servidor llevados al campo (RFC o correo ya registrados, validación). */
@@ -40,12 +40,13 @@ interface CompanyFormOptions {
 export function useCompanyForm({ withAdmin, excludeId, originalRfc }: CompanyFormOptions) {
   const form = useFormState<CompanyFormValues>(emptyCompanyForm, {
     serverErrors: companyServerErrors,
-    untouchedOnLoad: ['admin_email', 'admin_password'],
+    untouchedOnLoad: ['admin_email', 'admin_password', 'admin_password_confirm'],
   });
   const { values } = form;
   const rfcLength = normalizeRfc(values.rfc).length;
-  // Validación en vivo por el canal del backend: RFC y correo del administrador (únicos) y los
-  // datos de contacto (formato, con la misma regla que al guardar).
+  // Validación en vivo por el canal del backend: RFC y correo del administrador (únicos) y el
+  // teléfono (formato, con la misma regla que al guardar). La empresa tiene un solo correo: el de
+  // su administrador.
   const live = {
     rfc: useAvailability('company_rfc', values.rfc, {
       excludeId,
@@ -55,13 +56,12 @@ export function useCompanyForm({ withAdmin, excludeId, originalRfc }: CompanyFor
     admin_email: useAvailability('company_admin_email', values.admin_email, {
       enabled: withAdmin && !validateEmail(values.admin_email),
     }),
-    contact_email: useAvailability('company_contact_email', values.contact_email, { enabled: !validateEmail(values.contact_email) }),
     phone: useAvailability('company_phone', values.phone, { enabled: values.phone.length > 4 }),
   };
 
   const clientErrors = validateCompanyForm(values, { withAdmin });
   const errors = form.visibleErrors(clientErrors);
-  const liveFields = ['rfc', 'admin_email', 'contact_email', 'phone'] as const;
+  const liveFields = ['rfc', 'admin_email', 'phone'] as const;
   for (const field of liveFields) errors[field] ??= liveMessage(live[field]);
   const canSubmit = Object.keys(clientErrors).length === 0 && !liveFields.some((field) => blocking(live[field])) && !form.saving;
 

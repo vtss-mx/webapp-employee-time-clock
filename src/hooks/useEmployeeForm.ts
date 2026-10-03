@@ -6,14 +6,7 @@ import { useFormState } from './useFormState';
 import { validatePhone } from '../utils/phone';
 import { validateEmployeeForm } from '../utils/formRules';
 import type { EmployeeFormValues } from '../types';
-import {
-  CURP_LENGTH,
-  normalizeCurp,
-  normalizeRfc,
-  NSS_LENGTH,
-  RFC_LENGTH,
-  type FieldErrors,
-} from '../utils/validation';
+import { CURP_LENGTH, NSS_LENGTH, RFC_LENGTH, normalizeCurp, normalizeRfc, type FieldErrors, validateEmail } from '../utils/validation';
 
 type FormField = keyof EmployeeFormValues;
 type UniqueField = 'employee_number' | 'rfc' | 'curp' | 'nss' | 'email' | 'phone';
@@ -64,7 +57,7 @@ function liveError(state: AvailabilityState): string | undefined {
 export function useEmployeeForm({ excludeId, original, passwordOptional = false }: EmployeeFormOptions = {}) {
   const form = useFormState<EmployeeFormValues>(emptyEmployeeForm, {
     serverErrors: serverFieldErrors,
-    untouchedOnLoad: ['password'], // al editar, vacía = no cambiarla
+    untouchedOnLoad: ['password', 'password_confirm'], // al editar, vacía = no cambiarla
   });
   const { values, saving } = form;
   const [headwearExempt, setHeadwearExempt] = useState(false);
@@ -78,7 +71,13 @@ export function useEmployeeForm({ excludeId, original, passwordOptional = false 
     curp: useAvailability('curp', values.curp, { ...unchanged('curp'), enabled: normalizeCurp(values.curp).length === CURP_LENGTH }),
     nss: useAvailability('nss', values.nss, { ...unchanged('nss'), enabled: values.nss.length === NSS_LENGTH }),
     email: useAvailability('email', values.email, unchanged('email')),
-    phone: useAvailability('phone', values.phone, { ...unchanged('phone'), enabled: !validatePhone(values.phone) }),
+    // Alta: el teléfono se valida junto con el correo (si la persona ya trabaja en otra empresa,
+    // deben ser de su misma cuenta). Al editar se valida solo.
+    phone: useAvailability('phone', values.phone, {
+      ...unchanged('phone'),
+      enabled: !validatePhone(values.phone),
+      related: excludeId === undefined && !validateEmail(values.email) ? values.email.trim() : undefined,
+    }),
   };
   // La persona ya trabaja en otra empresa: se vincula su cuenta (conserva su contraseña).
   const linking = !passwordOptional && live.email.status === 'linkable';

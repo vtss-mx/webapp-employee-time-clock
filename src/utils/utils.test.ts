@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { downloadUrl } from './download';
 import { haptic } from './haptics';
-import { envBoolean, envNumber, envString } from './env';
+import { envBoolean, envNumber, envNumberList, envString } from './env';
 import { ageFrom, formatConfidence, formatDate, formatDateTime, formatPercent, initials, timeAgo } from './format';
 import { hasKeys, isArrayOf, isNothing, isPage, isRecord } from './guards';
 import { preferenceStore, tabStore } from './storage';
@@ -17,6 +17,7 @@ import {
   validateEmployeeNumber,
   validateNss,
   validatePassword,
+  validatePasswordConfirm,
   validateRfc,
 } from './validation';
 import { validateEmployeeForm } from './formRules';
@@ -37,6 +38,12 @@ describe('env', () => {
     expect(envNumber(env, 'N', 1, 50)).toBe(50);
     expect(envNumber(env, 'BAD', 7)).toBe(7);
     expect(envNumber(env, 'EMPTY', 7)).toBe(7);
+  });
+  it('lee listas de números: ordenadas, sin repetidos y dentro de los límites', () => {
+    const lists = { SIZES: '30, 10,20,10, 0, 80, x', NONE: 'x, 0' };
+    expect(envNumberList(lists, 'SIZES', [5], 1, 50)).toEqual([10, 20, 30]);
+    expect(envNumberList(lists, 'NONE', [5], 1, 50)).toEqual([5]);
+    expect(envNumberList(lists, 'MISSING', [10, 20])).toEqual([10, 20]);
   });
   it('lee booleanos en varios formatos', () => {
     expect(envBoolean(env, 'T', false)).toBe(true);
@@ -111,7 +118,7 @@ describe('validation', () => {
     expect(validateEmployeeNumber('EMP-001')).toBeUndefined();
   });
   it('valida el formulario completo y permite contraseña opcional al editar', () => {
-    const values = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'ana@e.com', password: '' };
+    const values = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'ana@e.com', password: '', password_confirm: '' };
     expect(validateEmployeeForm(values)).toHaveProperty('password');
     expect(validateEmployeeForm(values, { passwordOptional: true })).toEqual({});
   });
@@ -139,12 +146,15 @@ describe('RFC', () => {
     expect(validateRfc('pegj-900515-ab1')).toBeUndefined();
     expect(validateRfc('ÑAÑE000229XYA')).toBeUndefined();
     expect(validateRfc('PEGJ900515AB1', '1990-05-15')).toBeUndefined();
-    expect(validateRfc('PEGJ900515AB1', '1990-05-16')).toBe('El RFC no coincide con la fecha de nacimiento');
+    expect(validateRfc('PEGJ900515AB1', '1990-05-16')).toBe('El RFC indica nacimiento el 15/05/1990, pero la fecha de nacimiento es 16/05/1990');
+    // El caso de la captura: RFC del 1 de septiembre con la fecha escrita como 03/09/2003.
+    expect(validateRfc('TARS0309014K1', '2003-09-03')).toBe('El RFC indica nacimiento el 01/09/2003, pero la fecha de nacimiento es 03/09/2003');
+    expect(validateRfc('TARS0309014K')).toBe('El RFC de una persona física tiene 13 caracteres; llevas 12');
     expect(validateRfc('PEGJ900515AB1', '')).toBeUndefined(); // sin fecha aún: no se compara
   });
 
   it('el formulario exige el RFC y su coincidencia con la fecha', () => {
-    const base = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'E1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123' };
+    const base = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'E1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123', password_confirm: 'Segura123' };
     expect(validateEmployeeForm({ ...base, rfc: '' })).toHaveProperty('rfc', 'El RFC es obligatorio');
     expect(validateEmployeeForm({ ...base, rfc: 'RUAA900102AB1' })).toHaveProperty('rfc');
     expect(validateEmployeeForm({ ...base, rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567' })).toEqual({});
@@ -162,7 +172,9 @@ describe('CURP, NSS y teléfono (mismas reglas que el backend)', () => {
     expect(validateCurp('HEGG561327MVZRRL04')).toContain('fecha');
     expect(validateCurp('HEGG560427MVZRRL05')).toContain('dígito verificador');
     expect(validateCurp('HEGG560427MVZRRL04', '1956-04-27')).toBeUndefined();
-    expect(validateCurp('HEGG560427MVZRRL04', '1956-04-28')).toBe('La CURP no coincide con la fecha de nacimiento');
+    expect(validateCurp('HEGG560427MVZRRL04', '1956-04-28')).toBe('La CURP indica nacimiento el 27/04/1956, pero la fecha de nacimiento es 28/04/1956');
+    expect(validateCurp('HEGG560427MVZRRL04', '2056-04-27')).toContain('siglo');
+    expect(validateCurp('TARS030901HSRNZB1')).toBe('La CURP tiene 18 caracteres; llevas 17');
     expect(validateCurp('RUAA900101MSRRZL09', '1990-01-01')).toBeUndefined();
   });
 
@@ -280,5 +292,18 @@ describe('haptic', () => {
     expect(vibrate.mock.calls).toEqual([[18], [[40, 60, 40]]]);
     Object.defineProperty(navigator, 'vibrate', { value: undefined, configurable: true });
     expect(() => haptic('success')).not.toThrow();
+  });
+});
+
+describe('confirmar contraseña', () => {
+  const employee = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123', password_confirm: 'Segura123' };
+
+  it('toda contraseña que se asigna se repite y debe coincidir', () => {
+    expect(validatePasswordConfirm('Segura123', 'Segura123')).toBeUndefined();
+    expect(validatePasswordConfirm('Segura123', '')).toBe('Repite la contraseña');
+    expect(validatePasswordConfirm('Segura123', 'Segura124')).toBe('Las contraseñas no coinciden');
+    expect(validateEmployeeForm({ ...employee, password_confirm: 'Otra1234' }).password_confirm).toBe('Las contraseñas no coinciden');
+    // Edición sin cambiar la contraseña: no se pide repetirla.
+    expect(validateEmployeeForm({ ...employee, password: '', password_confirm: '' }, { passwordOptional: true }).password_confirm).toBeUndefined();
   });
 });

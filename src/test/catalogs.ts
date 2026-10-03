@@ -1,4 +1,4 @@
-import type { CatalogItem, Catalogs, ConfidenceLevelItem, CountryItem, FaceErrorItem, ReasonItem } from '../types';
+import type { AntispoofLevelItem, CatalogItem, Catalogs, ConfidenceLevelItem, CountryItem, FaceErrorItem, ReasonItem } from '../types';
 import { createCatalogApi, type CatalogApi } from '../utils/catalogs';
 
 /**
@@ -75,9 +75,10 @@ const FACE_ERROR_CODES = [
   'LOW_DETECTION_SCORE', 'FACE_TOO_SMALL', 'FACE_CUT_OFF', 'POSE_NOT_FRONTAL', 'POSE_TILTED', 'POSE_PITCH', 'TOO_DARK',
   'TOO_BRIGHT', 'TOO_BLURRY', 'ACCESSORIES_DETECTED', 'SPOOF_DETECTED', 'ENROLL_INCONSISTENT', 'LIVENESS_REQUIRED',
   'CHALLENGE_INVALID', 'LIVENESS_FAILED', 'LIVENESS_MISMATCH', 'FACE_NOT_REGISTERED', 'FACE_SERVICE_BUSY',
-  'FACE_SERVICE_UNAVAILABLE', 'FACE_PROCESSING_ERROR',
+  'FACE_SERVICE_UNAVAILABLE', 'FACE_PROCESSING_ERROR', 'IMAGE_NOT_FROM_CAMERA', 'STATIC_CAPTURE', 'REPLAY_DETECTED',
+  'CAPTURE_INCONSISTENT', 'VIRTUAL_CAMERA', 'CHALLENGE_TOO_FAST', 'FACE_ALREADY_REGISTERED', 'FACE_LOCKED',
 ];
-const NOT_RETRYABLE = new Set(['FACE_NOT_REGISTERED', 'FACE_SERVICE_UNAVAILABLE']);
+const NOT_RETRYABLE = new Set(['FACE_NOT_REGISTERED', 'FACE_SERVICE_UNAVAILABLE', 'FACE_ALREADY_REGISTERED', 'FACE_LOCKED']);
 
 export const catalogsFixture: Catalogs = {
   roles: rows([
@@ -108,6 +109,12 @@ export const catalogsFixture: Catalogs = {
     ['APPROVED', 'Aceptado', 'La empresa aceptó el registro facial.', { tone: 'success' }],
     ['REJECTED', 'Rechazado', 'La empresa rechazó el registro facial.', { tone: 'danger' }],
   ]),
+  device_statuses: rows([
+    ['PENDING', 'Por autorizar', 'El validador inició sesión en este dispositivo y espera la autorización de la empresa.', { tone: 'warning' }],
+    ['APPROVED', 'Autorizado', 'La empresa autorizó el dispositivo: el validador puede operar en él.', { tone: 'success' }],
+    ['REJECTED', 'Rechazado', 'La empresa no autorizó el dispositivo.', { tone: 'danger' }],
+    ['REVOKED', 'Revocado', 'La empresa retiró la autorización: sus sesiones se cerraron.', { tone: 'muted' }],
+  ]),
   verification_reasons: reasons([
     ['NO_MATCH', 'Rostro no coincide', 'Rostro no reconocido'],
     ['LIVENESS_FAILED', 'Prueba de vida no superada', 'No se detectó el giro de cabeza solicitado'],
@@ -123,6 +130,13 @@ export const catalogsFixture: Catalogs = {
     ['EXPIRED', 'QR expirado', 'El QR ha expirado. Solicita uno nuevo a tu empresa'],
     ['OTHER_EMPLOYEE', 'QR de otro empleado', 'QR no reconocido'],
     ['EMPLOYEE_INACTIVE', 'Empleado desactivado', 'El empleado está desactivado'],
+    ['SPOOF_DETECTED', 'Posible foto o pantalla', 'No se pudo confirmar que seas una persona frente a la cámara.'],
+    ['IMAGE_NOT_FROM_CAMERA', 'Imagen que no es de la cámara', 'La imagen no proviene de la cámara de la aplicación.'],
+    ['STATIC_CAPTURE', 'Foto fija', 'Las capturas son idénticas.'],
+    ['REPLAY_DETECTED', 'Captura reutilizada', 'Esta captura ya se había usado antes.'],
+    ['CAPTURE_INCONSISTENT', 'Capturas de tomas distintas', 'Las capturas no parecen de la misma toma.'],
+    ['VIRTUAL_CAMERA', 'Cámara virtual', 'No se permiten cámaras virtuales.'],
+    ['CHALLENGE_TOO_FAST', 'Giro demasiado rápido', 'El giro se capturó demasiado rápido.'],
   ]),
   accessories: rows([
     ['GLASSES', 'Lentes', null, { phrase: 'los lentes' }],
@@ -161,6 +175,19 @@ export const catalogsFixture: Catalogs = {
     false_accept_rate: falseAccept,
     rejection_rate: rejection,
   })),
+  antispoof_levels: [
+    ['STANDARD', 'Estándar', 'Rechaza cuando la mayoría de las capturas parecen una foto, una pantalla o un video.', 0.05, false],
+    ['HIGH', 'Alto', 'Más sensible: rechaza ante indicios moderados de foto o pantalla.', 0.3, false],
+    ['MAXIMUM', 'Máximo', 'Basta con que una sola captura parezca una foto o una pantalla para rechazar.', 0.5, true],
+  ].map(([code, name, description, threshold, anyFrame], index): AntispoofLevelItem => ({
+    code: code as string,
+    name: name as string,
+    description: description as string,
+    sort_order: index + 1,
+    active: true,
+    threshold: threshold as number,
+    any_frame: anyFrame as boolean,
+  })),
   face_errors: FACE_ERROR_CODES.map((code, index): FaceErrorItem => ({
     code,
     name: code,
@@ -175,6 +202,7 @@ export const catalogsFixture: Catalogs = {
     ['HEADWEAR', 'Posible gorra o sombrero', 'El sistema detectó una posible gorra o sombrero y el empleado indicó que no la usa.'],
     ['MASK', 'Posible cubrebocas', 'El sistema detectó un posible cubrebocas y el empleado indicó que no lo usa.'],
     ['SPOOF', 'Posible foto o pantalla', 'El anti-spoofing sugiere que las capturas podrían ser de una foto o una pantalla.'],
+    ['DUPLICATE_FACE', 'Rostro ya registrado en otro empleado', 'El rostro se parece al registro aprobado de otro empleado de la empresa.'],
   ]),
 };
 

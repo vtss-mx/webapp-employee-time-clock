@@ -15,6 +15,55 @@ const policy = { ...samplePolicy, updated_at: '2026-10-01T10:00:00Z', updated_by
 afterEach(() => resetPolicyCache());
 
 describe('SettingsPage (COMPANY)', () => {
+  it('candados contra suplantación: cada uno se desactiva con confirmación y sus ajustes se guardan', async () => {
+    const { calls } = mockFetch((call) => {
+      if (call.init.method !== 'PUT') return apiOk(policy);
+      return apiOk({ ...policy, ...(JSON.parse(call.init.body as string) as object) });
+    });
+    renderWithProviders(<SettingsPage />);
+    const lock = await screen.findByRole('switch', { name: 'Bloquear cámaras virtuales' });
+    expect(lock).toHaveAttribute('aria-checked', 'true');
+    for (const name of ['Solo capturas en vivo', 'Detectar fotos fijas', 'Detectar capturas reutilizadas', 'Exigir una sola toma', 'Tiempo humano en la prueba de vida', 'Detectar rostros duplicados', 'Bloqueo por intentos fallidos']) {
+      expect(screen.getByRole('switch', { name })).toHaveAttribute('aria-checked', 'true');
+    }
+    await userEvent.click(lock);
+    const confirm = await screen.findByRole('alertdialog', { name: 'Desactivar bloquear cámaras virtuales' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Desactivar' }));
+    await waitFor(() => expect(lock).toHaveAttribute('aria-checked', 'false'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
+
+    // Ajustes: nivel de anti-spoofing (catálogo), giros y bloqueo.
+    await userEvent.click(screen.getByRole('button', { name: /Sensibilidad del anti-spoofing/ }));
+    await userEvent.click(screen.getByRole('option', { name: /Máximo/ }));
+    expect(await screen.findByText('Anti-spoofing: nivel Máximo')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+    await userEvent.click(screen.getByRole('button', { name: /Giros de la prueba de vida/ }));
+    await userEvent.click(screen.getByRole('option', { name: '1 giro' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
+    await userEvent.click(screen.getByRole('button', { name: /Intentos antes del bloqueo/ }));
+    await userEvent.click(screen.getByRole('option', { name: '3 intentos' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
+    await userEvent.click(screen.getByRole('button', { name: /Duración del bloqueo/ }));
+    await userEvent.click(screen.getByRole('option', { name: '1 h' }));
+    await waitFor(() => expect(calls.filter((c) => c.init.method === 'PUT')).toHaveLength(5));
+    expect(calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([
+      { block_virtual_cameras: false },
+      { anti_spoofing_level: 'MAXIMUM' },
+      { liveness_steps: 1 },
+      { lockout_max_failures: 3 },
+      { lockout_minutes: 60 },
+    ]);
+  });
+
+  it('los ajustes de un candado apagado no se pueden cambiar', async () => {
+    mockFetch(apiOk({ ...policy, anti_spoofing: false, liveness_challenge: false, lockout_enabled: false }));
+    renderWithProviders(<SettingsPage />);
+    expect(await screen.findByRole('button', { name: /Sensibilidad del anti-spoofing/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Giros de la prueba de vida/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Intentos antes del bloqueo/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Duración del bloqueo/ })).toBeDisabled();
+  });
+
   it('nivel de confianza: control de 80 % a 100 % (100 = 99.999 %), guardado explícito y confirmación si es muy estricto', async () => {
     const { calls } = mockFetch((call) => {
       if (call.init.method !== 'PUT') return apiOk(policy);
@@ -37,6 +86,7 @@ describe('SettingsPage (COMPANY)', () => {
     await waitFor(() => expect(slider).toHaveValue('95'));
     expect(JSON.parse(calls.filter((c) => c.init.method === 'PUT').at(-1)?.init.body as string)).toEqual({ min_confidence: 0.95 });
     expect(await screen.findByText('Nivel de confianza actualizado')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' })); // confirmación en popup
 
     // Volver al máximo pide confirmación (más reintentos) y explica que 100 % = 99.999 %.
     fireEvent.change(slider, { target: { value: '100' } });

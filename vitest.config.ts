@@ -31,6 +31,9 @@ export default defineConfig({
         'src/components/LiveFaceFlow.tsx',
         'src/components/QrScanPanel.tsx',
         'src/components/FaceGuide.tsx',
+        // SDK de Google Maps (script externo, mapa y consultas reales): se validan en navegador.
+        'src/services/maps/googleMaps.ts',
+        'src/components/location/MapCanvas.tsx',
         'src/pages/**',
         // Fábricas de carga diferida: cada una solo importa una pantalla (las pantallas ya se excluyen).
         'src/routes/lazyPages.ts',

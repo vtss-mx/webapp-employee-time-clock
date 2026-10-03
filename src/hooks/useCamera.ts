@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { preferenceStore } from '../utils/storage';
 import { describeCameraProblem, errorKind, type CameraProblem, type CameraProblemKind } from '../utils/cameraDiagnostics';
+import {
+  activeKind,
+  cameraConstraints,
+  kindLabel,
+  parseRemembered,
+  rememberedFor,
+  shouldMirror,
+  switchTarget,
+  toCameraDevices,
+  type CameraDevice,
+  type CameraFacing,
+  type CameraKind,
+  type CameraTarget,
+} from '../utils/cameraDevices';
 
-export type CameraFacing = 'user' | 'environment';
-/** consent: aún no hay permiso; se muestra la explicación previa antes del aviso del navegador. */
-export type CameraStatus = 'idle' | 'consent' | 'requesting' | 'active' | 'error';
-
-export interface CameraDevice {
-  deviceId: string;
-  label: string;
-  rawLabel: string;
-  kind: 'front' | 'back' | 'unknown';
-}
+export type { CameraDevice, CameraFacing } from '../utils/cameraDevices';
+/** requesting: abriendo la cámara (incluye el aviso nativo de permiso del navegador, si aplica). */
+export type CameraStatus = 'idle' | 'requesting' | 'active' | 'error';
 
 export interface UseCameraOptions {
   /** Cámara preferida al iniciar: frontal para rostro, trasera para QR. */
@@ -33,9 +40,13 @@ export interface CameraController {
   problem: CameraProblem | null;
   devices: CameraDevice[];
   activeDeviceId: string | null;
+  /** Nombre de la cámara abierta ("Cámara frontal", "Cámara trasera"...), para el visor. */
+  activeLabel: string;
+  /** Nombre real que da el sistema a la cámara abierta (detecta cámaras virtuales; viaja con las capturas). */
+  trackLabel: string;
   isMirrored: boolean;
   start: (deviceId?: string) => Promise<void>;
-  /** El usuario aceptó la explicación previa: se pide el permiso al navegador. */
+  /** Abre la cámara del propósito (la recordada si le sirve); el navegador pide el permiso. */
   requestAccess: () => void;
   stop: () => void;
   switchCamera: () => void;
@@ -43,48 +54,12 @@ export interface CameraController {
   captureFrame: (options?: CaptureOptions) => Promise<Blob>;
 }
 
-/** Ya se concedió el permiso en este navegador (respaldo donde no existe la Permissions API). */
-const GRANTED_KEY = 'tc.camera.granted';
-
-/** Estado del permiso sin mostrar ningún aviso. 'unknown' si el navegador no lo informa (Firefox). */
-export async function cameraPermission(): Promise<PermissionState | 'unknown'> {
-  try {
-    const result = await navigator.permissions?.query({ name: 'camera' as PermissionName });
-    return result?.state ?? 'unknown';
-  } catch {
-    return 'unknown';
-  }
-}
-
-const FRONT_RE = /front|frontal|user|selfie|delantera|facing front|facetime/i;
-const BACK_RE = /back|rear|trasera|posterior|environment|facing back/i;
-
-function detectKind(label: string): CameraDevice['kind'] {
-  if (FRONT_RE.test(label)) return 'front';
-  if (BACK_RE.test(label)) return 'back';
-  return 'unknown';
-}
-
-/** Etiquetas legibles: "Cámara frontal", "Cámara trasera 2", "Cámara 1"... */
-function toCameraDevices(inputs: MediaDeviceInfo[]): CameraDevice[] {
-  const counters = { front: 0, back: 0, unknown: 0 };
-  const totals = { front: 0, back: 0, unknown: 0 };
-  inputs.forEach((d) => totals[detectKind(d.label)]++);
-  return inputs.map((d) => {
-    const kind = detectKind(d.label);
-    const n = ++counters[kind];
-    const base = kind === 'front' ? 'Cámara frontal' : kind === 'back' ? 'Cámara trasera' : 'Cámara';
-    const label = kind === 'unknown' ? `${base} ${n}` : totals[kind] > 1 ? `${base} ${n}` : base;
-    return { deviceId: d.deviceId, label, rawLabel: d.label, kind };
-  });
-}
-
-function cameraConstraints(facing: string, deviceId?: string): MediaStreamConstraints {
-  const size = { width: { ideal: 1280 }, height: { ideal: 720 } };
-  return {
-    audio: false,
-    video: deviceId ? { ...size, deviceId: { exact: deviceId } } : { ...size, facingMode: { ideal: facing } },
-  };
+/** Cámara que realmente abrió el navegador: su id (para recordarla o volver a ella) y su lado. */
+function openedCamera(stream: MediaStream, requestedId?: string): { id: string | null; kind: CameraKind; label: string } {
+  const track = stream.getVideoTracks()[0];
+  const settings = track?.getSettings() ?? {};
+  const label = track?.label ?? '';
+  return { id: settings.deviceId ?? requestedId ?? null, kind: activeKind(settings.facingMode, label), label };
 }
 
 function isMissingDeviceError(err: unknown): boolean {
@@ -96,12 +71,6 @@ async function attachStream(video: HTMLVideoElement, stream: MediaStream): Promi
   video.muted = true;
   video.setAttribute('playsinline', 'true'); // iOS: evita pantalla completa
   await video.play().catch(() => undefined);
-}
-
-/** Espejo solo para cámara frontal (o webcam única de laptop/PC). */
-export function shouldMirror(facingMode: string | undefined, label: string, facing: string, deviceCount: number): boolean {
-  const kind = facingMode ? (facingMode === 'user' ? 'front' : 'back') : detectKind(label);
-  return kind === 'front' || (kind === 'unknown' && facing === 'user' && deviceCount <= 1);
 }
 
 /**
@@ -123,6 +92,9 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
   const [devices, setDevices] = useState<CameraDevice[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
+  const [kind, setKind] = useState<CameraKind>('unknown');
+  const [trackLabel, setTrackLabel] = useState('');
+  const kindRef = useRef<CameraKind>('unknown');
 
   const releaseStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -131,7 +103,6 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
   }, []);
 
   const fail = useCallback((kind: CameraProblemKind) => {
-    if (kind === 'denied') preferenceStore.remove(GRANTED_KEY); // ya no está concedido
     setStatus('error');
     setProblem(describeCameraProblem(kind));
   }, []);
@@ -144,8 +115,8 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
     return list;
   }, []);
 
-  const start = useCallback(
-    async (deviceId?: string) => {
+  const open = useCallback(
+    async (target: CameraTarget = {}): Promise<void> => {
       const requestId = ++requestIdRef.current;
       setProblem(null);
 
@@ -160,11 +131,11 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
 
       let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(cameraConstraints(facing, deviceId));
+        stream = await navigator.mediaDevices.getUserMedia(cameraConstraints(facing, target));
       } catch (err) {
-        // Si la cámara recordada ya no existe, reintentar con la preferencia de orientación.
-        if (deviceId && isMissingDeviceError(err)) {
-          if (requestId === requestIdRef.current) return start(undefined);
+        // Si la cámara pedida ya no existe (o ese lado no existe), abrir la del propósito.
+        if ((target.deviceId || target.facing) && isMissingDeviceError(err)) {
+          if (requestId === requestIdRef.current) return open({});
           return;
         }
         if (requestId === requestIdRef.current) fail(errorKind(err));
@@ -178,21 +149,22 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
       }
 
       streamRef.current = stream;
-      preferenceStore.set(GRANTED_KEY, '1');
       if (videoRef.current) await attachStream(videoRef.current, stream);
 
-      const track = stream.getVideoTracks()[0];
-      const settings = track?.getSettings() ?? {};
-      const currentId = settings.deviceId ?? deviceId ?? null;
-      activeDeviceRef.current = currentId;
-      setActiveDeviceId(currentId);
-      if (currentId) preferenceStore.set(prefKey, currentId);
+      const opened = openedCamera(stream, target.deviceId);
+      activeDeviceRef.current = opened.id;
+      kindRef.current = opened.kind;
+      setActiveDeviceId(opened.id);
+      setKind(opened.kind);
+      setTrackLabel(opened.label);
+      // Se recuerda con su lado: solo se reabre si sirve para este propósito (rememberedFor).
+      if (opened.id) preferenceStore.set(prefKey, JSON.stringify({ deviceId: opened.id, kind: opened.kind }));
 
       // Tras conceder permiso, enumerateDevices ya devuelve etiquetas reales.
       const list = await refreshDevices().catch(() => [] as CameraDevice[]);
       if (requestId !== requestIdRef.current) return;
 
-      setIsMirrored(shouldMirror(settings.facingMode, track?.label ?? '', facing, list.length));
+      setIsMirrored(shouldMirror(opened.kind, facing, list.length));
       setStatus('active');
     },
     [facing, fail, prefKey, refreshDevices, releaseStream],
@@ -204,30 +176,18 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
     setStatus('idle');
   }, [releaseStream]);
 
-  const selectCamera = useCallback((deviceId: string) => void start(deviceId), [start]);
-  const requestAccess = useCallback(() => void start(preferenceStore.get(prefKey) ?? undefined), [prefKey, start]);
+  const start = useCallback((deviceId?: string) => open({ deviceId }), [open]);
+  const selectCamera = useCallback((deviceId: string) => void open({ deviceId }), [open]);
+  const requestAccess = useCallback(
+    () => void open({ deviceId: rememberedFor(parseRemembered(preferenceStore.get(prefKey)), facing) }),
+    [facing, open, prefKey],
+  );
 
-  /**
-   * Primer inicio: si el permiso ya está concedido (o denegado, para mostrar cómo resolverlo) se
-   * abre la cámara directamente; si el navegador lo va a preguntar, antes se explica para qué se
-   * usa (status "consent") y el aviso del sistema aparece solo cuando el usuario pulsa "Permitir".
-   */
-  const begin = useCallback(async () => {
-    const requestId = requestIdRef.current;
-    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) return requestAccess();
-    const permission = await cameraPermission();
-    if (requestId !== requestIdRef.current) return; // desmontado o iniciado por otra vía
-    const known = permission === 'granted' || permission === 'denied';
-    if (known || (permission === 'unknown' && preferenceStore.get(GRANTED_KEY) === '1')) return requestAccess();
-    setStatus('consent');
-  }, [requestAccess]);
-
+  // Teléfono: alterna frontal ↔ trasera (lente principal). Computadora: siguiente webcam.
   const switchCamera = useCallback(() => {
-    if (devices.length < 2) return;
-    const index = devices.findIndex((d) => d.deviceId === activeDeviceRef.current);
-    const next = devices[(index + 1) % devices.length];
-    void start(next.deviceId);
-  }, [devices, start]);
+    const target = switchTarget(devices, activeDeviceRef.current, kindRef.current);
+    if (target) void open(target);
+  }, [devices, open]);
 
   const captureFrame = useCallback(async ({ maxSide = 1280, quality = 0.92 }: CaptureOptions = {}) => {
     const video = videoRef.current;
@@ -251,7 +211,8 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
 
   // Inicio automático (con la última cámara elegida para este propósito) y limpieza al desmontar.
   useEffect(() => {
-    if (autoStart) void begin();
+    // El permiso lo pide el navegador (aviso nativo); mientras tanto el visor explica qué hacer.
+    if (autoStart) requestAccess();
     const requests = requestIdRef; // invalida un start() pendiente al desmontar
     return () => {
       requests.current++;
@@ -294,6 +255,8 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
     problem,
     devices,
     activeDeviceId,
+    activeLabel: kindLabel(kind),
+    trackLabel,
     isMirrored,
     start,
     requestAccess,

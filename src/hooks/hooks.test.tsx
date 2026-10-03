@@ -71,7 +71,7 @@ describe('usePendingEnrollments', () => {
 });
 
 describe('useEmployeeForm', () => {
-  const valid = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123' };
+  const valid = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123', password_confirm: 'Segura123' };
 
   const wrapper = ({ children }: { children: ReactNode }) => <FeedbackProvider>{children}</FeedbackProvider>;
 
@@ -104,12 +104,37 @@ describe('useEmployeeForm', () => {
       }),
     );
     const { result } = renderHook(() => useEmployeeForm(), { wrapper });
-    act(() => result.current.setValues({ ...valid, password: '' }));
+    act(() => result.current.setValues({ ...valid, password: '', password_confirm: '' }));
     await waitFor(() => expect(result.current.linking).toBe(true));
     await waitFor(() => expect(result.current.canSubmit).toBe(true));
     expect(serverFieldErrors(new ApiError({ statusCode: 409, code: 'ACCOUNT_PHONE_MISMATCH', message: 'otro teléfono' }))).toEqual({
       phone: 'otro teléfono',
     });
+  });
+
+  it('persona en varias empresas: el teléfono se valida en vivo junto con el correo escrito', async () => {
+    const check = vi.spyOn(availability, 'checkAvailability').mockImplementation((field, value, _exclude, related) =>
+      Promise.resolve({
+        field, value, normalized: value, valid: true, via: 'http',
+        ...(field === 'phone' && related === 'a@e.com'
+          ? { available: false, code: 'MISMATCH', message: 'Ese correo ya tiene una cuenta con otro teléfono' }
+          : { available: true, code: field === 'email' ? 'LINKABLE' : 'AVAILABLE', message: 'Ok' }),
+      }),
+    );
+    const { result } = renderHook(() => useEmployeeForm(), { wrapper });
+    act(() => result.current.setValues({ ...valid, password: '', password_confirm: '' }));
+    await waitFor(() => expect(result.current.live.phone).toMatchObject({ status: 'taken', message: 'Ese correo ya tiene una cuenta con otro teléfono' }));
+    expect(result.current.canSubmit).toBe(false);
+    expect(check).toHaveBeenCalledWith('phone', valid.phone, undefined, 'a@e.com');
+  });
+
+  it('al editar, el teléfono se valida solo (no se vincula a nadie)', async () => {
+    const check = vi.spyOn(availability, 'checkAvailability').mockImplementation((field, value) =>
+      Promise.resolve({ field, value, normalized: value, valid: true, available: true, code: 'AVAILABLE', message: 'Ok', via: 'http' }),
+    );
+    const { result } = renderHook(() => useEmployeeForm({ excludeId: 7, passwordOptional: true }), { wrapper });
+    act(() => result.current.setValues({ ...valid, password: '', password_confirm: '' }));
+    await waitFor(() => expect(check).toHaveBeenCalledWith('phone', valid.phone, 7, undefined));
   });
 
   it('red de seguridad al enviar con datos incompletos: marca todo y resume en un popup', async () => {

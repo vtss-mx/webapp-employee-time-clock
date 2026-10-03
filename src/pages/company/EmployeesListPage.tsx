@@ -9,14 +9,10 @@ import { ListResults } from '../../components/ui/ListResults';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
 import { initials } from '../../utils/format';
-import { config } from '../../utils/config';
-
-const PAGE_SIZE = config.employeesPageSize;
 
 export function EmployeesListPage() {
   const navigate = useNavigate();
   const list = useSearchList((query, signal) => employeeService.list(query, signal), {
-    pageSize: PAGE_SIZE,
     errorTitle: 'No se pudieron cargar los empleados',
   });
   const { data } = list;
@@ -46,6 +42,7 @@ export function EmployeesListPage() {
 
           <ListResults
             list={list}
+            pager={{ noun: { one: 'empleado', other: 'empleados' } }}
             columns={['Empleado', 'Correo', 'Registro facial', 'QR', 'Estado']}
             onOpen={(emp) => open(emp.id)}
             empty={{

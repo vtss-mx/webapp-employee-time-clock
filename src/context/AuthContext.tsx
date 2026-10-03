@@ -1,10 +1,39 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError, configureApiClient, TOUCH_DEVICE_REQUIRED } from '../services/apiClient';
 import type { ApiErrorItem } from '../services/apiClient';
-import { authService } from '../services/authService';
+import { authService, type LoginProofs } from '../services/authService';
 import { meService } from '../services/meService';
 import type { AuthTokenResponse, Session, User, UserPreferences } from '../types';
+import { deviceProof } from '../utils/deviceKey';
+import { currentLocation } from '../utils/geolocation';
+import { describeDevice } from '../utils/userAgent';
 import { preferenceStore } from '../utils/storage';
+
+/**
+ * Inicio de sesión con las pruebas que el backend pida a un validador, en el orden en que las pide:
+ * - DEVICE_PROOF_REQUIRED: el dispositivo firma el reto con su llave (no exportable).
+ * - LOCATION_REQUIRED: la ubicación del dispositivo (aviso nativo del navegador).
+ * Cada prueba se pide una sola vez; cualquier otro error (incluido "dispositivo por autorizar") sube.
+ */
+async function loginWithProofs(email: string, password: string, remember: boolean, onLocating?: () => void): Promise<AuthTokenResponse> {
+  const proofs: LoginProofs = {};
+  for (;;) {
+    try {
+      return await authService.login(email, password, remember, proofs);
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      if (err.code === 'DEVICE_PROOF_REQUIRED' && !proofs.device) {
+        const nonce = err.details?.nonce;
+        proofs.device = await deviceProof(typeof nonce === 'string' ? nonce : '', describeDevice(navigator.userAgent).label);
+      } else if (err.code === 'LOCATION_REQUIRED' && !proofs.location) {
+        onLocating?.();
+        proofs.location = await currentLocation();
+      } else {
+        throw err;
+      }
+    }
+  }
+}
 
 /** Indicador NO sensible: solo dice que vale la pena intentar restaurar la sesión al recargar. */
 const SIGNED_IN_KEY = 'tc.signed-in';
@@ -37,7 +66,8 @@ export interface AuthContextValue {
   deviceBlock: DeviceBlock | null;
   /** Sale de esa pantalla: cierra la sesión (si la hay) y vuelve al inicio de sesión. */
   dismissDeviceBlock: () => Promise<void>;
-  login: (email: string, password: string, remember?: boolean) => Promise<User>;
+  /** `onLocating`: el backend pidió la ubicación del dispositivo y se está obteniendo. */
+  login: (email: string, password: string, remember?: boolean, options?: { onLocating?: () => void }) => Promise<User>;
   logout: (reason?: string) => Promise<void>;
   logoutEverywhere: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -199,8 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session, clear, refreshUser]);
 
   const login = useCallback(
-    async (email: string, password: string, remember = false) => {
-      const response = await authService.login(email, password, remember);
+    async (email: string, password: string, remember = false, { onLocating }: { onLocating?: () => void } = {}) => {
+      const response = await loginWithProofs(email, password, remember, onLocating);
       apply(response);
       return response.user;
     },
