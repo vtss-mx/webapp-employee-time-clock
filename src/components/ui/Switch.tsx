@@ -11,10 +11,14 @@ interface SwitchProps {
   busy?: boolean;
 }
 
-/** Interruptor accesible (role="switch") con etiqueta, descripción e icono. */
+/**
+ * Interruptor accesible (role="switch") con etiqueta, descripción e icono. Toda la fila es una
+ * `<label>` del botón: en teléfonos y tabletas se activa tocando cualquier parte (como en los
+ * ajustes del sistema), no solo el control de 54×32.
+ */
 export function Switch({ checked, onChange, label, description, icon, badge, disabled = false, busy = false }: SwitchProps) {
   return (
-    <div className={`switch-row ${checked ? 'is-on' : ''} ${disabled ? 'is-disabled' : ''}`}>
+    <label className={`switch-row ${checked ? 'is-on' : ''} ${disabled ? 'is-disabled' : ''}`}>
       {icon && <span className="switch-row__icon">{icon}</span>}
       <span className="switch-row__text">
         <span className="switch-row__label">
@@ -34,6 +38,6 @@ export function Switch({ checked, onChange, label, description, icon, badge, dis
       >
         <span className="switch__thumb" />
       </button>
-    </div>
+    </label>
   );
 }

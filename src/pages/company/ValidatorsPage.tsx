@@ -6,9 +6,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { ValidatorModeBadge } from '../../components/ValidatorModes';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { ListPaginator } from '../../components/ui/Paginator';
-import { RetryState } from '../../components/ui/RetryState';
-import { SkeletonRows } from '../../components/ui/Skeleton';
+import { PagedItems } from '../../components/ui/PagedItems';
 import { useFeedback } from '../../hooks/useFeedback';
 import { usePagedList } from '../../hooks/usePagedList';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
@@ -30,7 +28,6 @@ export function ValidatorsPage() {
   const feedback = useFeedback();
   const { policy } = useVerificationPolicy();
   const list = usePagedList((page, signal) => validatorService.list(page, signal), { errorTitle: 'No se pudieron cargar los validadores' });
-  const items = list.data?.items ?? null;
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState<number | null>(null);
@@ -79,18 +76,17 @@ export function ValidatorsPage() {
           actions={addButton}
         />
         <PanelSection>
-          {!items && (list.error ? <RetryState onRetry={list.retry} /> : <SkeletonRows />)}
-          {items?.length === 0 && (
-            <div className="empty">
-              <span className="icon-tile icon-tile--lg">
-                <ScanLine size={30} />
-              </span>
-              <h2>Aún no tienes validadores</h2>
-              <p className="muted">Crea una cuenta para la tableta o el teléfono de cada acceso: recepción, comedor, planta...</p>
-              {addButton}
-            </div>
-          )}
-          {items && items.length > 0 && (
+          <PagedItems
+            list={list}
+            empty={{
+              icon: <ScanLine />,
+              title: 'No hay validadores registrados',
+              description: 'Crea una cuenta para la tableta o el teléfono de cada acceso (recepción, comedor, planta…) que identificará a tu personal.',
+              action: addButton,
+            }}
+            pager={{ noun: { one: 'validador', other: 'validadores' } }}
+          >
+            {(items) => (
             <ul className={`validator-list stagger ${list.loading ? 'is-loading' : ''}`}>
               {items.map((validator) => (
                 <li key={validator.id}>
@@ -101,8 +97,9 @@ export function ValidatorsPage() {
                     <small className="muted">
                       {today(validator.identifications_today)} · {validator.last_login_at ? `Último acceso: ${formatDateTime(validator.last_login_at)}` : 'Aún no inicia sesión'}
                     </small>
-                    <small className={`validator-list__address truncate ${validator.address ? 'muted' : 'text-warning'}`}>
-                      <MapPin size={13} aria-hidden /> {validator.address ? addressLine(validator.address) : 'Sin domicilio: edítalo para agregarlo'}
+                    <small className={`validator-list__address ${validator.address ? 'muted' : 'text-warning'}`}>
+                      <MapPin size={13} aria-hidden />
+                      <span className="truncate">{validator.address ? addressLine(validator.address) : 'Sin domicilio: edítalo para agregarlo'}</span>
                     </small>
                   </span>
                   <span className="validator-list__badges">
@@ -146,8 +143,8 @@ export function ValidatorsPage() {
                 </li>
               ))}
             </ul>
-          )}
-          <ListPaginator list={list} noun={{ one: 'validador', other: 'validadores' }} />
+            )}
+          </PagedItems>
         </PanelSection>
         <PanelFooter align="center">
           <p className="inline-note small muted">

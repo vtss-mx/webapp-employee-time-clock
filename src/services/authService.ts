@@ -1,5 +1,5 @@
-import type { AuthTokenResponse, DeviceSession, RememberedAccount, User } from '../types';
-import { hasKeys, isArrayOf, isNothing } from '../utils/guards';
+import type { AuthTokenResponse, DeviceSessionList, PageQuery, RememberedAccount, User } from '../types';
+import { hasKeys, isNothing, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
 import type { DeviceProof } from '../utils/deviceKey';
 import type { DeviceLocation } from '../utils/geolocation';
@@ -13,7 +13,7 @@ export interface LoginProofs {
 const isUser = hasKeys<User>('id', 'email', 'role');
 const isTokenResponse = (value: unknown): value is AuthTokenResponse =>
   hasKeys<AuthTokenResponse>('access_token', 'expires_in', 'session_id', 'user')(value) && isUser(value.user);
-const isSessions = isArrayOf<DeviceSession[]>(hasKeys('id', 'created_at', 'current'));
+const isSessions = isPage<DeviceSessionList>(hasKeys('id', 'created_at', 'current'));
 const isRemembered = hasKeys<RememberedAccount>('email');
 const isRememberedOrNothing = (value: unknown): value is RememberedAccount | null => value === null || isRemembered(value);
 
@@ -59,8 +59,9 @@ export const authService = {
     await apiRequest<unknown>('/auth/logout-all', { method: 'POST' });
   },
 
-  sessions(): Promise<DeviceSession[]> {
-    return apiRequest<DeviceSession[]>('/auth/sessions', { validate: isSessions });
+  /** Sesiones abiertas de la cuenta, paginadas (la actual primero). */
+  sessions(query: PageQuery, signal?: AbortSignal): Promise<DeviceSessionList> {
+    return apiRequest<DeviceSessionList>('/auth/sessions', { query: { ...query }, signal, validate: isSessions });
   },
 
   async revokeSession(id: string): Promise<void> {

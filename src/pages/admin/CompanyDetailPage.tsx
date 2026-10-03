@@ -5,9 +5,11 @@ import { ConfirmDialog } from '../../components/Modal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
+import { PagedItems } from '../../components/ui/PagedItems';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useFeedback } from '../../hooks/useFeedback';
+import { usePagedList, type PagedList } from '../../hooks/usePagedList';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
@@ -55,12 +57,56 @@ function CompanyActions({ company, busy, toggling, onToggle, onDelete }: Company
   );
 }
 
+interface CompanyAdminsProps {
+  list: PagedList<CompanyAdmin>;
+  companyId: number;
+  busy: boolean;
+  onToggle: (admin: CompanyAdmin) => void;
+}
+
+/** Administradores de la empresa (paginados): último acceso, estado, contraseña y activación. */
+function CompanyAdmins({ list, companyId, busy, onToggle }: CompanyAdminsProps) {
+  return (
+    <PagedItems
+      list={list}
+      skeletonRows={2}
+      empty={{ compact: true, icon: <UserCog />, title: 'No hay administradores registrados', description: 'Agrega la cuenta de la persona que administrará la empresa.' }}
+      pager={{ variant: 'compact', siblings: 0, noun: { one: 'administrador', other: 'administradores' } }}
+    >
+      {(admins) => (
+        <ul className={`company-admins ${list.loading ? 'is-loading' : ''}`}>
+          {admins.map((admin) => (
+            <li key={admin.id}>
+              <span className="avatar">{admin.email.slice(0, 2).toUpperCase()}</span>
+              <span className="company-admins__info">
+                <strong className="truncate">{admin.email}</strong>
+                <small className="muted">{admin.last_login_at ? `Último acceso: ${formatDateTime(admin.last_login_at)}` : 'Aún no inicia sesión'}</small>
+              </span>
+              <StatusBadge active={admin.active} />
+              <ButtonLink to={paths.admin.companyAdminPassword(companyId, admin.id)} size="sm" variant="ghost" icon={<KeyRound size={16} />}>
+                Restablecer contraseña
+              </ButtonLink>
+              <Button size="sm" variant={admin.active ? 'ghost' : 'secondary'} disabled={busy} onClick={() => onToggle(admin)}>
+                {admin.active ? 'Desactivar' : 'Activar'}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PagedItems>
+  );
+}
+
 /** Detalle de una empresa: datos, uso del plan, administradores y estado. */
 export function CompanyDetailPage() {
   const companyId = Number(useParams().id);
   const navigate = useNavigate();
   const feedback = useFeedback();
   const { data: company, setData: setCompany, error, retry: load } = useResource(() => adminService.get(companyId), companyId, 'No se pudo cargar la empresa');
+  const admins = usePagedList((page, signal) => adminService.admins(companyId, page, signal), {
+    errorTitle: 'No se pudieron cargar los administradores',
+    filterKey: String(companyId),
+  });
   const [confirm, setConfirm] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
 
@@ -76,6 +122,10 @@ export function CompanyDetailPage() {
       setConfirm(null);
     }
   };
+  /** Cambia el estado de un administrador y vuelve a pedir la página (el backend decide el resultado). */
+  const setAdminActive = (admin: CompanyAdmin, active: boolean) =>
+    run(() => adminService.setAdminStatus(companyId, admin.id, active), active ? 'Administrador activado' : 'Administrador desactivado').then(admins.retry);
+  const toggleAdmin = (admin: CompanyAdmin) => (admin.active ? setConfirm({ kind: 'admin', admin }) : void setAdminActive(admin, true));
 
   if (!company) {
     return error ? (
@@ -189,35 +239,7 @@ export function CompanyDetailPage() {
             </ButtonLink>
           }
         >
-          <ul className="company-admins">
-            {company.admins.map((admin) => (
-              <li key={admin.id}>
-                <span className="avatar">{admin.email.slice(0, 2).toUpperCase()}</span>
-                <span className="company-admins__info">
-                  <strong className="truncate">{admin.email}</strong>
-                  <small className="muted">
-                    {admin.last_login_at ? `Último acceso: ${formatDateTime(admin.last_login_at)}` : 'Aún no inicia sesión'}
-                  </small>
-                </span>
-                <StatusBadge active={admin.active} />
-                <ButtonLink to={paths.admin.companyAdminPassword(company.id, admin.id)} size="sm" variant="ghost" icon={<KeyRound size={16} />}>
-                  Restablecer contraseña
-                </ButtonLink>
-                <Button
-                  size="sm"
-                  variant={admin.active ? 'ghost' : 'secondary'}
-                  disabled={busy}
-                  onClick={() =>
-                    admin.active
-                      ? setConfirm({ kind: 'admin', admin })
-                      : void run(() => adminService.setAdminStatus(company.id, admin.id, true), 'Administrador activado')
-                  }
-                >
-                  {admin.active ? 'Desactivar' : 'Activar'}
-                </Button>
-              </li>
-            ))}
-          </ul>
+          <CompanyAdmins list={admins} companyId={company.id} busy={busy} onToggle={toggleAdmin} />
         </PanelSection>
       </Panel>
 
@@ -250,7 +272,7 @@ export function CompanyDetailPage() {
         tone="danger"
         loading={busy}
         onCancel={() => setConfirm(null)}
-        onConfirm={() => confirm?.kind === 'admin' && void run(() => adminService.setAdminStatus(company.id, confirm.admin.id, false), 'Administrador desactivado')}
+        onConfirm={() => confirm?.kind === 'admin' && void setAdminActive(confirm.admin, false)}
       />
     </div>
   );

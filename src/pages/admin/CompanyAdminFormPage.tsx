@@ -30,12 +30,15 @@ const MODES = {
 export function CompanyAdminFormPage() {
   const params = useParams();
   const companyId = Number(params.id);
-  const { data: company, error, retry } = useResource(() => adminService.get(companyId), companyId, 'No se pudo cargar la empresa');
+  const adminId = params.adminId ? Number(params.adminId) : null;
+  const { data, error, retry } = useResource(
+    () => Promise.all([adminService.get(companyId), adminId ? adminService.admin(companyId, adminId) : null]),
+    `${companyId}:${adminId ?? 'new'}`,
+    'No se pudo cargar la empresa',
+  );
 
-  if (!company) return error ? <RetryState onRetry={retry} /> : <SkeletonCard lines={4} />;
-  const admin = params.adminId ? company.admins.find((a) => a.id === Number(params.adminId)) : null;
-  if (params.adminId && !admin) return <RetryState onRetry={retry} />;
-  return <CompanyAdminForm company={company} admin={admin ?? null} />;
+  if (!data) return error ? <RetryState onRetry={retry} /> : <SkeletonCard lines={4} />;
+  return <CompanyAdminForm company={data[0]} admin={data[1]} />;
 }
 
 function CompanyAdminForm({ company, admin }: { company: CompanyDetail; admin: CompanyAdmin | null }) {

@@ -4,7 +4,7 @@ import type {
   EmployeeCreatePayload,
   EmployeeList,
   EmployeeListParams,
-  EmployeeQr,
+  EmployeeQrSummary,
   EmployeeUpdatePayload,
   PageQuery,
   VerificationLogList,
@@ -16,7 +16,7 @@ import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 import { isVerificationResult } from './verificationService';
 
 const isEmployee = hasKeys<Employee>('id', 'employee_number', 'first_name', 'last_name');
-const isQr = hasKeys<EmployeeQr>('image_base64', 'employee_number');
+const isQrSummary = hasKeys<EmployeeQrSummary>('live', 'last_used_at');
 
 export const employeeService = {
   /** Registro asistido: la empresa captura el rostro del empleado presente (queda aprobado al momento). */
@@ -66,12 +66,14 @@ export const employeeService = {
     });
   },
 
-  getQr(id: number): Promise<EmployeeQr> {
-    return apiRequest<EmployeeQr>(`/employees/${id}/qr`, { validate: isQr });
+  /** Actividad del QR dinámico (si tiene uno vigente, cuándo lo generó y lo usó). */
+  qrSummary(id: number): Promise<EmployeeQrSummary> {
+    return apiRequest<EmployeeQrSummary>(`/employees/${id}/qr`, { validate: isQrSummary });
   },
 
-  regenerateQr(id: number): Promise<EmployeeQr> {
-    return apiRequest<EmployeeQr>(`/employees/${id}/qr/regenerate`, { method: 'POST', validate: isQr });
+  /** Invalida el QR vigente: el teléfono del empleado muestra otro. */
+  revokeQr(id: number): Promise<EmployeeQrSummary> {
+    return apiRequest<EmployeeQrSummary>(`/employees/${id}/qr`, { method: 'DELETE', validate: isQrSummary });
   },
 
   /** Bitácora de verificaciones del empleado, paginada (la más reciente primero). */

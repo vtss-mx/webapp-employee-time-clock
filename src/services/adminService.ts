@@ -1,9 +1,9 @@
-import type { CompanyDetail, CompanyFormValues, CompanyList, CompanyListParams, PlatformStats } from '../types';
+import type { CompanyAdmin, CompanyAdminList, CompanyDetail, CompanyFormValues, CompanyList, CompanyListParams, PageQuery, PlatformStats } from '../types';
 import { hasKeys, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
 
-const isCompany = hasKeys<CompanyDetail>('id', 'name', 'active', 'employee_count');
-const isDetail = hasKeys<CompanyDetail>('id', 'name', 'admins');
+const isDetail = hasKeys<CompanyDetail>('id', 'name', 'active', 'employee_count');
+const isAdmin = hasKeys<CompanyAdmin>('id', 'email', 'active');
 const isStats = hasKeys<PlatformStats>('companies', 'active_companies', 'employees', 'company_admins');
 
 type CompanyData = Omit<CompanyFormValues, 'admin_email' | 'admin_password' | 'admin_password_confirm'>;
@@ -25,7 +25,7 @@ export const adminService = {
   },
 
   list(params: CompanyListParams = {}, signal?: AbortSignal): Promise<CompanyList> {
-    return apiRequest<CompanyList>('/admin/companies', { query: { ...params }, signal, validate: isPage(isCompany) });
+    return apiRequest<CompanyList>('/admin/companies', { query: { ...params }, signal, validate: isPage(isDetail) });
   },
 
   get(id: number): Promise<CompanyDetail> {
@@ -50,6 +50,15 @@ export const adminService = {
   /** Solo una empresa sin empleados (con empleados, el backend responde 409 y se desactiva). */
   remove(id: number): Promise<void> {
     return apiRequest<null>(`/admin/companies/${id}`, { method: 'DELETE' }).then(() => undefined);
+  },
+
+  /** Administradores de la empresa, paginados (el más antiguo primero). */
+  admins(id: number, query: PageQuery, signal?: AbortSignal): Promise<CompanyAdminList> {
+    return apiRequest<CompanyAdminList>(`/admin/companies/${id}/admins`, { query: { ...query }, signal, validate: isPage(isAdmin) });
+  },
+
+  admin(id: number, userId: number): Promise<CompanyAdmin> {
+    return apiRequest<CompanyAdmin>(`/admin/companies/${id}/admins/${userId}`, { validate: isAdmin });
   },
 
   addAdmin(id: number, email: string, password: string): Promise<CompanyDetail> {

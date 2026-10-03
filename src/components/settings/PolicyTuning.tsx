@@ -1,4 +1,4 @@
-import { Clock, Lock, Repeat, ScanFace } from 'lucide-react';
+import { Clock, Lock, QrCode, Repeat, ScanFace } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import type { VerificationPolicy, VerificationPolicyUpdate } from '../../types';
@@ -8,8 +8,9 @@ import { Select } from '../ui/Select';
 const STEPS = [1, 2];
 const LOCKOUT_FAILURES = [3, 5, 7, 10];
 const LOCKOUT_MINUTES = [5, 15, 30, 60, 120];
+const QR_LIFETIMES = [15, 30, 60, 120, 300];
 
-export type TuningKey = 'anti_spoofing_level' | 'liveness_steps' | 'lockout_max_failures' | 'lockout_minutes';
+export type TuningKey = 'anti_spoofing_level' | 'liveness_steps' | 'lockout_max_failures' | 'lockout_minutes' | 'qr_lifetime_seconds';
 
 interface PolicyTuningProps {
   policy: VerificationPolicy;
@@ -42,10 +43,12 @@ function TuningRow({ icon, label, description, children }: TuningRowProps) {
 }
 
 const minutesLabel = (minutes: number) => (minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`);
+const secondsLabel = (seconds: number) => (seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds} s`);
 
 /**
- * Ajustes de los candados: sensibilidad del anti-spoofing (catálogo), giros de la prueba de vida
- * y el bloqueo por intentos fallidos. Cada control se deshabilita si su candado está apagado.
+ * Ajustes de los candados: sensibilidad del anti-spoofing (catálogo), giros de la prueba de vida,
+ * el bloqueo por intentos fallidos y la vigencia del QR dinámico. Cada control se deshabilita si su
+ * candado está apagado.
  */
 export function PolicyTuning({ policy, saving, onSave }: PolicyTuningProps) {
   const { active, byCode } = useCatalogs();
@@ -97,6 +100,17 @@ export function PolicyTuning({ policy, saving, onSave }: PolicyTuningProps) {
             disabled={!policy.lockout_enabled || saving === 'lockout_minutes'}
             options={[...new Set([...LOCKOUT_MINUTES, policy.lockout_minutes])].sort((a, b) => a - b).map((n) => ({ value: String(n), label: minutesLabel(n) }))}
             onChange={(value) => onSave('lockout_minutes', { lockout_minutes: Number(value) }, 'Bloqueo actualizado', `El bloqueo durará ${minutesLabel(Number(value))}.`)}
+          />
+        )}
+      </TuningRow>
+      <TuningRow icon={<QrCode size={20} />} label="Vigencia del código QR" description="Cada QR del empleado se renueva solo al cumplir este tiempo y sirve una sola vez. Menos tiempo, más seguro.">
+        {(labelId) => (
+          <Select
+            aria-labelledby={labelId}
+            value={String(policy.qr_lifetime_seconds)}
+            disabled={!policy.qr_enabled || saving === 'qr_lifetime_seconds'}
+            options={[...new Set([...QR_LIFETIMES, policy.qr_lifetime_seconds])].sort((a, b) => a - b).map((n) => ({ value: String(n), label: secondsLabel(n) }))}
+            onChange={(value) => onSave('qr_lifetime_seconds', { qr_lifetime_seconds: Number(value) }, 'Vigencia del QR actualizada', `Cada código QR durará ${secondsLabel(Number(value))} y servirá una sola vez.`)}
           />
         )}
       </TuningRow>

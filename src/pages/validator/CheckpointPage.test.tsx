@@ -39,7 +39,7 @@ function server(profile: CheckpointProfile, overrides: Record<string, () => Resp
     const path = call.url.split('?')[0];
     if (overrides[path]) return overrides[path]();
     if (path === '/api/checkpoint/me') return apiOk(profile);
-    if (path === '/api/checkpoint/recent') return apiOk(events);
+    if (path === '/api/checkpoint/recent') return apiOk({ items: events, total: events.length, page: 1, size: 10 });
     if (path === '/api/settings/verification') return apiOk(samplePolicy);
     if (path === '/api/checkpoint/qr/inspect') return apiOk({ employee_id: 7, name: 'Ana Ruiz', employee_number: 'EMP-7' });
     return apiOk(identifiedResult);
@@ -66,6 +66,13 @@ describe('CheckpointPage (VALIDATOR)', () => {
     expect(await screen.findByText('Ana Ruiz')).toBeInTheDocument();
     expect(screen.getByText('No identificado')).toBeInTheDocument();
     expect(screen.getByText('Rostro · Rostro no coincide')).toBeInTheDocument();
+  });
+
+  it('sin identificaciones: estado vacío y sin paginador', async () => {
+    server(sampleCheckpoint, { '/api/checkpoint/recent': () => apiOk({ items: [], total: 0, page: 1, size: 10 }) });
+    renderWithProviders(<CheckpointPage />);
+    expect(await screen.findByText('Aún no hay identificaciones')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });
 
   it('QR: identifica, muestra el resultado para el operador y refresca la bitácora', async () => {
@@ -108,7 +115,7 @@ describe('CheckpointPage (VALIDATOR)', () => {
     server({ ...sampleCheckpoint, mode: 'QR', qr_enabled: false });
     renderWithProviders(<CheckpointPage />);
     expect(await screen.findByText('Identificación con QR desactivada')).toBeInTheDocument();
-    expect(screen.getByText(/usa el modo “Solo QR”/)).toBeInTheDocument();
+    expect(screen.getByText(/usa el modo «Solo QR»/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: QR_CARD })).not.toBeInTheDocument();
   });
 

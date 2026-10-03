@@ -46,6 +46,8 @@ export interface User {
   screens: Screen[];
   /** Inicio del usuario (su primera pantalla); null si no tiene ninguna. */
   home: string | null;
+  /** Zona horaria del negocio (hora del Centro): fechas y horas se muestran en ella. */
+  timezone?: string;
 }
 
 /** Pantalla del usuario, tal como la envía el backend (catalog.screens). */
@@ -126,9 +128,10 @@ export interface CompanyAdmin {
   created_at: string;
 }
 
-export interface CompanyDetail extends Company {
-  admins: CompanyAdmin[];
-}
+export type CompanyAdminList = Page<CompanyAdmin>;
+
+/** Detalle de una empresa: sus administradores se piden aparte, paginados (`adminService.admins`). */
+export type CompanyDetail = Company;
 
 export type CompanyList = Page<Company>;
 
@@ -190,6 +193,8 @@ export interface DeviceSession {
   current: boolean;
 }
 
+export type DeviceSessionList = Page<DeviceSession>;
+
 export interface Employee {
   id: number;
   user_id: number;
@@ -213,7 +218,6 @@ export interface Employee {
   latest_enrollment_id: number | null;
   has_face: boolean;
   face_samples: number;
-  has_active_qr: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -279,15 +283,35 @@ export interface FaceEnrollmentDetail extends FaceEnrollment {
 
 export type FaceEnrollmentList = Page<FaceEnrollment>;
 
-export interface EmployeeQr {
+/**
+ * QR DINÁMICO del empleado (lo genera en su teléfono): vive `lifetime_seconds` y sirve una sola vez.
+ * La imagen lleva el token; no se descarga ni se imprime.
+ */
+export interface DynamicQr {
   id: number;
-  employee_id: number;
   employee_number: string;
-  active: boolean;
   created_at: string;
-  expires_at: string | null;
+  expires_at: string;
+  lifetime_seconds: number;
   image_base64: string;
-  file_name: string;
+}
+
+/** Estado de un QR emitido: vigente, ya usado, vencido o reemplazado/invalidado. */
+export type QrState = 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
+
+export interface QrStatus {
+  id: number;
+  status: QrState;
+  expires_at: string | null;
+  used_at: string | null;
+}
+
+/** Para la empresa: solo la actividad del QR dinámico del empleado (no lo ve ni lo descarga). */
+export interface EmployeeQrSummary {
+  live: boolean;
+  live_until: string | null;
+  last_issued_at: string | null;
+  last_used_at: string | null;
 }
 
 /** QR_FACE: doble factor del validador (el QR dice quién es y el rostro lo confirma). */
@@ -369,6 +393,8 @@ export interface VerificationPolicy {
   lockout_minutes: number;
   /** Cada dispositivo de un validador lo autoriza la empresa antes de operar. */
   validator_device_approval: boolean;
+  /** Segundos que vive cada QR dinámico del empleado antes de renovarse solo. */
+  qr_lifetime_seconds: number;
   /** Nombres de cámaras virtuales que no se aceptan (la app avisa antes de capturar). */
   blocked_cameras: string[];
   updated_at: string | null;
@@ -480,6 +506,8 @@ export interface CheckpointEvent {
   employee_name: string | null;
   employee_number: string | null;
 }
+
+export type CheckpointEventList = Page<CheckpointEvent>;
 
 // ---------- Catálogos de la BD (GET /api/catalogs) ----------
 

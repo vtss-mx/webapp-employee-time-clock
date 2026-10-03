@@ -9,6 +9,7 @@ import { KpiCard, KpiValue, type Kpi } from '../../components/ui/KpiCard';
 import { usePendingEnrollments } from '../../hooks/usePendingEnrollments';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
+import { businessHour } from '../../utils/format';
 
 interface Stats {
   total: number;
@@ -17,7 +18,7 @@ interface Stats {
 }
 
 function greeting() {
-  const h = new Date().getHours();
+  const h = businessHour();
   return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
 

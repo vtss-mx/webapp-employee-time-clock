@@ -4,11 +4,14 @@ import { LiveFaceFlow } from '../../components/LiveFaceFlow';
 import { QrScanPanel } from '../../components/QrScanPanel';
 import { VerificationAttempt, type VerificationOutcome } from '../../components/VerificationAttempt';
 import { ValidatorModeBadge, availableMethods } from '../../components/ValidatorModes';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { PagedItems } from '../../components/ui/PagedItems';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useErrorPopup } from '../../hooks/useFeedback';
+import { usePagedList, type PagedList } from '../../hooks/usePagedList';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { errorMessage } from '../../services/apiClient';
 import { checkpointService } from '../../services/checkpointService';
@@ -64,9 +67,9 @@ function QrThenFace({ finish, onCancel }: { finish: Finish; onCancel: () => void
   return (
     <QrScanPanel
       title="Paso 1 de 2 · Código QR"
-      description="Escanea el código QR de la credencial del empleado. Después se confirmará su rostro."
+      description="Escanea el código QR que el empleado muestra en su teléfono. Después se confirmará su rostro."
       busyMessage="QR detectado. Buscando al empleado..."
-      invalidMessage="QR inválido. Usa la credencial generada por la empresa"
+      invalidMessage="QR inválido. Pide al empleado que muestre su código desde la app"
       onScan={async (content) => {
         try {
           setHolder({ qr: content, employee: await checkpointService.inspectQr(content) });
@@ -112,9 +115,9 @@ function CheckpointSession({ method, canUseQr, onSwitch, onExit, onOutcome }: Se
         return (
           <QrScanPanel
             title="Escanear QR"
-            description="Apunta la cámara al código QR de la credencial del empleado. La lectura es automática."
+            description="Apunta la cámara al código QR que el empleado muestra en su teléfono. La lectura es automática y cada código sirve una sola vez."
             busyMessage="QR detectado. Identificando..."
-            invalidMessage="QR inválido. Usa la credencial generada por la empresa"
+            invalidMessage="QR inválido. Pide al empleado que muestre su código desde la app"
             onScan={async (content) => {
               try {
                 finish({ result: await checkpointService.identifyQr(content), error: null });
@@ -130,33 +133,37 @@ function CheckpointSession({ method, canUseQr, onSwitch, onExit, onOutcome }: Se
   );
 }
 
-function RecentList({ events }: { events: CheckpointEvent[] | null }) {
+/** Identificaciones de este dispositivo (paginadas): quién, cómo y cuándo. */
+function RecentList({ list }: { list: PagedList<CheckpointEvent> }) {
   const { nameOf } = useCatalogs();
-  if (!events) return <p className="muted small">Cargando...</p>;
-  if (events.length === 0) return <p className="muted small">Aún no hay identificaciones en este dispositivo.</p>;
   return (
-    <ul className="recent-list stagger">
-      {events.map((event) => (
-        <li key={event.id} className={event.success ? 'is-ok' : 'is-failed'}>
-          {event.success ? <CheckCircle2 size={20} aria-label="Identificado" /> : <XCircle size={20} aria-label="No identificado" />}
-          <span className="recent-list__info">
-            <strong className="truncate">{event.employee_name ?? 'No identificado'}</strong>
-            <small className="muted">
-              {[
-                event.employee_number,
-                nameOf('verification_methods', event.method),
-                event.success ? null : nameOf('verification_reasons', event.reason, 'Fallida'),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </small>
-          </span>
-          <time className="muted small" dateTime={event.created_at}>
-            {timeAgo(event.created_at)}
-          </time>
-        </li>
-      ))}
-    </ul>
+    <PagedItems
+      list={list}
+      skeletonRows={3}
+      empty={{ compact: true, icon: <History />, title: 'Aún no hay identificaciones', description: 'Cada identificación hecha en este dispositivo aparecerá aquí con su resultado y su hora.' }}
+      pager={{ variant: 'compact', siblings: 0, noun: { one: 'identificación', other: 'identificaciones' } }}
+    >
+      {(events) => (
+      <ul className={`recent-list stagger ${list.loading ? 'is-loading' : ''}`}>
+        {events.map((event) => (
+          <li key={event.id} className={event.success ? 'is-ok' : 'is-failed'}>
+            {event.success ? <CheckCircle2 size={20} aria-label="Identificado" /> : <XCircle size={20} aria-label="No identificado" />}
+            <span className="recent-list__info">
+              <strong className="truncate">{event.employee_name ?? 'No identificado'}</strong>
+              <small className="muted">
+                {[event.employee_number, nameOf('verification_methods', event.method), event.success ? null : nameOf('verification_reasons', event.reason, 'Fallida')]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </small>
+            </span>
+            <time className="muted small" dateTime={event.created_at}>
+              {timeAgo(event.created_at)}
+            </time>
+          </li>
+        ))}
+      </ul>
+      )}
+    </PagedItems>
   );
 }
 
@@ -168,18 +175,14 @@ export function CheckpointPage() {
   const catalogs = useCatalogs();
   const [profile, setProfile] = useState<CheckpointProfile | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [events, setEvents] = useState<CheckpointEvent[] | null>(null);
   const [method, setMethod] = useState<VerificationMethod | null>(null);
 
   const load = useCallback(() => {
     setError(null);
     checkpointService.profile().then(setProfile).catch(setError);
   }, []);
-  const refreshRecent = useCallback(() => {
-    checkpointService.recent(config.checkpointRecentItems).then(setEvents).catch(() => undefined);
-  }, []);
+  const recent = usePagedList((page, signal) => checkpointService.recent(page, signal), { errorTitle: 'No se pudieron cargar las identificaciones recientes' });
   useEffect(load, [load]);
-  useEffect(refreshRecent, [refreshRecent]);
   useErrorPopup(error, { title: 'No se pudo cargar el punto de control', retry: load });
 
   if (!profile) return error ? <RetryState onRetry={load} /> : <SkeletonCard lines={5} />;
@@ -192,7 +195,7 @@ export function CheckpointPage() {
         canUseQr={methods.includes('QR')}
         onSwitch={setMethod}
         onExit={() => setMethod(null)}
-        onOutcome={refreshRecent}
+        onOutcome={recent.retry}
       />
     );
   }
@@ -207,16 +210,11 @@ export function CheckpointPage() {
 
         <PanelSection>
           {methods.length === 0 ? (
-            <div className="empty">
-              <span className="icon-tile icon-tile--lg">
-                <CircleSlash size={30} />
-              </span>
-              <h2>Identificación con QR desactivada</h2>
-              <p className="muted">
-                Este validador usa el modo “{catalogs.nameOf('validator_modes', profile.mode)}”, pero tu empresa desactivó la verificación con QR.
-                Pide a un administrador que la active o que cambie el modo del validador.
-              </p>
-            </div>
+            <EmptyState
+              icon={<CircleSlash />}
+              title="Identificación con QR desactivada"
+              description={`Este validador usa el modo «${catalogs.nameOf('validator_modes', profile.mode)}», pero tu empresa desactivó la verificación con QR. Pide a un administrador que la active o que cambie el modo del validador.`}
+            />
           ) : (
             <div className="method-grid stagger">
               {methods.map((key) => {
@@ -240,7 +238,7 @@ export function CheckpointPage() {
         </PanelSection>
 
         <PanelSection title="Últimas identificaciones" icon={<History size={20} />}>
-          <RecentList events={events} />
+          <RecentList list={recent} />
         </PanelSection>
         <PanelFooter align="center">
           <p className="inline-note small muted">

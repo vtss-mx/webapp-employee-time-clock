@@ -1,11 +1,11 @@
-import type { CheckpointEmployee, CheckpointEvent, CheckpointProfile, VerificationResult } from '../types';
-import { hasKeys, isArrayOf } from '../utils/guards';
+import type { CheckpointEmployee, CheckpointEventList, CheckpointProfile, PageQuery, VerificationResult } from '../types';
+import { hasKeys, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
 import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 
 const isProfile = hasKeys<CheckpointProfile>('id', 'name', 'mode', 'company');
 const isHolder = hasKeys<CheckpointEmployee>('employee_id', 'name', 'employee_number');
-const isEvents = isArrayOf<CheckpointEvent[]>(hasKeys('id', 'created_at', 'success', 'method'));
+const isEvents = isPage<CheckpointEventList>(hasKeys('id', 'created_at', 'success', 'method'));
 const isResult = hasKeys<VerificationResult>('verified', 'method', 'message');
 
 /** Punto de control (rol VALIDATOR): identifica a los empleados de su empresa. */
@@ -14,8 +14,9 @@ export const checkpointService = {
     return apiRequest<CheckpointProfile>('/checkpoint/me', { signal, validate: isProfile });
   },
 
-  recent(limit = 8, signal?: AbortSignal): Promise<CheckpointEvent[]> {
-    return apiRequest<CheckpointEvent[]>('/checkpoint/recent', { query: { limit }, signal, validate: isEvents });
+  /** Identificaciones de este validador, paginadas (la más reciente primero). */
+  recent(query: PageQuery, signal?: AbortSignal): Promise<CheckpointEventList> {
+    return apiRequest<CheckpointEventList>('/checkpoint/recent', { query: { ...query }, signal, validate: isEvents });
   },
 
   identifyQr(qrContent: string): Promise<VerificationResult> {

@@ -81,6 +81,7 @@ describe('ValidatorDevicesPage (COMPANY)', () => {
   it('sin dispositivos lo explica', async () => {
     server([]);
     renderPage();
-    expect(await screen.findByText('Sin dispositivos todavía')).toBeInTheDocument();
+    expect(await screen.findByText('No hay dispositivos registrados')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });
 });

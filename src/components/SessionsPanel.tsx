@@ -1,46 +1,30 @@
 import { Laptop, LogOut, MonitorSmartphone, ShieldAlert, Smartphone } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useErrorPopup, useFeedback } from '../hooks/useFeedback';
-import { RetryState } from './ui/RetryState';
+import { useFeedback } from '../hooks/useFeedback';
+import { usePagedList } from '../hooks/usePagedList';
 import { authService } from '../services/authService';
-import type { DeviceSession } from '../types';
 import { formatDateTime, timeAgo } from '../utils/format';
 import { describeDevice } from '../utils/userAgent';
 import { ConfirmDialog } from './Modal';
-import { SkeletonRows } from './ui/Skeleton';
 import { Button } from './ui/Button';
+import { PagedItems } from './ui/PagedItems';
 import { PanelSection } from './ui/Panel';
 
 /** Sección "Sesiones activas" (dispositivos) con revocación individual o total. */
 export function SessionsPanel() {
   const { logoutEverywhere } = useAuth();
   const feedback = useFeedback();
-  const [sessions, setSessions] = useState<DeviceSession[] | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  const list = usePagedList((page, signal) => authService.sessions(page, signal), { errorTitle: 'No se pudieron cargar tus sesiones' });
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setSessions(await authService.sessions());
-      setError(null);
-    } catch (e) {
-      setError(e);
-    }
-  }, []);
-  useErrorPopup(error, { title: 'No se pudieron cargar tus sesiones', retry: () => void load() });
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const revoke = async (id: string) => {
     setBusy(id);
     try {
       await authService.revokeSession(id);
       void feedback.success('Sesión cerrada', 'Ese dispositivo deberá iniciar sesión de nuevo.');
-      await load();
+      list.retry();
     } catch (e) {
       void feedback.fromError(e, { title: 'No se pudo cerrar la sesión' });
     } finally {
@@ -63,12 +47,16 @@ export function SessionsPanel() {
     <PanelSection
       title="Sesiones activas"
       icon={<MonitorSmartphone size={20} />}
-      aside={sessions && <span className="badge badge--info">{sessions.length}</span>}
+      aside={list.data && <span className="badge badge--info">{list.total}</span>}
     >
-      {Boolean(error) && !sessions && <RetryState onRetry={() => void load()} />}
-      {!sessions && !error && <SkeletonRows rows={2} />}
-      {sessions && (
-        <ul className="session-list">
+      <PagedItems
+        list={list}
+        skeletonRows={2}
+        empty={{ compact: true, icon: <MonitorSmartphone />, title: 'No hay sesiones abiertas', description: 'Cada dispositivo en que inicies sesión aparecerá aquí para que puedas cerrarlo.' }}
+        pager={{ variant: 'compact', siblings: 0, noun: { one: 'sesión', other: 'sesiones' } }}
+      >
+        {(sessions) => (
+        <ul className={`session-list ${list.loading ? 'is-loading' : ''}`}>
           {sessions.map((s) => {
             const device = describeDevice(s.user_agent);
             const Icon = device.mobile ? Smartphone : Laptop;
@@ -93,7 +81,8 @@ export function SessionsPanel() {
             );
           })}
         </ul>
-      )}
+        )}
+      </PagedItems>
       <p className="inline-note small muted">
         <ShieldAlert size={16} /> ¿No reconoces un dispositivo? Ciérralo y cambia tu contraseña.
       </p>

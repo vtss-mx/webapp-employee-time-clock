@@ -1,4 +1,5 @@
 import { config } from './config';
+import { businessDate } from './format';
 
 export type FieldErrors<T> = Partial<Record<keyof T, string>>;
 
@@ -45,7 +46,7 @@ export function validateBirthDate(value: string): string | undefined {
   if (!value) return 'La fecha de nacimiento es obligatoria';
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return 'Fecha inválida';
-  const today = new Date();
+  const today = businessDate();
   if (date >= today) return 'Debe ser anterior a hoy';
   let age = today.getFullYear() - date.getFullYear();
   const m = today.getMonth() - date.getMonth();
@@ -181,8 +182,8 @@ export function validateMaxEmployees(value: string): string | undefined {
   return Number.isInteger(n) && n >= 1 && n <= 1_000_000 ? undefined : 'Escribe un número entero mayor a 0';
 }
 
-/** Fecha máxima (YYYY-MM-DD, hora LOCAL) para el selector: edad mínima cumplida hoy. */
-export function maxBirthDate(today: Date = new Date()): string {
+/** Fecha máxima (YYYY-MM-DD) para el selector: edad mínima cumplida hoy (en la zona del negocio). */
+export function maxBirthDate(today: Date = businessDate()): string {
   const d = new Date(today);
   d.setFullYear(d.getFullYear() - MIN_EMPLOYEE_AGE);
   // No usar toISOString(): en UTC puede ser ya "mañana" y el validador rechazaría la fecha.

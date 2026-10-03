@@ -1,17 +1,69 @@
-const dateFormatter = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' });
-const dateTimeFormatter = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+/**
+ * Zona horaria del NEGOCIO: hora del Centro de México. La envía el backend (`user.timezone`) y se
+ * aplica con `setBusinessTimeZone`; todas las fechas y horas se muestran y "hoy" se calcula en
+ * ella, no en la del dispositivo (un teléfono en Hermosillo ve la misma hora que la empresa).
+ */
+export const DEFAULT_TIME_ZONE = 'America/Mexico_City';
+
+function formattersFor(timeZone: string) {
+  return {
+    timeZone,
+    date: new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeZone }),
+    dateTime: new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone }),
+    // Año-mes-día y hora del momento en la zona del negocio (en-CA da YYYY-MM-DD).
+    day: new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }),
+    hour: new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone }),
+  };
+}
+
+let zone = formattersFor(DEFAULT_TIME_ZONE);
+// Fechas de calendario ("YYYY-MM-DD", p. ej. nacimiento): no son un instante, no cambian con la zona.
+const calendarFormatter = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeZone: 'UTC' });
+
+/** Usa la zona horaria del negocio que envía el backend (una desconocida se ignora). */
+export function setBusinessTimeZone(timeZone: string | null | undefined): void {
+  if (!timeZone || timeZone === zone.timeZone) return;
+  try {
+    zone = formattersFor(timeZone);
+  } catch {
+    // Zona que el navegador no conoce: se conserva la del Centro.
+  }
+}
+
+export function businessTimeZone(): string {
+  return zone.timeZone;
+}
+
+/** Hoy (YYYY-MM-DD) en la zona del negocio. */
+export function businessToday(now: Date = new Date()): string {
+  return zone.day.format(now);
+}
+
+/** Hoy en la zona del negocio como fecha local (para calcular con getFullYear/getMonth/getDate). */
+export function businessDate(now: Date = new Date()): Date {
+  const [year, month, day] = businessToday(now).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/** Hora (0-23) en la zona del negocio. */
+export function businessHour(now: Date = new Date()): number {
+  return Number(zone.hour.format(now));
+}
 
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
-  // Las fechas "YYYY-MM-DD" se interpretan en hora local para evitar desfase de un día.
-  const date = value.length === 10 ? new Date(`${value}T00:00:00`) : new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+  if (value.length === 10) {
+    const day = new Date(`${value}T00:00:00Z`);
+    return Number.isNaN(day.getTime()) ? value : calendarFormatter.format(day);
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : zone.date.format(date);
 }
 
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date);
+  return Number.isNaN(date.getTime()) ? value : zone.dateTime.format(date);
 }
 
 export function formatPercent(value: number | null | undefined): string {
@@ -38,9 +90,10 @@ export function initials(name: string): string {
     .join('');
 }
 
+/** Edad cumplida hoy (en la zona del negocio). */
 export function ageFrom(birthDate: string): number {
   const d = new Date(`${birthDate}T00:00:00`);
-  const t = new Date();
+  const t = businessDate();
   let age = t.getFullYear() - d.getFullYear();
   if (t.getMonth() < d.getMonth() || (t.getMonth() === d.getMonth() && t.getDate() < d.getDate())) age--;
   return age;

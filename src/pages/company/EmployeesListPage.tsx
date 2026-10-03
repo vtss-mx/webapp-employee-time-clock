@@ -1,9 +1,9 @@
-import { UserPlus, Users } from 'lucide-react';
+import { SearchX, UserPlus, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { useSearchList } from '../../hooks/useSearchList';
 import { ListToolbar } from '../../components/ui/ListControls';
-import { Badge, FaceStatusBadge, StatusBadge } from '../../components/StatusBadge';
+import { FaceStatusBadge, StatusBadge } from '../../components/StatusBadge';
 import { ButtonLink } from '../../components/ui/Button';
 import { ListResults } from '../../components/ui/ListResults';
 import { paths } from '../../routes/paths';
@@ -43,17 +43,22 @@ export function EmployeesListPage() {
           <ListResults
             list={list}
             pager={{ noun: { one: 'empleado', other: 'empleados' } }}
-            columns={['Empleado', 'Correo', 'Registro facial', 'QR', 'Estado']}
+            columns={['Empleado', 'Correo', 'Registro facial', 'Estado']}
             onOpen={(emp) => open(emp.id)}
-            empty={{
-              icon: <Users size={30} />,
-              title: 'No se encontraron empleados',
-              action: !list.filtered && (
-                <ButtonLink to={paths.company.newEmployee} variant="primary" icon={<UserPlus size={18} />}>
-                  Registrar el primero
-                </ButtonLink>
-              ),
-            }}
+            empty={
+              list.filtered
+                ? { icon: <SearchX />, title: 'Ningún empleado coincide con la búsqueda', description: 'Prueba con otro nombre, número de empleado, RFC o correo, o cambia el filtro de estado.' }
+                : {
+                    icon: <Users />,
+                    title: 'No hay empleados registrados',
+                    description: 'Registra a tu personal para que pueda identificarse con su rostro o su código QR.',
+                    action: (
+                      <ButtonLink to={paths.company.newEmployee} variant="primary" icon={<UserPlus size={18} />}>
+                        Registrar el primero
+                      </ButtonLink>
+                    ),
+                  }
+            }
             renderCells={(emp) => (
               <>
                 <td className="table__primary">
@@ -65,14 +70,11 @@ export function EmployeesListPage() {
                     </span>
                   </span>
                 </td>
-                <td data-label="Correo" className="truncate" style={{ maxWidth: 260 }}>
-                  {emp.email}
+                <td data-label="Correo" className="table__wide">
+                  <span className="truncate">{emp.email}</span>
                 </td>
                 <td data-label="Registro facial">
                   <FaceStatusBadge status={emp.face_status} />
-                </td>
-                <td data-label="QR">
-                  <Badge ok={emp.has_active_qr} yes="Activo" no="Sin QR" />
                 </td>
                 <td data-label="Estado">
                   <StatusBadge active={emp.active} />

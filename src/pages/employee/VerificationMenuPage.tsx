@@ -33,29 +33,18 @@ export function VerificationMenuPage() {
             </Link>
 
             {policy.qr_enabled && (
-              <Link to={paths.employee.verifyQr} className="method-card">
+              <Link to={paths.employee.myQr} className="method-card">
                 <span className="method-card__icon">
                   <QrCode size={42} />
                 </span>
-                <span className="method-card__title">VERIFICAR CON QR</span>
-                <span className="method-card__desc">Escanea el código QR de tu credencial</span>
+                <span className="method-card__title">MOSTRAR MI QR</span>
+                <span className="method-card__desc">Muéstralo al validador: cambia cada {policy.qr_lifetime_seconds} s y sirve una sola vez</span>
                 <span className="method-card__cta">
-                  Comenzar <ArrowRight size={18} />
+                  Mostrar <ArrowRight size={18} />
                 </span>
               </Link>
             )}
           </div>
-
-          {policy.qr_enabled && (
-            <Link to={paths.employee.myQr} className="my-qr-link">
-              <QrCode size={20} />
-              <span>
-                <strong>Mi código QR</strong>
-                <span className="muted small">Tu credencial digital de identidad</span>
-              </span>
-              <ArrowRight size={18} />
-            </Link>
-          )}
         </PanelSection>
         <PanelFooter align="center">
           <p className="inline-note small muted">

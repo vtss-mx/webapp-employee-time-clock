@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { useFeedback } from '../hooks/useFeedback';
+import { samplePolicy } from '../test/fixtures';
 import { apiFail, apiOk, mockFetch } from '../test/http';
 import { catalogsFixture, catalogsWith } from '../test/catalogs';
 import { renderWithProviders, WithCatalogs } from '../test/render';
@@ -23,7 +24,7 @@ import { PageHeader } from './PageHeader';
 import { QrCodePanel } from './QrCodePanel';
 import { describeDevice } from '../utils/userAgent';
 import { PageLoader } from './Spinner';
-import { Badge, EnrollmentBadge, FaceStatusBadge, StatusBadge } from './StatusBadge';
+import { EnrollmentBadge, FaceStatusBadge, StatusBadge } from './StatusBadge';
 import { Button } from './ui/Button';
 import { SkeletonCard, SkeletonRows } from './ui/Skeleton';
 import { StatusMark } from './ui/StatusMark';
@@ -83,8 +84,6 @@ describe('componentes de presentación', () => {
         <FaceStatusBadge status="APPROVED" />
         <EnrollmentBadge status="REJECTED" />
         <EnrollmentBadge status={'ARCHIVED' as 'PENDING'} />
-        <Badge ok yes="Con QR" no="Sin QR" />
-        <Badge ok={false} yes="Con rostro" no="Sin rostro" />
       </>,
       { wrapper: WithCatalogs },
     );
@@ -92,8 +91,6 @@ describe('componentes de presentación', () => {
     expect(screen.getByText('Validado')).toHaveClass('badge--success');
     expect(screen.getByText('Rechazado')).toHaveClass('badge--danger');
     expect(screen.getByText('ARCHIVED')).toHaveClass('badge--muted'); // código sin registro en el catálogo
-    expect(screen.getByText('Con QR')).toHaveClass('badge--info');
-    expect(screen.getByText('Sin rostro')).toHaveClass('badge--warning');
   });
 
   it('accesorios: ícono y regla de la política por código del catálogo', () => {
@@ -267,30 +264,36 @@ describe('sesiones', () => {
   });
 });
 
-describe('QrCodePanel', () => {
-  const qr = { id: 1, employee_id: 5, employee_number: 'EMP-5', active: true, created_at: '2026-01-01T00:00:00Z', expires_at: null, image_base64: 'data:image/png;base64,AAA', file_name: 'qr.png' };
+describe('QrCodePanel (QR dinámico)', () => {
+  const live = { live: true, live_until: '2026-10-03T12:00:30Z', last_issued_at: '2026-10-03T12:00:00Z', last_used_at: null };
 
-  it('muestra, descarga y regenera el QR', async () => {
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    const onChanged = vi.fn();
-    mockFetch((call) => (call.url.endsWith('/regenerate') ? apiOk({ ...qr, id: 2 }) : apiOk(qr)));
-    renderWithProviders(<QrCodePanel employeeId={5} employeeName="Ana" hasActiveQr onChanged={onChanged} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Ver QR' }));
-    expect(await screen.findByAltText(/EMP-5/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Descargar' }));
-    expect(click).toHaveBeenCalled();
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'QR descargado' })).getByRole('button', { name: 'Entendido' }));
-    await userEvent.click(within(screen.getByRole('dialog')).getByLabelText('Cerrar'));
-    await userEvent.click(screen.getByRole('button', { name: 'Regenerar QR' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Regenerar' }));
-    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  it('muestra la actividad e invalida el código vigente con confirmación', async () => {
+    const { calls } = mockFetch((call) =>
+      call.init.method === 'DELETE' ? apiOk({ ...live, live: false, live_until: null }) : call.url.includes('/settings/') ? apiOk(samplePolicy) : apiOk(live),
+    );
+    renderWithProviders(<QrCodePanel employeeId={5} />);
+    expect(await screen.findByText('En pantalla')).toBeInTheDocument();
+    expect(screen.getByText('Nunca')).toBeInTheDocument(); // aún no lo usa
+    await userEvent.click(screen.getByRole('button', { name: 'Invalidar código vigente' }));
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Invalidar' }));
+    expect(await screen.findByText('Código invalidado')).toBeInTheDocument();
+    expect(calls.find((c) => c.init.method === 'DELETE')?.url).toBe('/api/employees/5/qr');
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Código invalidado' })).getByRole('button', { name: 'Entendido' }));
+    expect(screen.getByText('Sin código vigente')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Invalidar código vigente' })).toBeDisabled();
   });
 
-  it('informa errores del servidor', async () => {
-    mockFetch(apiFail(404, 'QR_NOT_FOUND', 'Sin QR'));
-    renderWithProviders(<QrCodePanel employeeId={5} employeeName="Ana" hasActiveQr onChanged={vi.fn()} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Descargar QR' }));
-    expect(await screen.findByText('Sin QR')).toBeInTheDocument();
+  it('si falla la carga ofrece reintentar', async () => {
+    let failed = false;
+    mockFetch((call) => {
+      if (call.url.includes('/settings/')) return apiOk(samplePolicy);
+      if (failed) return apiOk({ ...live, last_used_at: '2026-10-03T12:00:10Z' });
+      failed = true;
+      return apiFail(500, 'INTERNAL', 'Falla');
+    });
+    renderWithProviders(<QrCodePanel employeeId={5} />);
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('En pantalla')).toBeInTheDocument();
   });
 });
 

@@ -110,7 +110,7 @@ const POLICY_SECTIONS: Section[] = [
     title: 'Métodos de identificación',
     icon: <QrCode size={20} />,
     hint: 'Formas en que los empleados pueden identificarse.',
-    options: [{ key: 'qr_enabled', icon: <QrCode size={20} />, label: 'Verificación con código QR', on: 'Los empleados pueden identificarse con su QR personal.', off: 'Solo reconocimiento facial.' }],
+    options: [{ key: 'qr_enabled', icon: <QrCode size={20} />, label: 'Verificación con código QR', on: 'Los empleados muestran en su teléfono un QR dinámico: cambia solo y cada código sirve una sola vez.', off: 'Solo reconocimiento facial.' }],
   },
   {
     title: 'Dispositivos permitidos',

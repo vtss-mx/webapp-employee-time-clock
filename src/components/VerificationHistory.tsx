@@ -1,11 +1,9 @@
-import { ScanFace, ShieldCheck } from 'lucide-react';
+import { History, ScanFace, ShieldCheck } from 'lucide-react';
 import { useCatalogs } from '../hooks/useCatalogs';
 import { usePagedList } from '../hooks/usePagedList';
 import { employeeService } from '../services/employeeService';
 import { formatConfidence, formatDateTime } from '../utils/format';
-import { ListPaginator } from './ui/Paginator';
-import { RetryState } from './ui/RetryState';
-import { SkeletonRows } from './ui/Skeleton';
+import { PagedItems } from './ui/PagedItems';
 
 /**
  * Bitácora de verificaciones de un empleado, paginada (la más reciente primero): método y motivo
@@ -17,12 +15,14 @@ export function VerificationHistory({ employeeId }: { employeeId: number }) {
     errorTitle: 'No se pudo cargar la bitácora',
     filterKey: String(employeeId),
   });
-  const items = list.data?.items;
-
-  if (!items) return list.error ? <RetryState onRetry={list.retry} /> : <SkeletonRows rows={3} />;
-  if (items.length === 0) return <p className="muted">Sin registros todavía.</p>;
   return (
-    <>
+    <PagedItems
+      list={list}
+      skeletonRows={3}
+      empty={{ compact: true, icon: <History />, title: 'No hay verificaciones registradas', description: 'Cada intento de identificación de este empleado quedará registrado aquí.' }}
+      pager={{ variant: 'compact', siblings: 0, noun: { one: 'intento', other: 'intentos' } }}
+    >
+      {(items) => (
       <ul className={`log-list ${list.loading ? 'is-loading' : ''}`}>
         {items.map((log) => (
           <li key={log.id}>
@@ -38,7 +38,7 @@ export function VerificationHistory({ employeeId }: { employeeId: number }) {
           </li>
         ))}
       </ul>
-      <ListPaginator list={list} variant="compact" siblings={0} noun={{ one: 'intento', other: 'intentos' }} />
-    </>
+      )}
+    </PagedItems>
   );
 }

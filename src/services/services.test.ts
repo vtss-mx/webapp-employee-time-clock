@@ -12,7 +12,8 @@ import { settingsService } from './settingsService';
 import { faceService, verificationService } from './verificationService';
 
 const employee = { id: 1, employee_number: 'EMP-1', first_name: 'Ana', last_name: 'Ruiz' };
-const qr = { image_base64: 'data:', employee_number: 'EMP-1', file_name: 'qr.png' };
+const qr = { id: 1, image_base64: 'data:', employee_number: 'EMP-1', expires_at: 'x', lifetime_seconds: 30 };
+const qrSummary = { live: true, live_until: null, last_issued_at: null, last_used_at: null };
 const detail = { id: 3, status: 'PENDING', employee_id: 1 };
 const result = { verified: true, method: 'FACE', message: 'ok' };
 const policy = { block_glasses: true, block_headwear: true, block_mask: false, liveness_challenge: true, anti_spoofing: true, qr_enabled: true };
@@ -27,8 +28,8 @@ describe('servicios', () => {
     ['employees.setStatus', () => employeeService.setStatus(1, false), employee, 'PATCH', '/api/employees/1/status'],
     ['employees.remove', () => employeeService.remove(1), null, 'DELETE', '/api/employees/1'],
     ['employees.resetFace', () => employeeService.resetFace(1), employee, 'POST', '/api/employees/1/face/reset'],
-    ['employees.getQr', () => employeeService.getQr(1), qr, 'GET', '/api/employees/1/qr'],
-    ['employees.regenerateQr', () => employeeService.regenerateQr(1), qr, 'POST', '/api/employees/1/qr/regenerate'],
+    ['employees.qrSummary', () => employeeService.qrSummary(1), qrSummary, 'GET', '/api/employees/1/qr'],
+    ['employees.revokeQr', () => employeeService.revokeQr(1), qrSummary, 'DELETE', '/api/employees/1/qr'],
     ['employees.history', () => employeeService.history(1, { page: 1, size: 10 }), { items: [{ id: 1, method: 'QR', success: true }], total: 1, page: 1, size: 10 }, 'GET', '/api/employees/1/verifications?page=1&size=10'],
     ['enrollments.submit', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
     ['enrollments.list', () => enrollmentService.list('PENDING', { page: 1, size: 10 }), { items: [detail], total: 1 }, 'GET', '/api/enrollments?status=PENDING&page=1&size=10'],
@@ -36,14 +37,14 @@ describe('servicios', () => {
     ['enrollments.approve', () => enrollmentService.approve(3), detail, 'POST', '/api/enrollments/3/approve'],
     ['enrollments.reject', () => enrollmentService.reject(3, 'foto borrosa'), detail, 'POST', '/api/enrollments/3/reject'],
     ['verification.face', () => verificationService.verifyFace({ frontal: [new Blob(['a'])], challenge: { id: 'c', images: [new Blob(['t'])] } }), result, 'POST', '/api/verification/face'],
-    ['verification.qr', () => verificationService.verifyQr('TCQR1:x'), result, 'POST', '/api/verification/qr'],
     ['face.challenge', () => faceService.getChallenge(), { liveness_required: true }, 'POST', '/api/face/challenge'],
     ['face.check', () => faceService.check([new Blob(['a']), new Blob(['b'])], true), { detection_score: 0.9 }, 'POST', '/api/face/check'],
-    ['me.qr', () => meService.getMyQr(), qr, 'GET', '/api/users/me/qr'],
+    ['me.issueQr', () => meService.issueQr(), qr, 'POST', '/api/users/me/qr'],
+    ['me.qrStatus', () => meService.qrStatus(7), { id: 7, status: 'USED' }, 'GET', '/api/users/me/qr/7'],
     ['settings.get', () => settingsService.getVerificationPolicy(), policy, 'GET', '/api/settings/verification'],
     ['settings.update', () => settingsService.updateVerificationPolicy({ block_mask: false }), policy, 'PUT', '/api/settings/verification'],
     ['enrollments.submitReview', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }, true), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
-    ['auth.sessions', () => authService.sessions(), [{ id: 's', created_at: 'x', current: true }], 'GET', '/api/auth/sessions'],
+    ['auth.sessions', () => authService.sessions({ page: 1, size: 10 }), { items: [{ id: 's', created_at: 'x', current: true }], total: 1, page: 1, size: 10 }, 'GET', '/api/auth/sessions?page=1&size=10'],
     ['auth.revokeSession', () => authService.revokeSession('s/1'), null, 'DELETE', '/api/auth/sessions/s%2F1'],
     ['auth.logoutAll', () => authService.logoutAll(), { revoked: 1 }, 'POST', '/api/auth/logout-all'],
     ['auth.remembered', () => authService.remembered(), { email: 'ana@empresa.com' }, 'GET', '/api/auth/remembered'],

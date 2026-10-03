@@ -5,6 +5,7 @@ import { authService, type LoginProofs } from '../services/authService';
 import { meService } from '../services/meService';
 import type { AuthTokenResponse, Session, User, UserPreferences } from '../types';
 import { deviceProof } from '../utils/deviceKey';
+import { setBusinessTimeZone } from '../utils/format';
 import { currentLocation } from '../utils/geolocation';
 import { describeDevice } from '../utils/userAgent';
 import { preferenceStore } from '../utils/storage';
@@ -106,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       expiresAt: Date.now() + response.expires_in * 1000,
     };
     sessionRef.current = next; // disponible de inmediato para reintentar peticiones
+    setBusinessTimeZone(response.user.timezone); // antes de dibujar cualquier fecha
     setSession(next);
     setStatus('authenticated');
     setLogoutReason(null);
@@ -165,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const current = sessionRef.current;
     if (!current) return;
     const next = { ...current, user: update(current.user) };
+    setBusinessTimeZone(next.user.timezone);
     sessionRef.current = next;
     setSession(next);
   }, []);

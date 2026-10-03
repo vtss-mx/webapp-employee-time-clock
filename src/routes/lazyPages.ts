@@ -45,7 +45,6 @@ export const CompanySelectPage = page(() => import('../pages/employee/CompanySel
 export const PendingValidationPage = page(() => import('../pages/employee/PendingValidationPage'), 'PendingValidationPage');
 export const VerificationMenuPage = page(() => import('../pages/employee/VerificationMenuPage'), 'VerificationMenuPage');
 export const FaceVerificationPage = page(() => import('../pages/employee/FaceVerificationPage'), 'FaceVerificationPage');
-export const QrVerificationPage = page(() => import('../pages/employee/QrVerificationPage'), 'QrVerificationPage');
 export const MyQrPage = page(() => import('../pages/employee/MyQrPage'), 'MyQrPage');
 export const ValidatorPasswordPage = page(() => import('../pages/company/ValidatorPasswordPage'), 'ValidatorPasswordPage');
 export const ReverifyIdentityPage = page(() => import('../pages/company/ReverifyIdentityPage'), 'ReverifyIdentityPage');

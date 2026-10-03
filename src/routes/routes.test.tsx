@@ -102,10 +102,11 @@ describe('rutas (armadas con las pantallas que envía el backend)', () => {
         revoked = true;
         return apiOk(null);
       },
-      '/auth/sessions': () => apiOk(sessions()),
+      '/auth/sessions': () => apiOk({ items: sessions(), total: sessions().length, page: 1, size: 10 }),
     });
     expect(await screen.findByText('Este dispositivo')).toBeInTheDocument();
     expect(screen.getByText('Dispositivo desconocido')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Paginación' })).toHaveTextContent('Mostrando 1–2 de 2 sesiones'); // paginadas
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
     await waitFor(() => expect(screen.queryByText('Dispositivo desconocido')).toBeNull());
     await userEvent.click(screen.getByRole('button', { name: /todos los dispositivos/ }));

@@ -22,7 +22,7 @@ export function FaceVerificationPage() {
           policy={policy}
           alternative={
             policy.qr_enabled
-              ? { label: 'Identificarme con QR', icon: <QrCode size={18} />, onSelect: () => void navigate(paths.employee.verifyQr) }
+              ? { label: 'Mostrar mi código QR', icon: <QrCode size={18} />, onSelect: () => void navigate(paths.employee.myQr) }
               : undefined
           }
           onSubmit={async (captured) => {

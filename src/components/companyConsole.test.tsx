@@ -11,7 +11,7 @@ import { checkAvailability } from '../services/availabilityService';
 import { ApiError } from '../services/apiClient';
 import { apiOk, liveCheck, mockFetch } from '../test/http';
 import { WithCatalogs, renderWithProviders } from '../test/render';
-import type { CompanyDetail, CompanyFormValues, Page } from '../types';
+import type { CompanyAdmin, CompanyDetail, CompanyFormValues, Page } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
 import { validateCompanyRfc, validateMaxEmployees } from '../utils/validation';
 import { CompanyDetailPage } from '../pages/admin/CompanyDetailPage';
@@ -22,6 +22,7 @@ import { ListToolbar } from './ui/ListControls';
 import { ListResults } from './ui/ListResults';
 
 const wrapper = ({ children }: { children: ReactNode }) => <FeedbackProvider>{children}</FeedbackProvider>;
+const admin: CompanyAdmin = { id: 9, email: 'admin@pan.com', active: true, last_login_at: null, created_at: '2026-01-01T00:00:00Z' };
 const company: CompanyDetail = {
   id: 4,
   name: 'Panificadora',
@@ -34,7 +35,6 @@ const company: CompanyDetail = {
   admin_count: 1,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
-  admins: [{ id: 9, email: 'admin@pan.com', active: true, last_login_at: null, created_at: '2026-01-01T00:00:00Z' }],
 };
 const validCompany: CompanyFormValues = {
   name: 'Panificadora',
@@ -55,6 +55,8 @@ describe('adminService', () => {
     ['get', () => adminService.get(4), company, 'GET', '/api/admin/companies/4'],
     ['setStatus', () => adminService.setStatus(4, false), company, 'PATCH', '/api/admin/companies/4/status'],
     ['setAdminStatus', () => adminService.setAdminStatus(4, 9, true), company, 'PATCH', '/api/admin/companies/4/admins/9/status'],
+    ['admins', () => adminService.admins(4, { page: 2, size: 10 }), { items: [admin], total: 11, page: 2, size: 10 }, 'GET', '/api/admin/companies/4/admins?page=2&size=10'],
+    ['admin', () => adminService.admin(4, 9), admin, 'GET', '/api/admin/companies/4/admins/9'],
     ['validación en vivo (respaldo HTTP del canal)', () => checkAvailability('company_rfc', 'PNO120315AB1', 4), { field: 'company_rfc', valid: true, available: true, code: 'AVAILABLE', message: 'ok' }, 'GET', '/api/validation?field=company_rfc&value=PNO120315AB1&exclude_id=4'],
   ])('%s', async (_name, call, data, method, url) => {
     const { calls } = mockFetch(apiOk(data));
@@ -241,8 +243,12 @@ describe('useSearchList + ListControls', () => {
 });
 
 describe('CompanyDetailPage: eliminar empresa', () => {
-  const renderDetail = (detail: CompanyDetail) => {
-    const mock = mockFetch((call) => (call.init.method === 'DELETE' ? apiOk(null) : apiOk(detail)));
+  const renderDetail = (detail: CompanyDetail, admins: CompanyAdmin[] = [admin]) => {
+    const mock = mockFetch((call) => {
+      if (call.init.method === 'DELETE') return apiOk(null);
+      if (call.url.includes('/admins?')) return apiOk({ items: admins, total: admins.length, page: 1, size: 10 });
+      return apiOk(detail);
+    });
     renderWithProviders(
       <Routes>
         <Route path="/admin/companies/:id" element={<CompanyDetailPage />} />
@@ -270,5 +276,31 @@ describe('CompanyDetailPage: eliminar empresa', () => {
     await userEvent.click(confirm);
     expect(await screen.findByText('Listado de empresas')).toBeInTheDocument();
     expect(calls.find((c) => c.init.method === 'DELETE')?.url).toBe('/api/admin/companies/4');
+  });
+
+  it('administradores paginados: desactivar pide confirmación y vuelve a cargar la página', async () => {
+    const calls = renderDetail(company);
+    expect(await screen.findByText('admin@pan.com')).toBeInTheDocument();
+    expect(screen.getByText('Aún no inicia sesión')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByText('admin@pan.com').closest('li')!).getByRole('button', { name: 'Desactivar' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Desactivar administrador' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }));
+    expect(await screen.findByText('Administrador desactivado')).toBeInTheDocument();
+    expect(calls.find((c) => c.init.method === 'PATCH')?.url).toBe('/api/admin/companies/4/admins/9/status');
+    await waitFor(() => expect(calls.filter((c) => c.url.includes('/admins?'))).toHaveLength(2));
+  });
+
+  it('activar un administrador inactivo no pide confirmación', async () => {
+    const calls = renderDetail(company, [{ ...admin, active: false, last_login_at: '2026-02-01T10:00:00Z' }]);
+    expect(await screen.findByText(/Último acceso/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Activar' }));
+    expect(await screen.findByText('Administrador activado')).toBeInTheDocument();
+    expect(JSON.parse(calls.find((c) => c.init.method === 'PATCH')?.init.body as string)).toEqual({ active: true });
+  });
+
+  it('sin administradores: estado vacío y sin paginador', async () => {
+    renderDetail(company, []);
+    expect(await screen.findByText('No hay administradores registrados')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });
 });

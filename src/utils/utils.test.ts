@@ -2,7 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { downloadUrl } from './download';
 import { haptic } from './haptics';
 import { envBoolean, envNumber, envNumberList, envString } from './env';
-import { ageFrom, formatConfidence, formatDate, formatDateTime, formatPercent, initials, timeAgo } from './format';
+import {
+  ageFrom,
+  businessDate,
+  businessHour,
+  businessTimeZone,
+  businessToday,
+  DEFAULT_TIME_ZONE,
+  formatConfidence,
+  formatDate,
+  formatDateTime,
+  formatPercent,
+  initials,
+  setBusinessTimeZone,
+  timeAgo,
+} from './format';
 import { hasKeys, isArrayOf, isNothing, isPage, isRecord } from './guards';
 import { preferenceStore, tabStore } from './storage';
 import {
@@ -89,6 +103,21 @@ describe('format', () => {
     expect(formatPercent(null)).toBe('—');
     expect(initials('juan perez')).toBe('JP');
     expect(initials('admin@empresa.com')).toBe('AE');
+  });
+  it('fechas y horas en la zona del negocio (hora del Centro), no en la del dispositivo', () => {
+    const instant = '2026-10-03T05:30:00Z'; // 23:30 del 2 de octubre en el Centro (UTC−6)
+    expect(businessTimeZone()).toBe(DEFAULT_TIME_ZONE);
+    expect(businessToday(new Date(instant))).toBe('2026-10-02');
+    expect(businessHour(new Date(instant))).toBe(23);
+    expect(formatDateTime(instant)).toMatch(/2 oct 2026/);
+    expect(formatDate('2026-03-15')).toMatch(/15 mar 2026/); // fecha de calendario: no se desplaza
+    setBusinessTimeZone('Asia/Tokyo');
+    expect(businessToday(new Date(instant))).toBe('2026-10-03');
+    setBusinessTimeZone('Zona/Inexistente'); // se ignora
+    expect(businessTimeZone()).toBe('Asia/Tokyo');
+    setBusinessTimeZone(null);
+    setBusinessTimeZone(DEFAULT_TIME_ZONE);
+    expect(businessDate(new Date(instant)).getDate()).toBe(2);
   });
   it('calcula edad y tiempo relativo', () => {
     const year = new Date().getFullYear();

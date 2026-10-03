@@ -1,4 +1,4 @@
-import { Building2, Plus } from 'lucide-react';
+import { Building2, Plus, SearchX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ButtonLink } from '../../components/ui/Button';
@@ -47,15 +47,20 @@ export function CompaniesListPage() {
             pager={{ noun: { one: 'empresa', other: 'empresas' } }}
             columns={['Empresa', 'Empleados', 'Administradores', 'Alta', 'Estado']}
             onOpen={(c) => open(c.id)}
-            empty={{
-              icon: <Building2 size={30} />,
-              title: 'No se encontraron empresas',
-              action: !list.filtered && (
-                <ButtonLink to={paths.admin.newCompany} variant="primary" icon={<Plus size={18} />}>
-                  Registrar la primera
-                </ButtonLink>
-              ),
-            }}
+            empty={
+              list.filtered
+                ? { icon: <SearchX />, title: 'Ninguna empresa coincide con la búsqueda', description: 'Prueba con otro nombre, razón social o RFC, o cambia el filtro de estado.' }
+                : {
+                    icon: <Building2 />,
+                    title: 'No hay empresas registradas',
+                    description: 'Da de alta la primera empresa con su administrador para que empiece a registrar a su personal.',
+                    action: (
+                      <ButtonLink to={paths.admin.newCompany} variant="primary" icon={<Plus size={18} />}>
+                        Registrar la primera
+                      </ButtonLink>
+                    ),
+                  }
+            }
             renderCells={(c) => (
               <>
                 <td className="table__primary">

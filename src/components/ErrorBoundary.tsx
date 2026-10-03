@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
   override render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className={this.props.inline ? 'empty' : 'center-page'} role="alert">
+      <div className={this.props.inline ? 'error-inline' : 'center-page'} role="alert">
         <span className="icon-tile icon-tile--lg icon-tile--danger">
           <AlertOctagon size={32} />
         </span>

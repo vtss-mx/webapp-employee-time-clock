@@ -35,7 +35,6 @@ const company: CompanyDetail = {
   admin_count: 1,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
-  admins: [{ id: 9, email: 'admin@pan.com', active: true, last_login_at: null, created_at: '2026-01-01T00:00:00Z' }],
 };
 const employee = { id: 7, employee_number: 'EMP-7', first_name: 'Ana', last_name: 'Ruiz', full_name: 'Ana Ruiz', face_status: 'APPROVED' };
 
@@ -77,7 +76,8 @@ describe('administradores de empresa (pantallas)', () => {
   });
 
   it('restablecer: solo pide la contraseña nueva del administrador elegido', async () => {
-    const { calls } = mockFetch(apiOk(company));
+    const admin = { id: 9, email: 'admin@pan.com', active: true, last_login_at: null, created_at: '2026-01-01T00:00:00Z' };
+    const { calls } = mockFetch((call) => apiOk(call.url.endsWith('/admins/9') ? admin : company));
     renderAt('/admin/companies/:id/admins/:adminId/password', '/admin/companies/4/admins/9/password', <CompanyAdminFormPage />, '/admin/companies/:id');
     expect(await screen.findByText('admin@pan.com · Panificadora')).toBeInTheDocument();
     expect(screen.queryByLabelText('Correo del administrador')).toBeNull();

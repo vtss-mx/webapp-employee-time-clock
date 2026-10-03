@@ -5,10 +5,6 @@ export function StatusBadge({ active }: { active: boolean }) {
   return <span className={`badge ${active ? 'badge--success' : 'badge--muted'}`}>{active ? 'Activo' : 'Inactivo'}</span>;
 }
 
-export function Badge({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
-  return <span className={`badge ${ok ? 'badge--info' : 'badge--warning'}`}>{ok ? yes : no}</span>;
-}
-
 /** Clase de cada tono del catálogo. "warning" es un estado en espera: su punto late. */
 const TONE_CLASS: Record<StatusTone, string> = {
   muted: 'badge--muted',

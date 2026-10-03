@@ -1,121 +1,71 @@
-import { BadgeCheck, Download, Maximize2, QrCode, RefreshCw, ShieldCheck, Sun, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { BadgeCheck, Maximize2, QrCode, RefreshCw, ShieldCheck, Sun, Timer, X } from 'lucide-react';
+import { useState } from 'react';
+import { DynamicQrCode } from '../../components/DynamicQrCode';
 import { Modal } from '../../components/Modal';
-import { Skeleton } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { useAuth } from '../../hooks/useAuth';
-import { useFeedback } from '../../hooks/useFeedback';
-import { ApiError } from '../../services/apiClient';
-import { meService } from '../../services/meService';
-import type { EmployeeQr } from '../../types';
-import { formatDate } from '../../utils/format';
-import { downloadUrl } from '../../utils/download';
+import { useDynamicQr } from '../../hooks/useDynamicQr';
+import { useErrorPopup } from '../../hooks/useFeedback';
+import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 
-type State =
-  | { kind: 'loading' }
-  | { kind: 'ready'; qr: EmployeeQr }
-  | { kind: 'error' };
-
-/** Código QR de identidad del empleado (disponible tras la aprobación de COMPANY). */
+/**
+ * Credencial digital del empleado: un QR DINÁMICO que se renueva solo (vigencia de la política de
+ * su empresa) y al usarse. Cada código sirve una sola vez, así que no se descarga ni se imprime:
+ * una foto o captura de pantalla no sirve para identificarse después.
+ */
 export function MyQrPage() {
   const { user } = useAuth();
-  const feedback = useFeedback();
-  const [state, setState] = useState<State>({ kind: 'loading' });
+  const { policy } = useVerificationPolicy();
+  const code = useDynamicQr();
   const [fullscreen, setFullscreen] = useState(false);
-
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setState({ kind: 'loading' });
-    try {
-      const qr = await meService.getMyQr(signal);
-      setState({ kind: 'ready', qr });
-    } catch (error) {
-      if (signal?.aborted) return;
-      setState({ kind: 'error' });
-      // Sin QR asignado es un aviso (lo resuelve la empresa); cualquier otra falla, un error.
-      if (error instanceof ApiError && error.code === 'QR_NOT_FOUND') {
-        void feedback.warning('Aún no tienes un código QR', error.message, { key: 'qr-missing' });
-      } else {
-        void feedback.fromError(error, { title: 'No se pudo cargar tu código QR', retry: () => void load() });
-      }
-    }
-  }, [feedback]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
-
-
-  const download = (qr: EmployeeQr) => {
-    downloadUrl(qr.image_base64, qr.file_name);
-    void feedback.success('QR descargado', qr.file_name);
-  };
+  useErrorPopup(code.error, { title: 'No se pudo generar tu código QR', retry: () => void code.renew() });
 
   const fullName = user?.employee?.full_name ?? user?.email ?? '';
+  const lifetime = code.qr?.lifetime_seconds ?? policy.qr_lifetime_seconds;
+  const renewing = code.phase === 'loading' || code.phase === 'used';
+  const shared = {
+    qr: code.qr,
+    phase: code.phase,
+    progress: code.progress,
+    remaining: code.remaining,
+    alt: `Código QR de ${fullName}`,
+    onRenew: () => void code.renew(),
+  };
+  const countdown =
+    code.phase === 'ready' ? (
+      <p className="dynamic-qr__countdown" aria-live="off">
+        <Timer size={16} aria-hidden /> Se renueva en <strong>{code.remaining} s</strong>
+      </p>
+    ) : null;
 
   return (
     <div className="page page-transition">
       <Panel>
         <PanelHero eyebrow="Credencial digital" title="Mi código QR">
-          <p className="muted">Tu identidad fue validada por tu empresa. Usa este código para identificarte.</p>
+          <p className="muted">Muéstralo al validador para identificarte. Cambia cada {lifetime} s y sirve una sola vez.</p>
         </PanelHero>
 
         <PanelSection className="my-qr">
-        {state.kind === 'loading' && (
-          <div className="my-qr__body" aria-busy>
-            <Skeleton width={260} height={260} radius={16} />
-            <Skeleton width={180} height={18} />
-            <Skeleton width={120} height={14} />
-          </div>
-        )}
-
-        {state.kind === 'error' && (
           <div className="my-qr__body">
-            <span className="my-qr__empty">
-              <QrCode size={48} />
-            </span>
-            <Button variant="secondary" icon={<RefreshCw size={18} />} onClick={() => void load()}>
-              Reintentar
-            </Button>
-          </div>
-        )}
-
-        {state.kind === 'ready' && (
-          <div className="my-qr__body">
-            <button type="button" className="my-qr__code" onClick={() => setFullscreen(true)} aria-label="Ampliar código QR">
-              <img src={state.qr.image_base64} alt={`Código QR de ${fullName}`} />
-              <span className="my-qr__zoom">
-                <Maximize2 size={16} />
-              </span>
-            </button>
+            <DynamicQrCode {...shared} onOpen={() => setFullscreen(true)} />
+            {countdown}
             <div className="my-qr__identity">
               <strong>{fullName}</strong>
               <span className="badge badge--success">
                 <BadgeCheck size={14} /> Identidad validada
               </span>
+              {code.qr && <span className="muted small">No. de empleado {code.qr.employee_number}</span>}
             </div>
-            <dl className="my-qr__meta">
-              <div>
-                <dt>No. de empleado</dt>
-                <dd>{state.qr.employee_number}</dd>
-              </div>
-              <div>
-                <dt>Vigencia</dt>
-                <dd>{state.qr.expires_at ? formatDate(state.qr.expires_at) : 'Sin vencimiento'}</dd>
-              </div>
-            </dl>
-            <div className="button-row" style={{ justifyContent: 'center' }}>
-              <Button variant="primary" icon={<Maximize2 size={18} />} onClick={() => setFullscreen(true)}>
+            <div className="button-row my-qr__actions">
+              <Button variant="primary" icon={<Maximize2 size={18} />} disabled={!code.qr} onClick={() => setFullscreen(true)}>
                 Mostrar en grande
               </Button>
-              <Button variant="secondary" icon={<Download size={18} />} onClick={() => download(state.qr)}>
-                Descargar
+              <Button variant="secondary" icon={<RefreshCw size={18} />} loading={renewing} onClick={() => void code.renew()}>
+                Generar otro
               </Button>
             </div>
           </div>
-        )}
         </PanelSection>
 
         <PanelFooter align="center">
@@ -124,33 +74,32 @@ export function MyQrPage() {
               <Sun size={16} /> Sube el brillo de tu pantalla para que el lector lo detecte más rápido.
             </li>
             <li>
-              <ShieldCheck size={16} color="var(--success)" /> El código no contiene tus datos personales ni biométricos. No lo
-              compartas: es personal e intransferible.
+              <ShieldCheck size={16} color="var(--success)" /> Cada código sirve una sola vez y vence en segundos: una foto o
+              captura de pantalla no sirve. No contiene tus datos personales ni biométricos.
             </li>
           </ul>
         </PanelFooter>
       </Panel>
 
-      {state.kind === 'ready' && (
-        <Modal
-          open={fullscreen}
-          title={fullName}
-          icon={<QrCode size={30} />}
-          eyebrow="Mi código QR"
-          onClose={() => setFullscreen(false)}
-          footer={
-            <Button variant="primary" size="lg" icon={<X size={20} />} onClick={() => setFullscreen(false)}>
-              Cerrar
-            </Button>
-          }
-        >
-          <div className="qr-view qr-view--large">
-            <img src={state.qr.image_base64} alt={`Código QR de ${fullName}`} />
-            <strong>{state.qr.employee_number}</strong>
-            <span className="muted small">Sube el brillo de tu pantalla para que se lea al instante.</span>
-          </div>
-        </Modal>
-      )}
+      <Modal
+        open={fullscreen}
+        title={fullName}
+        icon={<QrCode size={30} />}
+        eyebrow="Mi código QR"
+        onClose={() => setFullscreen(false)}
+        footer={
+          <Button variant="primary" size="lg" icon={<X size={20} />} onClick={() => setFullscreen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <div className="qr-view qr-view--large">
+          <DynamicQrCode {...shared} large />
+          {countdown}
+          {code.qr && <strong>{code.qr.employee_number}</strong>}
+          <span className="muted small">Sube el brillo de tu pantalla para que se lea al instante.</span>
+        </div>
+      </Modal>
     </div>
   );
 }

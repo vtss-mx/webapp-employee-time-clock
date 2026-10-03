@@ -12,14 +12,6 @@ export const verificationService = {
   verifyFace(captures: FaceCaptures): Promise<VerificationResult> {
     return postFaceCaptures('/verification/face', captures, isResult);
   },
-
-  verifyQr(qrContent: string): Promise<VerificationResult> {
-    return apiRequest<VerificationResult>('/verification/qr', {
-      method: 'POST',
-      body: { qr_content: qrContent },
-      validate: isResult,
-    });
-  },
 };
 
 export const faceService = {

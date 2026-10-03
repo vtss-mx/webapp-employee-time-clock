@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ButtonLink } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { KpiCard, type Kpi } from '../../components/ui/KpiCard';
@@ -74,12 +75,12 @@ export function AdminDashboardPage() {
         >
           {!recent && !error && <SkeletonRows rows={3} />}
           {recent && recent.length === 0 && (
-            <div className="empty">
-              <span className="icon-tile icon-tile--lg">
-                <Building2 size={30} />
-              </span>
-              <h2>Aún no hay empresas</h2>
-            </div>
+            <EmptyState
+              compact
+              icon={<Building2 />}
+              title="Aún no hay empresas registradas"
+              description="Registra la primera empresa con su administrador: aquí verás las más recientes y su actividad."
+            />
           )}
           {recent && recent.length > 0 && (
             <ul className="company-list">

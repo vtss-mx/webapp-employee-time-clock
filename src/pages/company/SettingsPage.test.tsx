@@ -45,23 +45,29 @@ describe('SettingsPage (COMPANY)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
     await userEvent.click(screen.getByRole('button', { name: /Duración del bloqueo/ }));
     await userEvent.click(screen.getByRole('option', { name: '1 h' }));
-    await waitFor(() => expect(calls.filter((c) => c.init.method === 'PUT')).toHaveLength(5));
+    await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
+    await userEvent.click(screen.getByRole('button', { name: /Vigencia del código QR/ }));
+    await userEvent.click(screen.getByRole('option', { name: '1 min' }));
+    expect(await screen.findByText('Cada código QR durará 1 min y servirá una sola vez.')).toBeInTheDocument();
+    await waitFor(() => expect(calls.filter((c) => c.init.method === 'PUT')).toHaveLength(6));
     expect(calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([
       { block_virtual_cameras: false },
       { anti_spoofing_level: 'MAXIMUM' },
       { liveness_steps: 1 },
       { lockout_max_failures: 3 },
       { lockout_minutes: 60 },
+      { qr_lifetime_seconds: 60 },
     ]);
   });
 
   it('los ajustes de un candado apagado no se pueden cambiar', async () => {
-    mockFetch(apiOk({ ...policy, anti_spoofing: false, liveness_challenge: false, lockout_enabled: false }));
+    mockFetch(apiOk({ ...policy, anti_spoofing: false, liveness_challenge: false, lockout_enabled: false, qr_enabled: false }));
     renderWithProviders(<SettingsPage />);
     expect(await screen.findByRole('button', { name: /Sensibilidad del anti-spoofing/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Giros de la prueba de vida/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Intentos antes del bloqueo/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Duración del bloqueo/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Vigencia del código QR/ })).toBeDisabled();
   });
 
   it('nivel de confianza: control de 80 % a 100 % (100 = 99.999 %), guardado explícito y confirmación si es muy estricto', async () => {

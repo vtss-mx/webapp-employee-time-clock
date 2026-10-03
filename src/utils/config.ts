@@ -67,14 +67,18 @@ export const config = {
   faceModelFallbackEnabled: envBoolean(env, 'VITE_FACE_MODEL_FALLBACK_ENABLED', true),
 
   // --- QR ---
-  /** Debe coincidir con el prefijo que genera el backend. */
-  qrPrefix: envString(env, 'VITE_QR_PREFIX', 'TCQR1:'),
+  /**
+   * Prefijo común de los QR de la app: el lector descarta al instante cualquier otro QR. Cuál sirve
+   * (el dinámico "TCQR2:"; el impreso anterior "TCQR1:" ya no) lo decide el backend.
+   */
+  qrPrefix: envString(env, 'VITE_QR_PREFIX', 'TCQR'),
   qrScanIntervalMs: envNumber(env, 'VITE_QR_SCAN_INTERVAL_MS', 150, 50, 1000),
+  /** Cada cuántos segundos "Mi código QR" consulta si un validador ya lo usó (para mostrar otro). */
+  qrStatusPollSeconds: envNumber(env, 'VITE_QR_STATUS_POLL_SECONDS', 2, 1, 10),
 
   // --- Punto de control (validador en tableta o teléfono) ---
   /** Segundos que el resultado queda en pantalla antes de volver a esperar a la siguiente persona. */
   checkpointResultSeconds: envNumber(env, 'VITE_CHECKPOINT_RESULT_SECONDS', 6, 2, 60),
-  checkpointRecentItems: envNumber(env, 'VITE_CHECKPOINT_RECENT_ITEMS', 8, 1, 50),
 
   // --- Google Maps (domicilio y ubicación de los validadores) ---
   maps: {

@@ -28,6 +28,7 @@ export const STRICT_RULES: VerificationRules = {
   lockout_max_failures: 5,
   lockout_minutes: 15,
   validator_device_approval: true,
+  qr_lifetime_seconds: 30,
   // Sin la lista del servidor no se bloquea ninguna en pantalla (el backend la exige igual).
   blocked_cameras: [],
 };

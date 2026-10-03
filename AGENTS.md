@@ -51,6 +51,11 @@ identificadores en inglés; comentarios, textos de la interfaz y documentación 
   omisión 10 por página con opciones 10/20/30/40/50 (`config.pageSizes`/`config.pageSize`). Se
   personaliza con props (`noun`, `labels`, `show`, `siblings`, `sizes`, `variant`) y tokens
   `--pager-*`; no se crean paginadores propios ni listas que carguen todo.
+- **Estados de un listado solo con `PagedItems`** (esqueleto, "Reintentar", vacío o los elementos
+  con su paginador; `ListResults` lo usa para las tablas). Sin registros se muestra `EmptyState`
+  (ícono, título y qué aparecerá ahí; la acción para crear el primero si aplica; `compact` dentro de
+  un panel; `tone="success"` cuando "nada pendiente" es buena noticia) y **el paginador se oculta**.
+  Con filtros activos, el vacío dice que nada coincide con la búsqueda.
 - Tareas asíncronas que actualizan estado tras esperar (peticiones, `sleep`) consultan
   `useMountedRef()`; nunca `useRef(true)` apagado solo al desmontar: en desarrollo StrictMode
   desmonta y vuelve a montar, y la marca quedaría en `false` (el flujo ignoraría las respuestas).
@@ -66,6 +71,12 @@ identificadores en inglés; comentarios, textos de la interfaz y documentación 
 - **Capturas faciales solo con `LiveFaceFlow`** y se envían como `FaceCaptures` (frontales, una
   captura por giro del reto y el nombre de la cámara) con `postFaceCaptures`. La app no captura
   con una cámara virtual (`isVirtualCamera` con la lista de la política).
+- **QR del empleado: dinámico y de un solo uso.** Se muestra solo con `useDynamicQr` +
+  `DynamicQrCode` (se renueva al vencer, al usarse y bajo demanda; pausa con la pantalla oculta).
+  Nunca se descarga, imprime ni se escanea desde la app del propio empleado: lo lee un validador.
+- **Fechas y horas en la zona del negocio** (hora del Centro, `user.timezone`): solo con
+  `formatDate`/`formatDateTime`/`timeAgo` y "hoy" con `businessToday`/`businessDate`/`businessHour`
+  (`utils/format.ts`); nunca `new Date().getHours()` ni formatos con la zona del dispositivo.
 - Dispositivos de validadores: la llave vive en `utils/deviceKey.ts` (WebCrypto, no exportable);
   el login firma el reto cuando el backend lo pide (`AuthContext`), nunca de otra forma.
 - Mensajes: **solo popups** (`useFeedback()`: `fromError`, `show`, `success`, `warning`...). La app
@@ -92,6 +103,16 @@ identificadores en inglés; comentarios, textos de la interfaz y documentación 
 ## 4. Interfaz
 
 - Mobile first; todo usable en teléfono (menú hamburguesa) y escritorio (sidebar contraíble).
+- **Teléfonos y tabletas** (se revisan en iPhone y iPad, vertical y horizontal, antes de dar algo
+  por terminado):
+  - Con dedo (`pointer: coarse`) ningún control mide menos de 44×44 px; una fila con interruptor
+    es tocable completa (`Switch` es una `<label>`).
+  - Las listas se acomodan al ancho de su contenedor (`@container`), no al de la pantalla: una
+    columna en teléfono, acciones a un lado en tableta, una fila en escritorio.
+  - Las tablas se vuelven tarjetas en pantallas angostas: la persona arriba, los datos cortos como
+    fichas con su etiqueta (`data-label`) y las celdas largas a lo ancho (`className="table__wide"`).
+  - Nunca desbordamiento horizontal de la página; las acciones principales quedan a lo ancho, al
+    alcance del pulgar.
 - Área de trabajo blanca; paneles con borde y sombra suaves; sin encabezado superior.
 - Accesibilidad: roles y `aria-*` correctos, foco gestionado en popups, navegación con teclado.
 - Acciones que el usuario ya confirmó no generan avisos redundantes después.

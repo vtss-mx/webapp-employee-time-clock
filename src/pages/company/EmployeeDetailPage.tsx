@@ -208,12 +208,7 @@ export function EmployeeDetailPage() {
 
           <FaceSection employee={employee} />
 
-          <QrCodePanel
-            employeeId={employee.id}
-            employeeName={employee.full_name}
-            hasActiveQr={employee.has_active_qr}
-            onChanged={load}
-          />
+          <QrCodePanel employeeId={employee.id} />
 
           <PanelSection title="Bitácora de verificaciones" icon={<Activity size={20} />}>
             <VerificationHistory employeeId={employee.id} />

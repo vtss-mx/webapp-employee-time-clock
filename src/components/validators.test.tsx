@@ -33,7 +33,7 @@ describe('validatorService y checkpointService', () => {
     ['resetPassword', () => validatorService.resetPassword(3, 'Nueva1234'), sampleValidator, 'PUT', '/api/validators/3/password'],
     ['remove', () => validatorService.remove(3), null, 'DELETE', '/api/validators/3'],
     ['profile', () => checkpointService.profile(), { id: 3, name: 'Recepción', mode: 'QR', company: { id: 1, name: 'Mi empresa' } }, 'GET', '/api/checkpoint/me'],
-    ['recent', () => checkpointService.recent(5), [], 'GET', '/api/checkpoint/recent?limit=5'],
+    ['recent', () => checkpointService.recent({ page: 2, size: 5 }), { items: [], total: 0, page: 2, size: 5 }, 'GET', '/api/checkpoint/recent?page=2&size=5'],
     ['identifyQr', () => checkpointService.identifyQr('TCQR1:abc'), identified, 'POST', '/api/checkpoint/identify/qr'],
     ['inspectQr', () => checkpointService.inspectQr('TCQR1:abc'), { employee_id: 7, name: 'Ana Ruiz', employee_number: 'EMP-7' }, 'POST', '/api/checkpoint/qr/inspect'],
   ])('%s', async (_name, call, data, method, url) => {

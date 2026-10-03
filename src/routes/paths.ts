@@ -42,7 +42,6 @@ export const paths = {
     dashboard: '/employee/dashboard',
     verify: '/employee/verify',
     verifyFace: '/employee/verify/face',
-    verifyQr: '/employee/verify/qr',
     myQr: '/employee/qr',
     enroll: '/employee/enroll',
     pending: '/employee/pending',

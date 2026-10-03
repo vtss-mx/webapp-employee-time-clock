@@ -46,7 +46,7 @@ describe('ValidatorsPage (COMPANY)', () => {
   it('vacío: invita a crear el primero (la pantalla de alta)', async () => {
     server([]);
     renderWithProviders(<ValidatorsPage />);
-    expect(await screen.findByText('Aún no tienes validadores')).toBeInTheDocument();
+    expect(await screen.findByText('No hay validadores registrados')).toBeInTheDocument();
     for (const link of screen.getAllByRole('link', { name: 'Agregar validador' })) expect(link).toHaveAttribute('href', '/company/validators/new');
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });

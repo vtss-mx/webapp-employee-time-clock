@@ -5,9 +5,7 @@ import { ConfirmDialog } from '../../components/Modal';
 import { DeviceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { ListPaginator } from '../../components/ui/Paginator';
-import { RetryState } from '../../components/ui/RetryState';
-import { SkeletonRows } from '../../components/ui/Skeleton';
+import { PagedItems } from '../../components/ui/PagedItems';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { usePagedList } from '../../hooks/usePagedList';
@@ -80,7 +78,6 @@ export function ValidatorDevicesPage() {
     }
   };
 
-  const items = list.data?.items;
   return (
     <div className="page">
       <Panel>
@@ -95,17 +92,17 @@ export function ValidatorDevicesPage() {
             Cada tableta o teléfono en que el validador inicia sesión queda registrado con una llave propia (no se puede copiar a otro
             equipo) y solo opera cuando lo autorizas.
           </p>
-          {!items && (list.error ? <RetryState onRetry={list.retry} /> : <SkeletonRows rows={3} />)}
-          {items?.length === 0 && (
-            <div className="empty">
-              <span className="icon-tile icon-tile--lg">
-                <MonitorSmartphone size={30} />
-              </span>
-              <h2>Sin dispositivos todavía</h2>
-              <p className="muted">Aparecerán aquí cuando el validador inicie sesión en una tableta o un teléfono.</p>
-            </div>
-          )}
-          {items && items.length > 0 && (
+          <PagedItems
+            list={list}
+            skeletonRows={3}
+            empty={{
+              icon: <MonitorSmartphone />,
+              title: 'No hay dispositivos registrados',
+              description: 'Cuando el validador inicie sesión en una tableta o un teléfono, el dispositivo aparecerá aquí para que lo autorices.',
+            }}
+            pager={{ noun: { one: 'dispositivo', other: 'dispositivos' } }}
+          >
+            {(items) => (
             <ul className={`validator-list stagger ${list.loading ? 'is-loading' : ''}`}>
               {items.map((device) => (
                 <li key={device.id}>
@@ -148,8 +145,8 @@ export function ValidatorDevicesPage() {
                 </li>
               ))}
             </ul>
-          )}
-          <ListPaginator list={list} noun={{ one: 'dispositivo', other: 'dispositivos' }} />
+            )}
+          </PagedItems>
         </PanelSection>
         <PanelFooter align="center">
           <p className="inline-note small muted">

@@ -26,7 +26,7 @@ export function CompanyCreatePage() {
         title: 'Empresa registrada',
         text: `${company.name} ya puede usar ${config.appName}.`,
         details: [
-          `Su administrador inicia sesión con ${company.admins[0]?.email ?? 'el correo capturado'}.`,
+          `Su administrador inicia sesión con ${form.values.admin_email.trim().toLowerCase()}.`,
           'La política de verificación se creó con los valores más seguros; la empresa puede ajustarla.',
           'Desde aquí puedes agregar más administradores, editar sus datos o desactivarla.',
         ],

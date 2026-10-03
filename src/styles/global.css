@@ -1662,36 +1662,78 @@ a.kpi:hover {
 .person__info small {
   color: var(--muted);
 }
+/* Celda ancha (correo...): en escritorio se recorta con "…" para no ensanchar la tabla. */
+.table td.table__wide .truncate {
+  display: block;
+  max-width: 260px;
+}
+/* Teléfonos y tabletas angostas: cada fila es una tarjeta. La persona arriba; los datos cortos
+   (estados, fechas, conteos) como fichas con su etiqueta encima, en la misma línea mientras
+   quepan; las celdas anchas y las acciones ocupan todo el ancho (botón a lo ancho: fácil de tocar). */
 @media (max-width: 760px) {
   .table thead {
     display: none;
   }
   .table,
-  .table tbody,
-  .table tr,
-  .table td {
+  .table tbody {
     display: block;
     width: 100%;
   }
   .table tr {
-    padding: 12px 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px 22px;
+    padding: 16px;
     border-bottom: 1px solid var(--border);
   }
+  /* Ficha: la etiqueta en su propia línea y el valor debajo, sin partirse ("48 / 50"); todas
+     crecen por igual para quedar alineadas de una tarjeta a otra. */
   .table td {
+    display: block;
+    flex: 1 1 0;
+    min-width: max-content;
+    border: 0;
+    padding: 0;
+  }
+  .table td[data-label]::before {
+    display: block;
+    margin-bottom: 4px;
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .table td.table__primary,
+  .table td.table__wide,
+  .table td:not([data-label]) {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .table td.table__primary::before {
+    display: none;
+  }
+  .table td.table__wide {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    border: 0;
-    padding: 6px 14px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
   }
-  .table td[data-label]::before {
-    content: attr(data-label);
-    color: var(--muted);
-    font-size: 0.85rem;
+  .table td.table__wide::before {
+    margin: 0;
   }
-  .table td.table__primary::before {
-    display: none;
+  .table td.table__wide .truncate {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .table td:not([data-label]) .btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -1846,12 +1888,16 @@ a.kpi:hover {
   }
 }
 .validator-list.is-loading,
-.log-list.is-loading {
+.log-list.is-loading,
+.recent-list.is-loading,
+.session-list.is-loading,
+.company-admins.is-loading {
   opacity: 0.6;
   transition: opacity 0.2s;
 }
 
-.empty {
+/* Error inesperado dentro de una pantalla (ErrorBoundary en línea). */
+.error-inline {
   display: grid;
   gap: 12px;
   justify-items: center;
@@ -1861,6 +1907,82 @@ a.kpi:hover {
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-lg);
   animation: fade-in-up 0.4s var(--ease);
+}
+
+/* ---------- Estado vacío (EmptyState.tsx) ----------
+   Personalizable con --empty-*: un ícono en un halo suave, título, descripción y la acción. */
+.empty-state {
+  --empty-accent: var(--primary);
+  --empty-soft: var(--primary-soft);
+  --empty-pad: clamp(36px, 7vw, 64px) 20px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: var(--empty-pad);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--empty-soft) 70%, transparent), transparent 70%),
+    var(--surface);
+  text-align: center;
+  animation: fade-in-up 0.4s var(--ease);
+}
+.empty-state--success {
+  --empty-accent: var(--success);
+  --empty-soft: var(--success-soft);
+}
+.empty-state--compact {
+  --empty-pad: 26px 16px;
+  gap: 6px;
+}
+.empty-state__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--empty-accent);
+  box-shadow:
+    0 0 0 8px color-mix(in srgb, var(--empty-soft) 75%, transparent),
+    0 0 0 16px color-mix(in srgb, var(--empty-soft) 35%, transparent),
+    var(--shadow-sm);
+}
+.empty-state--compact .empty-state__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--empty-soft) 75%, transparent), var(--shadow-xs);
+}
+.empty-state__icon svg {
+  width: 28px;
+  height: 28px;
+}
+.empty-state--compact .empty-state__icon svg {
+  width: 22px;
+  height: 22px;
+}
+.empty-state__title {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.empty-state--compact .empty-state__title {
+  font-size: 0.98rem;
+}
+.empty-state__text {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+.empty-state__action {
+  margin-top: 10px;
 }
 
 .tabs {
@@ -4896,8 +5018,19 @@ a.kpi:hover {
 }
 .confidence__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+/* Sin espacio para ambos botones (teléfono): cada uno crece y bajan a otra línea, nunca se salen. */
+.confidence__actions > .btn {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+@media (min-width: 600px) {
+  .confidence__actions > .btn {
+    flex: 0 0 auto;
+  }
 }
 
 /* Campos obligatorios: asterisco rojo junto a la etiqueta (decorativo: texto alternativo vacío) */
@@ -4999,12 +5132,7 @@ label.is-required::after {
 .usage__bar.is-high span {
   background: linear-gradient(90deg, #f59e0b, var(--danger));
 }
-@media (max-width: 599px) {
-  .company-admins li,
-  .validator-list li {
-    flex-wrap: wrap;
-  }
-}
+
 
 /* ---------- Teléfono con lada internacional ---------- */
 .phone-field {
@@ -5377,20 +5505,6 @@ label.is-required::after {
 .validator-list li:hover {
   border-color: var(--blue-200);
 }
-@media (max-width: 599px) {
-  .validator-list__info {
-    flex-basis: calc(100% - 56px);
-  }
-  .validator-list__badges {
-    padding-left: 52px;
-  }
-  .validator-list__actions {
-    width: 100%;
-    justify-content: flex-end;
-    border-top: 1px solid var(--border);
-    padding-top: 8px;
-  }
-}
 .mode-badge::before {
   display: none;
 }
@@ -5490,6 +5604,19 @@ button.method-card {
 }
 .method-grid > .method-card:only-child {
   grid-column: 1 / -1;
+}
+/* Tarjetas lado a lado (tableta, escritorio): ícono, título y "Comenzar" a la misma altura en
+   todas; la descripción absorbe la diferencia de largo. */
+@media (min-width: 600px) {
+  .method-card {
+    grid-template-rows: auto auto 1fr auto;
+  }
+  .method-card__desc {
+    align-self: start;
+  }
+  .method-card__cta {
+    align-self: end;
+  }
 }
 /* Teléfono del validador: tarjetas compactas (todos los métodos a la vista sin desplazarse). */
 @media (max-width: 599px) {
@@ -5763,10 +5890,15 @@ button.method-card {
   gap: 10px;
   max-width: 520px;
 }
+/* Solo el texto se recorta con "…": el ícono conserva su tamaño. */
 .validator-list__address {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+}
+.validator-list__address svg {
+  flex: none;
 }
 
 /* ---------- Ajustes de los candados (Configuración) ---------- */
@@ -5792,5 +5924,312 @@ button.method-card {
   }
   .tuning-row__control .select {
     width: 100%;
+  }
+}
+
+/* ==========================================================================
+   Experiencia táctil: teléfonos y tabletas
+   Cada pieza se acomoda al ancho que REALMENTE tiene (consultas de contenedor), no al de la
+   pantalla: la misma lista se ve en una columna en un teléfono, con las acciones a un lado en una
+   tableta vertical y en una sola fila en escritorio.
+   ========================================================================== */
+
+/* Lista de validadores y dispositivos: identidad · insignias · acciones. */
+.validator-list {
+  container: validators / inline-size;
+}
+.validator-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'lead info badges actions';
+  align-items: center;
+  gap: 10px 14px;
+}
+.validator-list li > :first-child {
+  grid-area: lead;
+}
+.validator-list__info {
+  grid-area: info;
+}
+.validator-list__badges {
+  grid-area: badges;
+  justify-content: flex-end;
+}
+.validator-list__actions {
+  grid-area: actions;
+  justify-content: flex-end;
+}
+/* Tableta: las insignias bajan bajo el nombre y las acciones quedan a la derecha. */
+@container validators (max-width: 1100px) {
+  .validator-list li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'lead info actions'
+      'lead badges actions';
+  }
+  .validator-list__badges {
+    justify-content: flex-start;
+  }
+}
+/* Teléfono: todo en una columna; las acciones al pie, repartidas a lo ancho (botones con texto en
+   su propia línea, al final). */
+@container validators (max-width: 620px) {
+  .validator-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'lead info'
+      '. badges'
+      'actions actions';
+    align-items: start;
+    padding: 14px;
+  }
+  .validator-list__actions {
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .validator-list__actions > * {
+    flex: 1 0 44px;
+  }
+  .validator-list__actions > .btn:not(.btn--icon) {
+    flex: 1 1 40%;
+    order: 1;
+  }
+}
+
+/* Interruptores en teléfono: el ícono y el título junto al control; la descripción a todo lo
+   ancho debajo (sin una columna estrecha de texto). Toda la fila es tocable (Switch.tsx). */
+.switch-row {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.switch-row.is-disabled {
+  cursor: default;
+}
+.switch-row:not(.is-disabled):active {
+  transform: scale(0.99);
+}
+@media (max-width: 599px) {
+  .switch-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 14px;
+  }
+  .switch-row__text {
+    display: contents;
+  }
+  .switch-row__icon {
+    grid-column: 1;
+    grid-row: 1;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+  .switch-row__label {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .switch-row .switch {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .switch-row__description {
+    grid-column: 1 / -1;
+  }
+  .switch-row:not(:has(.switch-row__icon)) .switch-row__label {
+    grid-column: 1 / 3;
+  }
+}
+
+/* Pestañas en teléfono: control segmentado que ocupa el ancho, con el ícono sobre el nombre (caben
+   todas sin desplazarse) y el contador como globo en la esquina. */
+@media (max-width: 599px) {
+  .tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(84px, 1fr);
+    width: 100%;
+  }
+  .tab {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-height: 58px;
+    padding: 8px 6px;
+    font-size: 0.8rem;
+  }
+  .tab__count {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    min-width: 20px;
+    padding: 0 6px;
+    font-size: 0.7rem;
+    line-height: 18px;
+  }
+}
+
+/* Dedo, no ratón: ningún control por debajo de 44×44 px (recomendación de Apple y de Google). */
+@media (pointer: coarse) {
+  .btn--sm {
+    min-height: 44px;
+  }
+  .btn--sm.btn--icon {
+    width: 44px;
+  }
+  .pager,
+  .pager--compact {
+    --pager-btn-size: 44px;
+  }
+  .pager__size .select__control,
+  .pager--compact .pager__size .select__control {
+    height: 44px;
+    min-height: 44px;
+  }
+  .page-header__back {
+    min-height: 44px;
+  }
+  .confidence__slider input[type='range'] {
+    min-height: 44px;
+  }
+  /* Menú lateral en tabletas horizontales: contraer y cerrar sesión. */
+  .mobilebar__brand {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+  }
+  .sidebar__collapse,
+  .user-card .btn--icon {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Teléfono: las acciones del encabezado se reparten a lo ancho (el botón principal queda a todo lo
+   ancho, al alcance del pulgar). Cada administrador: identidad y estado arriba; sus acciones
+   debajo, a lo ancho. */
+@media (max-width: 599px) {
+  .page-header__actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .company-admins li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px 12px;
+  }
+  .company-admins li > .btn {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+
+/* ---------- QR dinámico del empleado (DynamicQrCode.tsx) ----------
+   El código dentro de un anillo que se vacía con su vigencia (--qr-progress, 1 → 0): ámbar en los
+   últimos segundos y verde al usarse. Personalizable con --qr-size, --qr-ring y --qr-track. */
+.dynamic-qr {
+  --qr-size: min(260px, 70vw);
+  --qr-ring: var(--primary);
+  --qr-track: var(--border);
+  position: relative;
+  padding: 6px;
+  border-radius: 26px;
+  background: conic-gradient(var(--qr-ring) calc(var(--qr-progress, 1) * 360deg), var(--qr-track) 0);
+  box-shadow: var(--shadow);
+  animation: scale-in 0.4s var(--ease);
+}
+.dynamic-qr--large {
+  --qr-size: min(340px, 80vw);
+}
+.dynamic-qr.is-ending {
+  --qr-ring: var(--warning);
+}
+.dynamic-qr--used {
+  background: var(--success);
+}
+.dynamic-qr__frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--qr-size);
+  aspect-ratio: 1;
+  padding: 12px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #fff;
+}
+.dynamic-qr__button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.dynamic-qr__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  animation: qr-swap 0.45s var(--ease);
+}
+@keyframes qr-swap {
+  from {
+    opacity: 0;
+    transform: scale(0.92) rotateY(28deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.dynamic-qr__overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px;
+  text-align: center;
+  color: var(--text);
+  background: color-mix(in srgb, #fff 90%, transparent);
+  backdrop-filter: blur(4px);
+  animation: fade-in 0.25s var(--ease);
+}
+.dynamic-qr__overlay-icon {
+  color: var(--primary);
+}
+.dynamic-qr__overlay--used .dynamic-qr__overlay-icon {
+  color: var(--success);
+  animation: scale-in 0.5s var(--ease-spring);
+}
+.dynamic-qr__overlay--error .dynamic-qr__overlay-icon {
+  color: var(--danger);
+}
+.dynamic-qr__countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.dynamic-qr__countdown strong {
+  color: var(--text);
+}
+.my-qr__actions {
+  justify-content: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dynamic-qr,
+  .dynamic-qr__image,
+  .dynamic-qr__overlay-icon {
+    animation: none;
   }
 }

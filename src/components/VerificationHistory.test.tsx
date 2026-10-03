@@ -42,7 +42,7 @@ describe('VerificationHistory (bitácora paginada del empleado)', () => {
   it('sin intentos lo dice; si falla ofrece reintentar', async () => {
     mockFetch(apiOk({ items: [], total: 0, page: 1, size: 10 }));
     const { unmount } = renderWithProviders(<VerificationHistory employeeId={7} />);
-    expect(await screen.findByText('Sin registros todavía.')).toBeInTheDocument();
+    expect(await screen.findByText('No hay verificaciones registradas')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
     unmount();
 

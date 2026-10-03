@@ -2,6 +2,7 @@ import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-rea
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
+import { businessDate } from '../../utils/format';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
 import { Floating } from './Floating';
 
@@ -108,12 +109,12 @@ function moveInGrid(event: KeyboardEvent, columns: number): boolean {
  * mismo estilo de la aplicación. Flujo rápido para fechas lejanas: año → mes → día.
  */
 function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: CalendarProps) {
-  const initial = selected ?? openTo ?? max ?? new Date();
+  const initial = selected ?? openTo ?? max ?? businessDate();
   const [view, setView] = useState<View>('days');
   const [month, setMonth] = useState({ year: initial.getFullYear(), month: initial.getMonth() });
   const [focused, setFocused] = useState<Date>(initial);
   const minYear = (min ?? new Date(1920, 0, 1)).getFullYear();
-  const maxYear = (max ?? new Date()).getFullYear();
+  const maxYear = (max ?? businessDate()).getFullYear();
   const [yearPage, setYearPage] = useState(() => Math.floor((month.year - minYear) / YEARS_PER_PAGE));
   const bodyRef = useRef<HTMLDivElement>(null);
   const outOfRange = (d: Date) => Boolean((min && d < min) || (max && d > max));
@@ -217,7 +218,7 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
                 'datepicker__day',
                 day.getMonth() !== month.month && 'is-outside',
                 sameDay(day, selected) && 'is-selected',
-                sameDay(day, new Date()) && 'is-today',
+                sameDay(day, businessDate()) && 'is-today',
               ]
                 .filter(Boolean)
                 .join(' ');

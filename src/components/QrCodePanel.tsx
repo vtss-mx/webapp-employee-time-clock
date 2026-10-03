@@ -1,127 +1,85 @@
-import { Download, Eye, QrCode, RefreshCw } from 'lucide-react';
+import { Ban, QrCode, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useFeedback } from '../hooks/useFeedback';
+import { useResource } from '../hooks/useResource';
+import { useVerificationPolicy } from '../hooks/useVerificationPolicy';
 import { employeeService } from '../services/employeeService';
-import type { EmployeeQr } from '../types';
-import { formatDate, formatDateTime } from '../utils/format';
-import { ConfirmDialog, Modal } from './Modal';
+import { formatDateTime, timeAgo } from '../utils/format';
+import { ConfirmDialog } from './Modal';
 import { Button } from './ui/Button';
 import { PanelSection } from './ui/Panel';
-import { downloadUrl } from '../utils/download';
+import { RetryState } from './ui/RetryState';
 
-interface QrCodePanelProps {
-  employeeId: number;
-  employeeName: string;
-  hasActiveQr: boolean;
-  onChanged: () => void;
-}
-
-/** Sección "Código QR" del panel de detalle de empleado: ver, descargar y regenerar. */
-export function QrCodePanel({ employeeId, employeeName, hasActiveQr, onChanged }: QrCodePanelProps) {
+/**
+ * Sección "Código QR" del detalle de un empleado. El QR es dinámico: el empleado lo genera en su
+ * teléfono, cambia cada pocos segundos y sirve una sola vez, así que la empresa no lo ve ni lo
+ * imprime. Aquí ve su actividad y puede invalidar el vigente (su teléfono muestra otro).
+ */
+export function QrCodePanel({ employeeId }: { employeeId: number }) {
   const feedback = useFeedback();
-  const [qr, setQr] = useState<EmployeeQr | null>(null);
-  const [viewOpen, setViewOpen] = useState(false);
+  const { policy } = useVerificationPolicy();
+  const { data: summary, setData, error, retry } = useResource(() => employeeService.qrSummary(employeeId), employeeId, 'No se pudo cargar la actividad del QR');
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [loading, setLoading] = useState<'view' | 'download' | 'regenerate' | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const fetchQr = async (): Promise<EmployeeQr> => {
-    const data = qr ?? (await employeeService.getQr(employeeId));
-    setQr(data);
-    return data;
-  };
-
-  const download = (data: EmployeeQr) => {
-    downloadUrl(data.image_base64, data.file_name);
-    void feedback.success('QR descargado', data.file_name);
-  };
-
-  const run = async (kind: 'view' | 'download', action: (data: EmployeeQr) => void) => {
-    setLoading(kind);
+  const revoke = async () => {
+    setBusy(true);
     try {
-      action(await fetchQr());
+      setData(await employeeService.revokeQr(employeeId));
+      void feedback.success('Código invalidado', 'El código que tenía en pantalla ya no sirve; en su teléfono podrá mostrar uno nuevo.');
     } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo obtener el QR' });
+      void feedback.fromError(e, { title: 'No se pudo invalidar el código' });
     } finally {
-      setLoading(null);
+      setBusy(false);
+      setConfirmOpen(false);
     }
   };
 
-  const regenerate = async () => {
-    setLoading('regenerate');
-    try {
-      const data = await employeeService.regenerateQr(employeeId);
-      setQr(data);
-      setConfirmOpen(false);
-      void feedback.success('Nuevo QR generado', 'El código anterior ya no es válido.');
-      setViewOpen(true);
-      onChanged();
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo regenerar' });
-      setConfirmOpen(false);
-    } finally {
-      setLoading(null);
-    }
-  };
-
+  const live = summary?.live ?? false;
   return (
     <PanelSection
-      title="Código QR"
+      title="Código QR dinámico"
       icon={<QrCode size={20} />}
-      aside={<span className={`badge ${hasActiveQr ? 'badge--success' : 'badge--warning'}`}>{hasActiveQr ? 'Activo' : 'Sin QR'}</span>}
+      aside={summary && <span className={`badge ${live ? 'badge--success badge--live' : 'badge--muted'}`}>{live ? 'En pantalla' : 'Sin código vigente'}</span>}
     >
       <p className="muted">
-        {hasActiveQr
-          ? 'Código de identificación personal. No contiene datos personales ni biométricos.'
-          : 'El empleado no tiene un QR activo. Genera uno nuevo.'}
+        El empleado lo genera en su teléfono (Mi código QR). Cambia cada {policy.qr_lifetime_seconds} s y sirve una sola vez: no se
+        descarga ni se imprime.
       </p>
-
+      {!summary && error ? <RetryState onRetry={retry} /> : null}
+      {summary && (
+        <dl className="details">
+          <div>
+            <dt>Vigente hasta</dt>
+            <dd>{summary.live_until ? formatDateTime(summary.live_until) : '—'}</dd>
+          </div>
+          <div>
+            <dt>Último generado</dt>
+            <dd title={summary.last_issued_at ? formatDateTime(summary.last_issued_at) : undefined}>{summary.last_issued_at ? timeAgo(summary.last_issued_at) : 'Nunca'}</dd>
+          </div>
+          <div>
+            <dt>Último uso</dt>
+            <dd title={summary.last_used_at ? formatDateTime(summary.last_used_at) : undefined}>{summary.last_used_at ? timeAgo(summary.last_used_at) : 'Nunca'}</dd>
+          </div>
+        </dl>
+      )}
       <div className="button-row">
-        <Button variant="secondary" icon={<Eye size={18} />} disabled={!hasActiveQr || (loading !== null && loading !== 'view')} loading={loading === 'view'} onClick={() => run('view', () => setViewOpen(true))}>
-          Ver QR
+        <Button variant="secondary" icon={<RefreshCw size={18} />} disabled={busy} onClick={retry}>
+          Actualizar
         </Button>
-        <Button variant="secondary" icon={<Download size={18} />} disabled={!hasActiveQr || (loading !== null && loading !== 'download')} loading={loading === 'download'} onClick={() => run('download', download)}>
-          Descargar QR
-        </Button>
-        <Button variant="warning" icon={<RefreshCw size={18} />} disabled={loading !== null} onClick={() => setConfirmOpen(true)}>
-          Regenerar QR
+        <Button variant="danger-outline" icon={<Ban size={18} />} disabled={!live || busy} onClick={() => setConfirmOpen(true)}>
+          Invalidar código vigente
         </Button>
       </div>
 
-      <Modal
-        open={viewOpen && qr !== null}
-        title={employeeName}
-        icon={<QrCode size={30} />}
-        eyebrow="Código QR"
-        onClose={() => setViewOpen(false)}
-        footer={
-          qr && (
-            <Button variant="primary" icon={<Download size={18} />} onClick={() => download(qr)}>
-              Descargar
-            </Button>
-          )
-        }
-      >
-        {qr && (
-          <div className="qr-view">
-            <img src={qr.image_base64} alt={`Código QR del empleado ${qr.employee_number}`} />
-            <strong>{qr.employee_number}</strong>
-            <p className="muted small">
-              Generado: {formatDateTime(qr.created_at)}
-              <br />
-              Vence: {qr.expires_at ? formatDate(qr.expires_at) : 'Sin vencimiento'}
-            </p>
-          </div>
-        )}
-      </Modal>
-
       <ConfirmDialog
         open={confirmOpen}
-        title="Regenerar código QR"
-        message="Se invalidará el QR actual de forma inmediata y se generará uno nuevo. ¿Deseas continuar?"
-        confirmLabel="Regenerar"
+        title="Invalidar el código vigente"
+        message="El código que el empleado tiene en pantalla dejará de servir de inmediato; en su teléfono podrá mostrar uno nuevo. ¿Deseas continuar?"
+        confirmLabel="Invalidar"
         tone="danger"
-        loading={loading === 'regenerate'}
-        onConfirm={regenerate}
+        loading={busy}
+        onConfirm={() => void revoke()}
         onCancel={() => setConfirmOpen(false)}
       />
     </PanelSection>
