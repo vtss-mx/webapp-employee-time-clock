@@ -1,6 +1,8 @@
 import { fieldErrorsFrom } from '../services/apiClient';
 import type { CompanyFormValues } from '../types';
+import type { FieldLabels } from '../utils/changes';
 import { validateCompanyForm } from '../utils/formRules';
+import { formatPhone } from '../utils/phone';
 import { normalizeRfc, validateEmail, type FieldErrors } from '../utils/validation';
 import { availabilityBlocks, availabilityError, useAvailability } from './useAvailability';
 import { useFormState } from './useFormState';
@@ -14,6 +16,19 @@ export const emptyCompanyForm: CompanyFormValues = {
   admin_email: '',
   admin_password: '',
   admin_password_confirm: '',
+};
+
+/**
+ * Cómo se leen los datos de la empresa en la confirmación del alta (lo que se registrará) y de la
+ * edición ("antes → después"). La contraseña del administrador nunca se muestra: no está aquí.
+ */
+export const COMPANY_LABELS: FieldLabels<CompanyFormValues> = {
+  name: 'Nombre comercial',
+  legal_name: 'Razón social',
+  rfc: 'RFC',
+  phone: { label: 'Teléfono', format: formatPhone },
+  max_employees: { label: 'Límite de empleados', format: (value) => (value.trim() ? `${value.trim()} empleados` : 'Sin límite') },
+  admin_email: { label: 'Correo del administrador', format: (value) => value.trim().toLowerCase() },
 };
 
 /** Errores del servidor llevados al campo (RFC o correo ya registrados, validación). */

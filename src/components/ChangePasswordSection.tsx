@@ -56,12 +56,26 @@ export function ChangePasswordSection({ onChanged }: { onChanged?: () => void })
       void form.feedback.invalidForm(live);
       return;
     }
-    await form.save(async () => {
-      const { revoked_sessions: revoked } = await authService.changePassword(values.current, values.next);
-      void form.feedback.success('Contraseña actualizada', revoked ? `Se cerró la sesión en ${revoked} dispositivo(s) más.` : 'Tu sesión actual sigue activa.');
-      form.reset();
-      onChanged?.();
-    }, 'No se pudo cambiar la contraseña');
+    await form.save(
+      async () => {
+        const { revoked_sessions: revoked } = await authService.changePassword(values.current, values.next);
+        void form.feedback.success('Contraseña actualizada', revoked ? `Se cerró la sesión en ${revoked} dispositivo(s) más.` : 'Tu sesión actual sigue activa.');
+        form.reset();
+        onChanged?.();
+      },
+      'No se pudo cambiar la contraseña',
+      {
+        kind: 'edit',
+        tone: 'warning',
+        icon: <KeyRound size={30} />,
+        eyebrow: 'Seguridad de tu cuenta',
+        title: '¿Cambiar tu contraseña?',
+        message: 'A partir de ahora entrarás con la nueva contraseña.',
+        details: ['Se cerrará tu sesión en tus otros dispositivos.', 'Este dispositivo seguirá con la sesión iniciada.'],
+        confirmLabel: 'Cambiar contraseña',
+        confirmIcon: <KeyRound size={18} />,
+      },
+    );
   };
 
   return (

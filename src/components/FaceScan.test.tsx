@@ -15,13 +15,14 @@ describe('FaceScan: etapas del escáner facial', () => {
     expect(currentStage('frontal', 'off_center')).toBe('align');
     expect(currentStage('frontal', 'hold_still')).toBe('align');
     expect(currentStage('checking', 'ready')).toBe('scan');
-    expect(currentStage('challenge', 'turn')).toBe('liveness');
+    expect(currentStage('flash', 'ready')).toBe('liveness'); // destello de colores
+    expect(currentStage('challenge', 'move')).toBe('liveness');
     expect(currentStage('submitting', 'ready')).toBe('confirm');
     expect(currentStage('blocked', 'ready')).toBe('align');
   });
 
   it('el segmento actual se llena con el avance de su etapa', () => {
-    const base = { progress: 0.5, turnProgress: 0.25, capture: null };
+    const base = { progress: 0.5, moveProgress: 0.25, capture: null };
     expect(stageFill('align', base)).toBe(0.5);
     expect(stageFill('scan', { ...base, capture: { current: 2, total: 4 } })).toBe(0.5);
     expect(stageFill('scan', base)).toBe(1); // capturas tomadas: se valida

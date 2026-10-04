@@ -4,11 +4,14 @@ import { apiRequest } from './apiClient';
 
 const isReport = hasKeys<ErrorReportDetail>('id', 'code', 'status', 'severity', 'occurrences');
 
-export interface ErrorReportQuery extends PageQuery {
+/** Filtro de la bandeja (el mismo al listar y al marcar en bloque). */
+export interface ErrorFilter {
   status?: ErrorStatus;
   severity?: ErrorSeverity;
   search?: string;
 }
+
+export interface ErrorReportQuery extends PageQuery, ErrorFilter {}
 
 /** Errores del sistema (solo el ADMIN de la plataforma): bandeja, detalle y seguimiento. */
 export const errorReportService = {
@@ -35,5 +38,18 @@ export const errorReportService = {
 
   setStatus(id: number, status: ErrorStatus): Promise<ErrorReportDetail> {
     return apiRequest<ErrorReportDetail>(`/admin/errors/${id}/status`, { method: 'PATCH', body: { status }, validate: isReport });
+  },
+
+  /**
+   * Marca como solucionados todos los errores abiertos del filtro (estado o gravedad específicos; el
+   * backend lo exige). `seenUntil` es el `as_of` de la lista que vio el ADMIN: lo que ocurrió después
+   * sigue abierto. Devuelve cuántos cambiaron.
+   */
+  resolveMatching(filter: ErrorFilter, seenUntil: string): Promise<number> {
+    return apiRequest<{ resolved: number }>('/admin/errors/resolve', {
+      method: 'POST',
+      body: { ...filter, seen_until: seenUntil },
+      validate: hasKeys<{ resolved: number }>('resolved'),
+    }).then((result) => result.resolved);
   },
 };

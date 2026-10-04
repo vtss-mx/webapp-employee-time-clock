@@ -1,158 +1,40 @@
-import { act, fireEvent, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type { DetectionMode, FaceGuidance } from '../hooks/useFaceDetection';
+import { fireEvent, screen, act } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FaceGuidance } from '../hooks/useFaceDetection';
 import { ApiError } from '../services/apiClient';
-import { samplePolicy } from '../test/fixtures';
-import { apiFail, apiOk, envelope, jsonResponse, mockFetch, type MockCall } from '../test/http';
-import { renderWithProviders } from '../test/render';
+import {
+  accessoriesFound,
+  advance,
+  camera,
+  CHECK_OK,
+  detection,
+  flow,
+  heading,
+  message,
+  NO_LIVENESS,
+  renderFlow,
+  resetFaceFlow,
+  see,
+  serve,
+  stable,
+  TWO_TURNS,
+} from '../test/faceFlow';
+import { apiFail, apiOk } from '../test/http';
 import { CameraNotReadyError } from '../utils/cameraDiagnostics';
-import type { FaceChallenge } from '../types';
-import { challengeActions, flowStatus, introFor, LiveFaceFlow, scannerView, type CapturedFace } from './LiveFaceFlow';
+import { challengeActions, flowStatus, introFor, scannerView } from './liveFaceView';
 
 /*
- * Flujo facial completo con la cámara y MediaPipe simulados (tienen sus propias pruebas): la prueba
- * decide qué ve el detector (guía, avance, giro) y cuándo el rostro queda estable; el backend
- * (validación previa y reto) responde por fetch como el real.
+ * Flujo facial completo con la cámara y MediaPipe simulados (test/faceFlowMocks): escaneo frontal,
+ * prueba de vida con giros (el destello y los demás movimientos: LiveFaceFlow.liveness.test.tsx),
+ * accesorios, captura manual y cámara virtual.
  */
-const camera = vi.hoisted(() => ({ status: 'active', trackLabel: 'FaceTime HD Camera', isMirrored: true, capture: vi.fn<() => Promise<Blob>>() }));
-vi.mock('../hooks/useCamera', () => ({
-  useCamera: () => ({
-    videoRef: { current: null },
-    facing: 'user',
-    status: camera.status,
-    error: null,
-    problem: null,
-    devices: [],
-    activeDeviceId: null,
-    activeLabel: 'Cámara frontal',
-    trackLabel: camera.trackLabel,
-    isMirrored: camera.isMirrored,
-    start: () => Promise.resolve(),
-    requestAccess: () => undefined,
-    stop: () => undefined,
-    switchCamera: () => undefined,
-    selectCamera: () => undefined,
-    captureFrame: camera.capture,
-  }),
-}));
+vi.mock('../hooks/useCamera', async () => (await import('../test/faceFlowMocks')).cameraModule());
+vi.mock('../hooks/useFaceDetection', async (original) => (await import('../test/faceFlowMocks')).detectionModule(await original()));
 
-interface AutoCaptureOptions {
-  enabled: boolean;
-  mode?: DetectionMode;
-  stableFrames?: number;
-  onStable?: () => void | Promise<void>;
-}
-interface Reading {
-  guidance: FaceGuidance;
-  progress: number;
-  turnProgress: number;
-}
-/** Lo que "ve" el detector, como un store externo: la prueba lo cambia y el flujo se redibuja. */
-const detection = vi.hoisted(() => {
-  const listeners = new Set<() => void>();
-  let reading: Reading = { guidance: 'hold_still', progress: 0, turnProgress: 0 };
-  return {
-    detector: null as object | null,
-    error: null as string | null,
-    options: null as AutoCaptureOptions | null,
-    read: () => reading,
-    see(next: Partial<Reading>) {
-      reading = { ...reading, ...next };
-      listeners.forEach((listener) => listener());
-    },
-    reset() {
-      reading = { guidance: 'hold_still', progress: 0, turnProgress: 0 };
-    },
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      return () => void listeners.delete(listener);
-    },
-  };
-});
-vi.mock('../hooks/useFaceDetection', async (importOriginal) => {
-  const { useSyncExternalStore } = await import('react');
-  return {
-    ...(await importOriginal<Record<string, unknown>>()),
-    useFaceDetector: () => ({ detector: detection.detector, error: detection.error, loading: !detection.detector && !detection.error }),
-    useFaceAutoCapture: (options: AutoCaptureOptions) => {
-      detection.options = options;
-      return useSyncExternalStore(detection.subscribe, detection.read);
-    },
-  };
-});
-
-const CHECK_OK = { ok: true, message: 'Captura válida', detection_score: 0.99, quality_score: 0.9, yaw_ratio: 0 };
-const NO_LIVENESS: FaceChallenge = { liveness_required: false, challenge_id: null, action: null, instruction: null, actions: [], instructions: [], min_yaw_ratio: null, expires_in: null };
-const TWO_TURNS: FaceChallenge = {
-  liveness_required: true,
-  challenge_id: 'ch-1',
-  action: 'TURN_LEFT',
-  instruction: 'Gira la cabeza hacia tu izquierda',
-  actions: ['TURN_LEFT', 'TURN_RIGHT'],
-  instructions: ['Gira la cabeza hacia tu izquierda', 'Gira la cabeza hacia tu derecha'],
-  min_yaw_ratio: 0.25,
-  expires_in: 60,
-};
-
-type Responder = (call: MockCall) => Response | Promise<Response>;
-
-/** Backend del flujo: validación previa (/face/check) y reto (/face/challenge). */
-function serve({ check = () => apiOk(CHECK_OK), challenge = () => apiOk(NO_LIVENESS) }: { check?: Responder; challenge?: Responder } = {}) {
-  const { calls } = mockFetch((call) => (call.url.includes('/face/check') ? check(call) : call.url.includes('/face/challenge') ? challenge(call) : apiFail(404, 'NOT_FOUND')));
-  return { checks: () => calls.filter((c) => c.url.includes('/face/check')).length, challenges: () => calls.filter((c) => c.url.includes('/face/challenge')).length, calls };
-}
-
-/** Rechazo de la validación previa por accesorios (con los códigos que el servidor detectó). */
-const accessoriesFound = (accessories: string[]) =>
-  jsonResponse(
-    envelope(null, {
-      status: 422,
-      code: 'ACCESSORIES_DETECTED',
-      message: 'Retira tus accesorios',
-      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'Retira tus accesorios', field: null, details: { accessories } }],
-    }),
-    422,
-  );
-
-let frames: Blob[];
-let onSubmit: Mock<(captured: CapturedFace) => Promise<void>>;
-let onFatal: Mock<(error: unknown) => void>;
-
-function renderFlow(props: Partial<Parameters<typeof LiveFaceFlow>[0]> = {}) {
-  return renderWithProviders(
-    <LiveFaceFlow title="Verificación facial" frontalFrames={1} submittingMessage="Confirmando tu identidad..." policy={samplePolicy} onSubmit={onSubmit} onFatal={onFatal} onCancel={() => undefined} {...props} />,
-  );
-}
-
-const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
-/** El detector ve el rostro estable: dispara la captura de la fase actual y deja que avance. */
-async function stable() {
-  act(() => void detection.options?.onStable?.());
-  await advance(0);
-}
-const see = (reading: Partial<Reading>) => act(() => detection.see(reading));
-const message = () => screen.getAllByRole('status')[0];
-const heading = () => screen.getByRole('heading', { level: 2 });
 const arrow = () => document.querySelector('.turn-arrow');
+const { onSubmit, onFatal } = flow;
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  camera.status = 'active';
-  camera.trackLabel = 'FaceTime HD Camera';
-  camera.isMirrored = true;
-  frames = [];
-  camera.capture.mockReset().mockImplementation(() => {
-    const blob = new Blob([`captura-${frames.length + 1}`], { type: 'image/jpeg' });
-    frames.push(blob);
-    return Promise.resolve(blob);
-  });
-  detection.detector = {};
-  detection.error = null;
-  detection.options = null;
-  detection.reset();
-  onSubmit = vi.fn<(captured: CapturedFace) => Promise<void>>(() => Promise.resolve());
-  onFatal = vi.fn<(error: unknown) => void>();
-});
+beforeEach(resetFaceFlow);
 afterEach(() => vi.useRealTimers());
 
 describe('LiveFaceFlow: escaneo frontal y envío', () => {
@@ -175,7 +57,7 @@ describe('LiveFaceFlow: escaneo frontal y envío', () => {
     expect(server.checks()).toBe(1);
     expect(message()).toHaveTextContent('Confirmando tu identidad...');
     expect(heading()).toHaveTextContent('Confirmando tu identidad');
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: frames, camera: 'FaceTime HD Camera', accessoryReview: false });
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: camera.frames, camera: 'FaceTime HD Camera', accessoryReview: false });
     const form = server.calls.find((c) => c.url.includes('/face/check'))?.init.body as FormData;
     expect(form.getAll('images')).toHaveLength(3);
     expect(form.get('allow_headwear')).toBe('false');
@@ -225,18 +107,19 @@ describe('LiveFaceFlow: escaneo frontal y envío', () => {
   });
 });
 
-describe('LiveFaceFlow: prueba de vida', () => {
+describe('LiveFaceFlow: prueba de vida con giros', () => {
   it('dos giros: gira, vuelve al frente y gira al otro lado; envía una captura por giro, en orden', async () => {
     serve({ challenge: () => apiOk(TWO_TURNS) });
     renderFlow();
-    await stable();
-    expect(detection.options).toMatchObject({ enabled: true, mode: { kind: 'turn', direction: 'TURN_LEFT', minYawRatio: 0.25 }, stableFrames: 3 });
-    expect(heading()).toHaveTextContent('Sigue la indicación · giro 1 de 2');
+    const baseline = { pitch: 0.52, width: 210 };
+    await stable(baseline);
+    expect(detection.options).toMatchObject({ enabled: true, mode: { kind: 'action', action: 'TURN_LEFT', minimum: 0.25, baseline }, stableFrames: 3 });
+    expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 2');
 
-    see({ guidance: 'turn', turnProgress: 0.1 });
+    see({ guidance: 'move', moveProgress: 0.1 });
     expect(message()).toHaveTextContent('Gira la cabeza hacia tu izquierda');
     expect(arrow()?.querySelector('.lucide-arrow-left')).not.toBeNull(); // con espejo, su izquierda se ve a la izquierda
-    see({ turnProgress: 0.5 });
+    see({ moveProgress: 0.5 });
     expect(message()).toHaveTextContent('Un poco más...');
     see({ guidance: 'too_far' });
     expect(message()).toHaveTextContent('Acércate un poco más a la cámara');
@@ -245,59 +128,60 @@ describe('LiveFaceFlow: prueba de vida', () => {
     expect(arrow()).toBeNull();
 
     await stable(); // primer giro capturado: de vuelta al frente
-    expect(screen.getByText('Vuelve a mirar al frente para el siguiente giro.')).toBeInTheDocument();
-    expect(message()).toHaveTextContent('¡Bien! Prepárate para el siguiente giro...');
-    see({ guidance: 'turn', turnProgress: 0 });
+    expect(screen.getByText('Vuelve a mirar al frente para el siguiente paso.')).toBeInTheDocument();
+    expect(message()).toHaveTextContent('¡Bien! Prepárate para el siguiente paso...');
+    see({ guidance: 'move', moveProgress: 0 });
     expect(message()).toHaveTextContent('Vuelve a mirar al frente');
     expect(detection.options?.mode).toEqual({ kind: 'frontal' });
     expect(arrow()).toBeNull();
 
     await stable(); // ya al frente: el segundo giro
-    expect(heading()).toHaveTextContent('Sigue la indicación · giro 2 de 2');
-    expect(detection.options?.mode).toEqual({ kind: 'turn', direction: 'TURN_RIGHT', minYawRatio: 0.25 });
+    expect(heading()).toHaveTextContent('Prueba de vida · paso 2 de 2');
+    expect(detection.options?.mode).toEqual({ kind: 'action', action: 'TURN_RIGHT', minimum: 0.25, baseline });
     expect(message()).toHaveTextContent('Gira la cabeza hacia tu derecha');
     expect(arrow()?.querySelector('.lucide-arrow-right')).not.toBeNull();
 
     await stable();
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: [frames[0]], challenge: { id: 'ch-1', images: [frames[1], frames[2]] }, camera: 'FaceTime HD Camera', accessoryReview: false });
+    const [frontal, left, right] = camera.frames;
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: [frontal], challenge: { id: 'ch-1', images: [left, right] }, camera: 'FaceTime HD Camera', accessoryReview: false });
   });
 
-  it('reto de una versión anterior (solo `action`, sin mínimo de giro) con la cámara trasera sin espejo', async () => {
+  it('un solo giro con la cámara trasera sin espejo (y sin mínimo del servidor: el piso)', async () => {
     camera.isMirrored = false;
-    const legacy: FaceChallenge = { ...NO_LIVENESS, liveness_required: true, challenge_id: 'ch-old', action: 'TURN_RIGHT', instruction: 'Gira a tu derecha' };
-    serve({ challenge: () => apiOk(legacy) });
+    const single = { ...TWO_TURNS, challenge_id: 'ch-2', actions: ['TURN_RIGHT' as const], instructions: ['Gira a tu derecha'], min_yaw_ratio: null };
+    serve({ challenge: () => apiOk(single) });
     renderFlow();
     await stable();
-    expect(detection.options?.mode).toEqual({ kind: 'turn', direction: 'TURN_RIGHT', minYawRatio: 0.2 });
-    expect(heading()).toHaveTextContent(/^Sigue la indicación$/);
-    see({ guidance: 'turn' });
+    expect(detection.options?.mode).toEqual({ kind: 'action', action: 'TURN_RIGHT', minimum: 0.2, baseline: null });
+    expect(heading()).toHaveTextContent(/^Prueba de vida$/);
+    see({ guidance: 'move' });
     expect(message()).toHaveTextContent('Gira a tu derecha');
     expect(arrow()?.querySelector('.lucide-arrow-left')).not.toBeNull(); // sin espejo, su derecha se ve a la izquierda
     await stable();
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ challenge: { id: 'ch-old', images: [frames[1]] } }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ challenge: { id: 'ch-2', images: [camera.frames[1]] } }));
   });
 
-  it('el giro no se detecta a tiempo: pide otro reto conservando el escaneo; al tercero reinicia todo', async () => {
+  it('el movimiento no se detecta a tiempo: pide otro reto conservando el escaneo; al tercero reinicia todo', async () => {
     let issued = 0;
     const server = serve({ challenge: () => apiOk({ ...TWO_TURNS, challenge_id: `ch-${++issued}` }) });
     renderFlow();
     await stable();
     await advance(20_000);
-    expect(message()).toHaveTextContent('No se detectó el giro. Gira despacio hasta que la barra se llene.');
+    expect(message()).toHaveTextContent('No se completó el movimiento a tiempo. Hazlo despacio, hasta que el anillo se llene.');
     expect(heading()).toHaveTextContent('Intentemos de nuevo');
     await advance(3_000);
-    expect(heading()).toHaveTextContent('Sigue la indicación · giro 1 de 2');
+    expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 2');
     expect(server.challenges()).toBe(2);
 
     await stable(); // primer giro; el tiempo también corre al volver al frente
     await advance(20_000);
-    expect(message()).toHaveTextContent('No se detectó el giro');
+    expect(message()).toHaveTextContent('No se completó el movimiento a tiempo');
     await advance(3_000);
-    expect(heading()).toHaveTextContent('giro 1 de 2'); // el reto nuevo empieza desde su primer giro
+    expect(heading()).toHaveTextContent('paso 1 de 2'); // el reto nuevo empieza desde su primer movimiento
     expect(server.challenges()).toBe(3);
 
     await advance(20_000);
-    expect(message()).toHaveTextContent('No se detectó el giro de cabeza. Intentemos de nuevo.');
+    expect(message()).toHaveTextContent('No se completó la prueba de vida. Intentemos de nuevo desde el inicio.');
     await advance(3_000);
     expect(detection.options?.mode).toEqual({ kind: 'frontal' });
     expect(server.checks()).toBe(1); // los retos se repitieron sin volver a escanear
@@ -313,15 +197,14 @@ describe('LiveFaceFlow: prueba de vida', () => {
     expect(onFatal).toHaveBeenCalledWith(expect.objectContaining({ code: 'FORBIDDEN' }));
   });
 
-  it('si el reto nuevo ya no trae id (la empresa quitó la prueba de vida), no se captura un giro', async () => {
+  it('si el reto nuevo ya no pide prueba de vida (la empresa la quitó), se envían las frontales', async () => {
     let issued = 0;
     serve({ challenge: () => apiOk(++issued === 1 ? TWO_TURNS : NO_LIVENESS) });
     renderFlow();
     await stable();
     await advance(23_000);
-    await stable();
     expect(camera.capture).toHaveBeenCalledOnce(); // solo la frontal
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: [camera.frames[0]], camera: 'FaceTime HD Camera', accessoryReview: false });
   });
 
   it('si la cámara no da imagen al capturar el giro (llamada entrante), espera y vuelve a empezar sin rendirse', async () => {
@@ -451,18 +334,20 @@ describe('LiveFaceFlow: captura manual, cámara virtual y otra forma de identifi
 });
 
 describe('LiveFaceFlow: textos del visor (reglas puras)', () => {
-  const base = { guidance: 'turn' as FaceGuidance, submittingMessage: 'Enviando...', detectorReady: true, detectorFailed: false };
+  const base = { guidance: 'move' as FaceGuidance, submittingMessage: 'Enviando...', detectorReady: true, detectorFailed: false };
 
-  it('bloqueo sin motivo y giro sin instrucción usan su texto genérico', () => {
+  it('bloqueo sin motivo y movimiento sin instrucción usan su texto genérico', () => {
     expect(flowStatus({ ...base, phase: 'blocked' })).toEqual({ message: 'Intentemos de nuevo', tone: 'warn' });
-    expect(flowStatus({ ...base, phase: 'challenge', instruction: null })).toEqual({ message: 'Gira la cabeza', tone: 'idle' });
+    expect(flowStatus({ ...base, phase: 'challenge', instruction: null })).toEqual({ message: 'Haz el movimiento que se indica', tone: 'idle' });
     expect(flowStatus({ ...base, phase: 'checking', capture: null })).toEqual({ message: 'Analizando...', tone: 'busy' });
   });
 
-  it('el anillo del giro empieza vacío si aún no hay lectura; sin reto no hay giros', () => {
-    const view = scannerView({ ...base, phase: 'challenge', progress: 0.7, challenge: TWO_TURNS, step: 0, virtualCamera: false, mirrored: true, capture: null });
+  it('el anillo del movimiento empieza vacío si aún no hay lectura; sin reto no hay movimientos', () => {
+    const view = scannerView({ ...base, phase: 'challenge', progress: 0.7, challenge: TWO_TURNS, step: 0, virtualCamera: false, capture: null });
     expect(view.ringProgress).toBe(0);
     expect(challengeActions(null)).toEqual([]);
-    expect(introFor({ phase: 'challenge', stage: 'liveness', submittingMessage: 'Enviando...' })).toEqual({ title: 'Sigue la indicación', text: 'Gira la cabeza cuando el sistema te lo indique.' });
+    expect(introFor({ phase: 'challenge', stage: 'liveness', submittingMessage: 'Enviando...' })).toEqual({ title: 'Prueba de vida', text: 'Mueve la cabeza como se indique; la pantalla puede cambiar de color un instante.' });
+    const legacy = { ...TWO_TURNS, instructions: undefined as unknown as string[] }; // sin la lista: la instrucción del primero
+    expect(scannerView({ ...base, phase: 'challenge', progress: 0, challenge: legacy, step: 0, virtualCamera: false }).message).toBe('Gira la cabeza hacia tu izquierda');
   });
 });

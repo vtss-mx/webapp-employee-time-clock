@@ -38,7 +38,7 @@ function renderSelect(selectResponse: (call: MockCall) => Response, user: User =
       <SignIn />
       <Routes>
         <Route path="/" element={<CompanySelectPage />} />
-        <Route path={paths.employee.dashboard} element={<p>Menú del empleado</p>} />
+        <Route path={paths.employee.attendance} element={<p>Menú del empleado</p>} />
       </Routes>
     </>,
     { auth: true },

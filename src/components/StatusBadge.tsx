@@ -15,7 +15,20 @@ const TONE_CLASS: Record<StatusTone, string> = {
 };
 
 /** Estado de un catálogo con tono (registro facial o solicitud): nombre y tono vienen de la BD. */
-export function CatalogStatusBadge({ catalog, code }: { catalog: 'face_statuses' | 'enrollment_statuses' | 'device_statuses' | 'api_key_statuses' | 'error_statuses' | 'error_severities'; code: string }) {
+/** Catálogos con tono (`StatusItem`): su nombre y su color salen de la BD. */
+export type StatusCatalog =
+  | 'face_statuses'
+  | 'enrollment_statuses'
+  | 'device_statuses'
+  | 'api_key_statuses'
+  | 'error_statuses'
+  | 'error_severities'
+  | 'work_session_statuses'
+  | 'shift_request_statuses'
+  | 'board_states'
+  | 'assignment_states';
+
+export function CatalogStatusBadge({ catalog, code }: { catalog: StatusCatalog; code: string }) {
   const { byCode } = useCatalogs();
   const status = byCode(catalog, code);
   return <span className={`badge ${TONE_CLASS[status?.tone ?? 'muted']}`}>{status?.name ?? code}</span>;

@@ -9,7 +9,7 @@ import { samplePolicy } from '../test/fixtures';
 import { apiFail, apiOk, mockFetch } from '../test/http';
 import { catalogsFixture, catalogsWith } from '../test/catalogs';
 import { renderWithProviders, WithCatalogs } from '../test/render';
-import type { EmployeeFormValues, VerificationResult } from '../types';
+import type { EmployeeFormValues, FaceChallenge, VerificationResult } from '../types';
 import { Ban, Glasses } from 'lucide-react';
 import { accessoryIcon, ruledAccessories } from './accessories';
 import { CountUp } from './CountUp';
@@ -18,7 +18,7 @@ import { emptyEmployeeForm } from '../utils/formRules';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FaceRequirements } from './FaceRequirements';
 import { GlobalErrorHandler } from './GlobalErrorHandler';
-import { challengeActions, flowStatus, introFor, scannerView } from './LiveFaceFlow';
+import { challengeActions, detectionMode, flowStatus, introFor, scannerView } from './liveFaceView';
 import { ConfirmDialog, Modal } from './Modal';
 import { OfflineBanner } from './OfflineBanner';
 import { PageHeader } from './PageHeader';
@@ -212,44 +212,66 @@ describe('verificación', () => {
     expect(flowStatus({ ...base, phase: 'checking', capture: { current: 2, total: 5 } }).message).toBe('Capturando 2 de 5...');
     expect(flowStatus({ ...base, phase: 'submitting' }).message).toBe('Enviando');
     expect(flowStatus({ ...base, phase: 'blocked', blockedMessage: 'Quita lentes' })).toEqual({ message: 'Quita lentes', tone: 'warn' });
+    expect(flowStatus({ ...base, phase: 'flash' })).toEqual({ message: 'Mantén tu rostro frente a la pantalla', tone: 'busy' });
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'hold_still' }).tone).toBe('ok');
-    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'turn', instruction: 'Gira a la derecha' }).message).toBe('Gira a la derecha');
-    // A medio giro se anima a terminarlo.
-    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'turn', instruction: 'Gira a la derecha', turnProgress: 0.6 }).message).toBe('Un poco más...');
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha' }).message).toBe('Gira a la derecha');
+    // A medio movimiento se anima a terminarlo.
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha', moveProgress: 0.6 }).message).toBe('Un poco más...');
     expect(flowStatus({ ...base, phase: 'frontal', detectorFailed: true }).message).toMatch(/Capturar/);
     expect(flowStatus({ ...base, phase: 'frontal', detectorReady: false }).message).toBeTruthy();
-    // Entre dos giros: de vuelta al frente.
+    // Entre dos movimientos: de vuelta al frente.
     expect(flowStatus({ ...base, phase: 'recenter' })).toEqual({ message: 'Vuelve a mirar al frente', tone: 'idle' });
-    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'ready' }).tone).toBe('ok');
+    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'ready' })).toEqual({ message: '¡Bien! Prepárate para el siguiente paso...', tone: 'ok' });
   });
 
-  it('reto de uno o dos giros: orden, título, flecha y cámara virtual', () => {
-    const challenge = {
+  it('reto de varios movimientos: orden, título por paso, destello y cámara virtual', () => {
+    const challenge: FaceChallenge = {
       liveness_required: true,
       challenge_id: 'c1',
-      action: 'TURN_LEFT' as const,
-      instruction: 'Gira a tu izquierda',
-      actions: ['TURN_LEFT' as const, 'TURN_RIGHT' as const],
-      instructions: ['Gira a tu izquierda', 'Gira a tu derecha'],
+      action: 'LOOK_UP',
+      instruction: 'Mira hacia arriba',
+      actions: ['LOOK_UP', 'TURN_RIGHT', 'MOVE_CLOSER'],
+      instructions: ['Mira hacia arriba', 'Gira a tu derecha', 'Acerca tu rostro'],
       min_yaw_ratio: 0.18,
+      min_pitch_delta: 0.09,
+      min_closer_scale: 1.3,
+      flash: ['#FF0000', '#00FF00', '#0000FF'],
+      flash_required: false,
       expires_in: 90,
     };
-    expect(challengeActions(challenge)).toEqual(['TURN_LEFT', 'TURN_RIGHT']);
-    expect(challengeActions({ ...challenge, actions: [] })).toEqual(['TURN_LEFT']); // reto de una versión anterior
-    expect(challengeActions({ ...challenge, actions: [], action: null })).toEqual([]);
+    expect(challengeActions(challenge)).toEqual(['LOOK_UP', 'TURN_RIGHT', 'MOVE_CLOSER']);
     expect(challengeActions(null)).toEqual([]);
 
-    const base = { guidance: 'turn' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false, progress: 0.3, turnProgress: 0.7, challenge, virtualCamera: false, mirrored: true };
+    const base = { guidance: 'move' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false, progress: 0.3, moveProgress: 0.7, challenge, virtualCamera: false };
     const second = scannerView({ ...base, phase: 'challenge', step: 1 });
     expect(second.message).toBe('Un poco más...');
-    expect(second.intro).toEqual({ title: 'Sigue la indicación · giro 2 de 2', text: 'Gira a tu derecha' });
-    expect(second.pointsLeft).toBe(false); // derecha con espejo
+    expect(second.intro).toEqual({ title: 'Prueba de vida · paso 2 de 3', text: 'Gira a tu derecha' });
     expect(second.ringProgress).toBe(0.7);
-    expect(scannerView({ ...base, phase: 'challenge', step: 0 }).pointsLeft).toBe(true);
-    expect(scannerView({ ...base, phase: 'recenter', step: 1 }).intro.text).toBe('Vuelve a mirar al frente para el siguiente giro.');
+    expect(scannerView({ ...base, phase: 'flash', step: 0 }).intro).toEqual({
+      title: 'Prueba de vida · destello',
+      text: 'Mantén tu rostro frente a la pantalla mientras cambia de color.',
+    });
+    expect(scannerView({ ...base, phase: 'recenter', step: 1 }).intro.text).toBe('Vuelve a mirar al frente para el siguiente paso.');
     expect(scannerView({ ...base, phase: 'frontal', step: 0, guidance: 'ready' }).ringProgress).toBe(0.3);
     expect(scannerView({ ...base, phase: 'frontal', step: 0, virtualCamera: true })).toMatchObject({ tone: 'warn', message: expect.stringMatching(/Cámara virtual/) as string });
-    expect(introFor({ phase: 'challenge', stage: 'liveness', instruction: null, submittingMessage: '', step: { current: 1, total: 1 } }).title).toBe('Sigue la indicación');
+    expect(introFor({ phase: 'challenge', stage: 'liveness', instruction: null, submittingMessage: '', step: { current: 1, total: 1 } })).toEqual({
+      title: 'Prueba de vida',
+      text: 'Mueve la cabeza como se indique; la pantalla puede cambiar de color un instante.',
+    });
+  });
+
+  it('qué mide el detector en cada fase: el movimiento contra el rostro en reposo (con los mínimos del reto o los pisos)', () => {
+    const baseline = { pitch: 0.5, width: 200 };
+    const bare: FaceChallenge = { liveness_required: true, challenge_id: 'c', action: null, instruction: null, actions: [], instructions: [], min_yaw_ratio: null, min_pitch_delta: null, min_closer_scale: null, flash: [], flash_required: false, expires_in: null };
+    expect(detectionMode('frontal', bare, 'TURN_LEFT', baseline)).toEqual({ kind: 'frontal' });
+    expect(detectionMode('challenge', bare, null, baseline)).toEqual({ kind: 'frontal' });
+    expect(detectionMode('challenge', bare, 'TURN_LEFT', baseline)).toEqual({ kind: 'action', action: 'TURN_LEFT', minimum: 0.2, baseline });
+    expect(detectionMode('challenge', bare, 'LOOK_DOWN', null)).toEqual({ kind: 'action', action: 'LOOK_DOWN', minimum: 0.08, baseline: null });
+    expect(detectionMode('challenge', null, 'MOVE_CLOSER', baseline)).toMatchObject({ minimum: 1.25 });
+    const strict = { ...bare, min_yaw_ratio: 0.25, min_pitch_delta: 0.1, min_closer_scale: 1.4 };
+    expect(detectionMode('challenge', strict, 'TURN_RIGHT', baseline)).toMatchObject({ minimum: 0.25 });
+    expect(detectionMode('challenge', strict, 'LOOK_UP', baseline)).toMatchObject({ minimum: 0.1 });
+    expect(detectionMode('challenge', strict, 'MOVE_CLOSER', baseline)).toMatchObject({ minimum: 1.4 });
   });
 });
 
@@ -276,7 +298,7 @@ describe('QrCodePanel (QR dinámico)', () => {
     expect(await screen.findByText('En pantalla')).toBeInTheDocument();
     expect(screen.getByText('Nunca')).toBeInTheDocument(); // aún no lo usa
     await userEvent.click(screen.getByRole('button', { name: 'Invalidar código vigente' }));
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Invalidar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Invalidar el código vigente?' })).getByRole('button', { name: 'Invalidar' }));
     expect(await screen.findByText('Código invalidado')).toBeInTheDocument();
     expect(calls.find((c) => c.init.method === 'DELETE')?.url).toBe('/api/employees/5/qr');
     await userEvent.click(within(screen.getByRole('dialog', { name: 'Código invalidado' })).getByRole('button', { name: 'Entendido' }));

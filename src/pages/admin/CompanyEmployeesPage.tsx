@@ -1,23 +1,28 @@
-import { SearchX, Users } from 'lucide-react';
+import { Eraser, SearchX, Users } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { FaceStatusBadge, StatusBadge } from '../../components/StatusBadge';
+import { Button } from '../../components/ui/Button';
 import { ListToolbar } from '../../components/ui/ListControls';
 import { ListResults } from '../../components/ui/ListResults';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
+import { useAction } from '../../hooks/useAction';
 import { useResource } from '../../hooks/useResource';
 import { useSearchList } from '../../hooks/useSearchList';
 import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
-import type { CompanyDetail } from '../../types';
-import { initials } from '../../utils/format';
+import type { CompanyDetail, CompanyEmployee } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
+import { initials, timeAgo } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
 
 /**
  * Empleados de una empresa vistos por el ADMIN de la plataforma (/admin/companies/:id/employees):
- * paginados, con búsqueda y filtro, y de solo lectura. El backend envía solo su ficha de trabajo
- * (sin datos fiscales ni biometría): el ADMIN da soporte, no administra al personal de la empresa.
+ * paginados, con búsqueda y filtro. Su ficha de trabajo es de solo lectura (sin datos fiscales ni
+ * biometría): el ADMIN da soporte, no administra al personal de la empresa. Lo único que administra
+ * aquí es el aprendizaje del reconocimiento facial (la empresa no lo ve): cuánto aprendió de cada uno
+ * y "Olvidar lo aprendido".
  */
 export function CompanyEmployeesPage() {
   const companyId = Number(useParams().id);
@@ -35,6 +40,17 @@ function CompanyEmployees({ company }: { company: CompanyDetail }) {
     filterKey: String(company.id),
   });
   const { data } = list;
+  const action = useAction<number>();
+  // Se confirma antes de borrar: cancelar no envía nada.
+  const forget = (employee: CompanyEmployee) =>
+    void action.run(() => adminService.forgetLearnedFace(company.id, employee.id), {
+      busy: employee.id,
+      confirm: forgetConfirm(employee),
+      errorTitle: 'No se pudo olvidar lo aprendido',
+      success: ['Aprendizaje reiniciado', 'Se compara solo con su registro aprobado; volverá a aprender de sus identificaciones seguras.'],
+      // El backend devuelve su ficha ya sin lo aprendido: se reemplaza en la página sin volver a pedirla.
+      onSuccess: (updated) => list.updateItems((items) => items.map((item) => (item.id === updated.id ? updated : item))),
+    });
 
   return (
     <div className="page">
@@ -58,7 +74,7 @@ function CompanyEmployees({ company }: { company: CompanyDetail }) {
           <ListResults
             list={list}
             pager={{ noun: { one: 'empleado', other: 'empleados' } }}
-            columns={['Empleado', 'Correo', 'Teléfono', 'Departamento', 'Registro facial', 'Estado']}
+            columns={['Empleado', 'Correo', 'Teléfono', 'Departamento', 'Registro facial', 'Aprendizaje', 'Estado']}
             empty={
               list.filtered
                 ? { icon: <SearchX />, title: 'Ningún empleado coincide con la búsqueda', description: 'Prueba con otro nombre, número de empleado o correo, o cambia el filtro de estado.' }
@@ -85,6 +101,9 @@ function CompanyEmployees({ company }: { company: CompanyDetail }) {
                   <td data-label="Registro facial">
                     <FaceStatusBadge status={emp.face_status} />
                   </td>
+                  <td data-label="Aprendizaje">
+                    <Learned employee={emp} busy={action.busy} onForget={() => forget(emp)} />
+                  </td>
                   <td data-label="Estado">
                     <StatusBadge active={emp.active} />
                   </td>
@@ -94,6 +113,55 @@ function CompanyEmployees({ company }: { company: CompanyDetail }) {
           />
         </PanelSection>
       </Panel>
+
     </div>
+  );
+}
+
+/** "1 muestra" / "3 muestras". */
+const samples = (count: number) => `${count} ${count === 1 ? 'muestra' : 'muestras'}`;
+
+/** Olvidar lo aprendido de un empleado: qué se borra y que no tendrá que registrarse de nuevo. */
+function forgetConfirm(employee: CompanyEmployee): ConfirmInput {
+  const name = `${employee.first_name} ${employee.last_name}`;
+  return {
+    kind: 'delete',
+    icon: <Eraser size={30} />,
+    eyebrow: 'Aprendizaje del reconocimiento',
+    title: `¿Olvidar lo aprendido de ${name}?`,
+    message:
+      'Se borrarán las muestras que el reconocimiento aprendió de sus identificaciones. Volverá a compararse solo con su registro aprobado: no tendrá que registrarse de nuevo. Úsalo si se duda de alguna identificación.',
+    detailsTitle: 'Se borrará',
+    details: [
+      { label: 'Empleado', value: `${name} · ${employee.employee_number}` },
+      { label: 'Lo aprendido', value: `${samples(employee.face_learned_samples)} · ${timeAgo(employee.face_last_learned_at)}` },
+    ],
+    note: 'Lo aprendido no se puede recuperar; volverá a aprender de sus próximas identificaciones seguras.',
+    confirmLabel: 'Olvidar lo aprendido',
+    confirmIcon: <Eraser size={18} />,
+  };
+}
+
+interface LearnedProps {
+  employee: CompanyEmployee;
+  /** Empleado cuyo aprendizaje se está olvidando (su botón muestra el progreso; los demás esperan). */
+  busy: number | null;
+  onForget: () => void;
+}
+
+/** Cuánto aprendió el reconocimiento de sus identificaciones y, si aprendió algo, "Olvidar". */
+function Learned({ employee, busy, onForget }: LearnedProps) {
+  const learned = employee.face_learned_samples;
+  if (learned === 0) return <span className="muted">Sin aprender</span>;
+  return (
+    <span className="learned-cell">
+      <span>
+        {samples(learned)}
+        <small className="muted"> · {timeAgo(employee.face_last_learned_at)}</small>
+      </span>
+      <Button variant="ghost" size="sm" icon={<Eraser size={16} />} loading={busy === employee.id} disabled={busy !== null} onClick={onForget}>
+        Olvidar
+      </Button>
+    </span>
   );
 }

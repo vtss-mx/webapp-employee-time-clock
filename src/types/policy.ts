@@ -1,6 +1,6 @@
 // Política de verificación de la empresa y evolución de su reconocimiento facial.
 
-/** Política de verificación de la empresa (editable por COMPANY en Configuración). */
+/** Política de verificación de la empresa (la configura el ADMIN de la plataforma; la empresa solo la lee). */
 export interface VerificationPolicy {
   block_glasses: boolean;
   block_headwear: boolean;
@@ -12,11 +12,19 @@ export interface VerificationPolicy {
   validator_mobile_only: boolean;
   /** Confianza mínima: exactamente el `value` de un nivel activo del catálogo confidence_levels. */
   min_confidence: number;
-  // --- Candados contra engaños (cada uno lo activa o desactiva la empresa) ---
+  /** Confianza al identificar entre toda la plantilla (1:N, validadores); nunca rige por debajo de la 1:1. */
+  identify_confidence: number;
+  /** Calidad mínima de cada captura (0 = sin mínimo): detección, nitidez y luz combinadas. */
+  min_capture_quality: number;
+  // --- Candados contra engaños (cada uno se activa o desactiva por empresa) ---
   /** Sensibilidad del anti-spoofing: código del catálogo antispoof_levels. */
   anti_spoofing_level: string;
-  /** Giros aleatorios de la prueba de vida (1 o 2). */
+  /** Movimientos aleatorios de la prueba de vida (1 a 3: girar, mirar arriba o abajo, acercarse). */
   liveness_steps: number;
+  /** Segundos para responder el reto completo (destello y movimientos; 20 a 180). */
+  liveness_timeout_seconds: number;
+  /** Destello de colores en la pantalla: código del catálogo flash_modes (OFF, OBSERVE, ENFORCE). */
+  flash_liveness: string;
   block_virtual_cameras: boolean;
   reject_foreign_images: boolean;
   detect_static_captures: boolean;
@@ -33,6 +41,13 @@ export interface VerificationPolicy {
   qr_lifetime_seconds: number;
   /** Aprendizaje continuo: cada identificación segura enseña a la galería del empleado. */
   adaptive_learning: boolean;
+  // --- Ubicación de los registros de asistencia (las evalúa solo el servidor) ---
+  /** Precisión mínima (m) que debe informar el navegador; más imprecisa, se pide repetir. */
+  max_location_accuracy_m: number;
+  /** Rechazar un registro a una distancia imposible de recorrer desde el anterior. */
+  detect_impossible_travel: boolean;
+  /** Velocidad máxima creíble entre dos registros (km/h). */
+  max_travel_kmh: number;
   /** Nombres de cámaras virtuales que no se aceptan (la app avisa antes de capturar). */
   blocked_cameras: string[];
   updated_at: string | null;
@@ -41,8 +56,23 @@ export interface VerificationPolicy {
 
 export type VerificationPolicyUpdate = Partial<Omit<VerificationPolicy, 'updated_at' | 'updated_by' | 'blocked_cameras'>>;
 
-/** Reglas que la app aplica en pantalla (el umbral de confianza solo lo evalúa el servidor). */
-export type VerificationRules = Omit<VerificationPolicy, 'min_confidence' | 'updated_at' | 'updated_by'>;
+/**
+ * Reglas que la app aplica en pantalla (el umbral de confianza solo lo evalúa el servidor; la vida del
+ * reto y el destello llegan en cada reto, `FaceChallenge`).
+ */
+export type VerificationRules = Omit<
+  VerificationPolicy,
+  | 'min_confidence'
+  | 'identify_confidence'
+  | 'min_capture_quality'
+  | 'max_location_accuracy_m'
+  | 'detect_impossible_travel'
+  | 'max_travel_kmh'
+  | 'liveness_timeout_seconds'
+  | 'flash_liveness'
+  | 'updated_at'
+  | 'updated_by'
+>;
 
 /** Evolución del reconocimiento facial de la empresa: lo que su galería aprendió del uso. */
 export interface FaceLearningSummary {

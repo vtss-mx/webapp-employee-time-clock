@@ -65,6 +65,14 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa1234');
   }
   const server = (create: () => Response) => mockFetch((call) => (call.url.includes('/validation') ? liveCheck() : create()));
+  /** Pide registrar y devuelve la confirmación (lo que se registrará, sin la contraseña). */
+  async function askToCreate() {
+    const submit = screen.getByRole('button', { name: 'Registrar empresa' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await userEvent.click(submit);
+    return screen.findByRole('dialog', { name: '¿Registrar la empresa Panificadora?' });
+  }
+  const confirmCreate = async () => userEvent.click(within(await askToCreate()).getByRole('button', { name: 'Registrar empresa' }));
 
   it('registra la empresa, lleva a su detalle y explica cómo entra su administrador', async () => {
     const { calls } = server(() => apiOk(company, { status: 201 }));
@@ -75,7 +83,26 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     await fillCompany();
     await waitFor(() => expect(submit).toBeEnabled());
     expect(submit).not.toHaveAttribute('title');
-    await userEvent.click(submit);
+
+    // Primero se confirma lo que se registrará (nunca la contraseña); cancelar no envía nada.
+    const dialog = await askToCreate();
+    expect(within(dialog).getByText('Nuevo registro')).toBeInTheDocument();
+    expect(within(within(dialog).getByRole('region', { name: 'Se registrará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Nombre comercialPanificadora',
+      'Razón socialPanificadora del Norte SA de CV',
+      'RFCPNO120315AB1',
+      'Teléfono+52 662 123 4567',
+      'Correo del administradoradmin@pan.com',
+      'Integraciones (API)No',
+    ]);
+    expect(dialog).not.toHaveTextContent('Empresa1234');
+    expect(dialog).toHaveTextContent('Comparte la contraseña inicial por un medio seguro.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(sent(calls, 'POST')).toHaveLength(0);
+    expect(screen.getByLabelText('Nombre comercial')).toHaveValue('Panificadora'); // el formulario sigue igual
+
+    await confirmCreate();
     expect(await screen.findByText('Detalle de empresa')).toBeInTheDocument();
     const popup = await screen.findByRole('dialog', { name: 'Empresa registrada' });
     expect(popup).toHaveTextContent('Panificadora ya puede usar Employee Time Clock.');
@@ -86,7 +113,7 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     expect(JSON.parse(post.init.body as string)).toMatchObject({ name: 'Panificadora', rfc: 'PNO120315AB1', max_employees: null, api_enabled: false, admin_password: 'Empresa1234' });
   });
 
-  it('el ADMIN puede darle Integraciones (API) desde el alta (por omisión no la tiene)', async () => {
+  it('el ADMIN puede darle Integraciones (API) y un límite desde el alta (por omisión no los tiene)', async () => {
     const { calls } = server(() => apiOk({ ...company, api_enabled: true }, { status: 201 }));
     renderFrom('/admin/companies/new', '/admin/companies/new', <CompanyCreatePage />);
     const api = screen.getByRole('switch', { name: 'Integraciones (API)' });
@@ -94,21 +121,21 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     await userEvent.click(api);
     expect(api).toHaveAttribute('aria-checked', 'true');
     await fillCompany();
-    const submit = screen.getByRole('button', { name: 'Registrar empresa' });
-    await waitFor(() => expect(submit).toBeEnabled());
-    await userEvent.click(submit);
+    await userEvent.type(screen.getByLabelText('Límite de empleados'), '25');
+    const facts = within(await askToCreate()).getByRole('region', { name: 'Se registrará' });
+    expect(facts).toHaveTextContent('Límite de empleados25 empleados');
+    expect(facts).toHaveTextContent('Integraciones (API)Sí');
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Registrar empresa' }));
     const popup = await screen.findByRole('dialog', { name: 'Empresa registrada' });
     expect(popup).toHaveTextContent('Tiene acceso a Integraciones (API): puede crear sus llaves.');
-    expect(JSON.parse(sent(calls, 'POST')[0].init.body as string)).toMatchObject({ api_enabled: true });
+    expect(JSON.parse(sent(calls, 'POST')[0].init.body as string)).toMatchObject({ api_enabled: true, max_employees: 25 });
   });
 
   it('un RFC ya registrado se marca en su campo y se avisa en popup; la pantalla sigue disponible', async () => {
     server(() => apiFail(409, 'COMPANY_RFC_TAKEN', 'El RFC ya está registrado'));
     renderFrom('/admin/companies/new', '/admin/companies/new', <CompanyCreatePage />);
     await fillCompany();
-    const submit = screen.getByRole('button', { name: 'Registrar empresa' });
-    await waitFor(() => expect(submit).toBeEnabled());
-    await userEvent.click(submit);
+    await confirmCreate();
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo registrar la empresa' });
     expect(popup).toHaveTextContent('El RFC ya está registrado');
     expect(screen.getByLabelText('RFC de la empresa')).toHaveAccessibleDescription(/El RFC ya está registrado/);
@@ -134,7 +161,7 @@ describe('CompanyEditPage (solo se envía lo que cambió)', () => {
       return loads.length > 1 ? (loads.shift() as Response) : loads[0];
     });
 
-  it('carga la empresa en el formulario; sin cambios no guarda; guarda solo el campo cambiado', async () => {
+  it('carga la empresa en el formulario; sin cambios avisa y no guarda; confirma y guarda solo el campo cambiado', async () => {
     const { calls } = server(apiOk(company));
     renderFrom('/admin/companies/:id/edit', '/admin/companies/4/edit', <CompanyEditPage />);
     expect(screen.getByLabelText('Cargando')).toBeInTheDocument();
@@ -143,29 +170,62 @@ describe('CompanyEditPage (solo se envía lo que cambió)', () => {
     const save = screen.getByRole('button', { name: 'Guardar cambios' });
     await waitFor(() => expect(save).toHaveAttribute('title', 'No hay cambios por guardar'));
     expect(save).toBeDisabled();
+    // Un envío forzado (Enter) sin cambios no pregunta: avisa "Sin cambios" y no envía nada.
     forceSubmit(save);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Sin cambios' })).getByRole('button', { name: 'Entendido' }));
 
     await userEvent.clear(screen.getByLabelText('Límite de empleados'));
     await userEvent.type(screen.getByLabelText('Límite de empleados'), '80');
     await waitFor(() => expect(save).toBeEnabled());
     expect(save).not.toHaveAttribute('title');
     await userEvent.click(save);
+    const dialog = await screen.findByRole('dialog', { name: '¿Guardar los cambios de Panificadora?' });
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('1 cambioLímite de empleadosAntes: 50 empleadosDespués: 80 empleados');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(sent(calls, 'PUT')).toHaveLength(0); // cancelar no envía nada y el formulario sigue igual
+    expect(screen.getByLabelText('Límite de empleados')).toHaveValue('80');
+
+    await userEvent.click(save);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Guardar los cambios de Panificadora?' })).getByRole('button', { name: 'Guardar cambios' }));
     expect(await screen.findByText('Detalle de empresa')).toBeInTheDocument();
     expect(await screen.findByRole('dialog', { name: 'Cambios guardados' })).toBeInTheDocument();
     const puts = sent(calls, 'PUT');
-    expect(puts).toHaveLength(1); // el envío forzado sin cambios no llegó a la API
+    expect(puts).toHaveLength(1);
     expect(puts[0].url).toBe('/api/admin/companies/4');
     expect(JSON.parse(puts[0].init.body as string)).toEqual({ max_employees: 80 });
   });
 
+  it('quitar el límite y cambiar el teléfono: la confirmación muestra "Sin límite" y el teléfono legible', async () => {
+    const { calls } = server(apiOk(company));
+    renderFrom('/admin/companies/:id/edit', '/admin/companies/4/edit', <CompanyEditPage />);
+    await userEvent.clear(await screen.findByLabelText('Límite de empleados'));
+    await userEvent.clear(screen.getByLabelText('Teléfono'));
+    await userEvent.type(screen.getByLabelText('Teléfono'), '6629876543');
+    const save = screen.getByRole('button', { name: 'Guardar cambios' });
+    await waitFor(() => expect(save).toBeEnabled());
+    await userEvent.click(save);
+    const changes = within(await screen.findByRole('dialog', { name: '¿Guardar los cambios de Panificadora?' })).getByRole('region', { name: 'Cambios' });
+    expect(within(changes).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'TeléfonoAntes: +52 662 123 4567Después: +52 662 987 6543',
+      'Límite de empleadosAntes: 50 empleadosDespués: Sin límite',
+    ]);
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Detalle de empresa')).toBeInTheDocument();
+    expect(JSON.parse(sent(calls, 'PUT')[0].init.body as string)).toEqual({ phone: '+526629876543', max_employees: null });
+  });
+
   it('una empresa sin datos obligatorios pide completarlos antes de guardar; "Cancelar" regresa', async () => {
-    server(apiOk(bare));
+    const { calls } = server(apiOk(bare));
     renderFrom('/admin/companies/:id/edit', '/admin/companies/4/edit', <CompanyEditPage />);
     expect(await screen.findByLabelText('Razón social')).toHaveValue('');
     expect(screen.getByLabelText('RFC de la empresa')).toHaveValue('');
     expect(screen.getByLabelText('Límite de empleados')).toHaveValue('');
     const save = screen.getByRole('button', { name: 'Guardar cambios' });
     expect(save).toHaveAttribute('title', 'Completa correctamente todos los campos obligatorios');
+    // Incompleto, un envío forzado ni pregunta ni llega a la API.
+    forceSubmit(save);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(sent(calls, 'PUT')).toHaveLength(0);
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(await screen.findByText('Listado de empresas')).toBeInTheDocument();
   });
@@ -194,7 +254,7 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
     return mock.calls;
   }
 
-  it('desactivada y sin datos opcionales: "Sin capturar", sin límite; activarla no pide confirmación', async () => {
+  it('desactivada y sin datos opcionales: "Sin capturar", sin límite; activarla también se confirma', async () => {
     const calls = renderDetail({ ...bare, active: false });
     expect(await screen.findByRole('heading', { name: 'Panificadora' })).toBeInTheDocument();
     expect(screen.getAllByText('Sin capturar')).toHaveLength(3); // razón social, RFC y teléfono
@@ -205,8 +265,18 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
     expect(await screen.findByText('No hay administradores registrados')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Activar' }));
+    let dialog = await screen.findByRole('dialog', { name: '¿Activar Panificadora?' });
+    expect(dialog).toHaveTextContent('podrá volver a iniciar sesión de inmediato');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: InactivaDespués: Activa');
+    expect(within(dialog).getByRole('region', { name: 'Personal que recupera el acceso' })).toHaveTextContent('Administradores1Empleados3');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(sent(calls, 'PATCH')).toHaveLength(0); // cancelar no envía nada
+    expect(screen.getByRole('button', { name: 'Activar' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Activar' }));
+    dialog = await screen.findByRole('dialog', { name: '¿Activar Panificadora?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Activar empresa' }));
     expect(await screen.findByRole('dialog', { name: 'Empresa activada' })).toHaveTextContent('Su personal ya puede iniciar sesión.');
-    expect(screen.queryByRole('alertdialog')).toBeNull(); // sin confirmación previa
     expect(JSON.parse(sent(calls, 'PATCH')[0].init.body as string)).toEqual({ active: true });
     expect(screen.getByText('Operando')).toBeInTheDocument();
   });
@@ -219,28 +289,39 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
     expect(screen.getByText('de 50 empleados')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
-    const dialog = screen.getByRole('alertdialog', { name: 'Desactivar Panificadora' });
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar Panificadora?' });
+    expect(dialog).toHaveTextContent('Se cerrará de inmediato la sesión de todo su personal');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: ActivaDespués: Inactiva');
+    expect(within(dialog).getByRole('region', { name: 'Personal afectado' })).toHaveTextContent('Administradores1Empleados46');
+    expect(dialog).toHaveTextContent('Sus datos se conservan');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(sent(calls, 'PATCH')).toHaveLength(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Desactivar empresa' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Desactivar empresa' }));
     expect(await screen.findByRole('dialog', { name: 'Empresa desactivada' })).toHaveTextContent('Su personal ya no puede iniciar sesión.');
     expect(sent(calls, 'PATCH')[0].url).toBe('/api/admin/companies/4/status');
     expect(screen.getByRole('button', { name: 'Activar' })).toBeInTheDocument();
   });
 
-  it('Integraciones (API): darla no pide confirmación; quitarla sí (sus sistemas dejan de recibir datos)', async () => {
+  it('Integraciones (API): darla y quitarla se confirman; cancelar deja el interruptor como estaba', async () => {
     const calls = renderDetail(company);
     const api = await screen.findByRole('switch', { name: 'Integraciones (API)' });
     expect(api).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Sin acceso: la pantalla no aparece en su menú y sus llaves no funcionan.')).toBeInTheDocument();
 
     await userEvent.click(api);
+    let dialog = await screen.findByRole('dialog', { name: '¿Dar Integraciones a Panificadora?' });
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('Integraciones (API)Antes: Sin accesoDespués: Con acceso');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(sent(calls, 'PUT')).toHaveLength(0);
+    expect(api).toHaveAttribute('aria-checked', 'false'); // sin confirmar, nada cambia
+
+    await userEvent.click(api);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Dar Integraciones a Panificadora?' })).getByRole('button', { name: 'Dar acceso' }));
     expect(await screen.findByRole('dialog', { name: 'Integraciones activadas' })).toHaveTextContent('sus llaves funcionan');
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
-    expect(screen.queryByRole('alertdialog')).toBeNull();
     const [enable] = sent(calls, 'PUT');
     expect(enable.url).toBe('/api/admin/companies/4');
     expect(JSON.parse(enable.init.body as string)).toEqual({ api_enabled: true });
@@ -248,22 +329,26 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
     expect(screen.getByRole('button', { name: 'Desactivar' })).not.toHaveAttribute('aria-busy', 'true'); // solo el interruptor estuvo ocupado
 
     await userEvent.click(api);
-    const dialog = screen.getByRole('alertdialog', { name: 'Quitar Integraciones a Panificadora' });
+    dialog = await screen.findByRole('alertdialog', { name: '¿Quitar Integraciones a Panificadora?' });
+    expect(dialog).toHaveTextContent('Sus sistemas conectados dejarán de recibir información de inmediato');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('Antes: Con accesoDespués: Sin acceso');
+    expect(dialog).toHaveTextContent('Las llaves se conservan');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(sent(calls, 'PUT')).toHaveLength(1);
     expect(api).toHaveAttribute('aria-checked', 'true'); // sin confirmar, nada cambia
 
     await userEvent.click(api);
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Quitar acceso' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Quitar acceso' }));
     expect(await screen.findByRole('dialog', { name: 'Integraciones desactivadas' })).toHaveTextContent('Sus llaves ya no funcionan');
     expect(JSON.parse(sent(calls, 'PUT')[1].init.body as string)).toEqual({ api_enabled: false });
     expect(api).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('"Ver empleados" lleva a la lista de solo consulta de la empresa', async () => {
+  it('"Ver empleados" y "Política de verificación" llevan a sus pantallas de la empresa', async () => {
     renderDetail(company);
     expect(await screen.findByRole('link', { name: 'Ver empleados' })).toHaveAttribute('href', '/admin/companies/4/employees');
+    expect(screen.getByRole('link', { name: 'Política de verificación' })).toHaveAttribute('href', '/admin/companies/4/policy');
   });
 
   it('mientras se vuelve a pedir la página de administradores, la lista se atenúa', async () => {
@@ -271,6 +356,7 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
     let requests = 0;
     renderDetail(company, () => (requests++ === 0 ? adminsPage([admin]) : new Promise<Response>((resolve) => (release = resolve))));
     await userEvent.click(await screen.findByRole('button', { name: 'Activar' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Activar a admin@pan.com?' })).getByRole('button', { name: 'Activar administrador' }));
     await waitFor(() => expect(screen.getByText('admin@pan.com').closest('ul')).toHaveClass('is-loading'));
     release(adminsPage([{ ...admin, active: true }]));
     await waitFor(() => expect(screen.getByText('admin@pan.com').closest('ul')).not.toHaveClass('is-loading'));

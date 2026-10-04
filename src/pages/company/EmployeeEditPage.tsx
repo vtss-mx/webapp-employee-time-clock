@@ -6,12 +6,30 @@ import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
-import { useEmployeeForm } from '../../hooks/useEmployeeForm';
+import { EMPLOYEE_LABELS, useEmployeeForm } from '../../hooks/useEmployeeForm';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
-import type { EmployeeFormValues, EmployeeUpdatePayload } from '../../types';
+import type { Employee, EmployeeFormValues, EmployeeUpdatePayload } from '../../types';
+import { describeChanges } from '../../utils/changes';
+
+/** El formulario con los datos actuales del empleado (la contraseña vacía = no cambiarla). */
+function toForm(employee: Employee): EmployeeFormValues {
+  return {
+    first_name: employee.first_name,
+    last_name: employee.last_name,
+    birth_date: employee.birth_date,
+    curp: employee.curp ?? '',
+    rfc: employee.rfc ?? '',
+    nss: employee.nss ?? '',
+    employee_number: employee.employee_number,
+    phone: employee.phone ?? '',
+    email: employee.email,
+    password: '',
+    password_confirm: '',
+  };
+}
 
 export function EmployeeEditPage() {
   const { id } = useParams();
@@ -39,19 +57,7 @@ export function EmployeeEditPage() {
   useLayoutEffect(() => {
     if (!original) return;
     setHeadwearExempt(original.headwear_exempt);
-    loadValues({
-      first_name: original.first_name,
-      last_name: original.last_name,
-      birth_date: original.birth_date,
-      curp: original.curp ?? '',
-      rfc: original.rfc ?? '',
-      nss: original.nss ?? '',
-      employee_number: original.employee_number,
-      phone: original.phone ?? '',
-      email: original.email,
-      password: '',
-      password_confirm: '',
-    });
+    loadValues(toForm(original));
   }, [original, setHeadwearExempt, loadValues]);
 
   // Solo se envían los campos modificados (y sin cambios no hay nada que guardar).
@@ -71,12 +77,17 @@ export function EmployeeEditPage() {
   const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     // Sin el empleado cargado no hay cambios (payload vacío): `dirty` también cubre ese caso.
-    if (!dirty || !validate()) return;
+    if (!original || !dirty || !validate()) return;
 
     await save(async () => {
       await employeeService.update(employeeId, payload);
       void feedback.success('Cambios guardados');
       void navigate(paths.company.employee(employeeId));
+    }, {
+      kind: 'edit',
+      title: `¿Guardar los cambios de ${original.full_name}?`,
+      changes: describeChanges({ ...toForm(original), headwear_exempt: original.headwear_exempt }, { ...values, headwear_exempt: headwearExempt }, EMPLOYEE_LABELS),
+      note: payload.password ? 'Deberá entrar con la nueva contraseña: compártela por un medio seguro.' : undefined,
     });
   };
 

@@ -37,6 +37,7 @@ function renderPanel(routes: Record<string, (call: MockCall) => Response | Promi
 }
 
 const closeEverywhere = () => userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión en todos los dispositivos' }));
+const ALL = '¿Cerrar la sesión en todos tus dispositivos?';
 
 describe('SessionsPanel', () => {
   it('cerrar en todos los dispositivos: "Cancelar" no cierra nada; "Cerrar todas" cierra la sesión sin otro aviso', async () => {
@@ -44,12 +45,12 @@ describe('SessionsPanel', () => {
     expect(await screen.findByText('Este dispositivo')).toBeInTheDocument();
 
     await closeEverywhere();
-    await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Cerrar todas las sesiones' })).getByRole('button', { name: 'Cancelar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: ALL })).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(calls.some((call) => call.url.endsWith('/auth/logout-all'))).toBe(false);
 
     await closeEverywhere();
-    await userEvent.click(screen.getByRole('button', { name: 'Cerrar todas' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: ALL })).getByRole('button', { name: 'Cerrar todas' }));
     expect(await screen.findByText('Sesión cerrada')).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
@@ -58,11 +59,23 @@ describe('SessionsPanel', () => {
     renderPanel({ '/auth/logout-all': () => apiFail(503, 'SERVICE_UNAVAILABLE', 'Servicio no disponible'), '/auth/sessions': () => page(session('a', true)) });
     await screen.findByText('Este dispositivo');
     await closeEverywhere();
-    await userEvent.click(screen.getByRole('button', { name: 'Cerrar todas' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: ALL })).getByRole('button', { name: 'Cerrar todas' }));
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo cerrar sesión en todos los dispositivos' });
     expect(popup).toHaveTextContent('Servicio no disponible');
-    expect(screen.queryByRole('alertdialog', { name: 'Cerrar todas las sesiones' })).toBeNull();
+    expect(screen.queryByRole('alertdialog', { name: ALL })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Cerrar sesión en todos los dispositivos' })).toBeEnabled(); // se puede reintentar
     expect(screen.getByText('Este dispositivo')).toBeInTheDocument(); // la sesión sigue abierta
+  });
+
+  it('cerrar otra sesión se confirma con su dispositivo e IP; cancelar no la cierra', async () => {
+    const { calls } = renderPanel({ '/auth/sessions': () => page(session('a', true), session('c', false)) });
+    await screen.findByText('Este dispositivo');
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    const confirm = await screen.findByRole('alertdialog', { name: /^¿Cerrar la sesión de .*\?$/ });
+    expect(confirm).toHaveTextContent('IP10.0.0.1');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    expect(calls.some((call) => call.init.method === 'DELETE')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeEnabled();
   });
 
   it('al cerrar otra sesión la lista se recarga atenuada (sin esqueleto) hasta tener la respuesta', async () => {
@@ -75,6 +88,9 @@ describe('SessionsPanel', () => {
     await screen.findByText('Este dispositivo');
     expect(screen.getByText(/IP desconocida/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    const confirm = await screen.findByRole('alertdialog', { name: /^¿Cerrar la sesión de .*\?$/ });
+    expect(confirm).toHaveTextContent('IPDesconocida');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cerrar sesión' }));
     await waitFor(() => expect(document.querySelector('.session-list')).toHaveClass('is-loading'));
     answer(page(session('a', true)));
     await waitFor(() => expect(document.querySelector('.session-list')).not.toHaveClass('is-loading'));

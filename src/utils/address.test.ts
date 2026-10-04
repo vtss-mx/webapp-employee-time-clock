@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { loginLocationMessage, mapsProblemMessage } from '../components/location/locationMessages';
-import { MapsApiError } from '../services/maps/googleMaps';
+import { loginLocationMessage } from '../components/location/locationMessages';
 import { ApiError } from '../services/apiClient';
 import {
   addressForPoint,
   addressFromParts,
+  addressFromResults,
   addressLine,
   EMPTY_ADDRESS,
   formatPoint,
+  missingAreaFields,
   normalizePostalCode,
   pickAddress,
   validateAddress,
@@ -48,6 +49,47 @@ describe('domicilio desde Google', () => {
       city: 'Cuauhtémoc',
     });
     expect(addressFromParts([])).toEqual({});
+  });
+
+  it('México: la colonia (sublocality) y el nombre del edificio (premise) nunca son la ciudad, la calle ni el número', () => {
+    const colonia = [part(['premise'], 'Torre Hermosillo'), part(['sublocality_level_1', 'sublocality', 'political'], 'Centro'), part(['administrative_area_level_2', 'political'], 'Hermosillo')];
+    expect(addressFromParts(colonia)).toEqual({ municipality: 'Hermosillo', city: 'Hermosillo' });
+    // Solo la ciudad (sin municipio): el municipio es la misma; con número interior (subpremise) también se usa.
+    expect(addressFromParts([part(['locality', 'political'], 'Zapopan'), part(['subpremise'], '4B')])).toEqual({ interior_number: '4B', municipality: 'Zapopan', city: 'Zapopan' });
+    // Otros países: el nivel 3 (comuna, municipio) cubre al municipio y a la ciudad.
+    expect(addressFromParts([part(['administrative_area_level_3'], 'Bolonia')])).toEqual({ municipality: 'Bolonia', city: 'Bolonia' });
+    // Reino Unido: la ciudad postal.
+    expect(addressFromParts([part(['postal_town'], 'London'), part(['administrative_area_level_2'], 'Greater London')])).toEqual({ municipality: 'Greater London', city: 'London' });
+  });
+
+  it('varios resultados del mismo punto: manda el más preciso y los demás completan solo lo de la zona', () => {
+    const exact = [part(['street_number'], '71'), part(['route'], 'Calle Dr. Paliza'), part(['locality'], 'Hermosillo')];
+    const postalCode = [part(['postal_code'], '83000'), part(['country'], 'México', 'MX'), part(['locality'], 'Otra ciudad')];
+    const otherHouse = [part(['street_number'], '99'), part(['route'], 'Otra calle'), part(['subpremise'], '3'), part(['administrative_area_level_1'], 'Sonora')];
+    const municipality = [part(['administrative_area_level_2'], 'Hermosillo')];
+    expect(addressFromResults([exact, postalCode, otherHouse, municipality])).toEqual({
+      street: 'Calle Dr. Paliza', // del más preciso, aunque otro traiga otra calle
+      exterior_number: '71',
+      postal_code: '83000',
+      country_code: 'MX',
+      state: 'Sonora',
+      municipality: 'Hermosillo', // del más preciso (su ciudad), no del resultado del municipio
+      city: 'Hermosillo', // la del más preciso, no la del código postal
+    });
+    // El número exterior y el interior nunca salen de otro resultado (serían los de otra casa).
+    expect(addressFromResults([[part(['locality'], 'Hermosillo')], otherHouse])).toEqual({ street: 'Otra calle', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo' });
+    // Un primer resultado sin datos (p. ej. un plus code) no impide armar el domicilio con los demás.
+    expect(addressFromResults([[part(['plus_code'], '3394+5R')], exact])).toEqual({ street: 'Calle Dr. Paliza', municipality: 'Hermosillo', city: 'Hermosillo' });
+    expect(addressFromResults([])).toEqual({});
+  });
+
+  it('sabe si al domicilio le falta algo de la zona (calle, código postal, estado, municipio, ciudad o país)', () => {
+    const complete = addressFromParts(HERMOSILLO);
+    expect(missingAreaFields(complete)).toBe(false);
+    expect(missingAreaFields({ ...complete, exterior_number: undefined })).toBe(false); // el número no es de la zona
+    expect(missingAreaFields({ ...complete, postal_code: undefined })).toBe(true);
+    expect(missingAreaFields({ ...complete, country_code: '' })).toBe(true);
+    expect(missingAreaFields({})).toBe(true);
   });
 
   it('el punto nuevo reemplaza el domicilio; conserva el interior y el país si Google no los trae', () => {
@@ -128,15 +170,7 @@ describe('ubicación del dispositivo', () => {
   });
 });
 
-describe('mensajes de ubicación y de Google Maps', () => {
-  it('API no habilitada: qué falta y cómo seguir; falla de red: reintentar', () => {
-    const places = mapsProblemMessage(new MapsApiError('places', 'denied'));
-    expect(places).toMatchObject({ variant: 'warning', title: 'La búsqueda de lugares no está disponible', key: 'maps-places-denied' });
-    expect(places.footnote as string).toContain('Places API (New)');
-    expect(mapsProblemMessage(new MapsApiError('geocoding', 'denied')).title).toBe('El autollenado del domicilio no está disponible');
-    expect(mapsProblemMessage(new MapsApiError('maps', 'failed'))).toMatchObject({ variant: 'error', title: 'No se pudo consultar Google Maps' });
-  });
-
+describe('mensajes de ubicación', () => {
   it('inicio de sesión: errores de ubicación con su aviso; los demás, no', () => {
     expect(loginLocationMessage(new LocationError('denied'))?.title).toBe('Permite el acceso a tu ubicación');
     const inaccurate = new ApiError({ statusCode: 403, code: 'LOCATION_INACCURATE', message: 'No es precisa (±900 m).' });

@@ -9,7 +9,7 @@ import { useSearchList, type ListQuery } from '../hooks/useSearchList';
 import { adminService } from '../services/adminService';
 import { checkAvailability } from '../services/availabilityService';
 import { ApiError } from '../services/apiClient';
-import { apiOk, liveCheck, mockFetch } from '../test/http';
+import { apiFail, apiOk, liveCheck, mockFetch } from '../test/http';
 import { WithCatalogs, renderWithProviders } from '../test/render';
 import type { CompanyAdmin, CompanyDetail, CompanyFormValues, Page } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
@@ -134,7 +134,16 @@ describe('useCompanyForm', () => {
     const { result } = renderHook(() => useCompanyForm({ withAdmin: false, excludeId: 4, originalRfc: 'PNO120315AB1' }), { wrapper });
     act(() => result.current.loadValues({ ...validCompany, legal_name: '' }));
     expect(result.current.errors.legal_name).toBe('La razón social es obligatorio');
-    await act(() => result.current.save(() => Promise.reject(new ApiError({ statusCode: 409, code: 'COMPANY_RFC_TAKEN', message: 'RFC en uso' }))));
+    let saved: Promise<void> = Promise.resolve();
+    act(() => {
+      saved = result.current.save(() => Promise.reject(new ApiError({ statusCode: 409, code: 'COMPANY_RFC_TAKEN', message: 'RFC en uso' })), 'No se pudo guardar', {
+        kind: 'edit',
+        title: '¿Guardar los cambios?',
+        changes: [{ label: 'RFC', before: 'PNO120315AB1', after: 'ACM010101AB1' }],
+      });
+    });
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Guardar los cambios?' })).getByRole('button', { name: 'Guardar cambios' }));
+    await act(() => saved);
     expect(result.current.errors.rfc).toBe('RFC en uso');
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo guardar' })).toBeInTheDocument();
     act(() => result.current.setValues({ ...result.current.values, rfc: 'ACM010101AB2' }));
@@ -244,9 +253,9 @@ describe('useSearchList + ListControls', () => {
 });
 
 describe('CompanyDetailPage: eliminar empresa', () => {
-  const renderDetail = (detail: CompanyDetail, admins: CompanyAdmin[] = [admin]) => {
+  const renderDetail = (detail: CompanyDetail, admins: CompanyAdmin[] = [admin], remove: () => Response = () => apiOk(null)) => {
     const mock = mockFetch((call) => {
-      if (call.init.method === 'DELETE') return apiOk(null);
+      if (call.init.method === 'DELETE') return remove();
       if (call.url.includes('/admins?')) return apiOk({ items: admins, total: admins.length, page: 1, size: 10 });
       return apiOk(detail);
     });
@@ -267,34 +276,64 @@ describe('CompanyDetailPage: eliminar empresa', () => {
     expect(remove).toHaveAttribute('title', expect.stringMatching(/desactívala/));
   });
 
-  it('sin empleados se elimina escribiendo su nombre para confirmar', async () => {
-    const calls = renderDetail({ ...company, employee_count: 0 });
-    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar' }));
-    const dialog = screen.getByRole('alertdialog', { name: 'Eliminar Panificadora' });
-    const confirm = within(dialog).getByRole('button', { name: 'Eliminar empresa' });
-    expect(confirm).toBeDisabled();
-    await userEvent.type(within(dialog).getByLabelText(/Escribe «Panificadora»/), 'Panificadora');
-    await userEvent.click(confirm);
+  it('sin empleados se elimina escribiendo su nombre para confirmar; cancelar o un rechazo del servidor la conservan', async () => {
+    let attempts = 0;
+    const calls = renderDetail({ ...company, employee_count: 0 }, [admin], () => (attempts++ === 0 ? apiFail(409, 'COMPANY_IN_USE', 'La empresa tiene registros') : apiOk(null)));
+    const remove = await screen.findByRole('button', { name: 'Eliminar' });
+    /** Pide eliminar y escribe su nombre para habilitar el botón. */
+    const askToRemove = async () => {
+      await userEvent.click(remove);
+      const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar Panificadora?' });
+      const confirm = within(dialog).getByRole('button', { name: 'Eliminar empresa' });
+      expect(confirm).toBeDisabled();
+      await userEvent.type(within(dialog).getByLabelText(/Escribe «Panificadora»/), 'Panificadora');
+      return { dialog, confirm };
+    };
+    const first = await askToRemove();
+    expect(within(first.dialog).getByRole('region', { name: 'Se eliminará' })).toHaveTextContent('Razón socialPanificadora del Norte SA de CVRFCPNO120315AB1Administradores1');
+    expect(first.dialog).toHaveTextContent('Esta acción no se puede deshacer.');
+    await userEvent.click(within(first.dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false); // cancelar no envía nada
+
+    await userEvent.click((await askToRemove()).confirm);
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo eliminar la empresa' })).toHaveTextContent('La empresa tiene registros');
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+    expect(remove).toBeEnabled(); // la pantalla sigue disponible
+
+    await userEvent.click((await askToRemove()).confirm);
     expect(await screen.findByText('Listado de empresas')).toBeInTheDocument();
-    expect(calls.find((c) => c.init.method === 'DELETE')?.url).toBe('/api/admin/companies/4');
+    expect(calls.filter((c) => c.init.method === 'DELETE').map((c) => c.url)).toEqual(['/api/admin/companies/4', '/api/admin/companies/4']);
   });
 
-  it('administradores paginados: desactivar pide confirmación y vuelve a cargar la página', async () => {
+  it('administradores paginados: desactivar pide confirmación (cancelar no envía nada) y vuelve a cargar la página', async () => {
     const calls = renderDetail(company);
     expect(await screen.findByText('admin@pan.com')).toBeInTheDocument();
     expect(screen.getByText('Aún no inicia sesión')).toBeInTheDocument();
-    await userEvent.click(within(screen.getByText('admin@pan.com').closest('li')!).getByRole('button', { name: 'Desactivar' }));
-    const dialog = screen.getByRole('alertdialog', { name: 'Desactivar administrador' });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }));
+    const deactivate = within(screen.getByText('admin@pan.com').closest('li')!).getByRole('button', { name: 'Desactivar' });
+    await userEvent.click(deactivate);
+    let dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar a admin@pan.com?' });
+    expect(dialog).toHaveTextContent('Ya no podrá iniciar sesión en Panificadora y su sesión actual se cerrará.');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: ActivoDespués: Inactivo');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(calls.some((c) => c.init.method === 'PATCH')).toBe(false);
+    expect(calls.filter((c) => c.url.includes('/admins?'))).toHaveLength(1); // ni siquiera se vuelve a pedir la página
+
+    await userEvent.click(deactivate);
+    dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar a admin@pan.com?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Desactivar administrador' }));
     expect(await screen.findByText('Administrador desactivado')).toBeInTheDocument();
     expect(calls.find((c) => c.init.method === 'PATCH')?.url).toBe('/api/admin/companies/4/admins/9/status');
     await waitFor(() => expect(calls.filter((c) => c.url.includes('/admins?'))).toHaveLength(2));
   });
 
-  it('activar un administrador inactivo no pide confirmación', async () => {
+  it('activar un administrador inactivo también se confirma', async () => {
     const calls = renderDetail(company, [{ ...admin, active: false, last_login_at: '2026-02-01T10:00:00Z' }]);
     expect(await screen.findByText(/Último acceso/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Activar' }));
+    const dialog = await screen.findByRole('dialog', { name: '¿Activar a admin@pan.com?' });
+    expect(dialog).toHaveTextContent('Podrá volver a iniciar sesión en Panificadora');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: InactivoDespués: Activo');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Activar administrador' }));
     expect(await screen.findByText('Administrador activado')).toBeInTheDocument();
     expect(JSON.parse(calls.find((c) => c.init.method === 'PATCH')?.init.body as string)).toEqual({ active: true });
   });

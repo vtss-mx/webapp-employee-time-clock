@@ -147,7 +147,7 @@ describe('pantallas de carga diferida', () => {
     await waitFor(() => expect(reload).toHaveBeenCalledOnce());
   });
 
-  it('otro tipo de error no consulta la versión', () => {
+  it('otro tipo de error no consulta la versión: es una falla de la app y se reporta', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { calls } = sameVersion();
     function Bomb(): never {
@@ -159,7 +159,7 @@ describe('pantallas de carga diferida', () => {
       </ErrorBoundary>,
     );
     expect(screen.getByRole('alert')).toBeInTheDocument();
-    expect(calls).toHaveLength(0);
+    expect(calls.map((call) => call.url)).toEqual(['/api/client-errors']);
   });
 
   it('cargar bien una pantalla libera la marca de recarga', async () => {

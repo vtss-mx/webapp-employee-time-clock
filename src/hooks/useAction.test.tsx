@@ -108,23 +108,82 @@ describe('useAction', () => {
   });
 });
 
+describe('useAction: confirmación previa', () => {
+  it('cancelar no envía nada, no marca ocupado ni avisa; confirmar sigue con la acción', async () => {
+    const { result } = renderHook(() => useAction<number>(), { wrapper });
+    const task = vi.fn(() => Promise.resolve('ok'));
+    const callbacks = { onSuccess: vi.fn(), onError: vi.fn(), onSettled: vi.fn() };
+    const options = { busy: 3, errorTitle: 'No se pudo', success: ['Eliminado'] as const, ...callbacks, confirm: { kind: 'delete' as const, title: '¿Eliminar a Ana?' } };
+
+    let done: Promise<boolean> = Promise.resolve(true);
+    act(() => {
+      done = result.current.run(task, options);
+    });
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar a Ana?' });
+    expect(result.current.busy).toBeNull(); // mientras se pregunta, nada está ocupado
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(await done).toBe(false);
+    expect(task).not.toHaveBeenCalled();
+    Object.values(callbacks).forEach((callback) => expect(callback).not.toHaveBeenCalled());
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    act(() => {
+      done = result.current.run(task, options);
+    });
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Eliminar a Ana?' })).getByRole('button', { name: 'Eliminar' }));
+    expect(await done).toBe(true);
+    expect(task).toHaveBeenCalledOnce();
+    expect(callbacks.onSuccess).toHaveBeenCalledWith('ok');
+    expect(await screen.findByRole('dialog', { name: 'Eliminado' })).toBeInTheDocument();
+  });
+});
+
 describe('useSubmit', () => {
   it('"Guardando…" hasta salir de la pantalla; si falla se libera, marca el campo y explica el motivo', async () => {
     const { result } = renderHook(() => useSubmit(), { wrapper });
+    const confirm = { kind: 'create' as const, title: '¿Guardar?' };
+    /** Envía y confirma (todo envío de formulario pregunta antes). */
+    const sendConfirmed = async (submit: typeof result.current.submit, task: () => Promise<void>, title: string, onError?: (error: unknown) => void) => {
+      let done: Promise<boolean> = Promise.resolve(false);
+      act(() => {
+        done = submit(task, title, { confirm, onError });
+      });
+      await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Guardar?' })).getByRole('button', { name: 'Crear' }));
+      await act(() => done);
+    };
     expect(result.current.saving).toBe(false);
-    await act(async () => {
-      await result.current.submit(() => Promise.resolve(), 'No se pudo guardar');
-    });
+    await sendConfirmed(result.current.submit, () => Promise.resolve(), 'No se pudo guardar');
     expect(result.current.saving).toBe(true);
 
     const second = renderHook(() => useSubmit(), { wrapper });
     const onError = vi.fn();
     const failure = new ApiError({ statusCode: 409, code: 'EMAIL_TAKEN', message: 'Correo en uso' });
-    await act(async () => {
-      await second.result.current.submit(() => Promise.reject(failure), 'No se pudo agregar', onError);
-    });
+    await sendConfirmed(second.result.current.submit, () => Promise.reject(failure), 'No se pudo agregar', onError);
     expect(second.result.current.saving).toBe(false);
     expect(onError).toHaveBeenCalledWith(failure);
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo agregar' })).toHaveTextContent('Correo en uso');
+  });
+
+  it('con `confirm` pregunta antes de enviar: cancelar deja el formulario como estaba', async () => {
+    const { result } = renderHook(() => useSubmit(), { wrapper });
+    const task = vi.fn(() => Promise.reject(new ApiError({ statusCode: 409, code: 'EMAIL_TAKEN', message: 'Correo en uso' })));
+    const onError = vi.fn();
+    const options = { confirm: { kind: 'create' as const, title: '¿Agregar administrador?' }, onError };
+    let done: Promise<boolean> = Promise.resolve(true);
+    act(() => {
+      done = result.current.submit(task, 'No se pudo agregar', options);
+    });
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Agregar administrador?' })).getByRole('button', { name: 'Cancelar' }));
+    expect(await done).toBe(false);
+    expect(task).not.toHaveBeenCalled();
+    expect(result.current.saving).toBe(false);
+
+    act(() => {
+      done = result.current.submit(task, 'No se pudo agregar', options);
+    });
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Agregar administrador?' })).getByRole('button', { name: 'Crear' }));
+    expect(await done).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    await closePopup('No se pudo agregar');
   });
 });

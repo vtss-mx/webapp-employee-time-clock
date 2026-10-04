@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { fieldErrorsFrom } from '../services/apiClient';
 import { validatorService } from '../services/validatorService';
 import type { Address, Validator, ValidatorMode, ValidatorSettings } from '../types';
+import type { ConfirmInput } from '../types/confirm';
 import { ADDRESS_FIELDS, addressForPoint, pickAddress, validateAddress, type AddressValues, type GeoPoint } from '../utils/address';
 import { validateEmail, validatePassword, validatePasswordConfirm, type FieldErrors } from '../utils/validation';
 import { liveFeedback, useAvailability } from './useAvailability';
@@ -69,6 +70,10 @@ export function settingsFrom(values: ValidatorFormValues, mode: ValidatorMode, p
   };
 }
 
+/** Lo que se guardaría del validador tal como se abrió: la base de "antes → después" al editar. */
+export const settingsOf = (original: Validator): ValidatorSettings =>
+  settingsFrom(initialValues(original), original.mode, pointOf(original.address), original.location_required);
+
 /**
  * Estado del alta o la edición de un validador: cuenta (solo en el alta), modo, domicilio, punto
  * en el mapa y "requiere ubicación" con su radio. Valida en el cliente (solo UX), verifica el
@@ -109,7 +114,8 @@ export function useValidatorForm(original: Validator | null) {
     ADDRESS_FIELDS.forEach((f) => form.touch(f));
   };
 
-  const save = (onSaved: (saved: Validator) => void) => {
+  /** Guarda tras confirmar: `confirm` arma la pregunta con lo que se enviará (cancelar no envía nada). */
+  const save = (onSaved: (saved: Validator) => void, confirm: (settings: ValidatorSettings) => ConfirmInput) => {
     form.touchAll();
     setSubmitted(true);
     if (invalid) {
@@ -122,7 +128,7 @@ export function useValidatorForm(original: Validator | null) {
         ? await validatorService.update(original.id, settings)
         : await validatorService.create({ ...settings, email: values.email, password: values.password });
       onSaved(saved);
-    }, creating ? 'No se pudo agregar el validador' : 'No se pudo guardar el validador');
+    }, creating ? 'No se pudo agregar el validador' : 'No se pudo guardar el validador', confirm(settings));
   };
 
   return {

@@ -13,6 +13,8 @@ function formattersFor(timeZone: string) {
     // Año-mes-día y hora del momento en la zona del negocio (en-CA da YYYY-MM-DD).
     day: new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }),
     hour: new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone }),
+    // "07:55": hora de un registro (entrada, descanso, salida) en la zona del negocio.
+    time: new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }),
   };
 }
 
@@ -60,6 +62,22 @@ export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : zone.dateTime.format(date);
+}
+
+/** Hora "HH:MM" (24 h) de un instante en la zona del negocio. */
+export function formatTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : zone.time.format(date);
+}
+
+/** Duración legible: "45 min", "8 h", "7 h 20 min". */
+export function formatMinutes(minutes: number | null | undefined): string {
+  if (minutes == null) return '—';
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return `${rest} min`;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
 }
 
 export function formatPercent(value: number | null | undefined): string {

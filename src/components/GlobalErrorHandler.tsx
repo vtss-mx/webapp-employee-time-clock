@@ -1,13 +1,16 @@
 import { useEffect } from 'react';
 import { useFeedback } from '../hooks/useFeedback';
 import { ApiError } from '../services/apiClient';
+import { reportClientError } from '../services/clientErrorService';
 import { reloadForNewVersion } from '../services/versionReload';
 
 const GENERIC_TEXT = 'Intenta nuevamente. Si persiste, recarga la página.';
 
 /**
  * Red de seguridad para errores asíncronos no capturados (promesas rechazadas, errores de
- * scripts): se muestran en el popup de mensajes en lugar de fallar en silencio.
+ * scripts): se muestran en el popup de mensajes en lugar de fallar en silencio. Si es una falla de
+ * la app (no una respuesta de la API, un permiso, la red o una cancelación: lo decide
+ * `reportClientError`), además se reporta al ADMIN ("Errores del sistema").
  */
 export function GlobalErrorHandler() {
   const feedback = useFeedback();
@@ -26,12 +29,14 @@ export function GlobalErrorHandler() {
       const reason: unknown = event.reason;
       if (reason instanceof DOMException && reason.name === 'AbortError') return;
       console.error('[unhandledrejection]', reason);
+      void reportClientError({ kind: 'UNHANDLED', error: reason, component: 'unhandledrejection' });
       notify(reason);
     };
     const onError = (event: ErrorEvent) => {
       // Errores de recursos externos/ResizeObserver no afectan la operación.
       if (!event.error || /ResizeObserver/.test(event.message)) return;
       console.error('[error]', event.error);
+      void reportClientError({ kind: 'UNHANDLED', error: event.error, component: 'window.onerror' });
       notify(event.error);
     };
     // Vite no pudo descargar un módulo (pantalla, detector facial, generador de QR). Se recarga solo

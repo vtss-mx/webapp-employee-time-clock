@@ -1,8 +1,8 @@
 import type { Detection, FaceDetector } from '@mediapipe/tasks-vision';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { config } from '../utils/config';
-import { turnProgress, useFaceAutoCapture, yawRatio, type DetectionMode } from './useFaceDetection';
+import { face, videoElement } from '../test/faces';
+import { useFaceAutoCapture, type DetectionMode } from './useFaceDetection';
 
 /*
  * MediaPipe simulado: el detector real (WASM) se valida en navegador; aquí, la carga (local, respaldo
@@ -106,69 +106,8 @@ describe('useFaceDetector', () => {
 
 // --- Lectura del rostro -------------------------------------------------------------------------
 
-const VIDEO_SIZE = { width: 640, height: 480 };
-
-function videoElement({ readyState = 4, width = VIDEO_SIZE.width, height = VIDEO_SIZE.height } = {}): HTMLVideoElement {
-  const video = document.createElement('video');
-  Object.defineProperty(video, 'readyState', { value: readyState, configurable: true });
-  Object.defineProperty(video, 'videoWidth', { value: width, configurable: true });
-  Object.defineProperty(video, 'videoHeight', { value: height, configurable: true });
-  return video;
-}
-
-interface FaceSpec {
-  score?: number;
-  /** Centro de la caja en proporción del video y su tamaño en píxeles. */
-  cx?: number;
-  cy?: number;
-  size?: number;
-  /** Nariz respecto al punto medio de los ojos (proporción del ancho): positivo = gira a su izquierda. */
-  nose?: number;
-  eyeGap?: number;
-  box?: boolean;
-}
-
-/** Rostro como lo entrega BlazeFace: caja en píxeles y puntos (ojos y nariz) normalizados. */
-function face({ score = 0.95, cx = 0.5, cy = 0.5, size = 200, nose = 0, eyeGap = 0.1, box = true }: FaceSpec = {}): Detection {
-  const x = cx * VIDEO_SIZE.width - size / 2;
-  const y = cy * VIDEO_SIZE.height - size / 2;
-  return {
-    categories: [{ score, index: 0, categoryName: 'face', displayName: '' }],
-    boundingBox: box ? { originX: x, originY: y, width: size, height: size, angle: 0 } : undefined,
-    // Ojos en desorden (derecho primero): la métrica los ordena por posición.
-    keypoints: [
-      { x: cx + eyeGap / 2, y: 0.45 },
-      { x: cx - eyeGap / 2, y: 0.45 },
-      { x: cx + nose, y: 0.55 },
-    ],
-  };
-}
-
-describe('yawRatio y turnProgress (misma métrica que el backend)', () => {
-  const video = videoElement();
-
-  it('giro respecto a la distancia entre ojos; sin puntos suficientes o con ojos encimados no se mide', () => {
-    expect(yawRatio(face(), video)).toBe(0);
-    expect(yawRatio(face({ nose: 0.03 }), video)).toBeCloseTo(0.3);
-    expect(yawRatio({ ...face(), keypoints: face().keypoints.slice(0, 2) }, video)).toBeNull();
-    expect(yawRatio(face({ eyeGap: 0 }), video)).toBeNull();
-  });
-
-  it('avance del giro hacia el lado pedido (0..1); null fuera del reto o sin un único rostro medible', () => {
-    const left: DetectionMode = { kind: 'turn', direction: 'TURN_LEFT', minYawRatio: 0.2 };
-    const right: DetectionMode = { kind: 'turn', direction: 'TURN_RIGHT', minYawRatio: 0.2 };
-    const target = 0.2 + config.faceTurnMargin;
-    expect(turnProgress([face({ nose: 0.01 })], video, left)).toBeCloseTo(0.1 / target);
-    expect(turnProgress([face({ nose: 0.05 })], video, left)).toBe(1);
-    expect(turnProgress([face({ nose: 0.01 })], video, right)).toBe(0);
-    expect(turnProgress([face({ nose: -0.01 })], video, right)).toBeCloseTo(0.1 / target);
-    expect(turnProgress([face()], video, { kind: 'frontal' })).toBeNull();
-    expect(turnProgress([face(), face()], video, left)).toBeNull();
-    expect(turnProgress([face({ score: 0.2 })], video, left)).toBeNull();
-    expect(turnProgress([{ ...face(), categories: [] }], video, left)).toBeNull();
-    expect(turnProgress([face({ eyeGap: 0 })], video, left)).toBeNull();
-  });
-});
+const LEFT: DetectionMode = { kind: 'action', action: 'TURN_LEFT', minimum: 0.2, baseline: null };
+const RIGHT: DetectionMode = { ...LEFT, action: 'TURN_RIGHT' };
 
 describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
   let detections: Detection[];
@@ -209,7 +148,7 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
       pendingFrame?.(clock);
     });
 
-  function renderCapture(options: { mode?: DetectionMode; stableFrames?: number; onStable?: () => void; enabled?: boolean; video?: HTMLVideoElement | null } = {}) {
+  function renderCapture(options: { mode?: DetectionMode; stableFrames?: number; onStable?: (sample?: unknown) => void; enabled?: boolean; video?: HTMLVideoElement | null } = {}) {
     const videoRef = { current: options.video === undefined ? videoElement() : options.video };
     const detector = { detectForVideo: detect } as unknown as FaceDetector;
     return renderHook(
@@ -230,7 +169,7 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
 
   it('sin detector o deshabilitada (cámara apagada, verificación en curso) no analiza', () => {
     const { result } = renderHook(() => useFaceAutoCapture({ detector: null, videoRef: { current: videoElement() }, enabled: true }));
-    expect(result.current).toEqual({ guidance: 'loading', progress: 0, turnProgress: 0 });
+    expect(result.current).toEqual({ guidance: 'loading', progress: 0, moveProgress: 0 });
     renderCapture({ enabled: false });
     expect(requestAnimationFrame).not.toHaveBeenCalled();
   });
@@ -258,14 +197,58 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
   });
 
   it('prueba de vida: pide girar hasta superar el mínimo (con margen) hacia el lado del reto', () => {
-    const left: DetectionMode = { kind: 'turn', direction: 'TURN_LEFT', minYawRatio: 0.2 };
-    const right: DetectionMode = { kind: 'turn', direction: 'TURN_RIGHT', minYawRatio: 0.2 };
-    expect(guidanceFor([face()], left)).toBe('turn');
-    expect(guidanceFor([face({ nose: 0.05 })], left)).toBe('hold_still');
-    expect(guidanceFor([face({ nose: 0.05 })], right)).toBe('turn');
-    expect(guidanceFor([face({ nose: -0.05 })], right)).toBe('hold_still');
-    expect(guidanceFor([face({ cx: 0.75, nose: 0.05 })], left)).toBe('hold_still'); // al girar se tolera más el descentrado
-    expect(guidanceFor([face({ eyeGap: 0 })], left)).toBe('turn');
+    expect(guidanceFor([face()], LEFT)).toBe('move');
+    expect(guidanceFor([face({ nose: 0.05 })], LEFT)).toBe('hold_still');
+    expect(guidanceFor([face({ nose: 0.05 })], RIGHT)).toBe('move');
+    expect(guidanceFor([face({ nose: -0.05 })], RIGHT)).toBe('hold_still');
+    expect(guidanceFor([face({ cx: 0.75, nose: 0.05 })], LEFT)).toBe('hold_still'); // al moverse se tolera más el descentrado
+    expect(guidanceFor([face({ eyeGap: 0 })], LEFT)).toBe('move');
+    expect(guidanceFor([face({ size: 420, nose: 0.05 })], LEFT)).toBe('too_close'); // girando no se permite acercarse de más
+  });
+
+  it('mirar arriba o abajo: la nariz sube o baja respecto al rostro en reposo (más el margen)', () => {
+    const baseline = { pitch: 0.5, width: 200 };
+    const up: DetectionMode = { kind: 'action', action: 'LOOK_UP', minimum: 0.08, baseline };
+    const down: DetectionMode = { ...up, action: 'LOOK_DOWN' };
+    expect(guidanceFor([face()], up)).toBe('move');
+    expect(guidanceFor([face({ pitch: 0.43 })], up)).toBe('move'); // 0.07: no llega al mínimo con margen (0.10)
+    expect(guidanceFor([face({ pitch: 0.38 })], up)).toBe('hold_still');
+    expect(guidanceFor([face({ pitch: 0.38 })], down)).toBe('move');
+    expect(guidanceFor([face({ pitch: 0.62 })], down)).toBe('hold_still');
+    expect(guidanceFor([face({ pitch: 0.38, noMouth: true })], up)).toBe('move'); // sin la boca no se mide
+    expect(guidanceFor([face({ pitch: 0.38 })], { ...up, baseline: null })).toBe('move'); // sin rostro en reposo tampoco
+  });
+
+  it('acercarse: el rostro crece respecto al de frente (más el margen) y puede llenar más el cuadro', () => {
+    const closer: DetectionMode = { kind: 'action', action: 'MOVE_CLOSER', minimum: 1.25, baseline: { pitch: 0.5, width: 200 } };
+    expect(guidanceFor([face()], closer)).toBe('move');
+    expect(guidanceFor([face({ size: 255 })], closer)).toBe('move'); // 1.275: no llega a 1.30
+    expect(guidanceFor([face({ size: 270 })], closer)).toBe('hold_still');
+    expect(guidanceFor([face({ size: 420 })], closer)).toBe('hold_still'); // de frente sería "aléjate"
+    expect(guidanceFor([face({ size: 470 })], closer)).toBe('too_close'); // ya no cabe en el cuadro
+    expect(guidanceFor([face({ size: 270 })], { ...closer, baseline: null })).toBe('move');
+  });
+
+  it('el avance del movimiento alimenta el anillo (0..1)', () => {
+    detections = [face({ size: 230 })];
+    const closer: DetectionMode = { kind: 'action', action: 'MOVE_CLOSER', minimum: 1.25, baseline: { pitch: 0.5, width: 200 } };
+    const { result } = renderCapture({ mode: closer });
+    frame();
+    expect(result.current.moveProgress).toBeCloseTo(0.5);
+    detections = [face(), face({ cx: 0.3 })]; // dos rostros: no se mide, se conserva lo avanzado
+    frame();
+    expect(result.current).toMatchObject({ guidance: 'multiple', moveProgress: expect.closeTo(0.5) as number });
+  });
+
+  it('al quedar estable de frente entrega el rostro en reposo (promedio de los cuadros estables)', () => {
+    const onStable = vi.fn();
+    detections = [face({ size: 190, pitch: 0.48 })];
+    const { result } = renderCapture({ stableFrames: 2, onStable });
+    frame();
+    detections = [face({ size: 210, pitch: 0.52 })];
+    frame();
+    expect(result.current.guidance).toBe('ready');
+    expect(onStable).toHaveBeenCalledExactlyOnceWith({ pitch: expect.closeTo(0.5) as number, width: 200 });
   });
 
   it('rostro estable: el avance llega a 1 y la captura se dispara una sola vez', () => {
@@ -305,21 +288,20 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
   });
 
   it('durante el giro, perder el rostro un instante no borra lo avanzado (hasta 3 lecturas seguidas)', () => {
-    const mode: DetectionMode = { kind: 'turn', direction: 'TURN_LEFT', minYawRatio: 0.2 };
     detections = [face({ nose: 0.01 })];
-    const { result } = renderCapture({ mode, stableFrames: 3 });
-    expect(result.current.guidance).toBe('turn');
+    const { result } = renderCapture({ mode: LEFT, stableFrames: 3 });
+    expect(result.current.guidance).toBe('move');
     frame();
-    const halfway = result.current.turnProgress;
+    const halfway = result.current.moveProgress;
     expect(halfway).toBeGreaterThan(0.3);
     detections = [face({ nose: 0.0102 })]; // diferencia mínima: no se redibuja
     frame();
-    expect(result.current.turnProgress).toBe(halfway);
+    expect(result.current.moveProgress).toBe(halfway);
     detections = [];
     frame();
     frame();
     frame();
-    expect(result.current).toMatchObject({ guidance: 'turn', turnProgress: halfway });
+    expect(result.current).toMatchObject({ guidance: 'move', moveProgress: halfway });
     frame(); // la cuarta seguida sí cuenta
     expect(result.current.guidance).toBe('no_face');
   });
@@ -329,14 +311,16 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
     const videoRef = { current: videoElement() };
     const detector = { detectForVideo: detect } as unknown as FaceDetector;
     const { result, rerender } = renderHook(({ mode }: { mode: DetectionMode }) => useFaceAutoCapture({ detector, videoRef, enabled: true, mode }), {
-      initialProps: { mode: { kind: 'turn', direction: 'TURN_LEFT', minYawRatio: 0.2 } as DetectionMode },
+      initialProps: { mode: LEFT },
     });
     frame();
     expect(result.current.guidance).toBe('hold_still');
-    rerender({ mode: { kind: 'turn', direction: 'TURN_RIGHT', minYawRatio: 0.2 } });
-    expect(result.current).toMatchObject({ guidance: 'turn', progress: 0, turnProgress: 0 });
+    rerender({ mode: { ...LEFT } }); // el mismo movimiento (otro objeto): no se reinicia
+    expect(result.current.guidance).toBe('hold_still');
+    rerender({ mode: RIGHT });
+    expect(result.current).toMatchObject({ guidance: 'move', progress: 0, moveProgress: 0 });
     frame();
-    expect(result.current.guidance).toBe('turn');
+    expect(result.current.guidance).toBe('move');
   });
 
   it('sin imagen en el video o si el detector falla en un cuadro, espera al siguiente', () => {

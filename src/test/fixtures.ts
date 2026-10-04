@@ -53,6 +53,13 @@ export const samplePolicy: VerificationPolicy = {
   ...STRICT_RULES,
   blocked_cameras: ['virtual', 'manycam', 'obs virtual'],
   min_confidence: 0.99999,
+  identify_confidence: 0.99999,
+  min_capture_quality: 0.4,
+  max_location_accuracy_m: 100,
+  detect_impossible_travel: true,
+  max_travel_kmh: 200,
+  liveness_timeout_seconds: 60,
+  flash_liveness: 'OBSERVE',
   updated_at: null,
   updated_by: null,
 };

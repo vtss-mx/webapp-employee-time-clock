@@ -13,6 +13,13 @@ async function fill(current: string, next: string, confirm = next) {
   await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
 }
 
+/** Responde la confirmación previa al cambio ("Cambiar contraseña" o "Cancelar"). */
+async function answer(button: 'Cambiar contraseña' | 'Cancelar') {
+  const dialog = await screen.findByRole('alertdialog', { name: '¿Cambiar tu contraseña?' });
+  await userEvent.click(within(dialog).getByRole('button', { name: button }));
+  return dialog;
+}
+
 describe('ChangePasswordSection', () => {
   it('valida en el cliente antes de enviar', async () => {
     const { fn } = mockFetch(apiOk({ revoked_sessions: 0 }));
@@ -38,6 +45,12 @@ describe('ChangePasswordSection', () => {
     const { calls } = mockFetch(apiOk({ revoked_sessions: 2 }, { code: 'PASSWORD_CHANGED' }));
     renderWithProviders(<ChangePasswordSection onChanged={onChanged} />);
     await fill('Actual123', 'NuevaClave1');
+    // Se confirma antes: qué pasa con las demás sesiones. Cancelar no envía nada ni borra lo escrito.
+    expect(await answer('Cancelar')).toHaveTextContent('Se cerrará tu sesión en tus otros dispositivos.');
+    expect(calls).toHaveLength(0);
+    expect(screen.getByLabelText('Nueva contraseña')).toHaveValue('NuevaClave1');
+    await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
+    await answer('Cambiar contraseña');
     expect(await screen.findByText('Se cerró la sesión en 2 dispositivo(s) más.')).toBeInTheDocument();
     expect(JSON.parse(calls[0].init.body as string)).toEqual({ current_password: 'Actual123', new_password: 'NuevaClave1' });
     expect(onChanged).toHaveBeenCalledOnce();
@@ -51,6 +64,7 @@ describe('ChangePasswordSection', () => {
     mockFetch(apiFail(422, 'CURRENT_PASSWORD_INVALID', 'La contraseña actual no es correcta'));
     renderWithProviders(<ChangePasswordSection />);
     await fill('Mala1234', 'NuevaClave1');
+    await answer('Cambiar contraseña');
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo cambiar la contraseña' });
     expect(popup).toHaveTextContent('La contraseña actual no es correcta');
     expect(screen.getByLabelText('Contraseña actual')).toHaveAccessibleDescription('La contraseña actual no es correcta');
@@ -74,6 +88,7 @@ describe('ChangePasswordSection', () => {
     );
     renderWithProviders(<ChangePasswordSection />);
     await fill('Actual123', 'NuevaClave1');
+    await answer('Cambiar contraseña');
     const first = await screen.findByRole('alertdialog', { name: 'No se pudo cambiar la contraseña' });
     expect(within(first).getByText('Contraseña común')).toBeInTheDocument(); // detalle por campo
     expect(screen.getByLabelText('Nueva contraseña')).toHaveAccessibleDescription('Contraseña común');
@@ -81,6 +96,7 @@ describe('ChangePasswordSection', () => {
 
     mockFetch(apiFail(503, 'SERVER_BUSY', 'Ocupado'));
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
+    await answer('Cambiar contraseña');
     const second = await screen.findByRole('alertdialog', { name: 'No se pudo cambiar la contraseña' });
     expect(second).toHaveTextContent('Ocupado');
   });
@@ -109,6 +125,7 @@ describe('ChangePasswordSection: casos límite', () => {
     mockFetch(apiOk({ revoked_sessions: 0 }));
     renderWithProviders(<ChangePasswordSection />);
     await fill('Actual123', 'NuevaClave1');
+    await answer('Cambiar contraseña');
     expect(await screen.findByText('Tu sesión actual sigue activa.')).toBeInTheDocument();
   });
 });

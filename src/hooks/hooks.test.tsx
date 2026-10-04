@@ -1,4 +1,5 @@
-import { act, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, renderHook, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
@@ -182,9 +183,12 @@ describe('useEmployeeForm', () => {
 
   it('muestra errores del servidor por campo', async () => {
     const { result } = renderHook(() => useEmployeeForm(), { wrapper });
-    await act(() =>
-      result.current.save(() => Promise.reject(new ApiError({ statusCode: 409, code: 'EMAIL_TAKEN', message: 'Correo en uso' }))),
-    );
+    let saved: Promise<void> = Promise.resolve();
+    act(() => {
+      saved = result.current.save(() => Promise.reject(new ApiError({ statusCode: 409, code: 'EMAIL_TAKEN', message: 'Correo en uso' })), { kind: 'create', title: '¿Registrar?' });
+    });
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Registrar?' })).getByRole('button', { name: 'Crear' }));
+    await act(() => saved);
     expect(result.current.errors.email).toBe('Correo en uso');
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo guardar' })).toHaveTextContent('Correo en uso');
     expect(result.current.saving).toBe(false);

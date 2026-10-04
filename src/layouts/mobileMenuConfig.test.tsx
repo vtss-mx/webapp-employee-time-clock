@@ -10,11 +10,11 @@ import { AppLayout } from './AppLayout';
 
 /**
  * El menú de teléfonos se personaliza en `mobileMenu.ts`. Aquí, la configuración opuesta a la de
- * fábrica: entra por la derecha, sin título ni ícono en la barra, sin contador en el botón y sin
+ * fábrica: entra por la derecha, sin título ni ícono en la barra, con el contador en el botón y sin
  * cerrarse al elegir una opción.
  */
 vi.mock('./mobileMenu', () => ({
-  MOBILE_MENU: { side: 'right', showTitle: false, showBrand: false, badgeOnToggle: false, closeOnNavigate: false },
+  MOBILE_MENU: { side: 'right', showTitle: false, showBrand: false, badgeOnToggle: true, closeOnNavigate: false },
 }));
 
 function SignedIn() {
@@ -24,7 +24,7 @@ function SignedIn() {
 }
 
 describe('menú de teléfonos personalizado', () => {
-  it('sigue abierto al navegar y con otras teclas; la barra no muestra título, ícono ni contador', async () => {
+  it('sigue abierto al navegar y con otras teclas; la barra no muestra título ni ícono, sí el contador', async () => {
     mockFetch((call) =>
       call.url.includes('/enrollments') ? apiOk({ items: [], total: 3, page: 1, size: 1 }) : apiOk(tokenResponse({ ...sampleUser, role: 'COMPANY', employee: null })),
     );
@@ -45,13 +45,14 @@ describe('menú de teléfonos personalizado', () => {
     expect(sidebar).toHaveClass('sidebar--right');
     expect(within(bar).queryByRole('link', { name: 'Inicio' })).toBeNull();
     expect(bar.querySelector('.mobilebar__title')).toBeNull();
+    expect(await within(toggle).findByText('3')).toHaveClass('mobilebar__badge'); // la suma, sobre el botón
 
     await userEvent.click(toggle);
     await userEvent.keyboard('{Enter}'); // solo Escape cierra el menú
     expect(sidebar).toHaveClass('is-open');
     await userEvent.click(within(sidebar).getByRole('link', { name: 'Mi perfil' }));
     expect(sidebar).toHaveClass('is-open');
-    // El contador sí está en el menú, pero no se repite en el botón.
+    // Con el menú abierto el contador del botón se oculta: se ve en su opción.
     expect(await within(sidebar).findByText('3')).toBeInTheDocument();
     expect(toggle.querySelector('.mobilebar__badge')).toBeNull();
   });

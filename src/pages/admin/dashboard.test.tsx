@@ -113,7 +113,8 @@ describe('CompaniesListPage (empresas de la plataforma)', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar empresas' }), 'pan');
     expect(await screen.findByText('Ninguna empresa coincide con la búsqueda')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Registrar la primera/ })).toBeNull();
-    expect(calls.at(-1)?.url).toContain('search=pan');
+    // El vacío "nada coincide" se dibuja en cuanto cambia la búsqueda; la petición sale justo después.
+    await waitFor(() => expect(calls.at(-1)?.url).toContain('search=pan'));
   });
 
   it('filtra por estado (activas o inactivas)', async () => {

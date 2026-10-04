@@ -43,6 +43,8 @@ export const config = {
   // --- Actualización periódica (con jitter, pausada si la pestaña está oculta) ---
   pendingEnrollmentsPollMs: seconds('VITE_POLL_PENDING_ENROLLMENTS_SECONDS', 45, 10, 3600),
   pendingErrorsPollMs: seconds('VITE_POLL_PENDING_ERRORS_SECONDS', 60, 10, 3600),
+  pendingShiftRequestsPollMs: seconds('VITE_POLL_PENDING_SHIFT_REQUESTS_SECONDS', 60, 10, 3600),
+  pendingAbsenceRequestsPollMs: seconds('VITE_POLL_PENDING_ABSENCE_REQUESTS_SECONDS', 60, 10, 3600),
   validationStatusPollMs: seconds('VITE_POLL_VALIDATION_STATUS_SECONDS', 30, 10, 3600),
 
   // --- Reconocimiento facial ---
@@ -50,13 +52,28 @@ export const config = {
   verificationFrames: envNumber(env, 'VITE_FACE_VERIFICATION_FRAMES', 3, 1, 3),
   faceFrameGapMs: envNumber(env, 'VITE_FACE_FRAME_GAP_MS', 380, 100, 2000),
   faceResumeAfterBlockMs: seconds('VITE_FACE_RESUME_AFTER_BLOCK_SECONDS', 3, 1, 30),
+  /** Tiempo para cada movimiento del reto; el reto completo, además, vence cuando dice el servidor. */
   faceChallengeTimeoutMs: seconds('VITE_FACE_CHALLENGE_TIMEOUT_SECONDS', 20, 5, 85),
+  /** Margen antes de que venza el reto (`expires_in`): lo que tarda en subir el envío. */
+  faceChallengeMarginMs: seconds('VITE_FACE_CHALLENGE_MARGIN_SECONDS', 5, 0, 30),
+  /**
+   * Destello de colores: espera tras pintar cada color antes de capturar. Cubre la latencia de la
+   * cámara (el cuadro debe mostrar ya el color) y es menor a lo que tarda el balance de blancos
+   * automático en compensarlo (≈ 0.5–1 s en iPhone). Cada color queda unos 0.4 s: ≈ 2.3 cambios por
+   * segundo, con margen bajo el límite de 3 destellos por segundo (WCAG 2.3.1, fotosensibilidad); por
+   * eso el mínimo configurable es 340 ms.
+   */
+  faceFlashSettleMs: envNumber(env, 'VITE_FACE_FLASH_SETTLE_MS', 400, 340, 1000),
   faceDetectorTimeoutMs: seconds('VITE_FACE_DETECTOR_TIMEOUT_SECONDS', 20, 5, 120),
   faceDetectionMinScore: envNumber(env, 'VITE_FACE_DETECTION_MIN_SCORE', 0.6, 0.1, 1),
   faceDetectionIntervalMs: envNumber(env, 'VITE_FACE_DETECTION_INTERVAL_MS', 110, 50, 1000),
   /** Giro extra que exige el navegador sobre el mínimo del servidor: MediaPipe (cliente) y YuNet
    *  (servidor) miden distinto; con margen, la captura enviada siempre supera la prueba de vida. */
   faceTurnMargin: envNumber(env, 'VITE_FACE_TURN_MARGIN', 0.04, 0, 0.3),
+  /** Lo mismo al mirar arriba o abajo (cambio de la nariz entre ojos y boca)... */
+  facePitchMargin: envNumber(env, 'VITE_FACE_PITCH_MARGIN', 0.02, 0, 0.3),
+  /** ...y al acercarse (veces que crece el rostro, sobre el mínimo del servidor). */
+  faceCloserMargin: envNumber(env, 'VITE_FACE_CLOSER_MARGIN', 0.05, 0, 0.5),
   mediapipeWasmUrl: envString(env, 'VITE_MEDIAPIPE_WASM_URL', `${base}mediapipe/wasm`),
   faceModelUrl: envString(env, 'VITE_FACE_MODEL_URL', `${base}mediapipe/blaze_face_short_range.tflite`),
   faceModelFallbackUrl: envString(

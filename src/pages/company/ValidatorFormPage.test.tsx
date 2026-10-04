@@ -57,6 +57,9 @@ function renderAt(route: string) {
   );
 }
 
+/** Las filas de una sección de la confirmación ("Se registrará" o "Cambios"), como texto. */
+const rows = (dialog: HTMLElement, region: string) => within(within(dialog).getByRole('region', { name: region })).getAllByRole('listitem').map((li) => li.textContent);
+
 /** Cierra el popup con ese título (advertencia/error: alertdialog; información/éxito: dialog). */
 async function closePopup(title: string) {
   const heading = await screen.findByText(title);
@@ -88,7 +91,7 @@ describe('ValidatorFormPage: alta', () => {
     const search = screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' });
     await userEvent.type(search, 'Plaza Zar');
     expect(await screen.findByRole('option', { name: /Plaza Zaragoza/ })).toBeInTheDocument();
-    expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Plaza Zar', {}, 'MX');
+    expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Plaza Zar', {}, { country: 'MX', near: null });
     await userEvent.keyboard('{ArrowDown}{ArrowUp}{Enter}');
     await waitFor(() => expect(screen.getByLabelText('Calle')).toHaveValue('Calle Dr. Paliza'));
     expect(search).toHaveValue('Plaza Zaragoza, Hermosillo');
@@ -101,6 +104,18 @@ describe('ValidatorFormPage: alta', () => {
     expect(map()).toHaveAttribute('data-radius', '200');
     expect(screen.getByText(/Solo podrá iniciar sesión a no más de 200 m/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Agregar validador' }));
+    // Antes de crearlo confirma qué se registrará (la contraseña nunca se muestra).
+    const confirm = await screen.findByRole('dialog', { name: '¿Agregar el validador Recepción planta 1?' });
+    expect(rows(confirm, 'Se registrará')).toEqual([
+      'NombreRecepción planta 1',
+      'Correo de accesorecepcion@empresa.com',
+      'Modo de identificaciónQR o rostro',
+      'DomicilioCalle Dr. Paliza 71, 83000 Hermosillo, Sonora',
+      'Punto en el mapa29.07000, -110.95000',
+      'Exige ubicaciónSí, a 200 m',
+    ]);
+    expect(confirm).not.toHaveTextContent('Valida1234');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Agregar validador' }));
 
     expect(await screen.findByText('Lista de validadores')).toBeInTheDocument();
     const popup = await screen.findByRole('dialog', { name: 'Validador agregado' });
@@ -128,10 +143,11 @@ describe('ValidatorFormPage: alta', () => {
     maps.reverseGeocode.mockRejectedValue(new MapsApiError('geocoding', 'denied'));
     await userEvent.type(screen.getByLabelText('Número interior'), '2');
     await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
-    await closePopup('El autollenado del domicilio no está disponible');
+    // Sin Geocoding: se dice bajo el mapa (nunca un popup) y el punto queda marcado.
+    expect(await screen.findByText(/No pudimos completar el domicilio desde el mapa/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
     await waitFor(() => expect(maps.reverseGeocode).toHaveBeenCalledTimes(3));
-    expect(screen.queryByRole('alertdialog')).toBeNull(); // no se repite
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.getByLabelText('Número interior')).toHaveValue('2');
 
     await userEvent.click(screen.getByRole('button', { name: 'Quitar punto' }));
@@ -144,8 +160,7 @@ describe('ValidatorFormPage: alta', () => {
     renderAt('/company/validators/new');
     await userEvent.click(screen.getByRole('switch', { name: 'Requiere ubicación' }));
     await userEvent.clear(screen.getByLabelText(/Radio permitido/));
-    await userEvent.type(screen.getByLabelText(/Radio permitido/), '5');
-    await userEvent.click(screen.getByRole('button', { name: 'Agregar validador' }));
+    await userEvent.type(screen.getByLabelText(/Radio permitido/), '5{Enter}'); // Enter envía sin salir del campo (salir lo ajusta al mínimo)
     const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
     expect(popup).toHaveTextContent('Marca en el mapa el punto del acceso para exigir ubicación');
     expect(popup).toHaveTextContent('Entre 10 y 10,000 m');
@@ -171,13 +186,13 @@ describe('ValidatorFormPage: alta', () => {
     await waitFor(() => expect(screen.getByLabelText('Calle')).toHaveValue('Calle Dr. Paliza'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Ubicar la dirección escrita' }));
-    await closePopup('No encontramos esa dirección');
+    expect(await screen.findByText(/No encontramos esa dirección/)).toBeInTheDocument();
     expect(maps.geocodeAddress).toHaveBeenCalledWith('Calle Dr. Paliza 71, 83000 Hermosillo, Sonora, MX', 'MX');
     await userEvent.click(screen.getByRole('button', { name: 'Ubicar la dirección escrita' }));
     await waitFor(() => expect(map()).toHaveAttribute('data-point', '20.5,-100.4'));
 
     await userEvent.type(screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' }), 'Zócalo');
-    await closePopup('La búsqueda de lugares no está disponible');
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument(); // la lista lo dice, sin popup
     await userEvent.type(screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' }), ' CDMX');
     await new Promise((r) => setTimeout(r, 400));
     expect(maps.suggestPlaces).toHaveBeenCalledTimes(1); // sin la API no se vuelve a intentar
@@ -188,8 +203,8 @@ describe('ValidatorFormPage: alta', () => {
     mockFetch(() => liveCheck());
     renderAt('/company/validators/new');
     await userEvent.click(screen.getByRole('button', { name: 'Rechazar la clave' }));
-    await closePopup('El mapa no está disponible');
-    expect(screen.queryByRole('button', { name: 'Mi ubicación' })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Mi ubicación' })).toBeNull());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.getByLabelText('Calle')).toBeEnabled();
   });
 });
@@ -210,6 +225,10 @@ describe('ValidatorFormPage: edición', () => {
     await userEvent.clear(screen.getByLabelText(/Radio permitido/));
     await userEvent.type(screen.getByLabelText(/Radio permitido/), '150');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar los cambios de Recepción planta 1?' });
+    expect(rows(confirm, 'Cambios')).toEqual(['NombreAntes: Recepción planta 1Después: Acceso norte', 'Exige ubicaciónAntes: NoDespués: Sí, a 150 m']);
+    expect(confirm).toHaveTextContent('Su sesión abierta se cerrará: deberá iniciar sesión de nuevo desde ese lugar.');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Guardar cambios' }));
 
     const popup = await screen.findByRole('dialog', { name: 'Validador actualizado' });
     expect(popup).toHaveTextContent('Su sesión abierta se cerró');
@@ -234,6 +253,10 @@ describe('ValidatorFormPage: edición', () => {
       await userEvent.type(screen.getByLabelText(label), value);
     }
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar los cambios de Recepción planta 1?' });
+    // Sin domicilio antes; el municipio se dice porque no es la ciudad. El punto sigue sin marcar.
+    expect(rows(confirm, 'Cambios')).toEqual(['DomicilioAntes: Sin capturarDespués: Juárez S/N, 99999 Obregón, Sonora (municipio Cajeme)']);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Guardar cambios' }));
     await closePopup('No se pudo guardar el validador');
     expect(screen.getByLabelText('Código postal')).toHaveAccessibleDescription('Ese código postal no existe');
     await userEvent.type(screen.getByLabelText('Código postal'), '1');
@@ -246,6 +269,10 @@ describe('ValidatorFormPage: edición', () => {
     await userEvent.clear(await screen.findByLabelText(/Nombre o ubicación/));
     await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Acceso sur');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar los cambios de Recepción planta 1?' });
+    expect(rows(confirm, 'Cambios')).toEqual(['NombreAntes: Recepción planta 1Después: Acceso sur']);
+    expect(confirm).not.toHaveTextContent('Su sesión abierta se cerrará');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Guardar cambios' }));
     const popup = await screen.findByRole('dialog', { name: 'Validador actualizado' });
     expect(popup).toHaveTextContent('Puede iniciar sesión desde cualquier lugar.');
     expect(popup).not.toHaveTextContent('Su sesión abierta se cerró');
@@ -258,5 +285,49 @@ describe('ValidatorFormPage: edición', () => {
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo cargar el validador' });
     await userEvent.click(within(popup).getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByDisplayValue('Recepción planta 1')).toBeInTheDocument();
+  });
+});
+
+describe('ValidatorFormPage: confirmación antes de guardar', () => {
+  it('alta: cancelar no envía nada y el formulario sigue con lo escrito (sin punto ni ubicación exigida)', async () => {
+    const { calls } = mockFetch(() => liveCheck());
+    renderAt('/company/validators/new');
+    await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Comedor');
+    await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'comedor@empresa.com');
+    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Valida1234');
+    for (const [label, value] of [['Calle', 'Juárez'], ['Número exterior', 'S/N'], ['Código postal', '83000'], ['Estado', 'Sonora'], ['Municipio o alcaldía', 'Hermosillo'], ['Ciudad', 'Hermosillo']]) {
+      await userEvent.type(screen.getByLabelText(label), value);
+    }
+    const add = screen.getByRole('button', { name: 'Agregar validador' });
+    await waitFor(() => expect(add).toBeEnabled()); // el correo ya se verificó
+    await userEvent.click(add);
+    const confirm = await screen.findByRole('dialog', { name: '¿Agregar el validador Comedor?' });
+    expect(rows(confirm, 'Se registrará').slice(3)).toEqual(['DomicilioJuárez S/N, 83000 Hermosillo, Sonora', 'Punto en el mapaSin marcar', 'Exige ubicaciónNo']);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
+    expect(screen.getByLabelText(/Nombre o ubicación/)).toHaveValue('Comedor');
+    expect(add).toBeEnabled();
+  });
+
+  it('edición sin cambios avisa "Sin cambios" y no envía nada; cancelar los cambios tampoco', async () => {
+    const { calls } = mockFetch(apiOk(sampleValidator));
+    renderAt('/company/validators/3/edit');
+    expect(await screen.findByDisplayValue('Recepción planta 1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No modificaste ningún dato');
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+
+    await userEvent.click(screen.getByText('Solo QR'));
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar punto' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar los cambios de Recepción planta 1?' });
+    expect(rows(confirm, 'Cambios')).toEqual(['Modo de identificaciónAntes: QR o rostroDespués: Solo QR', 'Punto en el mapaAntes: 29.07290, -110.95590Después: Sin marcar']);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls.filter((c) => c.init.method === 'PUT')).toHaveLength(0);
+    expect(screen.getByRole('radio', { name: /Solo QR/ })).toBeChecked();
+    expect(map()).toHaveAttribute('data-point', '');
   });
 });

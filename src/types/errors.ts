@@ -5,18 +5,18 @@ export type ErrorStatus = 'PENDING' | 'IN_PROGRESS' | 'IN_REVIEW' | 'RESOLVED';
 /** Gravedad (catálogo error_severities). */
 export type ErrorSeverity = 'CRITICAL' | 'ERROR' | 'WARNING';
 
-/** Un error agrupado: todas sus ocurrencias iguales. */
+/** Una falla agrupada: todas sus ocurrencias iguales (un 4xx no se registra: es un resultado normal). */
 export interface ErrorReport {
   id: number;
-  /** HTTP, LOG (segundo plano o dentro de un proceso) o WEBSOCKET. */
-  source: 'HTTP' | 'LOG' | 'WEBSOCKET';
+  /** HTTP, LOG (segundo plano o dentro de un proceso), WEBSOCKET o CLIENT (falla de la aplicación web). */
+  source: 'HTTP' | 'LOG' | 'WEBSOCKET' | 'CLIENT';
   severity: ErrorSeverity;
   status: ErrorStatus;
   code: string;
   message: string;
   http_status: number | null;
   method: string | null;
-  /** Ruta sin ids o archivo:línea. */
+  /** Ruta sin ids (de la API o, si es CLIENT, de la pantalla) o archivo:línea. */
   location: string | null;
   exception_type: string | null;
   occurrences: number;
@@ -47,8 +47,22 @@ export interface ErrorOccurrence {
   context: ErrorContext | null;
 }
 
-/** Lo que se pidió y lo que se respondió, tal cual (o, si vino del log, dónde se registró). */
+/** Lo que contó el navegador de una falla de la aplicación web (origen CLIENT). */
+export interface ClientFailureContext {
+  /** CRASH (pantalla rota), UNHANDLED (error sin capturar) o CONFIG (configuración de la plataforma). */
+  kind: string;
+  /** Pantalla tal cual (sin query). */
+  path: string;
+  component: string | null;
+  detail: string | null;
+  app_version: string | null;
+  user_agent: string | null;
+  ip: string | null;
+}
+
+/** Lo que se pidió y lo que se respondió, tal cual (si vino del log, dónde se registró; si de la app web, lo que contó el navegador). */
 export interface ErrorContext {
+  client?: ClientFailureContext;
   request?: {
     method?: string | null;
     path?: string | null;

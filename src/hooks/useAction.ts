@@ -1,4 +1,6 @@
 import { useCallback, useState } from 'react';
+import type { ConfirmInput } from '../types/confirm';
+import { useConfirm } from './useConfirm';
 import { useFeedback } from './useFeedback';
 import { useMountedRef } from './useMountedRef';
 
@@ -25,6 +27,14 @@ export interface ActionOptions<R, K> {
    * el botón no se puede volver a pulsar mientras tanto. Solo se libera si falla.
    */
   keepBusy?: boolean;
+  /**
+   * Pregunta ANTES de enviar (crear, editar, eliminar...; decisión del dueño del producto). Si se
+   * cancela no se envía nada, no se marca ocupado, no se llama a ningún callback ni se avisa nada:
+   * `run` resuelve false y la pantalla queda como estaba. Es opcional aquí porque `run` también
+   * corre acciones que no cambian datos (consultar un estado, elegir los empleados de un filtro);
+   * toda acción que crea, cambia o borra la lleva.
+   */
+  confirm?: ConfirmInput;
 }
 
 /**
@@ -35,12 +45,14 @@ export interface ActionOptions<R, K> {
  */
 export function useAction<K = true>() {
   const feedback = useFeedback();
+  const confirm = useConfirm();
   const mounted = useMountedRef();
   const [busy, setBusy] = useState<K | null>(null);
 
   const run = useCallback(
     async <R>(task: () => Promise<R>, options: ActionOptions<R, K>): Promise<boolean> => {
       const { errorTitle, success, onSuccess, onError, onSettled, keepBusy = false } = options;
+      if (options.confirm && !(await confirm(options.confirm))) return false;
       setBusy(options.busy ?? (true as K));
       let ok = false;
       try {
@@ -59,22 +71,33 @@ export function useAction<K = true>() {
       }
       return ok;
     },
-    [feedback, mounted],
+    [feedback, confirm, mounted],
   );
 
   return { busy, run };
 }
 
+/** Opciones del envío de un formulario. */
+export interface SubmitOptions {
+  /**
+   * Pregunta ANTES de enviar (obligatoria: todo formulario crea o cambia datos). Si se cancela, nada
+   * se envía y el formulario sigue como estaba.
+   */
+  confirm: ConfirmInput;
+  /** Al fallar, antes del popup (p. ej. marcar el campo con el error del servidor). */
+  onError?: (error: unknown) => void;
+}
+
 /**
- * Envío de un formulario que se cierra al guardar (alta, edición, motivo, contraseña): "Guardando…"
- * hasta salir de la pantalla; si falla, el error se explica en un popup (`onError` puede además
- * marcar el campo) y el formulario se puede corregir y volver a enviar.
+ * Envío de un formulario que se cierra al guardar (alta, edición, motivo, contraseña): primero
+ * pregunta (`confirm`); luego "Guardando…" hasta salir de la pantalla; si falla, el error se explica
+ * en un popup (`onError` puede además marcar el campo) y el formulario se puede corregir y volver a
+ * enviar.
  */
 export function useSubmit() {
   const { busy, run } = useAction();
   const submit = useCallback(
-    (task: () => Promise<void>, errorTitle: ErrorTitle, onError?: (error: unknown) => void) =>
-      run(task, { errorTitle, onError, keepBusy: true }),
+    (task: () => Promise<void>, errorTitle: ErrorTitle, { confirm, onError }: SubmitOptions) => run(task, { errorTitle, onError, confirm, keepBusy: true }),
     [run],
   );
   return { saving: busy !== null, submit };

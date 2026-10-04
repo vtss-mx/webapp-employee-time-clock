@@ -1,19 +1,37 @@
-import { LocateOff, MapPinOff, SearchX } from 'lucide-react';
+import { LocateOff } from 'lucide-react';
 import { ApiError } from '../../services/apiClient';
-import type { MapsApiError } from '../../services/maps/googleMaps';
-import { LOCATION_MESSAGES, LocationError, type LocationProblem } from '../../utils/geolocation';
+import { LOCATION_MESSAGES, LOCATION_PERMISSION_STEPS, LocationError, type LocationProblem } from '../../utils/geolocation';
 import type { MessageInput } from '../MessageDialog';
 
-/** Ubicación del dispositivo bloqueada o no disponible (inicio de sesión o "Mi ubicación"). */
-export function locationProblemMessage(problem: LocationProblem): MessageInput {
+/** Para qué se pidió la ubicación: cambia por qué se necesita y cómo seguir tras permitirla. */
+export type LocationPurpose = 'login' | 'attendance' | 'map';
+
+const DENIED_BY_PURPOSE: Record<LocationPurpose, { text: string; next: string }> = {
+  login: {
+    text: 'Este validador solo puede iniciar sesión en su lugar de operación y el permiso de ubicación está bloqueado.',
+    next: 'Vuelve a la aplicación e inicia sesión de nuevo.',
+  },
+  attendance: {
+    text: 'Tu registro de asistencia necesita tu ubicación y el permiso está bloqueado en este navegador.',
+    next: 'Regresa aquí y toca «Reintentar».',
+  },
+  map: {
+    text: 'Para ubicarte en el mapa hace falta el permiso de ubicación y está bloqueado en este navegador.',
+    next: 'Vuelve a tocar «Mi ubicación» (o marca el punto en el mapa).',
+  },
+};
+
+/** Ubicación del dispositivo bloqueada o no disponible (inicio de sesión, asistencia o "Mi ubicación"). */
+export function locationProblemMessage(problem: LocationProblem, purpose: LocationPurpose = 'login'): MessageInput {
   const { title, text, steps } = LOCATION_MESSAGES[problem];
+  const denied = problem === 'denied' ? DENIED_BY_PURPOSE[purpose] : null;
   return {
     variant: problem === 'denied' || problem === 'insecure' ? 'warning' : 'error',
     icon: <LocateOff size={30} />,
     eyebrow: 'Ubicación',
     title,
-    text,
-    details: steps,
+    text: denied?.text ?? text,
+    details: denied ? [...LOCATION_PERMISSION_STEPS, denied.next] : steps,
     detailsStyle: 'steps',
     key: `location-${problem}`,
   };
@@ -44,44 +62,5 @@ export function loginLocationMessage(error: unknown): MessageInput | null {
         : undefined,
     detailsStyle: 'steps',
     key: `login-${error.code}`,
-  };
-}
-
-const API_NAMES = { maps: 'Maps JavaScript API', places: 'Places API (New)', geocoding: 'Geocoding API', geolocation: 'Geolocation API' };
-
-const DENIED: Record<MapsApiError['api'], { title: string; text: string }> = {
-  maps: { title: 'El mapa no está disponible', text: 'Google rechazó la clave del mapa. Escribe el domicilio a mano.' },
-  places: {
-    title: 'La búsqueda de lugares no está disponible',
-    text: 'Marca el punto directamente en el mapa y escribe el domicilio.',
-  },
-  geocoding: {
-    title: 'El autollenado del domicilio no está disponible',
-    text: 'El punto del mapa sí quedó marcado; escribe el domicilio a mano.',
-  },
-  geolocation: { title: 'No se pudo estimar tu ubicación', text: 'Marca el punto directamente en el mapa.' },
-};
-
-/** Google no respondió o la clave no tiene la API habilitada (se explica qué falta y cómo seguir). */
-export function mapsProblemMessage(error: MapsApiError): MessageInput {
-  if (error.problem === 'failed') {
-    return {
-      variant: 'error',
-      icon: <MapPinOff size={30} />,
-      eyebrow: 'Google Maps',
-      title: 'No se pudo consultar Google Maps',
-      text: 'Revisa tu conexión e inténtalo de nuevo. Mientras tanto puedes escribir el domicilio a mano.',
-      key: `maps-${error.api}-failed`,
-    };
-  }
-  const copy = DENIED[error.api];
-  return {
-    variant: 'warning',
-    icon: error.api === 'places' ? <SearchX size={30} /> : <MapPinOff size={30} />,
-    eyebrow: 'Google Maps',
-    title: copy.title,
-    text: copy.text,
-    footnote: `La clave de Google Maps no tiene habilitada «${API_NAMES[error.api]}». Quien administra la cuenta de Google Cloud puede habilitarla; después funcionará sin cambiar nada aquí.`,
-    key: `maps-${error.api}-denied`,
   };
 }

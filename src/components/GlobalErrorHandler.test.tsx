@@ -1,7 +1,8 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { ApiError } from '../services/apiClient';
+import { apiOk, mockFetch } from '../test/http';
 import { GlobalErrorHandler } from './GlobalErrorHandler';
 
 const GENERIC_TEXT = 'Intenta nuevamente. Si persiste, recarga la página.';
@@ -43,4 +44,19 @@ describe('GlobalErrorHandler', () => {
     expect(popup).toHaveTextContent(GENERIC_TEXT);
     expect(popup).not.toHaveTextContent('x is not a function'); // el detalle técnico no se muestra
   });
+
+  it('una falla de la app se reporta al ADMIN; una respuesta de la API no (el servidor ya la registró)', async () => {
+    const { calls } = mockFetch(apiOk(null, { status: 202 }));
+    const reported = () => calls.filter((call) => call.url === '/api/client-errors').map((call) => JSON.parse(call.init.body as string) as Record<string, unknown>);
+    rejectUnhandled(new ApiError({ statusCode: 500, code: 'INTERNAL_ERROR', message: 'falló', traceId: 't-1' }));
+    rejectUnhandled(new DOMException('Cancelada', 'AbortError')); // ni aviso ni reporte
+    rejectUnhandled(new TypeError('promesa rota'));
+    scriptError({ message: 'Uncaught RangeError', error: new RangeError('fuera de rango') });
+    await waitFor(() => expect(reported()).toHaveLength(2));
+    expect(reported().map((report) => [report.kind, report.component, report.message])).toEqual([
+      ['UNHANDLED', 'unhandledrejection', 'TypeError: promesa rota'],
+      ['UNHANDLED', 'window.onerror', 'RangeError: fuera de rango'],
+    ]);
+  });
 });
+

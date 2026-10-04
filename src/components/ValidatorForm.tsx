@@ -3,13 +3,16 @@ import type { useValidatorForm } from '../hooks/useValidatorForm';
 import { RADIUS_MAX_M, RADIUS_MIN_M } from '../hooks/useValidatorForm';
 import { config } from '../utils/config';
 import { ConfirmPasswordField, FormField } from './FormField';
+import { QuickChoices } from './shifts/formFields';
+import { metersText } from './shifts/shiftRules';
+import { NumberField } from './ui/NumberField';
 import { Switch } from './ui/Switch';
 import { ValidatorModePicker } from './ValidatorModes';
 
 type ValidatorForm = ReturnType<typeof useValidatorForm>;
 
 /** Radios sugeridos (m): de una recepción a un predio grande. */
-const RADIUS_PRESETS = [50, 100, 200, 500, 1000];
+const RADIUS_CHOICES = [50, 100, 200, 500, 1000].map((meters) => ({ value: String(meters), text: metersText(meters) }));
 
 /** Nombre, correo y contraseña inicial (solo en el alta: el correo no se cambia) y modo. */
 export function ValidatorAccountFields({ form }: { form: ValidatorForm }) {
@@ -100,36 +103,22 @@ export function ValidatorLocationRule({ form }: { form: ValidatorForm }) {
       />
       {locationRequired && (
         <div className="location-rule__radius">
-          <FormField
+          <NumberField
             label="Radio permitido (metros)"
             icon={<Ruler size={18} />}
-            type="number"
-            inputMode="numeric"
+            unit="m"
             min={RADIUS_MIN_M}
             max={RADIUS_MAX_M}
-            step={1}
+            step={10}
             required
             disabled={saving}
             value={values.radius}
             error={errors.radius}
             hint={`Entre ${RADIUS_MIN_M} y ${RADIUS_MAX_M.toLocaleString('es-MX')} m. Considera el tamaño del lugar y el margen del GPS.`}
             onBlur={() => form.touch('radius')}
-            onChange={(e) => form.set('radius', e.target.value)}
+            onChange={(value) => form.set('radius', value)}
           />
-          <div className="chips" role="group" aria-label="Radios sugeridos">
-            {RADIUS_PRESETS.map((meters) => (
-              <button
-                key={meters}
-                type="button"
-                className={`chip ${radius === meters ? 'is-active' : ''}`}
-                aria-pressed={radius === meters}
-                disabled={saving}
-                onClick={() => form.set('radius', String(meters))}
-              >
-                {meters >= 1000 ? `${meters / 1000} km` : `${meters} m`}
-              </button>
-            ))}
-          </div>
+          <QuickChoices label="Radios sugeridos" value={values.radius} choices={RADIUS_CHOICES} disabled={saving} onPick={(value) => form.set('radius', value)} />
         </div>
       )}
     </div>

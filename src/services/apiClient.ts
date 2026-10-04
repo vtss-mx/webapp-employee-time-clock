@@ -62,15 +62,6 @@ export interface RequestOptions<T> {
   retries?: number;
   /** Valida la forma de `data`; si no coincide se lanza ApiError INVALID_RESPONSE. */
   validate?: (data: unknown) => data is T;
-  /** La respuesta exitosa es un archivo (p. ej. un Excel): `data` es `DownloadedFile`. Un error sigue
-   * siendo el sobre JSON de siempre. */
-  download?: boolean;
-}
-
-/** Archivo descargado: su contenido y el nombre que propone el servidor (`Content-Disposition`). */
-export interface DownloadedFile {
-  blob: Blob;
-  filename: string | null;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -96,12 +87,6 @@ async function readBody(response: Response): Promise<{ body: unknown; isJson: bo
     }
   }
   return { body: text, isJson: false };
-}
-
-async function readFile(response: Response): Promise<{ body: DownloadedFile; isJson: boolean }> {
-  const disposition = response.headers.get('Content-Disposition') ?? '';
-  const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? null;
-  return { body: { blob: await response.blob(), filename }, isJson: true };
 }
 
 export function buildUrl(path: string, query?: RequestOptions<unknown>['query']): string {
@@ -174,7 +159,7 @@ async function attempt<T>(path: string, options: RequestOptions<T>, token: strin
   try {
     // credentials: la cookie HttpOnly del refresh token (el navegador solo la adjunta a /api/auth).
     response = await fetch(buildUrl(path, query), { method, headers, body: payload, signal: controller.signal, credentials: 'include' });
-    parsed = options.download && response.ok ? await readFile(response) : await readBody(response);
+    parsed = await readBody(response);
   } catch (error) {
     if (signal?.aborted) throw error;
     throw clientError(controller.signal.aborted ? 408 : 0, traceId);
@@ -249,11 +234,6 @@ export async function apiEnvelope<T>(path: string, options: RequestOptions<T> = 
 /** Petición que devuelve solo `data` (lo más común en servicios). */
 export async function apiRequest<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
   return (await apiEnvelope<T>(path, options)).data;
-}
-
-/** Descarga un archivo con la misma sesión, tiempo límite y manejo de errores que cualquier petición. */
-export function apiDownload(path: string, options: RequestOptions<DownloadedFile> = {}): Promise<DownloadedFile> {
-  return apiRequest<DownloadedFile>(path, { ...options, download: true });
 }
 
 export function errorMessage(error: unknown): string {

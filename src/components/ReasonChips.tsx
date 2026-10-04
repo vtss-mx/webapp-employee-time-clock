@@ -1,8 +1,11 @@
 import { useCatalogs } from '../hooks/useCatalogs';
 
+/** Catálogos de motivos sugeridos (rechazar un registro, pedir nueva verificación, registrar o corregir asistencia). */
+export type ReasonCatalog = 'enrollment_rejection_reasons' | 'reverification_reasons' | 'attendance_edit_reasons';
+
 interface ReasonChipsProps {
   /** Catálogo de motivos sugeridos (solo se ofrecen los activos, en su orden). */
-  catalog: 'enrollment_rejection_reasons' | 'reverification_reasons';
+  catalog: ReasonCatalog;
   /** Texto del motivo escrito o elegido. */
   value: string;
   onPick: (reason: string) => void;

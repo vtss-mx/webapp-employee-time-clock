@@ -1,9 +1,11 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GoogleMaps from '../../services/maps/googleMaps';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MapsApiError, POINT_ZOOM } from '../../services/maps/googleMaps';
 import type { GeoPoint } from '../../utils/address';
-import { MapCanvas } from './MapCanvas';
+import { MapCanvas, type MapView } from './MapCanvas';
 
 // Carga del SDK controlada por cada prueba; el resto del módulo es el real (el SDK real se valida en navegador).
 const sdk = vi.hoisted(() => ({ load: vi.fn<() => Promise<void>>(), authListeners: new Set<() => void>() }));
@@ -68,7 +70,7 @@ class FakeMap {
     return this.center;
   }
   /** La persona toca o mueve el mapa. */
-  emit(name: 'click' | 'center_changed' | 'dragend', event: MapEvent = { latLng: null }) {
+  emit(name: 'click' | 'center_changed' | 'dragstart' | 'dragend' | 'idle', event: MapEvent = { latLng: null }) {
     act(() => this.listeners.get(name)?.(event));
   }
 }
@@ -101,20 +103,27 @@ const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve
 function renderMap(point: GeoPoint | null = null, radius: number | null = null) {
   const onPick = vi.fn<(point: GeoPoint) => void>();
   const onFailure = vi.fn<(error: MapsApiError) => void>();
-  const view = render(<MapCanvas point={point} radius={radius} onPick={onPick} onFailure={onFailure} />);
-  const rerender = (next: GeoPoint | null, nextRadius: number | null = radius, handlers = { onPick, onFailure }) =>
+  const onView = vi.fn<(view: MapView) => void>();
+  const view = render(<MapCanvas point={point} radius={radius} onPick={onPick} onFailure={onFailure} onView={onView} />);
+  const rerender = (next: GeoPoint | null, nextRadius: number | null = radius, handlers = { onPick, onFailure, onView }) =>
     view.rerender(<MapCanvas point={next} radius={nextRadius} {...handlers} />);
-  return { ...view, onPick, onFailure, rerender };
+  return { ...view, onPick, onFailure, onView, rerender };
 }
 
 /** Espera a que el mapa quede dibujado y lo devuelve. */
 async function readyMap() {
-  await waitFor(() => expect(screen.queryByText(LOADING)).toBeNull());
+  // Listo = sin "Cargando" Y con el efecto del círculo ya aplicado (corre después del render; con la
+  // máquina ocupada puede llegar un instante tarde).
+  await waitFor(() => {
+    expect(screen.queryByText(LOADING)).toBeNull();
+    expect(circles[0]?.setMap).toHaveBeenCalled();
+  });
   expect(maps).toHaveLength(1);
   return { map: maps[0], circle: circles[0] };
 }
 
 const pin = (container: HTMLElement) => container.querySelector('.map-canvas__pin');
+const marker = (container: HTMLElement) => container.querySelector('.map-canvas__marker');
 
 beforeEach(() => {
   maps.length = 0;
@@ -152,7 +161,8 @@ describe('MapCanvas: carga', () => {
       clickableIcons: false,
       gestureHandling: 'cooperative',
     });
-    expect(circle.options).toMatchObject({ map: null, clickable: false, strokeColor: '#2563eb' });
+    // Radio con el azul de la marca (sin el token en la hoja de estilos): relleno tenue y borde fino.
+    expect(circle.options).toEqual({ map: null, clickable: false, strokeColor: '#2563eb', strokeOpacity: 0.6, strokeWeight: 1.5, fillColor: '#2563eb', fillOpacity: 0.08 });
     expect(circle.setMap).toHaveBeenLastCalledWith(null);
     expect(circle.setRadius).not.toHaveBeenCalled();
     expect(pin(container)).toBeNull();
@@ -163,12 +173,24 @@ describe('MapCanvas: carga', () => {
     const { container } = renderMap(PALIZA, 200);
     const { map, circle } = await readyMap();
     expect(map.options).toMatchObject({ center: PALIZA, zoom: POINT_ZOOM });
-    expect(pin(container)).toBeInTheDocument();
+    expect(pin(container)).toBe(screen.getByRole('img', { name: 'Punto marcado' })); // pin de la marca, accesible
+    expect(marker(container)?.querySelector('.map-canvas__halo')).toBeInTheDocument();
+    expect(marker(container)).not.toHaveClass('is-lifted');
     expect(container.firstElementChild).toHaveClass('map-canvas', 'has-point');
     await waitFor(() => expect(circle.setMap).toHaveBeenLastCalledWith(map));
     expect(circle.setCenter).toHaveBeenLastCalledWith(PALIZA);
     expect(circle.setRadius).toHaveBeenLastCalledWith(200);
     expect(map.panTo).not.toHaveBeenCalled(); // ya está centrado en el punto
+  });
+
+  it('el círculo toma el color de la marca del token --map-accent (Google no lee variables CSS)', async () => {
+    const wrapper = document.createElement('div');
+    wrapper.style.setProperty('--map-accent', ' #0f8a5f ');
+    document.body.appendChild(wrapper);
+    render(<MapCanvas point={PALIZA} radius={100} onPick={vi.fn()} onFailure={vi.fn()} onView={vi.fn()} />, { container: wrapper });
+    const { circle } = await readyMap();
+    expect(circle.options).toMatchObject({ strokeColor: '#0f8a5f', fillColor: '#0f8a5f' });
+    wrapper.remove();
   });
 
   it('con punto pero sin radio no dibuja el círculo', async () => {
@@ -228,13 +250,45 @@ describe('MapCanvas: tocar y arrastrar', () => {
   });
 
   it('los manejadores del mapa usan siempre las funciones más recientes', async () => {
-    const { onPick, onFailure, rerender } = renderMap();
+    const { onPick, onFailure, onView, rerender } = renderMap();
     const { map } = await readyMap();
     const latestPick = vi.fn<(point: GeoPoint) => void>();
-    rerender(null, null, { onPick: latestPick, onFailure });
+    const latestView = vi.fn<(view: MapView) => void>();
+    rerender(null, null, { onPick: latestPick, onFailure, onView: latestView });
     map.emit('click', { latLng: new FakeLatLng(PALIZA) });
     expect(latestPick).toHaveBeenCalledExactlyOnceWith(PALIZA);
     expect(onPick).not.toHaveBeenCalled();
+    map.emit('idle');
+    expect(latestView).toHaveBeenCalledTimes(1);
+    expect(onView).not.toHaveBeenCalled();
+  });
+
+  it('mientras se arrastra el mapa el pin se levanta y al soltar se asienta', async () => {
+    const { container, onPick } = renderMap(PALIZA, 100);
+    const { map } = await readyMap();
+    map.emit('dragstart');
+    expect(marker(container)).toHaveClass('is-lifted');
+    map.center = new FakeLatLng(ZOCALO);
+    map.emit('dragend');
+    expect(marker(container)).not.toHaveClass('is-lifted');
+    expect(onPick).toHaveBeenCalledExactlyOnceWith(ZOCALO);
+  });
+
+  it('al quedar quieto avisa lo que se ve (centro y acercamiento) para buscar lugares cercanos', async () => {
+    const { onView } = renderMap();
+    const { map } = await readyMap();
+    map.emit('idle');
+    expect(onView).toHaveBeenLastCalledWith({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM });
+    map.center = new FakeLatLng(PALIZA);
+    map.zoom = 13;
+    map.emit('idle');
+    expect(onView).toHaveBeenLastCalledWith({ center: PALIZA, zoom: 13 });
+    map.zoom = undefined; // Google aún no conoce el acercamiento: el de todo el país
+    map.emit('idle');
+    expect(onView).toHaveBeenLastCalledWith({ center: PALIZA, zoom: DEFAULT_ZOOM });
+    map.center = undefined; // sin centro todavía: nada que avisar
+    map.emit('idle');
+    expect(onView).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -339,5 +393,29 @@ describe('MapCanvas: salir antes de que cargue', () => {
     load.reject(new MapsApiError('maps', 'failed', 'timeout'));
     await settle();
     expect(onFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe('MapCanvas: contenedor redondeado sin el marco de foco de Google', () => {
+  // jsdom no aplica la hoja de estilos: se verifica que sus reglas sigan ahí (un cambio que las quite falla aquí).
+  const css = readFileSync(resolve(__dirname, '../../styles/global.css'), 'utf8');
+  const rule = (selector: string) => {
+    const start = css.indexOf(`\n${selector} {`); // al inicio de una línea: no una regla que lo contiene
+    expect(start, `falta la regla ${selector}`).toBeGreaterThan(-1);
+    return css.slice(start, css.indexOf('}', start));
+  };
+
+  it('quita el borde azul cuadrado que Google pone al enfocar el mapa (también con un clic)', () => {
+    expect(css).toContain('.map-canvas .gm-style iframe + div,\n.map-canvas .gm-style div[tabindex]:focus {');
+    expect(rule('.map-canvas .gm-style div[tabindex]:focus')).toMatch(/border: 0 !important;[\s\S]*outline: 0 !important;/);
+  });
+
+  it('el mapa queda recortado por el redondeo y el foco con teclado es un anillo propio con el mismo radio', () => {
+    expect(rule('.map-canvas')).toContain('clip-path: inset(0 round var(--map-radius));');
+    const ring = rule('.map-canvas::after');
+    expect(ring).toContain('border-radius: calc(var(--map-radius) - 1px);');
+    expect(ring).toContain('inset 0 0 0 2px var(--map-accent)');
+    expect(ring).toContain('pointer-events: none;');
+    expect(rule('.map-canvas:has(.gm-style div[tabindex]:focus-visible)::after')).toContain('opacity: 1;');
   });
 });

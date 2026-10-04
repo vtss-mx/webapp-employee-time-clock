@@ -27,6 +27,9 @@ const LIFETIMES = [
   { value: 'never', label: 'Sin vencimiento', description: 'Solo si el sistema no puede rotarla: revócala si deja de usarse.' },
 ];
 
+/** Nombre de cada vigencia, para la confirmación. */
+const LIFETIME_LABELS: Record<string, string> = Object.fromEntries(LIFETIMES.map((option) => [option.value, option.label]));
+
 /**
  * Crear una llave de la API (/company/integrations/new): nombre del sistema que se conecta, sus
  * permisos de lectura y su vigencia. El secreto se muestra una sola vez al terminar.
@@ -58,6 +61,24 @@ export function ApiKeyFormPage() {
         void feedback.show(apiKeySecretMessage(created));
       },
       (error) => (error instanceof ApiError && error.code === 'API_KEY_LIMIT' ? 'Llegaste al tope de llaves' : 'No se pudo crear la llave'),
+      {
+        // Pregunta antes de crearla; cancelar deja el formulario como estaba.
+        confirm: {
+          kind: 'create',
+          icon: <KeyRound size={30} />,
+          title: `¿Crear la llave «${name.trim()}»?`,
+          message: 'Al crearla verás su secreto una sola vez: cópialo y guárdalo en el sistema que se conectará.',
+          detailsTitle: 'Se creará',
+          details: [
+            { label: 'Nombre', value: name.trim() },
+            { label: 'Permisos (solo lectura)', value: active('api_scopes').filter((scope) => scopes.includes(scope.code)).map((scope) => scope.name).join(', ') },
+            { label: 'Vigencia', value: LIFETIME_LABELS[lifetime] },
+          ],
+          note: 'El secreto no se puede volver a consultar después.',
+          confirmLabel: 'Crear llave',
+          confirmIcon: <KeyRound size={18} />,
+        },
+      },
     );
   };
 

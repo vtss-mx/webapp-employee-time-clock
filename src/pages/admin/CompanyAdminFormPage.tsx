@@ -15,6 +15,7 @@ import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
 import { ApiError } from '../../services/apiClient';
 import type { CompanyAdmin, CompanyDetail } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
 import { validateEmail } from '../../utils/validation';
 
 /** Textos de cada pantalla: agregar un administrador o restablecer la contraseña de uno. */
@@ -22,6 +23,42 @@ const MODES = {
   add: { title: 'Agregar administrador', Icon: UserPlus, action: 'Agregar', password: 'Contraseña inicial', failed: 'No se pudo agregar el administrador' },
   reset: { title: 'Restablecer contraseña', Icon: KeyRound, action: 'Restablecer', password: 'Contraseña nueva', failed: 'No se pudo restablecer la contraseña' },
 } as const;
+
+/** Agregar un administrador: con qué correo entrará y a qué empresa (la contraseña nunca se muestra). */
+function addConfirm(company: CompanyDetail, email: string): ConfirmInput {
+  return {
+    kind: 'create',
+    icon: <UserPlus size={30} />,
+    title: `¿Agregar a ${email} como administrador?`,
+    message: 'Podrá iniciar sesión de inmediato con este correo y la contraseña inicial que asignaste, con el mismo acceso que los demás administradores de la empresa.',
+    detailsTitle: 'Se registrará',
+    details: [
+      { label: 'Correo', value: email },
+      { label: 'Empresa', value: company.name },
+    ],
+    note: 'Comparte la contraseña inicial por un medio seguro.',
+    confirmLabel: 'Agregar administrador',
+    confirmIcon: <UserPlus size={18} />,
+  };
+}
+
+/** Restablecer la contraseña de un administrador: la anterior deja de servir y se cierran sus sesiones. */
+function resetConfirm(company: CompanyDetail, admin: CompanyAdmin): ConfirmInput {
+  return {
+    tone: 'warning',
+    icon: <KeyRound size={30} />,
+    eyebrow: 'Seguridad de la cuenta',
+    title: `¿Restablecer la contraseña de ${admin.email}?`,
+    message: 'Su contraseña actual dejará de funcionar: deberá entrar con la nueva que asignaste.',
+    details: [
+      { label: 'Administrador', value: admin.email },
+      { label: 'Empresa', value: company.name },
+    ],
+    note: 'Se cerrarán todas sus sesiones abiertas. Comparte la contraseña nueva por un medio seguro.',
+    confirmLabel: 'Restablecer contraseña',
+    confirmIcon: <KeyRound size={18} />,
+  };
+}
 
 /**
  * Administradores de una empresa (consola de la plataforma):
@@ -73,7 +110,10 @@ function CompanyAdminForm({ company, admin }: { company: CompanyDetail; admin: C
         back();
       },
       mode.failed,
-      (err) => err instanceof ApiError && err.code === 'EMAIL_TAKEN' && setServerError(err.message),
+      {
+        confirm: admin ? resetConfirm(company, admin) : addConfirm(company, email.trim().toLowerCase()),
+        onError: (err) => err instanceof ApiError && err.code === 'EMAIL_TAKEN' && setServerError(err.message),
+      },
     );
   };
 

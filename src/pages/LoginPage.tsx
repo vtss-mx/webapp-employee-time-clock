@@ -1,4 +1,4 @@
-import { Check, KeyRound, LogIn, Mail } from 'lucide-react';
+import { KeyRound, LogIn, Mail } from 'lucide-react';
 import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/auth/AuthLayout';
@@ -6,6 +6,7 @@ import { loginRuleMessage } from '../components/auth/loginMessages';
 import { FormField } from '../components/FormField';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { Button } from '../components/ui/Button';
+import { Checkbox } from '../components/ui/Checkbox';
 import { useAuth } from '../hooks/useAuth';
 import { useFeedback } from '../hooks/useFeedback';
 import { useRememberedAccount } from '../hooks/useRememberedAccount';
@@ -155,20 +156,7 @@ export function LoginPage() {
           />
 
           <div className="auth-card__options">
-            <label className={`checkbox checkbox--inline ${remember ? 'is-checked' : ''}`} title={REMEMBER_HINT}>
-              <input
-                type="checkbox"
-                className="checkbox__input"
-                checked={remember}
-                disabled={loading}
-                onChange={(e) => setRemember(e.target.checked)}
-                aria-describedby="remember-hint"
-              />
-              <span className="checkbox__box" aria-hidden>
-                <Check size={14} strokeWidth={3} />
-              </span>
-              <span>Recordar mi cuenta</span>
-            </label>
+            <Checkbox variant="inline" size="sm" label="Recordar mi cuenta" title={REMEMBER_HINT} checked={remember} disabled={loading} onChange={setRemember} aria-describedby="remember-hint" />
           </div>
           <span id="remember-hint" className="sr-only">
             {REMEMBER_HINT}

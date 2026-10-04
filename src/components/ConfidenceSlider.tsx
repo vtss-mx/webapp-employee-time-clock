@@ -1,9 +1,10 @@
 import { Gauge, RotateCcw, Save } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useCatalogs } from '../hooks/useCatalogs';
+import { useConfirm } from '../hooks/useConfirm';
 import { useSyncOnChange } from '../hooks/useSyncOnChange';
-import { useFeedback } from '../hooks/useFeedback';
 import type { ConfidenceLevelItem } from '../types';
+import type { ConfirmInput } from '../types/confirm';
 import { formatConfidence } from '../utils/format';
 import { Button } from './ui/Button';
 
@@ -14,9 +15,55 @@ function nearestLevel([first, ...rest]: ConfidenceLevelItem[], target: number, m
 const byValue = (level: ConfidenceLevelItem) => level.value;
 const byPosition = (level: ConfidenceLevelItem) => level.sort_order;
 
+/** Cómo se lee un nivel: "99 % (Estricto)". */
+const levelText = (level: ConfidenceLevelItem) => `${formatConfidence(level.value)} (${level.name})`;
+
+/** Cifras medidas del nivel: se muestran bajo el control y en su confirmación. */
+const levelStats = (level: ConfidenceLevelItem) => [
+  { label: 'Similitud exigida', value: level.similarity.toFixed(3) },
+  { label: 'Impostores aceptados', value: level.false_accept_rate === 0 ? '0 de 3 000' : `≈ ${level.false_accept_rate} %` },
+  { label: 'Rechazos de una captura legítima', value: `≈ ${level.rejection_rate} %` },
+];
+
+/**
+ * Confirmación de un nivel nuevo (siempre se pregunta), con el nivel "antes → después". Bajarlo
+ * acepta con más facilidad a una persona parecida (se advierte en rojo); un nivel muy estricto
+ * (≥ 10 % de rechazos legítimos) avisa de los reintentos y de cómo reducirlos.
+ */
+function levelConfirm(label: string, saved: ConfidenceLevelItem, next: ConfidenceLevelItem): ConfirmInput {
+  const strict = next.rejection_rate >= 10;
+  const lower = next.value < saved.value;
+  return {
+    kind: 'edit',
+    tone: lower ? 'danger' : strict ? 'warning' : 'primary',
+    icon: <Gauge size={30} />,
+    eyebrow: 'Nivel de confianza',
+    title: `¿Exigir ${formatConfidence(next.value)} de confianza?`,
+    message: lower
+      ? 'Un nivel más bajo acepta con más facilidad a una persona parecida: habrá menos reintentos, pero menos seguridad.'
+      : strict
+        ? 'Es el nivel más estricto: aumenta la seguridad, pero habrá más reintentos.'
+        : 'Un nivel más alto protege mejor contra personas parecidas.',
+    changes: [{ label, before: levelText(saved), after: levelText(next) }],
+    detailsTitle: strict ? 'Antes de exigirlo' : 'Con este nivel',
+    details: strict
+      ? [
+          ...(next.sort_order >= 100 ? [`Ningún sistema biométrico puede garantizar el 100 %: se aplica el máximo calibrado, ${formatConfidence(next.value)}.`] : []),
+          `Aproximadamente ${next.rejection_rate} % de las capturas legítimas no alcanzan el nivel y se repiten.`,
+          'Pide a los empleados buena iluminación y mirar de frente a la cámara.',
+        ]
+      : levelStats(next),
+    note: 'Aplica en segundos a todas las verificaciones faciales de la empresa.',
+    confirmLabel: 'Guardar nivel',
+    confirmIcon: <Save size={18} />,
+  };
+}
+
 interface ConfidenceSliderProps {
   /** Nivel vigente (guardado). */
   value: number;
+  /** Nombre accesible del control (hay uno para verificar y otro para identificar entre todos). */
+  label?: string;
   busy?: boolean;
   onSave: (value: number) => void;
 }
@@ -39,11 +86,11 @@ interface LevelSliderProps extends ConfidenceSliderProps {
   saved: ConfidenceLevelItem;
 }
 
-function LevelSlider({ levels, saved, busy = false, onSave }: LevelSliderProps) {
+function LevelSlider({ levels, saved, busy = false, onSave, label = 'Nivel de confianza requerido' }: LevelSliderProps) {
   const [position, setPosition] = useState<number>(saved.sort_order);
   useSyncOnChange(saved.sort_order, setPosition); // al guardarse o cargarse otro nivel
   const id = useId();
-  const feedback = useFeedback();
+  const confirm = useConfirm();
 
   // Posiciones sin nivel activo se ajustan al más cercano.
   const step = nearestLevel(levels, position, byPosition);
@@ -51,28 +98,9 @@ function LevelSlider({ levels, saved, busy = false, onSave }: LevelSliderProps) 
   const min = levels[0].sort_order;
   const max = levels[levels.length - 1].sort_order;
 
-  /** Niveles muy estrictos se confirman en un popup (más reintentos para los empleados). */
+  /** Cada nivel nuevo se confirma antes de guardarse; cancelar deja el control donde está, sin guardar. */
   const save = async () => {
-    if (step.rejection_rate >= 10) {
-      const choice = await feedback.show({
-        variant: 'warning',
-        title: `¿Exigir ${formatConfidence(step.value)} de confianza?`,
-        text: 'Es el nivel más estricto: aumenta la seguridad, pero habrá más reintentos.',
-        details: [
-          ...(step.sort_order >= 100
-            ? [`Ningún sistema biométrico puede garantizar el 100 %: se aplica el máximo calibrado, ${formatConfidence(step.value)}.`]
-            : []),
-          `Aproximadamente ${step.rejection_rate} % de las capturas legítimas no alcanzan el nivel y se repiten.`,
-          'Pide a los empleados buena iluminación y mirar de frente a la cámara.',
-        ],
-        actions: [
-          { id: 'cancel', label: 'Cancelar', variant: 'ghost' },
-          { id: 'save', label: 'Guardar nivel', icon: <Save size={18} /> },
-        ],
-      });
-      if (choice !== 'save') return;
-    }
-    onSave(step.value);
+    if (await confirm(levelConfirm(label, saved, step))) onSave(step.value);
   };
   const changed = current !== saved.sort_order;
   const fill = ((current - min) / Math.max(1, max - min)) * 100;
@@ -101,7 +129,7 @@ function LevelSlider({ levels, saved, busy = false, onSave }: LevelSliderProps) 
           step={1}
           value={current}
           disabled={busy}
-          aria-label="Nivel de confianza requerido"
+          aria-label={label}
           aria-valuetext={`${formatConfidence(step.value)} (${step.name})`}
           onChange={(e) => setPosition(Number(e.target.value))}
         />
@@ -123,18 +151,12 @@ function LevelSlider({ levels, saved, busy = false, onSave }: LevelSliderProps) 
       </div>
 
       <dl className="confidence__stats">
-        <div>
-          <dt>Similitud exigida</dt>
-          <dd>{step.similarity.toFixed(3)}</dd>
-        </div>
-        <div>
-          <dt>Impostores aceptados</dt>
-          <dd>{step.false_accept_rate === 0 ? '0 de 3 000' : `≈ ${step.false_accept_rate} %`}</dd>
-        </div>
-        <div>
-          <dt>Rechazos de una captura legítima</dt>
-          <dd>≈ {step.rejection_rate} %</dd>
-        </div>
+        {levelStats(step).map((stat) => (
+          <div key={stat.label}>
+            <dt>{stat.label}</dt>
+            <dd>{stat.value}</dd>
+          </div>
+        ))}
       </dl>
 
       <div className="confidence__actions">

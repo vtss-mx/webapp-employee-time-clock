@@ -20,8 +20,17 @@ export const CATALOG_KEYS = [
   'reverification_reasons',
   'confidence_levels',
   'antispoof_levels',
+  'flash_modes',
   'face_errors',
   'enrollment_flags',
+  'work_modes',
+  'attendance_actions',
+  'work_session_statuses',
+  'shift_request_statuses',
+  'board_states',
+  'assignment_states',
+  'day_off_types',
+  'attendance_edit_reasons',
 ] as const satisfies readonly CatalogKey[];
 
 const isItemList = isArrayOf<CatalogItem[]>(hasKeys('code', 'name', 'sort_order', 'active'));

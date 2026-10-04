@@ -1,6 +1,6 @@
 import { LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { PageLoader } from '../components/Spinner';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { OfflineBanner } from '../components/OfflineBanner';
@@ -10,13 +10,16 @@ import { useAuth } from '../hooks/useAuth';
 import { useCatalogs } from '../hooks/useCatalogs';
 import { PendingEnrollmentsContext, usePendingEnrollments } from '../hooks/usePendingEnrollments';
 import { usePendingErrors } from '../hooks/usePendingErrors';
+import { usePendingAbsenceRequests } from '../hooks/usePendingAbsenceRequests';
+import { usePendingShiftRequests } from '../hooks/usePendingShiftRequests';
 import { homeForUser } from '../routes/paths';
 import type { User } from '../types';
 import { config } from '../utils/config';
 import { MobileBar, useDrawer } from './MobileBar';
 import { MOBILE_MENU } from './mobileMenu';
 import { useFeedback } from '../hooks/useFeedback';
-import { navFor, usesBadge } from './navigation';
+import { navFor, navGroups, usesBadge } from './navigation';
+import { SidebarNav } from './SidebarNav';
 import { useConfirmLogout } from '../components/auth/logoutConfirm';
 
 /** Menú contraído (escritorio): preferencia del usuario en la BD y atajo Ctrl/⌘ + B. */
@@ -65,6 +68,8 @@ export function AppLayout() {
   // contexto, a las pantallas que la muestran (dashboard). Solo si el menú del usuario lo lleva.
   const pending = usePendingEnrollments(usesBadge(user, 'PENDING_ENROLLMENTS'));
   const pendingErrors = usePendingErrors(usesBadge(user, 'PENDING_ERRORS'));
+  const pendingShiftRequests = usePendingShiftRequests(usesBadge(user, 'PENDING_SHIFT_REQUESTS'));
+  const pendingAbsences = usePendingAbsenceRequests(usesBadge(user, 'PENDING_ABSENCE_REQUESTS'));
 
   // En móvil, el menú lateral se cierra al navegar (configurable).
   useEffect(() => {
@@ -80,7 +85,12 @@ export function AppLayout() {
     .map((p) => p[0]?.toUpperCase())
     .join('');
 
-  const nav = navFor(user, { PENDING_ENROLLMENTS: pending, PENDING_ERRORS: pendingErrors });
+  const nav = navFor(user, {
+    PENDING_ENROLLMENTS: pending,
+    PENDING_ERRORS: pendingErrors,
+    PENDING_SHIFT_REQUESTS: pendingShiftRequests,
+    PENDING_ABSENCE_REQUESTS: pendingAbsences,
+  });
   const role = nameOf('roles', user.role);
 
   return (
@@ -119,15 +129,7 @@ export function AppLayout() {
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
-        <nav className="sidebar__nav" style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
-          {nav.map(({ to, label, icon: Icon, badge }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`} data-tooltip={label}>
-              <Icon size={20} />
-              <span className="nav-item__label">{label}</span>
-              {badge ? <span className="nav-item__badge">{badge}</span> : null}
-            </NavLink>
-          ))}
-        </nav>
+        <SidebarNav groups={navGroups(user, nav)} compact={collapsed} />
 
         <div className="sidebar__footer">
           <div className="user-card">

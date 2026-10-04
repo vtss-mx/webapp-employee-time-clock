@@ -6,12 +6,9 @@ import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import { DashboardPage } from './DashboardPage';
 
-const learning = { enabled: true, approved_employees: 3, employees_learning: 1, learned_samples: 4, identifications: 9, learned_identifications: 2, last_learned_at: null };
-
-/** Resumen: total de empleados (sin filtro) y activos (`active=true`); el panel de aprendizaje aparte. */
+/** Resumen: total de empleados (sin filtro) y activos (`active=true`). */
 function serve(totals: { all: number; active: number } | ((call: MockCall) => Response)) {
   return mockFetch((call) => {
-    if (call.url.includes('/face/learning')) return apiOk(learning);
     if (typeof totals === 'function') return totals(call);
     return apiOk({ items: [], total: call.url.includes('active=true') ? totals.active : totals.all, page: 1, size: 1 });
   });

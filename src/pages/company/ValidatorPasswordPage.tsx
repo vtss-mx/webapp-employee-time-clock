@@ -22,17 +22,36 @@ export function ValidatorPasswordPage() {
   const { saving, submit: send } = useSubmit();
 
   const back = () => void navigate(paths.company.validators);
+
+  if (!validator) return error ? <RetryState onRetry={retry} /> : <SkeletonCard lines={4} />;
+
+  // Pregunta antes de enviar (cerrará sus sesiones); cancelar deja el formulario como estaba.
   const submit = async (event: SubmitEvent) => {
     event.preventDefault();
     if (!form.valid) return;
-    await send(async () => {
-      const saved = await validatorService.resetPassword(validatorId, form.password);
-      void feedback.success('Contraseña restablecida', `${saved.email} debe iniciar sesión de nuevo: sus sesiones abiertas se cerraron.`);
-      back();
-    }, 'No se pudo restablecer la contraseña');
+    await send(
+      async () => {
+        const saved = await validatorService.resetPassword(validatorId, form.password);
+        void feedback.success('Contraseña restablecida', `${saved.email} debe iniciar sesión de nuevo: sus sesiones abiertas se cerraron.`);
+        back();
+      },
+      'No se pudo restablecer la contraseña',
+      {
+        confirm: {
+          tone: 'warning',
+          icon: <KeyRound size={30} />,
+          eyebrow: 'Restablecer contraseña',
+          title: `¿Restablecer la contraseña de ${validator.name}?`,
+          message: 'Deberá iniciar sesión con la contraseña nueva: compártela por un medio seguro.',
+          details: [{ label: 'Cuenta', value: validator.email }],
+          note: 'Sus sesiones abiertas se cerrarán de inmediato.',
+          confirmLabel: 'Restablecer contraseña',
+          confirmIcon: <KeyRound size={18} />,
+        },
+      },
+    );
   };
 
-  if (!validator) return error ? <RetryState onRetry={retry} /> : <SkeletonCard lines={4} />;
   return (
     <div className="page">
       <Panel onSubmit={(e) => void submit(e)}>

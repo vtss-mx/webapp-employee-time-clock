@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { availabilityBlocks, availabilityError, useAvailability } from './useAvailability';
 import { fieldErrorsFrom } from '../services/apiClient';
 import { useFormState } from './useFormState';
-import { validatePhone } from '../utils/phone';
+import { formatPhone, validatePhone } from '../utils/phone';
 import { emptyEmployeeForm, validateEmployeeForm } from '../utils/formRules';
 import type { EmployeeFormValues, EmployeeUniqueField, LiveChecks } from '../types';
+import type { ConfirmInput } from '../types/confirm';
+import type { FieldLabels } from '../utils/changes';
+import { formatDate } from '../utils/format';
 import { CURP_LENGTH, NSS_LENGTH, RFC_LENGTH, normalizeCurp, normalizeRfc, type FieldErrors, validateEmail } from '../utils/validation';
 
 const UNIQUE_FIELDS: EmployeeUniqueField[] = ['employee_number', 'rfc', 'curp', 'nss', 'email', 'phone'];
@@ -22,6 +25,21 @@ const ERROR_FIELDS: Partial<Record<string, keyof EmployeeFormValues>> = {
   ACCOUNT_PHONE_MISMATCH: 'phone',
   ACCOUNT_PHONE_MISSING: 'phone',
   PASSWORD_REQUIRED: 'password',
+};
+
+/** Datos del empleado en las confirmaciones: lo que se registra (alta) o lo que cambia (edición). */
+export const EMPLOYEE_LABELS: FieldLabels<EmployeeFormValues & { headwear_exempt?: boolean }> = {
+  first_name: 'Nombres',
+  last_name: 'Apellidos',
+  birth_date: { label: 'Fecha de nacimiento', format: formatDate },
+  employee_number: 'No. de empleado',
+  curp: 'CURP',
+  rfc: 'RFC',
+  nss: 'NSS',
+  phone: { label: 'Teléfono celular', format: formatPhone },
+  email: 'Correo electrónico',
+  password: { label: 'Contraseña', secret: true },
+  headwear_exempt: 'Excepción de prenda de cabeza',
 };
 
 /** Errores de campo devueltos por el backend (duplicados y validación). */
@@ -97,7 +115,8 @@ export function useEmployeeForm({ excludeId, original, passwordOptional = false 
     saving,
     canSubmit,
     validate,
-    save: (action: () => Promise<void>) => form.save(action),
+    /** Guarda tras confirmar (cancelar no envía nada y el formulario sigue igual). */
+    save: (action: () => Promise<void>, confirm: ConfirmInput) => form.save(action, 'No se pudo guardar', confirm),
     live,
     linking,
   };

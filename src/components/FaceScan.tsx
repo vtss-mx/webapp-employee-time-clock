@@ -1,12 +1,15 @@
-import { ArrowLeftRight, Camera, Crosshair, ScanFace, ShieldCheck, X, type LucideIcon } from 'lucide-react';
+import { Camera, Crosshair, Move, ScanFace, ShieldCheck, X, type LucideIcon } from 'lucide-react';
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import type { FaceGuidance } from '../hooks/useFaceDetection';
 import { config } from '../utils/config';
 import { Button } from './ui/Button';
 
-/** Fases internas del flujo facial (lo que hace el sistema). */
-/** recenter: entre dos giros de la prueba de vida, la persona vuelve a mirar al frente. */
-export type Phase = 'frontal' | 'checking' | 'blocked' | 'challenge' | 'recenter' | 'submitting';
+/**
+ * Fases internas del flujo facial (lo que hace el sistema). flash: la pantalla destella los colores
+ * del reto; challenge: un movimiento de la prueba de vida; recenter: entre dos movimientos, la
+ * persona vuelve a mirar al frente.
+ */
+export type Phase = 'frontal' | 'checking' | 'blocked' | 'flash' | 'challenge' | 'recenter' | 'submitting';
 
 /** Etapas que ve la persona (lo que debe hacer): una barra de progreso por etapa. */
 export type ScanStage = 'prepare' | 'align' | 'scan' | 'liveness' | 'confirm';
@@ -37,7 +40,7 @@ export const STAGE_INFO: Record<ScanStage, StageInfo> = {
   liveness: {
     name: 'Prueba de vida',
     title: 'Sigue la indicación',
-    text: 'Gira la cabeza cuando el sistema te lo indique.',
+    text: 'Mueve la cabeza como se indique; la pantalla puede cambiar de color un instante.',
   },
   confirm: {
     name: 'Confirmación',
@@ -50,7 +53,7 @@ const STAGE_ICONS: Record<ScanStage, LucideIcon> = {
   prepare: Camera,
   align: Crosshair,
   scan: ScanFace,
-  liveness: ArrowLeftRight,
+  liveness: Move,
   confirm: ShieldCheck,
 };
 
@@ -67,6 +70,7 @@ export function currentStage(phase: Phase, guidance: FaceGuidance): ScanStage {
   switch (phase) {
     case 'checking':
       return 'scan';
+    case 'flash':
     case 'challenge':
     case 'recenter':
       return 'liveness';
@@ -80,10 +84,11 @@ export function currentStage(phase: Phase, guidance: FaceGuidance): ScanStage {
 }
 
 /** Avance (0..1) dentro de la etapa actual: alimenta su segmento de la barra. */
-export function stageFill(stage: ScanStage, input: { progress: number; turnProgress: number; capture?: { current: number; total: number } | null }): number {
+/** `moveProgress`: avance del movimiento en curso (o de los colores, durante el destello). */
+export function stageFill(stage: ScanStage, input: { progress: number; moveProgress: number; capture?: { current: number; total: number } | null }): number {
   if (stage === 'align') return input.progress;
   if (stage === 'scan') return input.capture ? input.capture.current / input.capture.total : 1;
-  if (stage === 'liveness') return input.turnProgress;
+  if (stage === 'liveness') return input.moveProgress;
   if (stage === 'confirm') return 0.6;
   return 0.35;
 }

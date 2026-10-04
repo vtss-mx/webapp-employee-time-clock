@@ -5,8 +5,9 @@ import { CompanyAdminFields, CompanyDataFields } from '../../components/CompanyF
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { Switch } from '../../components/ui/Switch';
-import { useCompanyForm } from '../../hooks/useCompanyForm';
+import { COMPANY_LABELS, useCompanyForm } from '../../hooks/useCompanyForm';
 import { paths } from '../../routes/paths';
+import { describeValues } from '../../utils/changes';
 import { config } from '../../utils/config';
 import { adminService } from '../../services/adminService';
 
@@ -36,7 +37,18 @@ export function CompanyCreatePage() {
         ],
         detailsStyle: 'checks',
       });
-    }, 'No se pudo registrar la empresa');
+    }, 'No se pudo registrar la empresa', {
+      kind: 'create',
+      icon: <Building2 size={30} />,
+      title: `¿Registrar la empresa ${form.values.name.trim()}?`,
+      message: 'Su administrador podrá iniciar sesión de inmediato con su correo y la contraseña que asignaste. La política de verificación se creará con los valores más seguros.',
+      detailsTitle: 'Se registrará',
+      // Los datos capturados (sin la contraseña) y el módulo de Integraciones elegido.
+      details: [...describeValues(form.values, COMPANY_LABELS), { label: 'Integraciones (API)', value: apiEnabled ? 'Sí' : 'No' }],
+      note: 'Comparte la contraseña inicial por un medio seguro.',
+      confirmLabel: 'Registrar empresa',
+      confirmIcon: <Plus size={18} />,
+    });
   };
 
   return (

@@ -9,7 +9,10 @@ export interface MobileMenuConfig {
   showTitle: boolean;
   /** La barra muestra el ícono de la aplicación (lleva al inicio). */
   showBrand: boolean;
-  /** El botón del menú muestra la suma de los contadores (p. ej. validaciones pendientes). */
+  /**
+   * El botón del menú muestra la suma de los contadores (p. ej. validaciones pendientes). Apagado:
+   * en el teléfono el punto rojo sobre la hamburguesa distrae; los contadores siguen en el menú.
+   */
   badgeOnToggle: boolean;
   /** Elegir una opción cierra el menú. */
   closeOnNavigate: boolean;
@@ -19,6 +22,6 @@ export const MOBILE_MENU: MobileMenuConfig = {
   side: 'left',
   showTitle: true,
   showBrand: true,
-  badgeOnToggle: true,
+  badgeOnToggle: false,
   closeOnNavigate: true,
 };

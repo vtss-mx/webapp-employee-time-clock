@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -54,8 +54,16 @@ function renderEnrollment(submit: () => Response) {
   return () => calls.filter((call) => call.url.includes('/enrollment/face'));
 }
 
-async function captureAndSubmit() {
+/** "Comenzar registro" y la confirmación previa a abrir la cámara ("Abrir cámara" o "Cancelar"). */
+async function start(answer: 'Abrir cámara' | 'Cancelar' = 'Abrir cámara') {
   await userEvent.click(await screen.findByRole('button', { name: /Comenzar registro/ }));
+  const confirm = await screen.findByRole('dialog', { name: '¿Registrar tu rostro?' });
+  await userEvent.click(within(confirm).getByRole('button', { name: answer }));
+  return confirm;
+}
+
+async function captureAndSubmit() {
+  await start();
   await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
 }
 
@@ -148,13 +156,29 @@ describe('EnrollmentPage: bienvenida y avisos al entrar', () => {
     expect(screen.getByRole('heading', { name: 'Registra tu rostro nuevamente' })).toBeInTheDocument();
   });
 
+  it('se confirma antes de abrir la cámara: cancelar se queda en la bienvenida', async () => {
+    renderEnrollment(() => apiOk(null));
+    const confirm = await start('Cancelar');
+    expect(confirm).not.toHaveTextContent('se reemplazará'); // primer registro
+    expect(screen.queryByRole('button', { name: 'capturar rostro' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Comenzar registro/ })).toBeInTheDocument();
+  });
+
+  it('registrarse de nuevo avisa que el registro anterior se reemplaza', async () => {
+    withEmployee({ face_status: 'REJECTED', face_rejection_reason: 'Borrosa' });
+    renderEnrollment(() => apiOk(null));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'Tu registro anterior fue rechazado' })).getByRole('button', { name: 'Entendido' }));
+    expect(await start()).toHaveTextContent('Tu registro anterior se reemplazará por este.');
+    expect(screen.getByRole('button', { name: 'capturar rostro' })).toBeInTheDocument();
+  });
+
   it('salir de la cámara regresa a la bienvenida; una falla del flujo además se avisa en popup', async () => {
     renderEnrollment(() => apiOk(null));
-    await userEvent.click(await screen.findByRole('button', { name: /Comenzar registro/ }));
+    await start();
     await userEvent.click(screen.getByRole('button', { name: 'salir' }));
     expect(await screen.findByRole('button', { name: /Comenzar registro/ })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /Comenzar registro/ }));
+    await start();
     await userEvent.click(screen.getByRole('button', { name: 'falla de cámara' }));
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo completar el registro' });
     expect(popup).toHaveTextContent('La cámara dejó de responder');

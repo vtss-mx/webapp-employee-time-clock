@@ -1,7 +1,6 @@
 import { AlertTriangle, Camera, Check, CheckCircle2, ImageOff, ShieldCheck, UserCheck, UserX } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ConfirmDialog } from '../../components/Modal';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { EnrollmentBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
@@ -34,7 +33,6 @@ export function ValidationReviewPage() {
   const feedback = useFeedback();
   const catalogs = useCatalogs();
   const { data: item, error, retry } = useResource((signal) => enrollmentService.get(enrollmentId, signal), enrollmentId, 'No se pudo cargar la solicitud');
-  const [confirmApprove, setConfirmApprove] = useState(false);
   const { busy, run } = useAction();
 
   const flags = item?.flagged_accessories ?? [];
@@ -53,15 +51,27 @@ export function ValidationReviewPage() {
     });
   }, [item, feedback, catalogs]);
 
-  const approve = () =>
+  const approve = (fullName: string, employeeNumber: string) =>
     run(() => enrollmentService.approve(enrollmentId), {
+      confirm: {
+        tone: 'success',
+        icon: <UserCheck size={30} />,
+        eyebrow: 'Validar identidad',
+        title: `¿Aceptar a ${fullName}?`,
+        message: 'Confirmas que la persona de la fotografía es este empleado. Podrá identificarse con su rostro o su código QR.',
+        details: [
+          { label: 'Empleado', value: `${fullName} · ${employeeNumber}` },
+          ...flagged.map((flag) => `Revisa: ${flag.name}`),
+        ],
+        confirmLabel: 'Sí, aceptar',
+        confirmIcon: <UserCheck size={18} />,
+      },
       errorTitle: 'No se pudo aceptar',
       success: (res) => ['Usuario aceptado', `${res.full_name} ya puede identificarse.`],
       onSuccess: () => {
         notifyEnrollmentsChanged();
         void navigate(paths.company.validations);
       },
-      onError: () => setConfirmApprove(false),
     });
 
   if (error) {
@@ -214,28 +224,12 @@ export function ValidationReviewPage() {
             <ButtonLink to={paths.company.rejectValidation(item.id)} variant="danger-outline" size="lg" icon={<UserX size={20} />}>
               Rechazar usuario
             </ButtonLink>
-            <Button variant="success" size="lg" icon={<UserCheck size={20} />} onClick={() => setConfirmApprove(true)}>
+            <Button variant="success" size="lg" icon={<UserCheck size={20} />} loading={busy !== null} onClick={() => void approve(item.full_name, item.employee_number)}>
               Aceptar usuario
             </Button>
           </PanelFooter>
         )}
       </Panel>
-
-      <ConfirmDialog
-        open={confirmApprove}
-        title="Aceptar usuario"
-        tone="success"
-        message={
-          <>
-            Confirmas que la persona de la fotografía es <strong>{item.full_name}</strong>. Podrá identificarse con su
-            rostro o su código QR.
-          </>
-        }
-        confirmLabel="Sí, aceptar"
-        loading={busy !== null}
-        onConfirm={approve}
-        onCancel={() => setConfirmApprove(false)}
-      />
 
     </div>
   );

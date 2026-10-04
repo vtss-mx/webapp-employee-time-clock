@@ -1,38 +1,68 @@
-import { Ban, Check, MonitorSmartphone, ShieldOff, Smartphone, Tablet, X } from 'lucide-react';
-import { useState } from 'react';
+import { Ban, Check, MonitorSmartphone, ShieldOff, Smartphone, Tablet, X, type LucideIcon } from 'lucide-react';
 import { useParams } from 'react-router-dom';
-import { ConfirmDialog } from '../../components/Modal';
 import { DeviceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { PagedItems } from '../../components/ui/PagedItems';
 import { useAction } from '../../hooks/useAction';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { useResource } from '../../hooks/useResource';
 import { usePagedList } from '../../hooks/usePagedList';
 import { paths } from '../../routes/paths';
 import { validatorService } from '../../services/validatorService';
 import type { DeviceStatus, ValidatorDevice } from '../../types';
+import type { ConfirmInput, ConfirmTone } from '../../types/confirm';
 import { formatDateTime } from '../../utils/format';
 import { describeDevice } from '../../utils/userAgent';
 
 type Decision = Exclude<DeviceStatus, 'PENDING'>;
 
-/** Qué hace cada decisión (botón, aviso y si se confirma antes). */
-const DECISIONS: Record<Decision, { label: string; done: string; detail: string; confirm?: string }> = {
-  APPROVED: { label: 'Autorizar', done: 'Dispositivo autorizado', detail: 'El validador ya puede iniciar sesión en este dispositivo.' },
+/** Qué hace cada decisión: botón, confirmación (qué implica, color e ícono) y aviso al terminar. */
+const DECISIONS: Record<Decision, { label: string; done: string; detail: string; message: string; tone: ConfirmTone; Icon: LucideIcon }> = {
+  APPROVED: {
+    label: 'Autorizar',
+    done: 'Dispositivo autorizado',
+    detail: 'El validador ya puede iniciar sesión en este dispositivo.',
+    message: 'El validador podrá iniciar sesión e identificar a tu personal en este dispositivo. Puedes revocarlo después.',
+    tone: 'success',
+    Icon: Check,
+  },
   REJECTED: {
     label: 'Rechazar',
     done: 'Dispositivo rechazado',
     detail: 'El validador no podrá iniciar sesión en este dispositivo.',
-    confirm: 'El validador no podrá iniciar sesión en este dispositivo. Puedes autorizarlo después si fue un error.',
+    message: 'El validador no podrá iniciar sesión en este dispositivo. Puedes autorizarlo después si fue un error.',
+    tone: 'danger',
+    Icon: X,
   },
   REVOKED: {
     label: 'Revocar',
     done: 'Autorización revocada',
     detail: 'Sus sesiones abiertas se cerraron y ya no podrá iniciar sesión en este dispositivo.',
-    confirm: 'Se cerrarán las sesiones abiertas del validador y ya no podrá iniciar sesión en este dispositivo hasta que lo autorices de nuevo.',
+    message: 'Se cerrarán las sesiones abiertas del validador y ya no podrá iniciar sesión en este dispositivo hasta que lo autorices de nuevo.',
+    tone: 'danger',
+    Icon: ShieldOff,
   },
 };
+
+/** Toda decisión se confirma: el equipo, su estado "antes → después" (nombres del catálogo) y qué implica. */
+function decisionConfirm(device: ValidatorDevice, decision: Decision, statusName: (status: DeviceStatus) => string): ConfirmInput {
+  const { label, message, tone, Icon } = DECISIONS[decision];
+  return {
+    tone,
+    icon: <Icon size={30} />,
+    eyebrow: 'Dispositivo del validador',
+    title: `¿${label} «${device.name}»?`,
+    message,
+    changes: [{ label: 'Estado', before: statusName(device.status), after: statusName(decision) }],
+    details: [
+      { label: 'Equipo', value: describeDevice(device.user_agent).label },
+      { label: 'Registrado', value: formatDateTime(device.created_at) },
+    ],
+    confirmLabel: label,
+    confirmIcon: <Icon size={18} />,
+  };
+}
 
 /** Decisiones disponibles según el estado del dispositivo (las mismas reglas que el backend). */
 const AVAILABLE: Record<DeviceStatus, Decision[]> = {
@@ -55,24 +85,23 @@ function DeviceIcon({ device }: { device: ValidatorDevice }) {
 export function ValidatorDevicesPage() {
   const validatorId = Number(useParams().id);
   const { data: validator } = useResource((signal) => validatorService.get(validatorId, signal), validatorId, 'No se pudo cargar el validador');
+  const { nameOf } = useCatalogs();
   const { busy, run } = useAction<number>();
-  // Solo las decisiones con texto de confirmación pasan por aquí: el texto viaja con la decisión.
-  const [confirm, setConfirm] = useState<{ device: ValidatorDevice; decision: Decision; message: string } | null>(null);
 
   const list = usePagedList((page, signal) => validatorService.devices(validatorId, page, signal), {
     errorTitle: 'No se pudieron cargar los dispositivos',
     filterKey: String(validatorId),
   });
 
-  const decide = (device: ValidatorDevice, decision: Decision) => {
-    setConfirm(null);
-    return run(() => validatorService.setDeviceStatus(validatorId, device.id, decision), {
+  // Cancelar la confirmación no envía nada y el dispositivo sigue como estaba.
+  const decide = (device: ValidatorDevice, decision: Decision) =>
+    run(() => validatorService.setDeviceStatus(validatorId, device.id, decision), {
       busy: device.id,
+      confirm: decisionConfirm(device, decision, (status) => nameOf('device_statuses', status)),
       errorTitle: 'No se pudo actualizar el dispositivo',
       success: (saved) => [DECISIONS[decision].done, `${saved.name}: ${DECISIONS[decision].detail}`],
       onSuccess: (saved) => list.updateItems((items) => items.map((d) => (d.id === saved.id ? saved : d))),
     });
-  };
 
   return (
     <div className="page">
@@ -123,24 +152,23 @@ export function ValidatorDevicesPage() {
                     <DeviceStatusBadge status={device.status} />
                   </span>
                   <span className="validator-list__actions">
-                    {AVAILABLE[device.status].map((decision) => (
-                      <Button
-                        key={decision}
-                        size="sm"
-                        variant={decision === 'APPROVED' ? 'primary' : 'danger-outline'}
-                        icon={decision === 'APPROVED' ? <Check size={16} /> : decision === 'REJECTED' ? <X size={16} /> : <ShieldOff size={16} />}
-                        loading={busy === device.id}
-                        disabled={busy !== null}
-                        aria-label={`${DECISIONS[decision].label} ${device.name}`}
-                        onClick={() => {
-                          const message = DECISIONS[decision].confirm;
-                          if (message) setConfirm({ device, decision, message });
-                          else void decide(device, decision);
-                        }}
-                      >
-                        {DECISIONS[decision].label}
-                      </Button>
-                    ))}
+                    {AVAILABLE[device.status].map((decision) => {
+                      const { label, Icon } = DECISIONS[decision];
+                      return (
+                        <Button
+                          key={decision}
+                          size="sm"
+                          variant={decision === 'APPROVED' ? 'primary' : 'danger-outline'}
+                          icon={<Icon size={16} />}
+                          loading={busy === device.id}
+                          disabled={busy !== null}
+                          aria-label={`${label} ${device.name}`}
+                          onClick={() => void decide(device, decision)}
+                        >
+                          {label}
+                        </Button>
+                      );
+                    })}
                   </span>
                 </li>
               ))}
@@ -154,16 +182,6 @@ export function ValidatorDevicesPage() {
           </p>
         </PanelFooter>
       </Panel>
-      <ConfirmDialog
-        open={confirm !== null}
-        title={confirm ? `${DECISIONS[confirm.decision].label} «${confirm.device.name}»` : ''}
-        message={confirm ? confirm.message : ''}
-        confirmLabel={confirm ? DECISIONS[confirm.decision].label : ''}
-        tone="danger"
-        loading={busy !== null}
-        onCancel={() => setConfirm(null)}
-        onConfirm={() => confirm && void decide(confirm.device, confirm.decision)}
-      />
     </div>
   );
 }

@@ -14,10 +14,39 @@ import { paths } from '../../routes/paths';
 import { departmentService } from '../../services/departmentService';
 import { fieldErrorsFrom } from '../../services/http/envelope';
 import type { Department } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
+import { describeChanges, describeValues, type FieldLabels } from '../../utils/changes';
 
 interface DepartmentFormValues {
   name: string;
   description: string;
+}
+
+/** Cómo se leen los campos en la confirmación (en este orden). */
+const DEPARTMENT_LABELS: FieldLabels<DepartmentFormValues> = { name: 'Nombre', description: 'Descripción' };
+
+/**
+ * Antes de guardar: en el alta, qué se creará; en la edición, qué cambia ("antes → después"). Una
+ * edición sin cambios no pregunta: avisa "Sin cambios" y no envía nada.
+ */
+function saveConfirm(original: Department | null, initial: DepartmentFormValues, values: DepartmentFormValues): ConfirmInput {
+  if (!original) {
+    return {
+      kind: 'create',
+      icon: <Network size={30} />,
+      title: `¿Crear el departamento ${values.name.trim()}?`,
+      message: 'Después podrás nombrar a sus responsables y asignarle empleados.',
+      detailsTitle: 'Se creará',
+      details: describeValues(values, DEPARTMENT_LABELS),
+      confirmLabel: 'Crear departamento',
+    };
+  }
+  return {
+    kind: 'edit',
+    title: `¿Guardar los cambios de ${original.name}?`,
+    message: 'Sus responsables y empleados asignados no cambian.',
+    changes: describeChanges(initial, values, DEPARTMENT_LABELS),
+  };
 }
 
 /** Regla del nombre (solo UX: el backend la vuelve a validar y exige que sea único). */
@@ -60,7 +89,8 @@ export function DepartmentFormPage() {
 function DepartmentForm({ original }: { original: Department | null }) {
   const navigate = useNavigate();
   const feedback = useFeedback();
-  const form = useFormState<DepartmentFormValues>({ name: original?.name ?? '', description: original?.description ?? '' }, { serverErrors });
+  const initial: DepartmentFormValues = { name: original?.name ?? '', description: original?.description ?? '' };
+  const form = useFormState<DepartmentFormValues>(initial, { serverErrors });
   const { values } = form;
   const nameRule = validateDepartmentName(values.name);
   // Nombre único en la empresa, verificado en vivo (su propio nombre no cuenta al editar).
@@ -81,7 +111,7 @@ function DepartmentForm({ original }: { original: Department | null }) {
       const saved = original ? await departmentService.update(original.id, payload) : await departmentService.create(payload);
       void feedback.success(original ? 'Departamento actualizado' : 'Departamento creado', original ? `${saved.name} quedó actualizado.` : `Ya puedes asignar a sus responsables y empleados.`);
       void navigate(paths.company.department(saved.id), { replace: !original });
-    }, original ? 'No se pudo guardar el departamento' : 'No se pudo crear el departamento');
+    }, original ? 'No se pudo guardar el departamento' : 'No se pudo crear el departamento', saveConfirm(original, initial, values));
   };
 
   return (

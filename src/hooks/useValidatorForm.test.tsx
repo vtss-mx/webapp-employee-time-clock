@@ -2,8 +2,9 @@ import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
+import { sampleValidator } from '../test/fixtures';
 import { WithCatalogs } from '../test/render';
-import { settingsFrom, useValidatorForm, validateRadius, validateValidatorName, type ValidatorFormValues } from './useValidatorForm';
+import { settingsFrom, settingsOf, useValidatorForm, validateRadius, validateValidatorName, type ValidatorFormValues } from './useValidatorForm';
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <FeedbackProvider>
@@ -55,6 +56,22 @@ describe('useValidatorForm: reglas del cliente (solo UX; el backend valida igual
     expect(withoutPoint.address).toMatchObject({ latitude: null, longitude: null });
     expect(withoutPoint.location_radius_m).toBeNull();
     expect(settingsFrom({ ...VALUES, radius: '' }, 'QR_OR_FACE', null, false).location_radius_m).toBeNull();
+  });
+
+  it('lo que tenía al abrir (base del "antes → después"): igual que el formulario recién cargado', () => {
+    expect(settingsOf(sampleValidator)).toEqual({
+      name: 'Recepción planta 1',
+      mode: 'QR_OR_FACE',
+      address: { ...sampleValidator.address },
+      location_required: false,
+      location_radius_m: 100, // el radio por omisión del formulario
+    });
+    // Sin domicilio (validadores anteriores): vacío, sin punto.
+    expect(settingsOf({ ...sampleValidator, address: null, location_required: true, location_radius_m: 250 })).toMatchObject({
+      address: { street: '', interior_number: null, country_code: 'MX', latitude: null, longitude: null },
+      location_required: true,
+      location_radius_m: 250,
+    });
   });
 
   it('el radio vacío solo es error si se exige la ubicación', () => {

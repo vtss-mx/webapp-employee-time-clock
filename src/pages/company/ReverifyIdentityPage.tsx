@@ -9,6 +9,9 @@ import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
 
+/** El motivo en la confirmación: el que se escribió o qué verá el empleado si no hay uno. */
+const reasonDetail = (reason: string) => ({ label: 'Motivo que verá', value: reason || 'Sin motivo: se le indicará que la empresa solicitó verificar su identidad' });
+
 /** Motivo que verá el empleado al entrar al registro facial (uno o toda la empresa). */
 const REASON_FIELD = {
   catalog: 'reverification_reasons',
@@ -48,6 +51,17 @@ export function ReverifyIdentityPage() {
       intro={`Se eliminarán sus datos faciales actuales. En su próximo acceso, ${employee.first_name} deberá registrar su rostro con prueba de vida y tendrás que validarlo nuevamente. Mientras tanto no podrá identificarse.`}
       field={REASON_FIELD}
       submit={{ label: 'Solicitar verificación', icon: <RotateCcw size={18} />, variant: 'warning' }}
+      confirm={(reason) => ({
+        tone: 'warning',
+        icon: <ScanFace size={30} />,
+        eyebrow: 'Nueva verificación',
+        title: `¿Solicitar a ${employee.full_name} verificar su identidad?`,
+        message: 'Se eliminarán sus datos faciales actuales y no podrá identificarse con su rostro hasta registrarse de nuevo y que lo valides.',
+        details: [reasonDetail(reason)],
+        note: 'Sus datos faciales actuales no se pueden recuperar.',
+        confirmLabel: 'Solicitar verificación',
+        confirmIcon: <RotateCcw size={18} />,
+      })}
       errorTitle="No se pudo solicitar la verificación"
       onSend={async (reason) => {
         const updated = await employeeService.resetFace(employeeId, reason || undefined);
@@ -76,26 +90,26 @@ export function ReverifyAllPage() {
       backTo={paths.company.employees}
       backLabel="Empleados"
       icon={<Users size={20} />}
-      intro="Se eliminarán los datos faciales de todos tus empleados con registro (aprobado, en validación o rechazado), incluido lo que el reconocimiento aprendió de su uso. En su próximo acceso cada uno deberá registrar su rostro con prueba de vida y tendrás que validarlo. Mientras tanto no podrán identificarse con su rostro."
+      intro="Se eliminarán los datos faciales de todos tus empleados con registro (aprobado, en validación o rechazado). En su próximo acceso cada uno deberá registrar su rostro con prueba de vida y tendrás que validarlo. Mientras tanto no podrán identificarse con su rostro."
       field={REASON_FIELD}
       submit={{ label: 'Solicitar a todos', icon: <RotateCcw size={18} />, variant: 'danger' }}
       errorTitle="No se pudo solicitar la verificación"
-      confirm={async () =>
-        (await feedback.show({
-          variant: 'warning',
-          title: '¿Solicitar nueva verificación a todos?',
-          text: 'Esta acción afecta a toda tu empresa y no se puede deshacer.',
-          details: [
-            'Se borran los datos faciales de cada empleado con registro.',
-            'Cada uno deberá registrar su rostro de nuevo y tú validarlo.',
-            'Mientras tanto no podrán identificarse con su rostro.',
-          ],
-          actions: [
-            { id: 'cancel', label: 'Cancelar', variant: 'ghost' },
-            { id: 'confirm', label: 'Sí, solicitar a todos', variant: 'danger', icon: <RotateCcw size={18} /> },
-          ],
-        })) === 'confirm'
-      }
+      confirm={(reason) => ({
+        tone: 'danger',
+        icon: <Users size={30} />,
+        eyebrow: 'Toda la empresa',
+        title: '¿Solicitar nueva verificación a todos?',
+        message: 'Esta acción afecta a todos tus empleados con registro facial.',
+        details: [
+          'Se borran los datos faciales de cada empleado con registro.',
+          'Cada uno deberá registrar su rostro de nuevo y tú validarlo.',
+          'Mientras tanto no podrán identificarse con su rostro.',
+          reasonDetail(reason),
+        ],
+        note: 'Esta acción no se puede deshacer.',
+        confirmLabel: 'Sí, solicitar a todos',
+        confirmIcon: <RotateCcw size={18} />,
+      })}
       onSend={async (reason) => {
         const { employees } = await employeeService.resetAllFaces(reason || undefined);
         void feedback.success(

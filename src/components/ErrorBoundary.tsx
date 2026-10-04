@@ -1,6 +1,7 @@
 import { AlertOctagon, Home, RotateCcw } from 'lucide-react';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { reloadForNewVersion } from '../services/versionReload';
+import { reportClientError } from '../services/clientErrorService';
+import { isChunkLoadError, reloadForNewVersion } from '../services/versionReload';
 import { retryFailedLazy } from './retryableLazy';
 import { Button } from './ui/Button';
 
@@ -14,8 +15,9 @@ interface State {
   error: Error | null;
 }
 
-function isChunkLoadError(error: Error): boolean {
-  return /Loading chunk|dynamically imported module|Importing a module script failed/i.test(error.message);
+/** El componente que se rompió: el primero de la pila de componentes de React («at Nombre (...)»). */
+function brokenComponent(componentStack: string | null | undefined): string | undefined {
+  return componentStack ? /at (\S+)/.exec(componentStack)?.[1] : undefined;
 }
 
 /**
@@ -23,7 +25,8 @@ function isChunkLoadError(error: Error): boolean {
  * la aplicación en blanco. Ofrece reintentar sin perder la sesión: con una pantalla que no se pudo
  * descargar, "Reintentar" la descarga de nuevo (`retryFailedLazy`). Si no se descargó porque se
  * publicó una versión nueva, recarga la página (una sola vez, `reloadForNewVersion`); si fue la red,
- * no recarga (sin conexión el navegador mostraría su página de error en lugar de la app).
+ * no recarga (sin conexión el navegador mostraría su página de error en lugar de la app). Cualquier
+ * otra falla es un error de la app: se reporta al ADMIN ("Errores del sistema"), sin otro aviso.
  */
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null };
@@ -35,6 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
   override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
     if (isChunkLoadError(error)) void reloadForNewVersion();
+    else void reportClientError({ kind: 'CRASH', error, component: brokenComponent(info.componentStack), detail: info.componentStack ?? undefined });
   }
 
   private reset = () => {

@@ -86,7 +86,11 @@ describe('Integraciones (API): llaves de la empresa', () => {
     });
     renderList();
     await userEvent.click(await screen.findByRole('button', { name: 'Rotar' }));
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Rotar llave' }));
+    const rotate = await screen.findByRole('alertdialog', { name: '¿Rotar «Nómina»?' });
+    expect(rotate).toHaveTextContent('Se generará una llave nueva con los mismos permisos y vigencia.');
+    expect(rotate).toHaveTextContent('La llave actual dejará de funcionar de inmediato.');
+    expect(within(rotate).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Llavetck_Ab3dE9fG…PermisosEmpleados, IdentificacionesÚltimo usohace 5 minutos');
+    await userEvent.click(within(rotate).getByRole('button', { name: 'Rotar llave' }));
     const secret = await screen.findByRole('dialog', { name: 'Copia la llave de «Nómina»' });
     expect(within(secret).getByText(SECRET)).toBeInTheDocument();
     expect(within(secret).queryByLabelText('Cerrar')).toBeNull(); // solo se cierra confirmando
@@ -96,22 +100,29 @@ describe('Integraciones (API): llaves de la empresa', () => {
     await userEvent.click(within(secret).getByRole('button', { name: 'Ya la guardé' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Revocar' }));
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Revocar llave' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Revocar «Nómina»?' })).getByRole('button', { name: 'Revocar llave' }));
     expect(await screen.findByText('Llave revocada')).toBeInTheDocument();
     expect(calls.find((c) => c.init.method === 'DELETE')?.url).toBe('/api/api-keys/1');
     Reflect.deleteProperty(navigator, 'clipboard');
   });
 
-  it('cancelar la confirmación no cambia la llave; uso sin IP registrada', async () => {
-    const { calls } = mockFetch(apiOk(page([key({ last_used_ip: null })])));
+  it('cancelar revocar o rotar no cambia la llave; uso sin IP registrada', async () => {
+    const { calls } = mockFetch(apiOk(page([key({ last_used_ip: null }), key({ id: 2, name: 'ERP', scopes: ['VALIDATORS_READ'], last_used_at: null })])));
     renderList();
     expect(await screen.findByText('Último uso hace 5 minutos')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Revocar' }));
-    const dialog = screen.getByRole('alertdialog', { name: 'Revocar «Nómina»' });
-    expect(dialog).toHaveTextContent('No se puede deshacer');
+    const row = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
+    await userEvent.click(within(row('Nómina')).getByRole('button', { name: 'Revocar' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Revocar «Nómina»?' });
+    expect(dialog).toHaveTextContent('el sistema que la usa ya no podrá conectarse');
+    expect(dialog).toHaveTextContent('Esta acción no se puede deshacer.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await userEvent.click(within(row('ERP')).getByRole('button', { name: 'Rotar' }));
+    const rotate = await screen.findByRole('alertdialog', { name: '¿Rotar «ERP»?' });
+    expect(within(rotate).getByRole('region', { name: 'Detalles' })).toHaveTextContent('PermisosValidadoresÚltimo usoAún sin usar');
+    await userEvent.click(within(rotate).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(calls).toHaveLength(1); // solo la carga de la lista
+    expect(within(row('Nómina')).getByRole('button', { name: 'Revocar' })).toBeEnabled();
   });
 
   it('tras revocar vuelve a pedir la lista; mientras llega se atenúa', async () => {
@@ -124,7 +135,7 @@ describe('Integraciones (API): llaves de la empresa', () => {
     });
     renderList();
     await userEvent.click(await screen.findByRole('button', { name: 'Revocar' }));
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Revocar llave' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Revocar «Nómina»?' })).getByRole('button', { name: 'Revocar llave' }));
     expect(await screen.findByText('Llave revocada')).toBeInTheDocument();
     expect(screen.getByText('Nómina').closest('ul')).toHaveClass('is-loading');
     release(apiOk(page([key({ status: 'REVOKED', revoked_at: '2026-10-02T12:00:00Z' })])));
@@ -136,13 +147,18 @@ describe('Integraciones (API): llaves de la empresa', () => {
     mockFetch((call) => (call.url.endsWith('/rotate') ? apiFail(409, 'API_KEY_REVOKED', 'Una llave revocada no se puede rotar') : apiOk(page([key()]))));
     renderList();
     await userEvent.click(await screen.findByRole('button', { name: 'Rotar' }));
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Rotar llave' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Rotar «Nómina»?' })).getByRole('button', { name: 'Rotar llave' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo rotar la llave' })).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog', { name: '¿Rotar «Nómina»?' })).toBeNull(); // la confirmación ya se cerró
   });
 });
 
 describe('Crear llave (pantalla)', () => {
-  it('exige nombre y al menos un permiso; envía permisos y vigencia y muestra el secreto', async () => {
+  /** Confirma la creación en su popup (la pantalla tiene otro botón "Crear llave"). */
+  const confirmCreate = async (name: string) =>
+    userEvent.click(within(await screen.findByRole('dialog', { name: `¿Crear la llave «${name}»?` })).getByRole('button', { name: 'Crear llave' }));
+
+  it('exige nombre y al menos un permiso; confirma, envía permisos y vigencia y muestra el secreto', async () => {
     const { calls } = mockFetch(apiOk({ ...key({ name: 'Nómina' }), secret: SECRET }, { status: 201 }));
     renderForm();
     await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
@@ -157,6 +173,14 @@ describe('Crear llave (pantalla)', () => {
     await userEvent.click(screen.getByLabelText('Vence en'));
     await userEvent.click(screen.getByRole('option', { name: /Sin vencimiento/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
+    const dialog = await screen.findByRole('dialog', { name: '¿Crear la llave «Nómina»?' });
+    expect(within(within(dialog).getByRole('region', { name: 'Se creará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'NombreNómina',
+      'Permisos (solo lectura)Empleados',
+      'VigenciaSin vencimiento',
+    ]);
+    expect(dialog).toHaveTextContent('El secreto no se puede volver a consultar después.');
+    await confirmCreate('Nómina');
 
     expect(await screen.findByText('Integraciones')).toBeInTheDocument();
     expect(await screen.findByText(SECRET)).toBeInTheDocument();
@@ -170,6 +194,7 @@ describe('Crear llave (pantalla)', () => {
     await userEvent.type(screen.getByLabelText(/Nombre/), 'Auditor');
     await userEvent.click(screen.getByRole('switch', { name: 'Auditoría' }));
     await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
+    await confirmCreate('Auditor');
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo crear la llave' })).toHaveTextContent('Servicio no disponible');
   });
 
@@ -179,7 +204,26 @@ describe('Crear llave (pantalla)', () => {
     await userEvent.type(screen.getByLabelText(/Nombre/), 'ERP');
     await userEvent.click(screen.getByRole('switch', { name: 'Validadores' }));
     await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
+    await confirmCreate('ERP');
     expect(await screen.findByRole('alertdialog', { name: 'Llegaste al tope de llaves' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Crear llave' })).toBeEnabled());
+  });
+
+  it('cancelar la creación no envía nada y el formulario sigue como estaba', async () => {
+    const { calls } = mockFetch(apiOk({ ...key({ name: 'ERP' }), secret: SECRET }, { status: 201 }));
+    renderForm();
+    await userEvent.type(screen.getByLabelText(/Nombre/), 'ERP');
+    await userEvent.click(screen.getByRole('switch', { name: 'Validadores' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Empleados' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
+    const dialog = await screen.findByRole('dialog', { name: '¿Crear la llave «ERP»?' });
+    // Los permisos en el orden del catálogo y la vigencia por omisión.
+    expect(within(dialog).getByRole('region', { name: 'Se creará' })).toHaveTextContent('Permisos (solo lectura)Empleados, ValidadoresVigencia1 año');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls).toHaveLength(0);
+    expect(screen.getByLabelText(/Nombre/)).toHaveValue('ERP');
+    expect(screen.getByRole('switch', { name: 'Validadores' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Crear llave' })).toBeEnabled();
   });
 });

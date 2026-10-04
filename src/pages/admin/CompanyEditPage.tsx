@@ -6,11 +6,13 @@ import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
-import { emptyCompanyForm, useCompanyForm } from '../../hooks/useCompanyForm';
+import { COMPANY_LABELS, emptyCompanyForm, useCompanyForm } from '../../hooks/useCompanyForm';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
 import type { CompanyDetail, CompanyFormValues } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
+import { describeChanges } from '../../utils/changes';
 
 const EDITABLE = ['name', 'legal_name', 'rfc', 'phone', 'max_employees'] as const;
 
@@ -22,6 +24,19 @@ function toForm(company: CompanyDetail): CompanyFormValues {
     rfc: company.rfc ?? '',
     phone: company.phone ?? '',
     max_employees: company.max_employees ? String(company.max_employees) : '',
+  };
+}
+
+/** Confirmación de la edición: "antes → después" de cada dato que cambió (sin cambios, se avisa y no se envía nada). */
+function editConfirm(company: CompanyDetail, values: CompanyFormValues): ConfirmInput {
+  return {
+    kind: 'edit',
+    icon: <Building2 size={30} />,
+    title: `¿Guardar los cambios de ${company.name}?`,
+    message: 'Los datos se actualizan de inmediato en su ficha y en la consola de la empresa.',
+    changes: describeChanges(toForm(company), values, COMPANY_LABELS),
+    confirmLabel: 'Guardar cambios',
+    confirmIcon: <Save size={18} />,
   };
 }
 
@@ -43,12 +58,17 @@ export function CompanyEditPage() {
 
   const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
-    if (!form.canSubmit || !dirty) return;
-    await form.save(async () => {
-      await adminService.update(companyId, changes);
-      void form.feedback.success('Cambios guardados');
-      void navigate(paths.admin.company(companyId));
-    });
+    // Sin cambios (p. ej. Enter en un campo) la confirmación avisa "Sin cambios" y no envía nada.
+    if (!form.canSubmit || !original) return;
+    await form.save(
+      async () => {
+        await adminService.update(companyId, changes);
+        void form.feedback.success('Cambios guardados');
+        void navigate(paths.admin.company(companyId));
+      },
+      'No se pudo guardar',
+      editConfirm(original, form.values),
+    );
   };
 
   if (!original && !loadError) return <SkeletonCard lines={6} />;

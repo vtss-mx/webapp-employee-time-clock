@@ -1,4 +1,4 @@
-import { Check, FileBadge, Hash, HeartPulse, IdCard, KeyRound, Mail, ShieldCheck, UserRound } from 'lucide-react';
+import { FileBadge, Hash, HeartPulse, IdCard, KeyRound, Mail, ShieldCheck, UserRound } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { liveFeedback } from '../hooks/useAvailability';
 import type { EmployeeFormValues, LiveChecks } from '../types';
@@ -13,6 +13,7 @@ import {
   type FieldErrors,
 } from '../utils/validation';
 import { ConfirmPasswordField, FormField } from './FormField';
+import { Checkbox } from './ui/Checkbox';
 import { DateField } from './ui/DateField';
 import { PhoneField } from './ui/PhoneField';
 
@@ -183,20 +184,13 @@ export function HeadwearExemptField({
   disabled?: boolean;
 }) {
   return (
-    <label className={`checkbox ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}>
-      <input type="checkbox" className="checkbox__input" checked={checked} onChange={(e) => onChange(e.target.checked)} disabled={disabled} />
-      <span className="checkbox__box" aria-hidden>
-        <Check size={16} strokeWidth={3} />
-      </span>
-      <span>
-        <strong className="row" style={{ gap: 6 }}>
-          <ShieldCheck size={16} color="var(--primary)" /> Excepción de prenda de cabeza
-        </strong>
-        <small className="muted">
-          Permite verificar sin retirar prendas usadas por motivos religiosos o médicos. Lentes y cubrebocas se
-          deben retirar siempre.
-        </small>
-      </span>
-    </label>
+    <Checkbox
+      checked={checked}
+      onChange={onChange}
+      disabled={disabled}
+      icon={<ShieldCheck size={16} />}
+      label="Excepción de prenda de cabeza"
+      description="Permite verificar sin retirar prendas usadas por motivos religiosos o médicos. Lentes y cubrebocas se deben retirar siempre."
+    />
   );
 }

@@ -1,5 +1,6 @@
 import { useState, type SubmitEvent, type ReactNode } from 'react';
 import { useSubmit } from '../hooks/useAction';
+import type { ConfirmInput } from '../types/confirm';
 import type { ButtonVariant } from './ui/Button';
 import { FormFooter } from './FormFooter';
 import { ReasonField } from './ReasonField';
@@ -13,13 +14,16 @@ interface ReasonFormPanelProps {
   /** Qué pasará al confirmar (se explica antes del motivo). */
   intro: ReactNode;
   icon: ReactNode;
-  field: { catalog: 'enrollment_rejection_reasons' | 'reverification_reasons'; label: string; placeholder: string; required?: boolean };
+  /** Sin `catalog`, el campo no ofrece sugerencias (p. ej. la nota al rechazar un cambio de turno). */
+  field: { catalog?: 'enrollment_rejection_reasons' | 'reverification_reasons'; label: string; placeholder: string; required?: boolean };
   /** Regla del motivo (solo UX: el backend la vuelve a validar); su error se ve al intentar enviar. */
   validate?: (reason: string) => string | undefined;
   submit: { label: string; icon: ReactNode; variant: ButtonVariant; disabled?: boolean; disabledTitle?: string };
-  /** Confirmación previa (p. ej. una acción que afecta a toda la empresa): false = no se envía y
-   * el formulario sigue disponible. */
-  confirm?: (reason: string) => Promise<boolean>;
+  /**
+   * Confirmación ANTES de enviar (con el motivo escrito): cancelar no envía nada y el formulario sigue
+   * disponible.
+   */
+  confirm: (reason: string) => ConfirmInput;
   /** Envía el motivo (sin espacios sobrantes); al salir bien, la pantalla navega a otra. */
   onSend: (reason: string) => Promise<void>;
   /** Título del popup si no se pudo enviar (el motivo lo explica el error). */
@@ -42,10 +46,7 @@ export function ReasonFormPanel({ title, subtitle, backTo, backLabel, intro, ico
     setTouched(true);
     if (validate?.(reason)) return;
     const text = reason.trim();
-    void (async () => {
-      if (confirm && !(await confirm(text))) return;
-      await send(() => onSend(text), errorTitle);
-    })();
+    void send(() => onSend(text), errorTitle, { confirm: confirm(text) });
   };
 
   return (

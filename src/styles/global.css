@@ -639,32 +639,7 @@ img {
     grid-template-columns: 1fr 1fr;
   }
 }
-
-.checkbox {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-}
-.checkbox:hover {
-  border-color: var(--blue-200);
-}
-.checkbox input {
-  width: 22px;
-  height: 22px;
-  margin-top: 2px;
-  flex-shrink: 0;
-  accent-color: var(--primary);
-}
-.checkbox span {
-  display: grid;
-  gap: 2px;
-}
+/* Hora, número, casillas y opciones propias: bloque "Controles propios", al final del archivo. */
 
 /* ==========================================================================
    Superficies
@@ -1390,22 +1365,6 @@ img {
   padding: 0;
   font-size: inherit;
 }
-/* "Recordar mi cuenta": casilla compacta, sin la caja de las opciones de formulario. */
-.checkbox.checkbox--inline,
-.checkbox.checkbox--inline.is-checked {
-  align-items: center;
-  gap: 10px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font-size: 0.9rem;
-  color: var(--text-2);
-}
-.checkbox--inline .checkbox__box {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-}
 .auth__footer {
   position: relative;
   z-index: 2;
@@ -1519,6 +1478,107 @@ a.kpi:hover {
 .callout__body {
   flex: 1;
   min-width: 200px;
+}
+.callout--success {
+  background: linear-gradient(90deg, var(--success-soft), #fbfefc);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+}
+.callout__body ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+/* ---------- Medidor de un valor en un rango (components/ui/RangeMeter) ----------
+   Personalizable con --meter-track, --meter-fill y --meter-thumb; --meter (0..1) lo calcula el
+   componente. */
+.range-meter {
+  --meter-track: #e8edf6;
+  --meter-fill: var(--primary);
+  --meter-thumb: var(--surface);
+  display: grid;
+  gap: 6px;
+}
+.range-meter--success {
+  --meter-fill: var(--success);
+}
+.range-meter--warning {
+  --meter-fill: var(--warning);
+}
+.range-meter__track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--meter-track);
+}
+.range-meter__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--meter, 0) * 100%);
+  min-width: 10px;
+  border-radius: inherit;
+  background: var(--meter-fill);
+  transition: width 0.5s var(--ease);
+}
+.range-meter__thumb {
+  position: absolute;
+  top: 50%;
+  left: clamp(9px, calc(var(--meter, 0) * 100%), calc(100% - 9px));
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--meter-fill);
+  border-radius: 50%;
+  background: var(--meter-thumb);
+  box-shadow: var(--shadow-sm);
+  transform: translate(-50%, -50%);
+  transition: left 0.5s var(--ease);
+}
+.range-meter__scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ---------- Seguridad facial (ADMIN): umbrales autocalibrados ----------
+   Una columna en teléfono; las tarjetas se acomodan al ancho de su contenedor. */
+.threshold-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+.threshold {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.threshold--raised {
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
+.threshold__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.threshold__value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.threshold p {
+  margin: 0;
 }
 
 .action-grid {
@@ -2691,6 +2751,20 @@ a.kpi:hover {
   padding: 40px 24px;
   text-align: center;
 }
+/* El resultado como popup (ResultPopup): la ventana ya es la tarjeta y se desplaza si no cabe. */
+.msg--result {
+  grid-template-rows: minmax(0, 1fr);
+  width: min(520px, 100%);
+}
+.result-card--popup {
+  overflow-y: auto;
+  padding: 34px 24px 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
 .result-card__details {
   width: 100%;
   display: grid;
@@ -3188,6 +3262,122 @@ a.kpi:hover {
   height: 55%;
 }
 
+/* ---------- Prueba de vida: señales de cada movimiento (LivenessCues.tsx) ----------
+   Mirar arriba/abajo y acercarse usan la misma burbuja que el giro, a la derecha del óvalo real
+   (--oval-w, --arrow-size): nunca tapan el rostro ni el mensaje de estado. */
+.tilt-cue,
+.closer-cue__badge {
+  --side: 1;
+}
+.tilt-cue {
+  animation-name: nudge-y;
+}
+.tilt-cue--up {
+  --nudge-y: -14px;
+}
+.tilt-cue--down {
+  --nudge-y: 14px;
+}
+@keyframes nudge-y {
+  50% {
+    transform: translate(-50%, -50%) translateY(var(--nudge-y, -14px));
+  }
+}
+/* Acercarse: un óvalo punteado marca hasta dónde debe crecer el rostro (el mínimo del reto con el
+   margen de la app) y "crece" desde el óvalo de la guía; la lupa late junto a él. */
+.closer-cue {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.closer-cue__target {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(calc(var(--oval-w) * var(--closer-scale, 1.3)), calc(100cqw - 12px), calc((100cqh - 12px) * 3 / 4));
+  aspect-ratio: 3 / 4;
+  border: 3px dashed rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(7, 15, 36, 0.25),
+    0 0 26px rgba(37, 99, 235, 0.45);
+  transform: translate(-50%, -50%);
+  animation: closer-grow 1.6s var(--ease) infinite;
+}
+.closer-cue__badge {
+  animation-name: soft-beat;
+}
+@keyframes closer-grow {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(calc(1 / var(--closer-scale, 1.3)));
+  }
+  60%,
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes soft-beat {
+  50% {
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+}
+
+/* ---------- Destello de colores de la prueba de vida (FlashOverlay.tsx) ----------
+   A pantalla completa y sobre todo (también sobre los popups): la luz de la pantalla debe llegar al
+   rostro. Una ventana elíptica sobre el óvalo deja ver la cámara en su lugar. El color cambia al
+   instante (sin transición), también con "reducir movimiento": es la prueba de seguridad. */
+.flash {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 20px) 16px 16px;
+  background: var(--flash-color);
+}
+.flash--window {
+  background: radial-gradient(var(--flash-rx) var(--flash-ry) at var(--flash-x) var(--flash-y), transparent 99%, var(--flash-color) 100%);
+}
+.flash__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(7, 15, 36, 0.8);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(7, 15, 36, 0.35);
+  animation: fade-in-up 0.3s var(--ease);
+}
+.flash__steps {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.flash__steps li {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: rgba(7, 15, 36, 0.35);
+}
+.flash__steps li.is-done,
+.flash__steps li.is-current {
+  background: #fff;
+}
+.flash__steps li.is-current {
+  transform: scale(1.3);
+}
+
 /* ---------- Panel: contenedor único por pantalla ---------- */
 .panel {
   overflow: hidden;
@@ -3287,17 +3477,12 @@ a.kpi:hover {
 .panel__footer--center {
   justify-content: center;
 }
-/* Aprendizaje continuo del rostro en el expediente: la nota y, si aprendió algo, "Olvidar lo aprendido". */
-.learning-note {
-  display: flex;
+/* ADMIN · empleados de una empresa: lo aprendido del rostro y "Olvidar" en la misma celda. */
+.learned-cell {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-}
-.learning-note .inline-note {
-  flex: 1 1 260px;
-  margin: 0;
+  gap: 4px 8px;
 }
 .inline-note {
   display: flex;
@@ -3960,58 +4145,6 @@ a.kpi:hover {
   color: #fff;
 }
 
-/* ---------- Casilla personalizada ---------- */
-.checkbox {
-  position: relative;
-  align-items: center;
-}
-.checkbox__input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-  pointer-events: none;
-}
-.checkbox__box {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--control-border);
-  border-radius: 7px;
-  background: var(--control-bg);
-  color: transparent;
-  transition: background 0.2s var(--ease), border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
-}
-.checkbox__box svg {
-  transform: scale(0.4);
-  transition: transform 0.2s var(--ease-spring, ease);
-}
-.checkbox:hover .checkbox__box {
-  border-color: var(--control-border-hover);
-}
-.checkbox__input:focus-visible + .checkbox__box {
-  box-shadow: var(--control-ring);
-  border-color: var(--control-border-focus);
-}
-.checkbox.is-checked {
-  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
-  background: color-mix(in srgb, var(--primary-soft) 60%, var(--surface));
-}
-.checkbox.is-checked .checkbox__box {
-  border-color: transparent;
-  background: var(--primary-gradient);
-  color: #fff;
-}
-.checkbox.is-checked .checkbox__box svg {
-  transform: scale(1);
-}
-.checkbox.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
 /* ---------- Superficie flotante de un campo (calendario, selector de país) ----------
    Vive en un portal (componente Floating) con posición fija: ningún panel la recorta ni la tapa.
    Queda sobre el menú lateral y la barra inferior, y bajo las ventanas emergentes (1200). */
@@ -4247,12 +4380,6 @@ a.kpi:hover {
 .panel__footer {
   background: var(--surface);
 }
-.checkbox {
-  background: var(--surface);
-}
-.checkbox:hover {
-  background: var(--surface);
-}
 .table th {
   background: var(--surface);
   border-bottom-color: var(--border-strong);
@@ -4272,9 +4399,6 @@ a.kpi:hover {
 .switch-row.is-on {
   background: var(--surface);
   border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
-}
-.checkbox.is-checked {
-  background: var(--accent-soft);
 }
 
 /* ---------- Diagnóstico de cámara ---------- */
@@ -4662,6 +4786,127 @@ a.kpi:hover {
 .msg__footnote {
   color: var(--muted);
   text-align: center;
+}
+
+/* Confirmaciones (crear, editar, eliminar): lo que se crea, los cambios y la consecuencia.
+   Personalizables con --confirm-* sin tocar el componente. */
+.msg--confirm {
+  --confirm-radius: 14px;
+  --confirm-bg: var(--surface-2);
+  --confirm-border: var(--border);
+  --confirm-before: var(--muted);
+  --confirm-after: var(--text);
+}
+.confirm-block {
+  display: grid;
+  gap: 8px;
+}
+.confirm-block__title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.confirm-changes,
+.confirm-facts {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--confirm-border);
+  border-radius: var(--confirm-radius);
+  background: var(--confirm-bg);
+  list-style: none;
+}
+.confirm-changes li,
+.confirm-facts li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.confirm-changes li + li,
+.confirm-facts li + li {
+  border-top: 1px solid var(--confirm-border);
+}
+.confirm-changes__label,
+.confirm-facts__label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.confirm-changes__values {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  overflow-wrap: anywhere;
+}
+.confirm-changes__before {
+  color: var(--confirm-before);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--confirm-before) 60%, transparent);
+}
+.confirm-changes__arrow {
+  flex-shrink: 0;
+  color: var(--msg-color);
+}
+.confirm-changes__after {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--msg-soft);
+  color: var(--confirm-after);
+  font-weight: 700;
+}
+.confirm-facts__value {
+  color: var(--text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.confirm-facts__line {
+  grid-template-columns: 7px 1fr;
+  align-items: start;
+  column-gap: 10px;
+  color: var(--text-2);
+}
+.confirm-facts__line::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--msg-color);
+}
+.confirm-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--confirm-radius);
+  border-left: 4px solid var(--msg-color);
+  background: var(--msg-soft);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.confirm-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--msg-color);
+}
+/* Escritorio: las filas "Etiqueta: valor" en dos columnas */
+@media (min-width: 600px) {
+  .confirm-facts li:not(.confirm-facts__line),
+  .confirm-changes li {
+    grid-template-columns: minmax(110px, 34%) 1fr;
+    align-items: center;
+    column-gap: 12px;
+  }
 }
 @keyframes msg-fade {
   from {
@@ -5374,91 +5619,15 @@ label.is-required::after {
   display: none;
 }
 
+/* Modos de un validador (`RadioCard` en un `ChoiceGroup`): una columna en teléfono, dos desde 640 px. */
 .mode-picker {
   display: grid;
   gap: 10px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
 }
 @media (min-width: 640px) {
   .mode-picker {
     grid-template-columns: 1fr 1fr;
   }
-}
-.mode-picker__legend {
-  grid-column: 1 / -1;
-  margin-bottom: 4px;
-  padding: 0;
-  font-weight: 700;
-  font-size: 0.92rem;
-  color: var(--text-2);
-}
-.mode-option {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
-  border: 1.5px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition:
-    border-color 0.2s var(--ease),
-    box-shadow 0.2s var(--ease),
-    transform 0.2s var(--ease);
-}
-.mode-option:hover {
-  border-color: var(--blue-300);
-}
-.mode-option:active {
-  transform: scale(0.99);
-}
-.mode-option input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.mode-option:has(input:focus-visible) {
-  outline: 3px solid var(--blue-200);
-  outline-offset: 2px;
-}
-.mode-option.is-selected {
-  border-color: var(--primary);
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.06), transparent);
-  box-shadow: 0 10px 24px -18px rgba(37, 99, 235, 0.7);
-}
-.mode-option__icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  color: var(--primary);
-  transition:
-    background 0.2s,
-    color 0.2s;
-}
-.mode-option.is-selected .mode-option__icon {
-  background: var(--primary-gradient);
-  color: #fff;
-}
-.mode-option__text {
-  display: grid;
-  gap: 2px;
-  line-height: 1.35;
-}
-.mode-option__text small {
-  color: var(--muted);
-}
-fieldset:disabled .mode-option {
-  cursor: default;
-  opacity: 0.7;
 }
 
 /* Tarjetas de método como botones (punto de control). */
@@ -5657,9 +5826,16 @@ button.method-card {
   border-color: var(--danger);
 }
 .map-canvas {
+  /* Color de la marca en el mapa (pin, halo, círculo del radio y anillo de foco): se personaliza aquí.
+     El círculo lo dibuja Google: MapCanvas lee --map-accent al crearlo. */
+  --map-accent: var(--primary);
+  --map-pin: var(--map-accent);
+  --map-pin-ring: #fff;
   position: relative;
   height: var(--map-h);
   overflow: hidden;
+  /* Recorta también las capas que Google acelera con la GPU (sin esto Safari deja esquinas cuadradas). */
+  clip-path: inset(0 round var(--map-radius));
   border: 1px solid var(--border);
   border-radius: var(--map-radius);
   background: var(--surface-2);
@@ -5668,24 +5844,112 @@ button.method-card {
   position: absolute;
   inset: 0;
 }
-/* Pin fijo al centro: la punta marca el punto (el mapa se mueve debajo). */
-.map-canvas__pin {
+/* Google enmarca el mapa con un borde azul cuadrado (estilo en línea en el elemento que sigue a su
+   iframe) cada vez que recibe el foco, también con un clic o un toque, y no sigue el redondeo del
+   contenedor: se quita (con !important por ser estilo en línea), igual que el contorno de sus
+   divisiones enfocables. Para el teclado queda el anillo propio (abajo). */
+.map-canvas .gm-style iframe + div,
+.map-canvas .gm-style div[tabindex]:focus {
+  border: 0 !important;
+  outline: 0 !important;
+}
+/* Anillo de foco propio, solo con teclado: dentro del borde y con su mismo redondeo. */
+.map-canvas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: calc(var(--map-radius) - 1px);
+  box-shadow:
+    inset 0 0 0 2px var(--map-accent),
+    inset 0 0 0 5px color-mix(in srgb, var(--map-accent) 22%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s var(--ease);
+}
+.map-canvas:has(.gm-style div[tabindex]:focus-visible)::after {
+  opacity: 1;
+}
+/* Pin de la marca fijo al centro: la punta marca el punto (el mapa se mueve debajo). */
+.map-canvas__marker {
   position: absolute;
   top: 50%;
   left: 50%;
   z-index: 1;
-  color: var(--danger);
-  transform: translate(-50%, -100%);
-  filter: drop-shadow(0 4px 6px rgba(14, 26, 51, 0.35));
   pointer-events: none;
-  animation: pin-drop 0.35s var(--ease-spring);
 }
-.map-canvas__pin svg {
+.map-canvas__pin {
+  position: absolute;
+  top: -54px;
+  left: -22px;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 6px 8px rgba(14, 26, 51, 0.28)) drop-shadow(0 1px 1.5px rgba(14, 26, 51, 0.3));
+  transition: transform 0.25s var(--ease-spring);
+  animation: map-pin-drop 0.45s var(--ease-spring);
+}
+.map-canvas__pin-body {
+  fill: var(--map-pin);
+  stroke: var(--map-pin-ring);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.map-canvas__pin-shine {
   fill: #fff;
+  opacity: 0.16;
 }
-@keyframes pin-drop {
+.map-canvas__pin-disc {
+  fill: var(--map-pin-ring);
+}
+.map-canvas__pin-dot {
+  fill: var(--map-pin);
+}
+/* Sombra de color en el suelo con un pulso suave: el punto elegido se distingue sin distraer. */
+.map-canvas__halo {
+  position: absolute;
+  top: -4px;
+  left: -9px;
+  width: 18px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--map-pin) 26%, transparent);
+  transition:
+    transform 0.25s var(--ease),
+    opacity 0.25s var(--ease);
+}
+.map-canvas__halo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--map-pin);
+  border-radius: 50%;
+  opacity: 0;
+  animation: map-pin-pulse 2.4s var(--ease) 0.5s infinite;
+}
+/* Mientras se arrastra el mapa el pin se levanta (el punto se está moviendo); al soltar se asienta. */
+.map-canvas__marker.is-lifted .map-canvas__pin {
+  transform: translateY(-10px);
+}
+.map-canvas__marker.is-lifted .map-canvas__halo {
+  opacity: 0.55;
+  transform: scale(0.7);
+}
+.map-canvas__marker.is-lifted .map-canvas__halo::after {
+  animation: none;
+}
+@keyframes map-pin-drop {
   from {
-    transform: translate(-50%, -140%);
+    transform: translateY(-18px);
+    opacity: 0;
+  }
+}
+@keyframes map-pin-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(3.2);
     opacity: 0;
   }
 }
@@ -5745,6 +6009,33 @@ button.method-card {
   color: var(--muted);
   font-size: 0.72rem;
   text-align: right;
+}
+/* Distancia de cada sugerencia al punto de referencia ("350 m", "1.2 km"). */
+.place-search__distance {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.select__option.is-active .place-search__distance {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+@media (pointer: coarse) {
+  .place-search__clear {
+    right: 2px;
+    width: 44px;
+    height: 44px;
+  }
+  .place-search__menu .select__option {
+    min-height: 48px;
+  }
 }
 .location-rule {
   display: grid;
@@ -6455,175 +6746,6 @@ button.method-card {
   overflow-wrap: anywhere;
 }
 
-/* ==========================================================================
-   Asistente de reportes (pantalla "Reportes")
-   ========================================================================== */
-.report-assistant {
-  display: grid;
-  gap: 16px;
-}
-.report-thread {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 20px;
-}
-.report-turn {
-  display: grid;
-  gap: 10px;
-}
-/* La pregunta, como burbuja a la derecha; la respuesta, como tarjeta a lo ancho. */
-.report-turn__question {
-  justify-self: end;
-  max-width: min(560px, 90%);
-  margin: 0;
-  padding: 10px 14px;
-  border-radius: 16px 16px 4px 16px;
-  background: var(--blue-100);
-  color: var(--blue-800);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.report-answer {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  min-width: 0;
-}
-.report-answer__text {
-  margin: 0;
-  font-size: 1.02rem;
-  font-weight: 600;
-  line-height: 1.45;
-}
-.report-answer__notes {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-.report-answer__notes li {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  color: var(--text-2);
-}
-.report-answer__notes svg {
-  flex: none;
-  margin-top: 3px;
-  color: var(--warning);
-}
-.report-tags {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.report-tags li {
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text-2);
-  font-size: 0.82rem;
-}
-.report-answer__alternatives {
-  display: grid;
-  gap: 6px;
-}
-.report-answer__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-.report-answer__rate {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-}
-.report-table {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-.report-table td.is-number {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.report-composer {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-.report-suggestions {
-  display: grid;
-  gap: 8px;
-}
-.report-suggestions > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.report-builder {
-  display: grid;
-  gap: 16px;
-}
-.report-builder__grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-}
-.report-builder__columns {
-  display: grid;
-  gap: 8px;
-}
-.report-builder__label {
-  font-weight: 700;
-  font-size: 0.92rem;
-  color: var(--text-2);
-}
-.report-builder__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.saved-reports__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-.saved-reports__result {
-  display: grid;
-  gap: 8px;
-  margin-top: 16px;
-}
-.saved-reports__title {
-  margin: 0;
-  font-size: 1rem;
-}
-@media (min-width: 640px) {
-  .report-composer {
-    grid-template-columns: 1fr auto;
-  }
-  .report-builder__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1100px) {
-  .report-builder__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 /* Contexto literal de una ocurrencia de error (ADMIN): plegado hasta que se necesita. */
 .occurrence-context {
   margin-top: 6px;
@@ -6650,4 +6772,2243 @@ button.method-card {
 .occurrence-context .code-block {
   max-height: 320px;
   overflow: auto;
+}
+
+/* ===== Asistencia (empresa) ===== */
+/* Tablero del día, historial y detalle de una jornada (pages/company/attendance) y las piezas
+   compartidas de components/attendance (línea de tiempo, resumen, evidencia y filas del tablero).
+   Mobile first: tarjetas en contenedores angostos y columnas alineadas en uno ancho (@container). */
+
+/* ---------- Filtros: el día (o el rango), la búsqueda y el estado ---------- */
+.att-filters {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.att-filters .toolbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (pointer: coarse) {
+  .att-filters .chip {
+    min-height: 44px;
+  }
+}
+.att-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+}
+.att-day .field {
+  flex: 1 1 180px;
+  max-width: 280px;
+}
+/* "Ayer" y "Hoy" con el alto de los controles: alineados con el campo y fáciles de tocar. */
+.att-day__quick .chip {
+  min-height: var(--control-h, 48px);
+  padding-inline: 18px;
+}
+@media (min-width: 900px) {
+  .att-filters--board {
+    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+    align-items: end;
+  }
+}
+.att-fields {
+  display: grid;
+  gap: 12px;
+}
+@media (min-width: 560px) {
+  .att-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 960px) {
+  .att-fields {
+    grid-template-columns: repeat(3, minmax(0, 240px));
+  }
+}
+
+/* ---------- Tablero del día (BoardList): tarjeta por empleado; columnas en un contenedor ancho ---------- */
+.att-board {
+  container: att-board / inline-size;
+}
+.att-board__head {
+  display: none;
+}
+.att-board__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.att-board__list > li + li {
+  border-top: 1px solid var(--border);
+}
+.att-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: inherit;
+  text-decoration: none;
+  animation: fade-in 0.35s var(--ease) both;
+}
+.att-row--link {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.att-row--link:hover,
+.att-row--link:focus-visible {
+  background: var(--blue-50);
+  outline: none;
+}
+.att-row--link:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--blue-400);
+}
+.att-row__chevron {
+  color: var(--muted);
+}
+.att-row__facts {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 10px 16px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+/* Un dato: su etiqueta (en tarjetas), el valor y una aclaración debajo. También en el historial. */
+.att-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.3;
+}
+.att-cell small {
+  color: var(--muted);
+}
+.att-cell__label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* Hora con su insignia (retardo, salida anticipada): se acomodan en otra línea si no caben. */
+.att-cell__value,
+.att-fact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.att-cell__value {
+  font-weight: 700;
+}
+@container att-board (min-width: 860px) {
+  .att-board__head,
+  .att-row {
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.5fr) minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.2fr) 18px;
+    column-gap: 16px;
+  }
+  .att-board__head {
+    display: grid;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  /* Los datos pasan a ser columnas de la fila: Empleado, Turno, Estado, Entrada, Descansos, Salida. */
+  .att-row__facts {
+    display: contents;
+  }
+  .att-cell {
+    order: 3;
+  }
+  .att-cell.att-cell--shift {
+    order: 1;
+  }
+  .att-row__state {
+    order: 2;
+  }
+  .att-row__chevron {
+    order: 4;
+  }
+  /* Cada columna ya tiene encabezado: la etiqueta del dato queda solo para lectores de pantalla. */
+  .att-cell__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* ---------- Resumen de la jornada (SessionSummary): lo programado contra lo real ---------- */
+.att-summary > div {
+  align-content: start;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+@media (min-width: 900px) {
+  .att-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.att-fact__note {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.87rem;
+  font-weight: 400;
+}
+
+/* ---------- Línea de tiempo (Timeline: SessionTimeline y EventTimeline) ----------
+   Selectores de hijo directo: las listas dentro de un paso (la evidencia) no heredan la línea. */
+.att-timeline {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.att-timeline > .att-step {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding-bottom: 20px;
+}
+.att-timeline > .att-step:last-child {
+  padding-bottom: 0;
+}
+/* La línea que une el punto de un paso con el del siguiente. */
+.att-timeline > .att-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 34px;
+  bottom: 2px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.att-step--in .att-step__dot {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.att-step--break .att-step__dot {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.att-step--out .att-step__dot {
+  background: var(--blue-50);
+  color: var(--blue-700);
+}
+/* Un descanso en curso: resaltado (sin animación que redibuje). */
+.att-step--current .att-step__dot {
+  background: var(--warning);
+  color: #fff;
+  box-shadow: 0 0 0 5px var(--warning-soft);
+}
+.att-step--pending .att-step__dot {
+  border: 2px dashed var(--border-strong);
+  background: var(--surface);
+  color: var(--muted);
+}
+.att-step--missed .att-step__dot {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.att-step__body {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.att-step__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.att-step__time {
+  color: var(--text-2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.att-step__detail {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.att-step__total {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ---------- Evidencia de un registro (EventEvidence): fichas y el enlace al mapa ---------- */
+.att-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.att-evidence li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+.att-evidence li svg {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+.att-evidence li.att-evidence__link {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.att-evidence__link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--blue-50);
+  color: var(--blue-700);
+  font-weight: 700;
+  text-decoration: none;
+}
+.att-evidence__link a:hover,
+.att-evidence__link a:focus-visible {
+  background: var(--blue-100);
+}
+@media (pointer: coarse) {
+  .att-evidence__link a {
+    min-height: 44px;
+  }
+}
+
+/* ===== Mi asistencia (empleado) ===== */
+/* Reloj checador del empleado (inicio): tarjeta azul con su turno, en qué va, lo que corre (hora del
+   servidor) y los botones grandes de lo que puede registrar, al alcance del pulgar. */
+.time-clock {
+  position: relative;
+  overflow: hidden;
+  container: clock / inline-size;
+  display: grid;
+  gap: 16px;
+  padding: 22px 20px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(420px 240px at 100% 0%, rgba(147, 197, 253, 0.32), transparent 70%),
+    linear-gradient(150deg, #0b1f4d 0%, #143a8f 55%, var(--blue-600) 100%);
+  /* Dentro del área de trabajo `--on-app` es el texto oscuro (.shell): sobre este azul vuelve a ser
+     blanco, para el texto y para todo lo que la tarjeta contiene. */
+  --on-app: #ffffff;
+  --on-app-muted: rgba(219, 232, 255, 0.82);
+  color: var(--on-app);
+  box-shadow: var(--shadow-blue);
+}
+.time-clock::after {
+  content: '';
+  position: absolute;
+  top: -70px;
+  right: -70px;
+  width: 210px;
+  height: 210px;
+  border: 18px solid rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.time-clock > * {
+  position: relative;
+  z-index: 1;
+}
+.time-clock__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.time-clock__shift {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.time-clock__eyebrow {
+  color: var(--on-app-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.time-clock__hours {
+  font-size: clamp(1.7rem, 9cqi, 2.6rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.time-clock__days {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--on-app-muted);
+  font-size: 0.92rem;
+}
+.time-clock__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.time-clock__message {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.time-clock .live-time {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-variant-numeric: tabular-nums;
+}
+.time-clock__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.time-clock__facts div {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+}
+.time-clock__facts dt {
+  color: var(--on-app-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.time-clock__facts dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.time-clock__facts small {
+  display: block;
+  color: var(--on-app-muted);
+  font-weight: 400;
+}
+.time-clock__actions {
+  display: grid;
+  gap: 10px;
+}
+.time-clock__actions .btn {
+  min-height: 60px;
+  padding-inline: 16px;
+  font-size: 1.08rem;
+  white-space: normal;
+  text-align: center;
+}
+.time-clock__actions .btn--light {
+  --btn-fg: var(--blue-800);
+  --btn-shadow: 0 10px 24px -12px rgba(2, 8, 30, 0.7);
+}
+.time-clock__actions .btn--ghost,
+.time-clock__actions .btn--ghost:hover {
+  --btn-bg: rgba(255, 255, 255, 0.1);
+  --btn-fg: var(--on-app);
+  --btn-border: rgba(255, 255, 255, 0.4);
+  --btn-shadow: none;
+}
+@container clock (min-width: 560px) {
+  .time-clock {
+    padding: 28px;
+  }
+  .time-clock__actions {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+.my-attendance .panel__footer > .btn {
+  flex: 1 1 180px;
+}
+
+/* Dónde puede checar hoy: remoto y sus sitios (con su radio). */
+.check-places {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.check-places li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.check-places__info {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+.check-places__info strong {
+  overflow-wrap: anywhere;
+}
+
+/* Registro: pasos fuera de la cámara (ubicación, problema) y el resultado. */
+.record-step .panel__head--hero {
+  gap: 14px;
+  padding-block: 36px 28px;
+}
+.attendance-result__head {
+  display: grid;
+  gap: 6px;
+}
+.attendance-result__head h1 {
+  margin: 0;
+}
+.attendance-result__when {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 1.05rem;
+}
+.attendance-result__when strong {
+  color: var(--text);
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Validador: lo que la identificación registró en la asistencia (o por qué no). */
+.result-card__attendance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: #eef1f6;
+  color: #5b6884;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.result-card__attendance.is-recorded {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+/* Mis jornadas y mis solicitudes: tarjetas que se acomodan al ancho de la lista. */
+.attendance-list {
+  container: attendance-list / inline-size;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.attendance-list.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.attendance-item {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 0.15s;
+}
+.attendance-item:hover {
+  border-color: var(--blue-200);
+}
+.attendance-item__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.attendance-item__title {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.attendance-item__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.attendance-item .attendance-item__facts {
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+}
+.attendance-item__wide {
+  grid-column: 1 / -1;
+}
+.attendance-item__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+}
+.attendance-item__note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.attendance-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.attendance-item__actions > .btn {
+  flex: 1 1 200px;
+}
+@container attendance-list (max-width: 440px) {
+  .attendance-item__head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .attendance-item__badges {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+/* ===== Turnos y sitios (empresa) ===== */
+/* Grupo de opciones con nombre (días, sitios): un fieldset sin marco que se ve como un campo. */
+.choice-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.choice-group__legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--text-2);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+/* Campo con valores sugeridos debajo (minutos de descanso, radio del sitio). */
+.field-stack {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Días de la semana: siete fichas de al menos 44 px; en un contenedor angosto, en dos renglones. */
+.weekday-picker {
+  container: weekdays / inline-size;
+}
+.weekday-picker__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  max-width: 480px;
+  margin-bottom: 4px;
+}
+@container weekdays (max-width: 349px) {
+  .weekday-picker__days {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.weekday-picker__day {
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+}
+.weekday-picker__day.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-blue);
+}
+.weekday-picker__day:disabled,
+.quick-choices .chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+.weekday-picker__day:focus-visible,
+.quick-choices .chip:focus-visible {
+  outline: 2px solid var(--blue-400);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .quick-choices .chip {
+    min-height: 44px;
+  }
+}
+
+/* Sitios donde checa en persona: cada sitio es una tarjeta tocable completa con su casilla. */
+.site-picker__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Resumen en vivo del turno: duración, ventanas de entrada y salida, descansos y días. */
+.shift-summary {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--blue-100);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--blue-50), var(--surface));
+}
+.shift-summary--empty {
+  margin: 0;
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.shift-summary__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+.shift-summary__head .badge {
+  align-self: center;
+}
+.shift-summary__duration {
+  color: var(--blue-800);
+  font-size: 1.6rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.shift-summary__rows {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.shift-summary__rows > div {
+  display: grid;
+  gap: 2px;
+}
+.shift-summary__rows dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.shift-summary__rows dt svg {
+  color: var(--primary);
+}
+.shift-summary__rows dd {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+/* Tolerancias: "Entrada" y "Salida" lado a lado si caben; una debajo de otra en el teléfono. */
+.tolerance-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.tolerance-group {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.tolerance-group__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.tolerance-group__title svg {
+  color: var(--primary);
+}
+
+/* Asignaciones y solicitudes (sobre las tarjetas de `people-list`): el detalle se lee completo. */
+.shift-item__info > small {
+  overflow-wrap: anywhere;
+}
+.shift-item__quote {
+  color: var(--text-2);
+  font-style: italic;
+}
+.shift-change {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+}
+.shift-change svg {
+  flex: none;
+  color: var(--primary);
+}
+/* Filtro de la bandeja de solicitudes: angosto en escritorio, a lo ancho en el teléfono. */
+.request-filter {
+  display: grid;
+  max-width: 280px;
+  margin-bottom: 14px;
+}
+@media (max-width: 599px) {
+  .request-filter {
+    max-width: none;
+  }
+}
+
+/* ===== Google Maps sin popups: la lista del buscador dice "sin resultados" y un aviso bajo el mapa
+   explica lo que Google no pudo completar (el formulario sigue a mano). ===== */
+.place-search__empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.place-search__empty-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.place-search__empty-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.place-search__empty-text small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+.location-picker__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--info-soft);
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.location-picker__notice svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--info);
+}
+
+/* ===== Menú por menús y submenús (los define el backend) =====
+   Un módulo con una sola pantalla es una opción directa; con varias, una opción que despliega su
+   submenú (uno abierto a la vez). El menú se desplaza si no cabe en una pantalla baja. */
+.sidebar__nav {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-inline: -6px;
+  padding-inline: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.nav-block,
+.nav-menu {
+  display: grid;
+  gap: 2px;
+}
+.nav-menu__toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-menu__toggle:focus-visible {
+  outline: 2px solid #6f9bff;
+  outline-offset: 2px;
+}
+.nav-menu.has-current > .nav-menu__toggle {
+  color: #fff;
+}
+.nav-menu__chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  opacity: 0.7;
+  transition: transform 0.2s var(--ease);
+}
+.nav-item__badge + .nav-menu__chevron {
+  margin-left: 6px;
+}
+.nav-menu.is-open .nav-menu__chevron {
+  transform: rotate(180deg);
+}
+/* Submenú: con sangría y una guía vertical que lo une a su opción. */
+.nav-menu__items {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  margin-left: 22px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  animation: fade-in 0.2s var(--ease);
+}
+.nav-item--sub {
+  min-height: 40px;
+  padding-block: 8px;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+.nav-item--sub.is-active::before {
+  left: -11px;
+}
+@media (pointer: coarse) {
+  .nav-item--sub {
+    min-height: 44px;
+  }
+}
+@media (min-width: 1024px) {
+  /* Menú contraído (solo íconos): todas las pantallas, separadas por módulo con una línea. */
+  .sidebar__nav.is-compact .nav-block + .nav-block {
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ===== Controles propios (hora, número, casilla, opción) ===== */
+/* Componentes de `components/ui` que reemplazan a los controles del sistema (decisión del dueño del
+   producto: nada de la apariencia del navegador): `TimeField`, `NumberField`, `Checkbox` y
+   `RadioCard`. Se dibujan solo con los tokens; el input nativo, cuando existe por accesibilidad,
+   queda oculto y sigue siendo el que se enfoca, se anuncia y responde al teclado. */
+
+/* Tamaño compacto de los campos (`size="sm"`); con el dedo nunca baja de 44 px. */
+.field--sm {
+  --control-h: 40px;
+}
+@media (pointer: coarse) {
+  .field--sm {
+    --control-h: 44px;
+  }
+  /* Botón interno de un campo (abrir el selector de hora o el calendario, mostrar la contraseña). */
+  .field__toggle {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ---------- Hora (TimeField): selector con columnas de horas y minutos ---------- */
+.time-field input {
+  font-variant-numeric: tabular-nums;
+}
+.timepicker {
+  display: grid;
+  gap: 12px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px;
+}
+.timepicker__readout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.timepicker__readout svg {
+  color: var(--primary);
+}
+.timepicker__presets {
+  justify-content: center;
+  gap: 6px;
+}
+.timepicker__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+}
+.timepicker__column {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.timepicker__heading {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.timepicker__colon {
+  align-self: center;
+  padding-top: 18px;
+  color: var(--muted);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+/* Cada columna se desplaza sola (la opción activa queda al centro) y se desvanece en los bordes. */
+.timepicker__list {
+  --time-option-h: 40px;
+  position: relative;
+  max-height: calc(var(--time-option-h) * 5 + 8px);
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  list-style: none;
+  outline: none;
+  scrollbar-width: thin;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  transition: box-shadow 0.2s var(--ease);
+}
+.timepicker__list:focus-visible {
+  box-shadow: var(--control-ring);
+}
+.timepicker__option {
+  display: grid;
+  place-items: center;
+  height: var(--time-option-h);
+  border-radius: var(--radius-xs);
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.timepicker__option:hover:not([aria-disabled='true']),
+.timepicker__list:focus .timepicker__option.is-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.timepicker__list:focus-visible .timepicker__option.is-active {
+  box-shadow: inset 0 0 0 2px var(--blue-400);
+}
+.timepicker__option.is-selected,
+.timepicker__list:focus .timepicker__option.is-selected {
+  background: var(--primary-gradient);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+.timepicker__option[aria-disabled='true'] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+@media (pointer: coarse) {
+  .timepicker__list {
+    --time-option-h: 44px;
+  }
+  .timepicker__presets .chip {
+    min-height: 44px;
+  }
+}
+
+/* ---------- Número (NumberField): unidad junto al número y botones − / + ---------- */
+.number-field {
+  --stepper-size: calc(var(--control-h) - 12px);
+  --stepper-space: calc(var(--stepper-size) * 2 + 16px);
+}
+.number-field .field__control input {
+  padding-right: var(--stepper-space);
+  font-variant-numeric: tabular-nums;
+}
+/* La unidad sigue al número: una copia invisible del texto (mismo tipo de letra) ocupa su ancho. */
+.number-field__affix {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - var(--stepper-space));
+  padding-left: calc(var(--control-pad-x) + 1px);
+  overflow: hidden;
+  font-size: var(--control-font-size);
+  white-space: pre;
+  pointer-events: none;
+}
+.field--with-icon .number-field__affix {
+  padding-left: calc(var(--control-icon-space) + 1px);
+}
+.number-field__ghost {
+  visibility: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.number-field__unit {
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 0.9em;
+  font-weight: 600;
+}
+.number-field__steppers {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  transform: translateY(-50%);
+}
+.number-field__step {
+  display: grid;
+  place-items: center;
+  width: var(--stepper-size);
+  height: var(--stepper-size);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  color: var(--primary);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.1s var(--ease);
+}
+.number-field__step:hover:not(:disabled) {
+  background: var(--primary-soft);
+}
+.number-field__step:active:not(:disabled) {
+  background: var(--blue-100);
+  transform: scale(0.92);
+}
+.number-field__step:disabled {
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (pointer: coarse) {
+  .number-field {
+    --stepper-size: 44px;
+  }
+}
+
+/* ---------- Casilla (Checkbox) y opción (RadioCard) ---------- */
+/* El input nativo: fuera de la vista, presente para el teclado y el lector de pantalla. */
+input.checkbox__input,
+input.radio-card__input {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+/* Tarjeta tocable completa: la etiqueta entera responde al toque (también dentro de un campo). */
+label.checkbox--card,
+label.radio-card {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  min-height: 52px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.35;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 0.2s var(--ease),
+    background 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    transform 0.15s var(--ease);
+}
+label.checkbox--card {
+  align-items: center;
+}
+label.radio-card {
+  align-items: flex-start;
+}
+label.checkbox--card:hover,
+label.radio-card:hover {
+  border-color: var(--control-border-hover);
+}
+label.checkbox--card:not(.is-disabled):active,
+label.radio-card:not(:has(input:disabled)):active {
+  transform: scale(0.99);
+}
+label.checkbox--card:has(input:focus-visible),
+label.radio-card:has(input:focus-visible) {
+  outline: 2px solid var(--blue-400);
+  outline-offset: 2px;
+}
+label.checkbox--card.is-checked,
+label.radio-card.is-checked {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: var(--accent-soft);
+}
+label.radio-card.is-checked {
+  box-shadow: 0 10px 24px -18px rgba(37, 99, 235, 0.7);
+}
+label.checkbox.is-disabled,
+label.radio-card:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+/* Compacta junto a un texto ("Recordar mi cuenta"): sin tarjeta; con el dedo, 44 px de alto. */
+label.checkbox--inline {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 0.92rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  label.checkbox--inline {
+    min-height: 44px;
+  }
+}
+/* La caja de la casilla y el círculo de la opción comparten borde, foco y relleno al marcarse. */
+.checkbox__box,
+.radio-card__indicator {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--control-border);
+  background: var(--control-bg);
+  color: transparent;
+  transition:
+    background 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+.checkbox__box {
+  border-radius: 7px;
+}
+.checkbox--sm .checkbox__box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+.radio-card__indicator {
+  border-radius: 50%;
+}
+.checkbox:hover .checkbox__box,
+.radio-card:hover .radio-card__indicator {
+  border-color: var(--control-border-hover);
+}
+.checkbox__input:focus-visible + .checkbox__box,
+.radio-card__input:focus-visible ~ .radio-card__indicator {
+  border-color: var(--control-border-focus);
+  box-shadow: var(--control-ring);
+}
+.checkbox.is-checked .checkbox__box,
+.radio-card.is-checked .radio-card__indicator {
+  border-color: transparent;
+  background: var(--primary-gradient);
+  color: #fff;
+}
+.checkbox__box svg,
+.radio-card__indicator::after {
+  transform: scale(0.4);
+  transition: transform 0.2s var(--ease-spring);
+}
+.radio-card__indicator::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  transform: scale(0);
+}
+.checkbox.is-checked .checkbox__box svg,
+.radio-card.is-checked .radio-card__indicator::after {
+  transform: scale(1);
+}
+.radio-card--indicator-start .radio-card__indicator {
+  order: -1;
+}
+/* Textos: título, aclaración y lo que va al final (p. ej. una insignia). */
+.checkbox__text,
+.radio-card__text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+label.checkbox--inline .checkbox__text {
+  flex: none;
+}
+.checkbox__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.checkbox--card .checkbox__label,
+.radio-card__title {
+  color: var(--text);
+  font-weight: 700;
+}
+.checkbox__icon {
+  display: grid;
+  flex: none;
+  color: var(--primary);
+}
+.checkbox__description,
+.radio-card__description {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+.checkbox__aside {
+  flex: none;
+}
+/* Ícono de la opción en un recuadro que toma el color de la marca al elegirse. */
+.radio-card__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--primary);
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.radio-card.is-checked .radio-card__icon {
+  background: var(--primary-gradient);
+  color: #fff;
+}
+label.radio-card--sm {
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+.radio-card--sm .radio-card__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+/* Sitio en la lista de una asignación: nombre y domicilio en una línea (con "…"). */
+.site-option .checkbox__label,
+.site-option .checkbox__description {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Turnos para varios empleados: selector de empleados (EmployeePicker) y el resumen de una
+   operación masiva (BulkResultSummary). La lista se acomoda al ancho de su contenedor.
+   ========================================================================== */
+.employee-picker {
+  container: picker / inline-size;
+  display: grid;
+  gap: 12px;
+}
+.employee-picker__department {
+  width: 100%;
+}
+.employee-picker__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.employee-picker__bar .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.employee-picker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.employee-picker__list {
+  display: grid;
+  gap: 8px;
+}
+.employee-picker__list.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.employee-picker--error .employee-picker__list .checkbox {
+  border-color: var(--danger);
+}
+@container picker (min-width: 640px) {
+  .employee-picker__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container picker (max-width: 420px) {
+  .employee-picker__actions,
+  .employee-picker__actions .btn {
+    width: 100%;
+  }
+}
+.bulk-result {
+  display: grid;
+  gap: 14px;
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  text-align: left;
+}
+.bulk-result__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+.bulk-result__group--done .bulk-result__title {
+  color: var(--success);
+}
+.bulk-result__group--unchanged .bulk-result__title {
+  color: var(--muted);
+}
+.bulk-result__group--skipped .bulk-result__title {
+  color: var(--warning);
+}
+.bulk-result__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bulk-result__list li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.bulk-result__reason {
+  color: var(--text-2);
+  font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Calendario (empresa): pestañas, año y mes, cuadrícula del mes (MonthCalendar), detalle del día,
+   filtros y listas de festivos, ausencias y días laborables (components/calendar).
+   Mobile first: una columna en contenedores angostos; calendario y detalle lado a lado en uno ancho
+   (@container). Se personaliza con los tokens --month-cal-*.
+   ========================================================================== */
+.cal-tabs {
+  margin-bottom: 18px;
+}
+/* Teléfono: las cuatro pestañas caben a lo ancho (el nombre largo pasa a dos renglones). */
+@media (max-width: 599px) {
+  .cal-tabs {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .cal-tabs .tab {
+    white-space: normal;
+    text-align: center;
+    line-height: 1.15;
+  }
+}
+.tab-panel {
+  min-width: 0;
+}
+.cal-tab {
+  container: cal-tab / inline-size;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.cal-tab__title {
+  margin: 8px 0 0;
+  font-size: 1.05rem;
+}
+.cal-bar {
+  container: cal-bar / inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cal-bar__intro {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.cal-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@container cal-bar (max-width: 560px) {
+  .cal-bar__actions,
+  .cal-bar__actions .btn {
+    width: 100%;
+  }
+}
+
+/* ---------- Año / mes: anterior, periodo y siguiente ---------- */
+.period-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.period-switcher__label {
+  min-width: 7ch;
+  padding: 0 6px;
+  text-align: center;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Mes + detalle del día ---------- */
+.cal-month {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+/* Teléfono: el mes ocupa todo el ancho (sin marco) para que cada día se acerque a 44 px. */
+@container cal-tab (max-width: 420px) {
+  .cal-month .month-cal {
+    --month-cal-gap: 2px;
+    padding: 0;
+    border: 0;
+  }
+}
+@container cal-tab (min-width: 760px) {
+  .cal-month {
+    grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+    align-items: start;
+  }
+}
+.month-cal {
+  --month-cal-gap: 4px;
+  --month-cal-radius: var(--radius-sm);
+  --month-cal-today: var(--blue-300);
+  --month-cal-selected: var(--primary);
+  container: month-cal / inline-size;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.month-cal__head {
+  justify-self: center;
+  border: 0;
+}
+.month-cal__grid {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: var(--month-cal-gap);
+}
+.month-cal__weekday {
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+.month-cal__cell {
+  padding: 0;
+  vertical-align: top;
+}
+.month-cal__day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 2px;
+  border: 1px solid transparent;
+  border-radius: var(--month-cal-radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.month-cal__day:hover {
+  background: var(--primary-soft);
+}
+.month-cal__day:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.month-cal__day.has-markers {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.month-cal__day.is-today {
+  border-color: var(--month-cal-today);
+}
+.month-cal__day.is-today .month-cal__number {
+  color: var(--primary);
+  font-weight: 800;
+}
+.month-cal__day.is-selected {
+  border-color: var(--month-cal-selected);
+  box-shadow: inset 0 0 0 1px var(--month-cal-selected);
+}
+.month-cal__number {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.month-cal__markers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+}
+/* Marca: en contenedores angostos un punto de su color; en uno ancho, su texto (nombre o número). */
+.month-cal__marker {
+  --marker: var(--primary);
+  --marker-soft: var(--primary-soft);
+  width: 7px;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--marker);
+  font-size: 0;
+}
+.month-cal__marker--info {
+  --marker: var(--info);
+  --marker-soft: var(--info-soft);
+}
+.month-cal__marker--success {
+  --marker: var(--success);
+  --marker-soft: var(--success-soft);
+}
+.month-cal__marker--warning {
+  --marker: var(--warning);
+  --marker-soft: var(--warning-soft);
+}
+.month-cal__marker--danger {
+  --marker: var(--danger);
+  --marker-soft: var(--danger-soft);
+}
+.month-cal__marker--muted {
+  --marker: var(--muted);
+  --marker-soft: var(--surface-2);
+}
+@container month-cal (min-width: 520px) {
+  .month-cal__day {
+    min-height: 68px;
+  }
+  .month-cal__marker {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--marker-soft);
+    color: var(--marker);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+.month-cal__legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.month-cal__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.month-cal__key::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.month-cal__key--danger::before {
+  background: var(--danger);
+}
+.month-cal__key--info::before {
+  background: var(--info);
+}
+
+/* ---------- Detalle del día elegido ---------- */
+.cal-day {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.cal-day > * {
+  margin: 0;
+}
+.cal-day__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+}
+.cal-day__holiday {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--danger);
+}
+.cal-day__holiday strong {
+  color: var(--text);
+}
+.cal-day .btn {
+  justify-self: start;
+}
+
+/* ---------- Festivo en la lista: hoja de calendario ---------- */
+.cal-date-tile {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  line-height: 1;
+}
+.cal-date-tile strong {
+  font-size: 1.05rem;
+}
+.cal-date-tile small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ---------- Filtros de las ausencias ---------- */
+.cal-filters {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+@container cal-tab (min-width: 620px) {
+  .cal-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.cal-filters__clear {
+  justify-self: start;
+}
+@media (pointer: coarse) {
+  .period-switcher .btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* ===== Asistencia registrada por la empresa y días libres del empleado ===== */
+/* Insignia y motivo de lo que registró o corrigió la empresa (CompanyRecord, SessionSummary,
+   EventTimeline), acciones del tablero (corregir / registrar) y día libre, el editor de descansos
+   (BreaksEditor), la ventana del descanso en el reloj, el día libre (DayOffCard) y "Mis días libres"
+   (AbsenceItem, HolidayList, solicitud). Mobile first; las listas se acomodan a su contenedor. */
+
+/* ---------- Lo que registró o corrigió la empresa ---------- */
+.att-company svg {
+  flex: none;
+}
+.att-edited {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--blue-100);
+  border-radius: var(--radius);
+  background: var(--blue-50);
+}
+.att-edited__when {
+  color: var(--text-2);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.att-edited__reason {
+  flex-basis: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.att-edited__reason svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--primary);
+}
+.att-summary > .att-summary__company {
+  grid-column: 1 / -1;
+  border-color: var(--blue-100);
+  background: var(--blue-50);
+}
+.att-summary__company .att-fact {
+  overflow-wrap: anywhere;
+}
+.att-evidence li.att-evidence__note {
+  border-color: var(--blue-100);
+  background: var(--blue-50);
+  color: var(--text);
+}
+
+/* ---------- Tablero: día libre y acciones de la empresa en cada fila ---------- */
+.att-row__state {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+.att-row__reason {
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+.att-board__item {
+  --att-actions-w: 60px;
+  display: grid;
+}
+/* Tarjeta (contenedor angosto): la acción al pie, a lo ancho y al alcance del pulgar. */
+.att-board__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 14px;
+}
+.att-board__actions:empty {
+  display: none;
+}
+.att-board__actions .btn {
+  flex: 1 1 auto;
+}
+@container att-board (min-width: 520px) {
+  .att-board__actions .btn {
+    flex: 0 0 auto;
+  }
+}
+@media (pointer: coarse) {
+  .att-board__actions .btn {
+    min-height: 44px;
+  }
+}
+/* Columnas (contenedor ancho): la acción es un botón de ícono en su propia columna (su nombre sigue
+   siendo su texto para el lector de pantalla y su globo de ayuda); el encabezado deja ese espacio. */
+@container att-board (min-width: 860px) {
+  .att-board__head {
+    padding-right: calc(16px + var(--att-actions-w, 60px));
+  }
+  .att-board__item {
+    grid-template-columns: minmax(0, 1fr) var(--att-actions-w);
+    align-items: center;
+  }
+  .att-board__actions,
+  .att-board__actions:empty {
+    display: flex;
+    justify-content: center;
+    padding: 0 16px 0 0;
+  }
+  .att-board__actions .btn {
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .att-board__action-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .att-row__state {
+    align-items: flex-start;
+  }
+  .att-row__reason {
+    text-align: start;
+  }
+}
+
+/* ---------- Editor de descansos (BreaksEditor) ---------- */
+.breaks-editor {
+  container: breaks-editor / inline-size;
+  gap: 12px;
+}
+.breaks-editor__list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.breaks-editor__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title remove'
+    'times times';
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  animation: fade-in 0.25s var(--ease) both;
+}
+.breaks-editor__title {
+  grid-area: title;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-2);
+  font-weight: 700;
+}
+.breaks-editor__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.breaks-editor__times {
+  grid-area: times;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.breaks-editor__remove {
+  grid-area: remove;
+  justify-self: end;
+  --btn-fg: var(--danger);
+  --btn-shadow: none;
+}
+.breaks-editor__empty {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+.breaks-editor__add {
+  justify-self: stretch;
+}
+@container breaks-editor (max-width: 340px) {
+  .breaks-editor__times {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container breaks-editor (min-width: 520px) {
+  .breaks-editor__add {
+    justify-self: start;
+  }
+}
+@container breaks-editor (min-width: 680px) {
+  .breaks-editor__row {
+    grid-template-columns: 150px minmax(0, 1fr) auto;
+    grid-template-areas: 'title times remove';
+    align-items: end;
+  }
+  .breaks-editor__title,
+  .breaks-editor__remove {
+    align-self: center;
+  }
+}
+@media (pointer: coarse) {
+  .breaks-editor__add,
+  .breaks-editor__remove {
+    min-height: 44px;
+  }
+  .breaks-editor__remove {
+    width: 44px;
+  }
+}
+
+/* ---------- Reloj checador: la ventana del descanso ---------- */
+.time-clock .time-clock__note {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid rgba(253, 230, 138, 0.4);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  font-weight: 600;
+}
+.time-clock__note svg {
+  flex: none;
+}
+
+/* ---------- Día libre (DayOffCard): en "Mi asistencia" y dentro del reloj ---------- */
+.day-off {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--blue-100);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--blue-50) 0%, var(--surface) 100%);
+  animation: fade-in 0.35s var(--ease) both;
+}
+.day-off__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+.day-off--holiday .day-off__icon {
+  color: var(--warning);
+}
+.day-off__body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.day-off__title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+.day-off__name {
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+.day-off__range {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.day-off__days {
+  color: var(--muted);
+}
+.day-off__message {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.time-clock .day-off {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+}
+.time-clock .day-off__icon {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--on-app);
+  box-shadow: none;
+}
+.time-clock .day-off__title {
+  color: var(--on-app);
+}
+.time-clock .day-off__range,
+.time-clock .day-off__days {
+  color: var(--on-app-muted);
+}
+
+/* ---------- Mis días libres: próximos festivos y la solicitud ---------- */
+.holiday-list {
+  container: holiday-list / inline-size;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.holiday-list.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.holiday-list__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.holiday-list__sheet {
+  display: grid;
+  justify-items: center;
+  width: 48px;
+  overflow: hidden;
+  border: 1px solid var(--blue-100);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  line-height: 1.1;
+}
+.holiday-list__sheet small {
+  width: 100%;
+  padding: 2px 0;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.holiday-list__sheet strong {
+  padding: 4px 0 5px;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.holiday-list__text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+.holiday-list__text strong {
+  overflow-wrap: anywhere;
+}
+.holiday-list__text small {
+  color: var(--muted);
+}
+.holiday-list__weekday {
+  text-transform: capitalize;
+}
+@container holiday-list (max-width: 360px) {
+  .holiday-list__item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .holiday-list__item > .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+.absence-types {
+  display: grid;
+  gap: 10px;
+}
+@media (min-width: 560px) {
+  .absence-types {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .absence-types > .field__error,
+  .absence-types > .field__hint {
+    grid-column: 1 / -1;
+  }
 }

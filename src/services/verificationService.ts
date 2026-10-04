@@ -5,7 +5,8 @@ import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 
 export const isVerificationResult = hasKeys<VerificationResult>('verified', 'method', 'message');
 const isResult = isVerificationResult;
-const isChallenge = hasKeys<FaceChallenge>('liveness_required');
+/** El reto trae sus movimientos y los colores del destello (vacío si la empresa no lo usa). */
+const isChallenge = hasKeys<FaceChallenge>('liveness_required', 'actions', 'flash');
 const isCheck = hasKeys<FaceCheckResult>('detection_score');
 
 export const verificationService = {
@@ -15,7 +16,7 @@ export const verificationService = {
 };
 
 export const faceService = {
-  /** Reto aleatorio de prueba de vida (girar la cabeza), de uso único. */
+  /** Reto aleatorio de prueba de vida (destello de colores y movimientos de cabeza), de uso único. */
   getChallenge(): Promise<FaceChallenge> {
     return apiRequest<FaceChallenge>('/face/challenge', { method: 'POST', validate: isChallenge });
   },

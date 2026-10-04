@@ -1,6 +1,8 @@
 import { QrCode, ScanFace, ShieldCheck, SplitSquareHorizontal, type LucideIcon } from 'lucide-react';
 import { useCatalogs } from '../hooks/useCatalogs';
 import type { ValidatorMode, ValidatorModeItem, VerificationMethod } from '../types';
+import { ChoiceGroup } from './ui/ChoiceGroup';
+import { RadioCard } from './ui/RadioCard';
 
 /** Ícono de cada modo; el nombre, la descripción y los métodos vienen del catálogo validator_modes. */
 const MODE_ICONS: Partial<Record<string, LucideIcon>> = {
@@ -35,27 +37,18 @@ interface ValidatorModePickerProps {
   disabled?: boolean;
 }
 
-/** Selección del modo con tarjetas (grupo de radio accesible): solo los modos activos del catálogo. */
+/**
+ * Selección del modo con tarjetas propias (`RadioCard` en un grupo de opciones: las flechas recorren
+ * los modos): solo los modos activos del catálogo.
+ */
 export function ValidatorModePicker({ value, onChange, disabled = false }: ValidatorModePickerProps) {
   const { active } = useCatalogs();
   return (
-    <fieldset className="mode-picker" disabled={disabled}>
-      <legend className="mode-picker__legend">Cómo identifica</legend>
+    <ChoiceGroup label="Cómo identifica" className="mode-picker" radio disabled={disabled}>
       {active('validator_modes').map(({ code, name, description }) => {
         const Icon = modeIcon(code);
-        return (
-          <label key={code} className={`mode-option ${value === code ? 'is-selected' : ''}`}>
-            <input type="radio" name="validator-mode" value={code} checked={value === code} onChange={() => onChange(code)} />
-            <span className="mode-option__icon">
-              <Icon size={22} />
-            </span>
-            <span className="mode-option__text">
-              <strong>{name}</strong>
-              <small>{description}</small>
-            </span>
-          </label>
-        );
+        return <RadioCard key={code} name="validator-mode" value={code} checked={value === code} onChange={onChange} title={name} description={description} icon={<Icon size={22} />} />;
       })}
-    </fieldset>
+    </ChoiceGroup>
   );
 }

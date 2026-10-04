@@ -1,24 +1,70 @@
 import { KeyRound, MapPin, MonitorSmartphone, Pencil, Power, PowerOff, Radar, ScanLine, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ConfirmDialog } from '../../components/Modal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ValidatorModeBadge } from '../../components/ValidatorModes';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { PagedItems } from '../../components/ui/PagedItems';
 import { useAction } from '../../hooks/useAction';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { usePagedList } from '../../hooks/usePagedList';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { paths } from '../../routes/paths';
 import { validatorService } from '../../services/validatorService';
 import type { Validator } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
 import { addressLine } from '../../utils/address';
 import { formatDateTime, initials } from '../../utils/format';
 
-type Confirm = { kind: 'deactivate' | 'delete'; validator: Validator } | null;
+/** Qué validador se está procesando y con qué botón (cada uno muestra su propio "ocupado"). */
+type Busy = `${'status' | 'delete'}:${number}`;
 
 const today = (count: number) => (count === 1 ? '1 identificación hoy' : `${count} identificaciones hoy`);
+
+/** Activar o desactivar: qué cambia para quien usa el validador (el estado, "antes → después"). */
+function statusConfirm(validator: Validator): ConfirmInput {
+  const state = { label: 'Estado', before: validator.active ? 'Activo' : 'Inactivo', after: validator.active ? 'Inactivo' : 'Activo' };
+  const account = [{ label: 'Correo de acceso', value: validator.email }];
+  return validator.active
+    ? {
+        tone: 'danger',
+        icon: <PowerOff size={30} />,
+        eyebrow: 'Cambiar estado',
+        title: `¿Desactivar el validador ${validator.name}?`,
+        message: 'Dejará de identificar empleados y su sesión se cerrará de inmediato. No podrá iniciar sesión hasta que lo actives.',
+        changes: [state],
+        details: account,
+        confirmLabel: 'Desactivar',
+        confirmIcon: <PowerOff size={18} />,
+      }
+    : {
+        tone: 'success',
+        icon: <Power size={30} />,
+        eyebrow: 'Cambiar estado',
+        title: `¿Activar el validador ${validator.name}?`,
+        message: 'Podrá iniciar sesión de nuevo e identificar a tu personal desde sus dispositivos autorizados.',
+        changes: [state],
+        details: account,
+        confirmLabel: 'Activar',
+        confirmIcon: <Power size={18} />,
+      };
+}
+
+/** Eliminar: su cuenta desaparece, la bitácora de sus identificaciones se conserva. */
+function deleteConfirm(validator: Validator, modeName: string): ConfirmInput {
+  return {
+    kind: 'delete',
+    title: `¿Eliminar el validador ${validator.name}?`,
+    message: 'Se eliminará su cuenta y sus dispositivos ya no podrán iniciar sesión. La bitácora de sus identificaciones se conserva.',
+    details: [
+      { label: 'Correo de acceso', value: validator.email },
+      { label: 'Modo', value: modeName },
+      { label: 'Domicilio', value: addressLine(validator.address) || 'Sin domicilio' },
+    ],
+    note: 'Esta acción no se puede deshacer.',
+    confirmLabel: 'Eliminar validador',
+  };
+}
 
 /**
  * Validadores de identidad de la empresa: cuentas para tabletas o teléfonos en los accesos que
@@ -28,28 +74,30 @@ export function ValidatorsPage() {
   const { policy } = useVerificationPolicy();
   const list = usePagedList((page, signal) => validatorService.list(page, signal), { errorTitle: 'No se pudieron cargar los validadores' });
   const navigate = useNavigate();
-  const [confirm, setConfirm] = useState<Confirm>(null);
-  const { busy, run } = useAction<number>();
-  const close = () => setConfirm(null);
+  const { nameOf } = useCatalogs();
+  const { busy, run } = useAction<Busy>();
 
   const replace = (saved: Validator) => list.updateItems((current) => current.map((v) => (v.id === saved.id ? saved : v)));
 
-  const setActive = (validator: Validator, active: boolean) =>
-    run(() => validatorService.setStatus(validator.id, active), {
-      busy: validator.id,
+  // Activar, desactivar y eliminar preguntan antes (cancelar no envía nada).
+  const toggle = (validator: Validator) => {
+    const active = !validator.active;
+    return run(() => validatorService.setStatus(validator.id, active), {
+      busy: `status:${validator.id}`,
+      confirm: statusConfirm(validator),
       errorTitle: 'No se pudo cambiar el estado',
       success: [active ? 'Validador activado' : 'Validador desactivado', active ? `${validator.name} ya puede iniciar sesión.` : 'Su sesión se cerró y no podrá iniciar sesión hasta que lo actives.'],
       onSuccess: replace,
-      onSettled: close,
     });
+  };
 
   const remove = (validator: Validator) =>
     run(() => validatorService.remove(validator.id), {
-      busy: validator.id,
+      busy: `delete:${validator.id}`,
+      confirm: deleteConfirm(validator, nameOf('validator_modes', validator.mode)),
       errorTitle: 'No se pudo eliminar el validador',
       success: ['Validador eliminado', 'Su cuenta se eliminó; la bitácora de sus identificaciones se conserva.'],
       onSuccess: list.retry,
-      onSettled: close,
     });
 
   const addButton = (
@@ -123,13 +171,23 @@ export function ValidatorsPage() {
                       size="sm"
                       variant={validator.active ? 'ghost' : 'secondary'}
                       icon={validator.active ? <PowerOff size={16} /> : <Power size={16} />}
-                      loading={busy === validator.id && !confirm}
+                      loading={busy === `status:${validator.id}`}
                       disabled={busy !== null}
-                      onClick={() => (validator.active ? setConfirm({ kind: 'deactivate', validator }) : void setActive(validator, true))}
+                      onClick={() => void toggle(validator)}
                     >
                       {validator.active ? 'Desactivar' : 'Activar'}
                     </Button>
-                    <Button size="sm" variant="ghost" iconOnly icon={<Trash2 size={16} />} title="Eliminar" aria-label={`Eliminar ${validator.name}`} disabled={busy !== null} onClick={() => setConfirm({ kind: 'delete', validator })} />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      iconOnly
+                      icon={<Trash2 size={16} />}
+                      title="Eliminar"
+                      aria-label={`Eliminar ${validator.name}`}
+                      loading={busy === `delete:${validator.id}`}
+                      disabled={busy !== null}
+                      onClick={() => void remove(validator)}
+                    />
                   </span>
                 </li>
               ))}
@@ -146,27 +204,6 @@ export function ValidatorsPage() {
           </p>
         </PanelFooter>
       </Panel>
-
-      <ConfirmDialog
-        open={confirm?.kind === 'deactivate'}
-        title="Desactivar validador"
-        message={confirm ? `${confirm.validator.name} dejará de identificar empleados y su sesión se cerrará de inmediato.` : ''}
-        confirmLabel="Desactivar"
-        tone="danger"
-        loading={busy !== null}
-        onCancel={close}
-        onConfirm={() => confirm && void setActive(confirm.validator, false)}
-      />
-      <ConfirmDialog
-        open={confirm?.kind === 'delete'}
-        title="Eliminar validador"
-        message={confirm ? `Se eliminará la cuenta de ${confirm.validator.name} (${confirm.validator.email}). La bitácora de sus identificaciones se conserva.` : ''}
-        confirmLabel="Eliminar"
-        tone="danger"
-        loading={busy !== null}
-        onCancel={close}
-        onConfirm={() => confirm && void remove(confirm.validator)}
-      />
     </div>
   );
 }

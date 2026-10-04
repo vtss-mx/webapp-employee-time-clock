@@ -2,6 +2,7 @@ import { RefreshCw } from 'lucide-react';
 import { createContext, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MessageDialog, type MessageAction, type MessageInput } from '../components/MessageDialog';
 import { describeError, isHandledGlobally } from '../utils/errorPresentation';
+import { ConfirmProvider } from './ConfirmContext';
 
 export interface ErrorMessageOptions {
   /** Contexto de la acción ("No se pudo guardar"); por defecto, uno según el tipo de error. */
@@ -54,6 +55,8 @@ const textKey = (text: ReactNode) => (typeof text === 'string' || typeof text ==
  * información y éxito), uno a la vez, en cola y sin duplicados. La aplicación no usa toasts.
  * Cada popup se personaliza con `MessageInput`: variante, ícono, etiqueta, detalles (viñetas,
  * pasos o palomitas), contenido propio, acciones, nota al pie y si se puede cerrar.
+ * Monta también las confirmaciones de crear, editar y eliminar (`ConfirmProvider`, `useConfirm`):
+ * una sola instancia junto a los mensajes, en la app y en cada prueba que tenga mensajes.
  */
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
@@ -149,7 +152,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
 
   return (
     <FeedbackContext.Provider value={api}>
-      {children}
+      <ConfirmProvider notify={show}>{children}</ConfirmProvider>
       {current && (
         <MessageDialog
           key={current.id} // cada mensaje se monta de nuevo: foco en su acción principal

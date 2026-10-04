@@ -1,7 +1,7 @@
 import { config } from '../../utils/config';
 import { apiRequest } from '../apiClient';
 
-/** Reto de prueba de vida respondido: su id y una captura con la cabeza girada por cada giro, en orden. */
+/** Reto de prueba de vida respondido: su id y una captura por cada movimiento, en orden. */
 export interface FaceChallengeCapture {
   id: string;
   images: Blob[];
@@ -11,18 +11,24 @@ export interface FaceChallengeCapture {
 export interface FaceCaptures {
   frontal: Blob[];
   challenge?: FaceChallengeCapture;
+  /** Una captura por cada color del destello del reto, en el orden en que se pintaron. */
+  flash?: Blob[];
   /** Nombre de la cámara usada (el backend rechaza las cámaras virtuales). */
   camera?: string;
 }
 
-/** Multipart con las capturas frontales, las del reto (una por giro) y el nombre de la cámara. */
-export function buildFaceForm({ frontal, challenge, camera }: FaceCaptures, extra: Record<string, string> = {}): FormData {
+/**
+ * Multipart con las capturas frontales, las del reto (una por movimiento), las del destello (una por
+ * color; el orden importa: el servidor compara cada una con el color que se pintó) y la cámara.
+ */
+export function buildFaceForm({ frontal, challenge, flash = [], camera }: FaceCaptures, extra: Record<string, string> = {}): FormData {
   const form = new FormData();
   Object.entries(extra).forEach(([key, value]) => form.append(key, value));
   frontal.forEach((image, i) => form.append('images', image, `frontal-${i + 1}.jpg`));
   if (challenge) {
     form.append('challenge_id', challenge.id);
     challenge.images.forEach((image, i) => form.append('challenge_image', image, `challenge-${i + 1}.jpg`));
+    flash.forEach((image, i) => form.append('flash_image', image, `flash-${i + 1}.jpg`));
   }
   if (camera) form.append('camera_label', camera.slice(0, 200));
   return form;

@@ -1,6 +1,21 @@
-import type { CompanyAdmin, CompanyAdminList, CompanyDetail, CompanyEmployee, CompanyEmployeeList, CompanyFormValues, CompanyList, CompanyListParams, PageQuery, PlatformStats } from '../types';
+import type {
+  CompanyAdmin,
+  CompanyAdminList,
+  CompanyDetail,
+  CompanyEmployee,
+  CompanyEmployeeList,
+  CompanyFormValues,
+  CompanyList,
+  CompanyListParams,
+  FaceLearningSummary,
+  PageQuery,
+  PlatformStats,
+  VerificationPolicy,
+  VerificationPolicyUpdate,
+} from '../types';
 import { hasKeys, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
+import { isPolicy } from './settingsService';
 
 const isDetail = hasKeys<CompanyDetail>('id', 'name', 'active', 'employee_count');
 const isAdmin = hasKeys<CompanyAdmin>('id', 'email', 'active');
@@ -66,9 +81,32 @@ export const adminService = {
     return apiRequest<CompanyAdminList>(`/admin/companies/${id}/admins`, { query: { ...query }, signal, validate: isPage(isAdmin) });
   },
 
+  /** Política de verificación de identidad de la empresa: la configura el ADMIN (la empresa solo la lee). */
+  policy(id: number, signal?: AbortSignal): Promise<VerificationPolicy> {
+    return apiRequest<VerificationPolicy>(`/admin/companies/${id}/verification-policy`, { signal, validate: isPolicy });
+  },
+
+  /** Actualización parcial (solo los campos enviados); aplica en segundos a toda la empresa. */
+  updatePolicy(id: number, changes: VerificationPolicyUpdate): Promise<VerificationPolicy> {
+    return apiRequest<VerificationPolicy>(`/admin/companies/${id}/verification-policy`, { method: 'PUT', body: changes, validate: isPolicy });
+  },
+
   /** Empleados de la empresa, paginados y de solo lectura (su ficha de trabajo, sin biometría). */
   employees(id: number, query: CompanyListParams, signal?: AbortSignal): Promise<CompanyEmployeeList> {
     return apiRequest<CompanyEmployeeList>(`/admin/companies/${id}/employees`, { query: { ...query }, signal, validate: isPage(isEmployee) });
+  },
+
+  /** Cómo evoluciona el reconocimiento facial de la empresa (solo el ADMIN lo ve y lo administra). */
+  faceLearning(id: number, signal?: AbortSignal): Promise<FaceLearningSummary> {
+    return apiRequest<FaceLearningSummary>(`/admin/companies/${id}/face-learning`, {
+      signal,
+      validate: hasKeys<FaceLearningSummary>('enabled', 'employees_learning', 'learned_samples'),
+    });
+  },
+
+  /** Olvida lo que el reconocimiento aprendió de un empleado: vuelve a su registro aprobado. */
+  forgetLearnedFace(id: number, employeeId: number): Promise<CompanyEmployee> {
+    return apiRequest<CompanyEmployee>(`/admin/companies/${id}/employees/${employeeId}/face/learned`, { method: 'DELETE', validate: isEmployee });
   },
 
   admin(id: number, userId: number, signal?: AbortSignal): Promise<CompanyAdmin> {

@@ -1,10 +1,12 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { AuthContext, type AuthContextValue } from '../../context/AuthContext';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
-import { renderWithProviders } from '../../test/render';
-import type { Employee } from '../../types';
+import { renderWithProviders, sampleUser } from '../../test/render';
+import { withScreens } from '../../test/screens';
+import type { Employee, User } from '../../types';
 import { EmployeeDetailPage } from './EmployeeDetailPage';
 
 const employee: Employee = {
@@ -27,8 +29,6 @@ const employee: Employee = {
   latest_enrollment_id: 3,
   has_face: true,
   face_samples: 5,
-  face_learned_samples: 2,
-  face_last_learned_at: '2026-10-01T10:00:00Z',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-10-01T10:00:00Z',
 };
@@ -40,52 +40,51 @@ function serve(current: () => Employee, handle?: (call: MockCall) => Response | 
     if (custom) return custom;
     if (call.url.includes('/qr')) return apiOk({ live: false, live_until: null, last_issued_at: null, last_used_at: null });
     if (call.url.includes('/verifications')) return apiOk({ items: [], total: 0, page: 1, size: 10 });
-    if (call.init.method === 'DELETE') return apiOk({ ...current(), face_samples: 3, face_learned_samples: 0, face_last_learned_at: null });
     return apiOk(current());
   });
 }
 
-function renderDetail() {
+/** Usuario de la empresa con las pantallas que le da el backend (incluye Turnos). */
+const companyUser = withScreens({ ...sampleUser, role: 'COMPANY', employee: null });
+
+/** Sesión ya iniciada con ese usuario (las pantallas que puede ver vienen del backend). */
+function session(user: User | null): AuthContextValue {
+  return {
+    user,
+    status: user ? 'authenticated' : 'anonymous',
+    isAuthenticated: Boolean(user),
+    logoutReason: null,
+    deviceBlock: null,
+    dismissDeviceBlock: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+    logoutEverywhere: vi.fn(),
+    refreshUser: vi.fn(),
+    selectCompany: vi.fn(),
+    updatePreferences: vi.fn(),
+  };
+}
+
+function renderDetail(user: User | null = companyUser) {
   return renderWithProviders(
-    <Routes>
-      <Route path="/company/employees/:id" element={<EmployeeDetailPage />} />
-      <Route path="/company/employees" element={<p>Listado de empleados</p>} />
-    </Routes>,
+    <AuthContext.Provider value={session(user)}>
+      <Routes>
+        <Route path="/company/employees/:id" element={<EmployeeDetailPage />} />
+        <Route path="/company/employees/:id/face/enroll" element={<p>Cámara de registro</p>} />
+        <Route path="/company/employees" element={<p>Listado de empleados</p>} />
+      </Routes>
+    </AuthContext.Provider>,
     { route: '/company/employees/7' },
   );
 }
 
-describe('EmployeeDetailPage: aprendizaje continuo del rostro', () => {
-  it('muestra lo aprendido y lo olvida con confirmación (el registro aprobado se queda)', async () => {
-    let current = employee;
-    const { calls } = serve(() => current);
-    renderDetail();
-    expect(await screen.findByText(/2 muestras aprendidas de sus identificaciones seguras/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Olvidar lo aprendido' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Olvidar lo aprendido' });
-    expect(within(dialog).getByText(/no tendrá que registrarse de nuevo/)).toBeInTheDocument();
-    current = { ...employee, face_samples: 3, face_learned_samples: 0, face_last_learned_at: null };
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Olvidar lo aprendido' }));
-
-    expect(await screen.findByText('Aprendizaje reiniciado')).toBeInTheDocument();
-    expect(calls.find((c) => c.init.method === 'DELETE')?.url).toBe('/api/employees/7/face/learned');
-    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
-    await waitFor(() => expect(screen.getByText(/aprenderá de sus identificaciones seguras/)).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'Olvidar lo aprendido' })).not.toBeInTheDocument();
-  });
-
-  it('una sola muestra se dice en singular; sin rostro aprobado no se muestra el aprendizaje', async () => {
-    let current: Employee = { ...employee, face_learned_samples: 1 };
-    serve(() => current);
-    const { unmount } = renderDetail();
-    expect(await screen.findByText(/1 muestra aprendida de sus identificaciones/)).toBeInTheDocument();
-    unmount();
-
-    current = { ...employee, face_status: 'PENDING_REVIEW', face_learned_samples: 0 };
+describe('EmployeeDetailPage: sin aprendizaje automático', () => {
+  it('la empresa no ve ni administra lo que aprende el reconocimiento (lo hace el ADMIN)', async () => {
+    serve(() => employee);
     renderDetail();
     expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
     expect(screen.queryByText(/Aprendizaje continuo/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Olvidar lo aprendido' })).not.toBeInTheDocument();
   });
 });
 
@@ -111,7 +110,7 @@ describe('EmployeeDetailPage: expediente', () => {
     expect(screen.getByText(/Exento de retirar prenda de cabeza/)).toBeInTheDocument();
     // Rechazado: se registra en persona (acción principal), se consulta su validación y se puede pedir otra.
     expect(screen.queryByRole('link', { name: 'Verificar identidad' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Registrar rostro en persona' })).toHaveAttribute('href', '/company/employees/7/face/enroll');
+    expect(screen.getByRole('button', { name: 'Registrar rostro en persona' })).toHaveClass('btn--primary');
     expect(screen.getByRole('link', { name: 'Ver validación' })).toHaveAttribute('href', '/company/validations/3');
     expect(screen.getByRole('link', { name: 'Solicitar nueva verificación' })).toHaveAttribute('href', '/company/employees/7/reverify');
   });
@@ -119,7 +118,7 @@ describe('EmployeeDetailPage: expediente', () => {
   it('sin registro facial ni departamento: solo ofrece registrarlo en persona', async () => {
     serve(() => ({ ...employee, face_status: 'NOT_ENROLLED', latest_enrollment_id: null, rfc: null, department_id: null, department_name: null, managed_departments: [] }));
     renderDetail();
-    expect(await screen.findByRole('link', { name: 'Registrar rostro en persona' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Registrar rostro en persona' })).toBeInTheDocument();
     expect(screen.getByText('Sin departamento')).toBeInTheDocument();
     expect(screen.queryByText('Responsable de')).toBeNull();
     expect(screen.getAllByText('Sin capturar')).toHaveLength(4); // RFC, CURP, NSS y teléfono
@@ -139,27 +138,28 @@ describe('EmployeeDetailPage: expediente', () => {
     );
     renderDetail();
     expect(await screen.findByRole('link', { name: 'Verificar identidad' })).toHaveAttribute('href', '/company/employees/7/face/verify');
-    expect(screen.getByRole('link', { name: 'Registrar de nuevo en persona' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar de nuevo en persona' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Desactivar empleado' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'Desactivar empleado' })).getByRole('button', { name: 'Cancelar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Desactivar a Ana Ruiz?' })).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(calls.some((c) => c.init.method === 'PATCH')).toBe(false);
 
     await userEvent.click(screen.getByRole('button', { name: 'Desactivar empleado' }));
-    const deactivate = await screen.findByRole('alertdialog', { name: 'Desactivar empleado' });
+    const deactivate = await screen.findByRole('alertdialog', { name: '¿Desactivar a Ana Ruiz?' });
     expect(deactivate).toHaveTextContent('Su sesión actual se cerrará');
+    expect(within(deactivate).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: ActivoDespués: Inactivo');
     await userEvent.click(within(deactivate).getByRole('button', { name: 'Desactivar' }));
     expect(await screen.findByText('Empleado desactivado')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     // Inactivo: sin acciones en persona.
     expect(await screen.findByRole('button', { name: 'Activar empleado' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Verificar identidad' })).toBeNull();
-    expect(screen.queryByRole('link', { name: /en persona/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /en persona/ })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Activar empleado' }));
-    const activate = await screen.findByRole('dialog', { name: 'Activar empleado' });
-    expect(activate).toHaveTextContent('podrá volver a iniciar sesión');
+    const activate = await screen.findByRole('dialog', { name: '¿Activar a Ana Ruiz?' });
+    expect(activate).toHaveTextContent('Podrá volver a iniciar sesión');
     await userEvent.click(within(activate).getByRole('button', { name: 'Activar' }));
     expect(await screen.findByText('Empleado activado')).toBeInTheDocument();
     expect(calls.filter((c) => c.init.method === 'PATCH').map((c) => JSON.parse(c.init.body as string) as unknown)).toEqual([{ active: false }, { active: true }]);
@@ -176,16 +176,28 @@ describe('EmployeeDetailPage: expediente', () => {
       },
     );
     renderDetail();
-    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar definitivamente' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Eliminar empleado' });
-    expect(dialog).toHaveTextContent('Esta acción no se puede deshacer');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Eliminar definitivamente' }));
+    /** Pide eliminar y escribe su número de empleado para habilitar el botón. */
+    const confirmDelete = async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }));
+      const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar a Ana Ruiz?' });
+      const button = within(dialog).getByRole('button', { name: 'Eliminar definitivamente' });
+      expect(button).toBeDisabled();
+      await userEvent.type(within(dialog).getByLabelText('Escribe «EMP-7» para confirmar'), 'EMP-7');
+      return { dialog, button };
+    };
+    await screen.findByRole('heading', { name: 'Ana Ruiz' });
+    const first = await confirmDelete();
+    expect(first.dialog).toHaveTextContent('Esta acción no se puede deshacer');
+    expect(first.dialog).toHaveTextContent('Correoana@empresa.com');
+    await userEvent.click(within(first.dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false); // cancelar no envía nada
+
+    await userEvent.click((await confirmDelete()).button);
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo eliminar' })).toHaveTextContent('No se puede eliminar en este momento');
-    expect(screen.queryByRole('alertdialog', { name: 'Eliminar empleado' })).toBeNull(); // la confirmación se cerró
+    expect(screen.queryByRole('alertdialog', { name: '¿Eliminar a Ana Ruiz?' })).toBeNull(); // la confirmación se cerró
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'Eliminar empleado' })).getByRole('button', { name: 'Eliminar definitivamente' }));
+    await userEvent.click((await confirmDelete()).button);
     expect(await screen.findByText('Listado de empleados')).toBeInTheDocument();
     expect(await screen.findByText('Empleado eliminado')).toBeInTheDocument();
     expect(calls.filter((c) => c.init.method === 'DELETE').map((c) => c.url)).toEqual(['/api/employees/7', '/api/employees/7']);
@@ -207,5 +219,53 @@ describe('EmployeeDetailPage: expediente', () => {
     expect(screen.getByRole('heading', { name: 'Empleado' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Volver a cargar' }));
     expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
+  });
+});
+
+describe('EmployeeDetailPage: registro en persona', () => {
+  it('pregunta antes de abrir la cámara: cancelar se queda; confirmar abre el registro', async () => {
+    serve(() => employee);
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Registrar de nuevo en persona' }));
+    const dialog = await screen.findByRole('dialog', { name: '¿Registrar el rostro de Ana Ruiz?' });
+    expect(dialog).toHaveTextContent('Su registro facial actual se reemplazará por el nuevo.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.getByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar de nuevo en persona' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Registrar el rostro de Ana Ruiz?' })).getByRole('button', { name: 'Abrir cámara' }));
+    expect(await screen.findByText('Cámara de registro')).toBeInTheDocument();
+  });
+
+  it('sin registro previo no avisa que se reemplazará', async () => {
+    serve(() => ({ ...employee, face_status: 'NOT_ENROLLED', latest_enrollment_id: null }));
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Registrar rostro en persona' }));
+    expect(await screen.findByRole('dialog', { name: '¿Registrar el rostro de Ana Ruiz?' })).not.toHaveTextContent('se reemplazará');
+  });
+});
+
+describe('EmployeeDetailPage: turnos', () => {
+  it('con la pantalla de Turnos lleva a los turnos del empleado', async () => {
+    serve(() => employee);
+    renderDetail();
+    expect(await screen.findByRole('link', { name: 'Turnos' })).toHaveAttribute('href', '/company/shifts/employees/7');
+  });
+
+  it('con su registro por validar, la acción principal es validarlo', async () => {
+    serve(() => ({ ...employee, face_status: 'PENDING_REVIEW' }));
+    renderDetail();
+    expect(await screen.findByRole('link', { name: 'Validar identidad' })).toHaveClass('btn--primary');
+  });
+
+  it('sin esa pantalla (o sin sesión) no muestra el enlace: lo decide el backend', async () => {
+    serve(() => employee);
+    const { unmount } = renderDetail({ ...companyUser, screens: companyUser.screens.filter((s) => s.code !== 'COMPANY_SHIFTS') });
+    expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Turnos' })).toBeNull();
+    unmount();
+    renderDetail(null);
+    expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Turnos' })).toBeNull();
   });
 });

@@ -28,6 +28,11 @@ function claimReload(now: number): boolean {
   return historyState()[RELOAD_MARK] === now;
 }
 
+/** Un módulo de la aplicación no se pudo descargar: una versión nueva publicada o la red (no es una falla de la app). */
+export function isChunkLoadError(error: Error): boolean {
+  return /Loading chunk|dynamically imported module|Importing a module script failed/i.test(error.message);
+}
+
 /**
  * Un módulo de la aplicación no se pudo descargar (pantalla, detector facial, generador de QR...).
  * Solo si ya se publicó una versión nueva (los archivos de esta ya no existen en el servidor) se

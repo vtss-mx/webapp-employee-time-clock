@@ -11,7 +11,7 @@ describe('FaceGuide: visor del escáner facial', () => {
     const tones = (list: FaceGuidance[]) => list.map(guidanceTone);
     expect(tones(['hold_still', 'ready'])).toEqual(['ok', 'ok']);
     expect(tones(['no_face', 'loading'])).toEqual(['idle', 'idle']);
-    expect(tones(['multiple', 'too_far', 'too_close', 'off_center', 'look_straight', 'too_dark', 'too_bright', 'turn'])).toEqual(Array(8).fill('warn'));
+    expect(tones(['multiple', 'too_far', 'too_close', 'off_center', 'look_straight', 'too_dark', 'too_bright', 'move'])).toEqual(Array(8).fill('warn'));
   });
 
   it('el anillo se llena con el avance y el mensaje se anuncia a lectores de pantalla', () => {

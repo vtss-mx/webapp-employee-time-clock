@@ -1,6 +1,7 @@
 import type { Detection, FaceDetector } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState } from 'react';
 import { config } from '../utils/config';
+import { actionMeasure, actionTarget, averageSample, confidentFaces, faceSample, moveProgress, yawRatio, type ActionMode, type FaceBaseline } from '../utils/facePose';
 
 /**
  * Detección facial en el navegador (MediaPipe BlazeFace, WASM/CPU) para guiar al usuario
@@ -17,7 +18,7 @@ export type FaceGuidance =
   | 'look_straight'
   | 'too_dark'
   | 'too_bright'
-  | 'turn'
+  | 'move'
   | 'hold_still'
   | 'ready';
 
@@ -31,18 +32,17 @@ export const FACE_GUIDANCE_MESSAGES: Record<FaceGuidance, string> = {
   look_straight: 'Mira directamente a la cámara',
   too_dark: 'Hay poca luz. Busca un lugar más iluminado',
   too_bright: 'Hay demasiada luz. Evita la luz directa',
-  turn: 'Gira la cabeza como se indica',
+  move: 'Haz el movimiento que se indica',
   hold_still: 'Rostro detectado. Mantente quieto...',
   ready: 'Rostro detectado',
 };
 
 /**
- * - frontal: rostro de frente (registro y primera fase de verificación).
- * - turn: prueba de vida; la cabeza debe girar hacia `direction` (punto de vista de la persona).
+ * - frontal: rostro de frente (registro, primera fase de verificación y regreso al frente).
+ * - action: un movimiento de la prueba de vida (girar, mirar arriba o abajo, acercarse; punto de
+ *   vista de la persona) hasta el mínimo del servidor más el margen de la app (`utils/facePose`).
  */
-export type DetectionMode =
-  | { kind: 'frontal' }
-  | { kind: 'turn'; direction: 'TURN_LEFT' | 'TURN_RIGHT'; minYawRatio: number };
+export type DetectionMode = { kind: 'frontal' } | ActionMode;
 
 let detectorPromise: Promise<FaceDetector> | null = null;
 
@@ -116,76 +116,70 @@ function faceLuminance(video: HTMLVideoElement, box: Box) {
   return sum / (data.length / 4);
 }
 
-/**
- * Misma métrica que el backend: desplazamiento horizontal de la nariz respecto al punto
- * medio de los ojos / distancia entre ojos, en la imagen original (sin espejo).
- * Positivo = la persona gira hacia SU izquierda.
- */
-export function yawRatio(detection: Detection, video: HTMLVideoElement): number | null {
-  const kp = detection.keypoints;
-  if (!kp || kp.length < 3) return null;
-  const w = video.videoWidth;
-  const h = video.videoHeight;
-  const [a, b] = [kp[0], kp[1]].sort((p, q) => p.x - q.x);
-  const midX = ((a.x + b.x) / 2) * w;
-  const dist = Math.hypot((b.x - a.x) * w, (b.y - a.y) * h);
-  return dist > 1 ? (kp[2].x * w - midX) / dist : null;
-}
+/** Tamaño máximo del rostro en el cuadro; al acercarse se permite más (sin salirse del cuadro). */
+const MAX_FACE_SIZE = 0.8;
+const MAX_CLOSER_FACE_SIZE = 0.95;
 
-function evaluate(detections: Detection[], video: HTMLVideoElement, mode: DetectionMode): FaceGuidance {
-  const boxes = detections
-    .filter((d) => (d.categories?.[0]?.score ?? 0) >= config.faceDetectionMinScore)
-    .map((d) => ({ face: d, box: d.boundingBox }))
-    .filter((d): d is { face: Detection; box: NonNullable<Detection['boundingBox']> } => d.box !== undefined);
-  if (boxes.length === 0) return 'no_face';
-  if (boxes.length > 1) return 'multiple';
-
-  const { face, box } = boxes[0];
+/** Encuadre: distancia y centrado (al moverse se tolera más el descentrado). null si está bien. */
+function framingProblem(box: Box, video: HTMLVideoElement, mode: DetectionMode): Exclude<FaceGuidance, 'hold_still'> | null {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   const size = Math.max(box.width / vw, box.height / vh);
   if (size < 0.18) return 'too_far';
-  if (size > 0.8) return 'too_close';
-
+  const closer = mode.kind === 'action' && mode.action === 'MOVE_CLOSER';
+  if (size > (closer ? MAX_CLOSER_FACE_SIZE : MAX_FACE_SIZE)) return 'too_close';
   const cx = (box.originX + box.width / 2) / vw;
   const cy = (box.originY + box.height / 2) / vh;
-  const tolerance = mode.kind === 'turn' ? 0.3 : 0.22;
+  const tolerance = mode.kind === 'action' ? 0.3 : 0.22;
   if (Math.abs(cx - 0.5) > tolerance || Math.abs(cy - 0.5) > 0.25) return 'off_center';
+  return null;
+}
 
-  const yaw = yawRatio(face, video);
-  if (mode.kind === 'frontal') {
-    if (yaw !== null && Math.abs(yaw) > MAX_FRONTAL_YAW) return 'look_straight';
-  } else {
-    const sign = mode.direction === 'TURN_LEFT' ? 1 : -1;
-    if (yaw === null || sign * yaw < mode.minYawRatio + config.faceTurnMargin) return 'turn';
-    return 'hold_still';
+/** Guía del cuadro y, si el rostro está listo, lo que se mide de él (rostro en reposo). */
+type Evaluation = { guidance: 'hold_still'; sample: FaceBaseline } | { guidance: Exclude<FaceGuidance, 'hold_still'> };
+
+function evaluate(detections: Detection[], video: HTMLVideoElement, mode: DetectionMode): Evaluation {
+  const boxes = confidentFaces(detections)
+    .map((d) => ({ face: d, box: d.boundingBox }))
+    .filter((d): d is { face: Detection; box: NonNullable<Detection['boundingBox']> } => d.box !== undefined);
+  if (boxes.length === 0) return { guidance: 'no_face' };
+  if (boxes.length > 1) return { guidance: 'multiple' };
+
+  const { face, box } = boxes[0];
+  const framing = framingProblem(box, video, mode);
+  if (framing) return { guidance: framing };
+  const sample = faceSample(face, box, video);
+
+  if (mode.kind === 'action') {
+    const measure = actionMeasure(face, video, mode);
+    return measure !== null && measure >= actionTarget(mode) ? { guidance: 'hold_still', sample } : { guidance: 'move' };
   }
+  const yaw = yawRatio(face, video);
+  if (yaw !== null && Math.abs(yaw) > MAX_FRONTAL_YAW) return { guidance: 'look_straight' };
 
   const luminance = faceLuminance(video, box);
-  if (luminance < 45) return 'too_dark';
-  if (luminance > 220) return 'too_bright';
-  return 'hold_still';
+  if (luminance < 45) return { guidance: 'too_dark' };
+  if (luminance > 220) return { guidance: 'too_bright' };
+  return { guidance: 'hold_still', sample };
 }
 
 /**
- * Avance del giro (0..1) hacia lo que exige el reto: alimenta la barra y el anillo para que la
- * persona sepa cuánto le falta. null si no hay un único rostro que medir.
+ * Durante un movimiento el detector del navegador puede perder el rostro un instante (de perfil, muy
+ * cerca o mirando hacia abajo): esas lecturas no reinician el avance mientras no sean más de estas
+ * seguidas.
  */
-export function turnProgress(detections: Detection[], video: HTMLVideoElement, mode: DetectionMode): number | null {
-  if (mode.kind !== 'turn') return null;
-  const faces = detections.filter((d) => (d.categories?.[0]?.score ?? 0) >= config.faceDetectionMinScore);
-  if (faces.length !== 1) return null;
-  const yaw = yawRatio(faces[0], video);
-  if (yaw === null) return null;
-  const sign = mode.direction === 'TURN_LEFT' ? 1 : -1;
-  return Math.max(0, Math.min(1, (sign * yaw) / (mode.minYawRatio + config.faceTurnMargin)));
-}
+const MOVE_MISSES_TOLERATED = 3;
 
-/**
- * Durante el giro el detector del navegador puede perder el rostro un instante (perfil): esas
- * lecturas no reinician el avance mientras no sean más de estas seguidas.
- */
-const TURN_MISSES_TOLERATED = 3;
+/** Lo que el detector ve en un cuadro (null si aún no hay imagen o el detector falló en él). */
+function readFrame(detector: FaceDetector, video: HTMLVideoElement | null, now: number, mode: DetectionMode): (Evaluation & { moved: number | null }) | null {
+  if (!video || video.readyState < 2 || !video.videoWidth) return null;
+  try {
+    const { detections } = detector.detectForVideo(video, now);
+    return { ...evaluate(detections, video, mode), moved: mode.kind === 'action' ? moveProgress(detections, video, mode) : null };
+  } catch {
+    return null;
+  }
+}
 
 interface AutoCaptureOptions {
   detector: FaceDetector | null;
@@ -195,11 +189,20 @@ interface AutoCaptureOptions {
   mode?: DetectionMode;
   /** Frames consecutivos válidos antes de disparar onStable (~110 ms cada uno). */
   stableFrames?: number;
-  /** Se invoca una vez cuando hay un único rostro estable que cumple el modo. */
-  onStable?: () => void | Promise<void>;
+  /**
+   * Se invoca una vez cuando hay un único rostro estable que cumple el modo, con el promedio de lo
+   * medido en esos cuadros (de frente: el rostro en reposo contra el que se miden los movimientos).
+   */
+  onStable?: (sample?: FaceBaseline) => void | Promise<void>;
 }
 
 const FRONTAL: DetectionMode = { kind: 'frontal' };
+
+/** Identidad del modo: el ciclo de detección se reinicia solo cuando cambia lo que se pide. */
+function modeKey(mode: DetectionMode): string {
+  if (mode.kind === 'frontal') return 'frontal';
+  return `${mode.action}:${mode.minimum}:${mode.baseline?.pitch}:${mode.baseline?.width}`;
+}
 
 export function useFaceAutoCapture({
   detector,
@@ -212,11 +215,11 @@ export function useFaceAutoCapture({
   const [guidance, setGuidance] = useState<FaceGuidance>('loading');
   /** 0..1: avance hacia la captura automática (rostro estable). Alimenta el anillo de progreso. */
   const [progress, setProgress] = useState(0);
-  /** 0..1: cuánto ha girado la cabeza respecto a lo que pide el reto (solo en modo turn). */
-  const [turn, setTurn] = useState(0);
+  /** 0..1: cuánto se ha movido la cabeza respecto a lo que pide el reto (solo en un movimiento). */
+  const [move, setMove] = useState(0);
   const onStableRef = useRef(onStable);
   onStableRef.current = onStable;
-  const modeKey = mode.kind === 'frontal' ? 'frontal' : `${mode.direction}:${mode.minYawRatio}`;
+  const key = modeKey(mode);
 
   useEffect(() => {
     if (!enabled || !detector) return;
@@ -225,44 +228,40 @@ export function useFaceAutoCapture({
     let stable = 0;
     let misses = 0;
     let fired = false;
-    setGuidance(mode.kind === 'turn' ? 'turn' : 'no_face');
+    let samples: FaceBaseline[] = [];
+    const moving = mode.kind === 'action';
+    setGuidance(moving ? 'move' : 'no_face');
     setProgress(0);
-    setTurn(0);
+    setMove(0);
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       if (now - last < config.faceDetectionIntervalMs || fired) return;
       last = now;
-      const video = videoRef.current;
-      if (!video || video.readyState < 2 || !video.videoWidth) return;
+      const reading = readFrame(detector, videoRef.current, now, mode);
+      if (!reading) return;
+      const { moved } = reading;
+      if (moved !== null) setMove((prev) => (Math.abs(prev - moved) < 0.02 ? prev : moved));
 
-      let next: FaceGuidance;
-      let turned: number | null = null;
-      try {
-        const { detections } = detector.detectForVideo(video, now);
-        next = evaluate(detections, video, mode);
-        turned = turnProgress(detections, video, mode);
-      } catch {
-        return;
-      }
-      if (turned !== null) setTurn((prev) => (Math.abs(prev - turned) < 0.02 ? prev : turned));
-
-      // Giro: un rostro perdido un instante no borra lo avanzado (se conserva la guía anterior).
-      if (mode.kind === 'turn' && next === 'no_face' && misses < TURN_MISSES_TOLERATED) {
+      // Movimiento: un rostro perdido un instante no borra lo avanzado (se conserva la guía anterior).
+      if (moving && reading.guidance === 'no_face' && misses < MOVE_MISSES_TOLERATED) {
         misses++;
         return;
       }
       misses = 0;
 
-      if (next === 'hold_still') {
+      let next: FaceGuidance = reading.guidance;
+      if (reading.guidance === 'hold_still') {
         stable++;
+        samples.push(reading.sample);
         if (stable >= stableFrames && onStableRef.current) {
           fired = true;
           next = 'ready';
-          void onStableRef.current();
+          void onStableRef.current(averageSample(samples));
         }
       } else {
         stable = 0;
+        samples = [];
       }
       const ratio = Math.min(1, stable / stableFrames);
       setProgress((prev) => (prev === ratio ? prev : ratio));
@@ -271,9 +270,9 @@ export function useFaceAutoCapture({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-    // `mode` se representa con modeKey para no reiniciar el ciclo en cada render.
+    // `mode` se representa con su clave para no reiniciar el ciclo en cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detector, enabled, videoRef, modeKey, stableFrames]);
+  }, [detector, enabled, videoRef, key, stableFrames]);
 
-  return { guidance, progress, turnProgress: turn };
+  return { guidance, progress, moveProgress: move };
 }

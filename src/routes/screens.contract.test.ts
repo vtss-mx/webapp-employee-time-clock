@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SEED_GRANTS, SEED_SCREENS } from '../test/screens';
+import { SEED_GRANTS, SEED_MODULES, SEED_SCREENS } from '../test/screens';
 import { iconFor, SCREEN_VIEWS } from './screens';
 import { Circle } from 'lucide-react';
 
@@ -27,9 +27,14 @@ describe('pantallas: contrato con el backend', () => {
     const seed = JSON.parse(readFileSync(SEED_FILE, 'utf-8')) as {
       screens: Array<Record<string, unknown>>;
       role_screens: Array<{ role_code: string; screen_code: string }>;
+      menu_modules: Array<{ code: string; name: string; icon: string }>;
+      menu_module_screens: Array<{ screen_code: string; module_code: string }>;
     };
-    const pick = ({ code, name, short_name, path, icon, badge }: Record<string, unknown>) => ({ code, name, short_name, path, icon, badge });
+    const modules = Object.fromEntries(seed.menu_module_screens.map((link) => [link.screen_code, link.module_code]));
+    const pick = ({ code, name, short_name, path, icon, badge }: Record<string, unknown>) => ({ code, name, short_name, path, icon, badge, module: modules[code as string] });
     expect(SEED_SCREENS).toEqual(seed.screens.map(pick));
+    expect(SEED_MODULES).toEqual(seed.menu_modules.map(({ code, name, icon }) => ({ code, name, icon })));
+    for (const module of SEED_MODULES) expect(iconFor(module.icon), module.icon).not.toBe(Circle);
     const grants: Record<string, string[]> = {};
     for (const { role_code, screen_code } of seed.role_screens) (grants[role_code] ??= []).push(screen_code);
     expect(SEED_GRANTS).toEqual(grants);

@@ -3,8 +3,8 @@ import { settingsService } from '../services/settingsService';
 import type { VerificationPolicy, VerificationRules } from '../types';
 
 /**
- * Valores seguros mientras carga o si no hay red: se asume lo más estricto. Sin umbral de
- * confianza: solo lo evalúa el servidor y lo edita Configuración con la política cargada.
+ * Valores seguros mientras carga o si no hay red: se asume lo más estricto. Sin umbrales de
+ * confianza ni de calidad: solo los evalúa el servidor (los configura el ADMIN en la política).
  */
 export const STRICT_RULES: VerificationRules = {
   block_glasses: true,

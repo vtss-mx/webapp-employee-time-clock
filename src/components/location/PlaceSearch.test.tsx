@@ -2,23 +2,38 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GoogleMaps from '../../services/maps/googleMaps';
-import { MapsApiError, type FoundPlace, type PlaceSuggestion } from '../../services/maps/googleMaps';
+import { MapsApiError, type FoundPlace, type PlaceSuggestion, type SearchOptions } from '../../services/maps/googleMaps';
+import type { GeoPoint } from '../../utils/address';
+import type * as Geolocation from '../../utils/geolocation';
+import type { DeviceLocation } from '../../utils/geolocation';
 import { PlaceSearch } from './PlaceSearch';
 
 // Places de Google simulado (el SDK real se valida en navegador).
 const maps = vi.hoisted(() => ({
   newSearchSession: vi.fn<() => Promise<unknown>>(),
-  suggestPlaces: vi.fn<(input: string, token: unknown, country?: string) => Promise<PlaceSuggestion[]>>(),
+  suggestPlaces: vi.fn<(input: string, token: unknown, options?: SearchOptions) => Promise<PlaceSuggestion[]>>(),
   resolvePlace: vi.fn<(suggestion: PlaceSuggestion) => Promise<FoundPlace>>(),
 }));
 vi.mock('../../services/maps/googleMaps', async (importOriginal) => ({ ...(await importOriginal<typeof GoogleMaps>()), mapsService: maps }));
+// Ubicación que el dispositivo ya conoce (solo con el permiso ya dado; jsdom no la tiene).
+const device = vi.hoisted(() => ({ knownLocation: vi.fn<() => Promise<DeviceLocation | null>>() }));
+vi.mock('../../utils/geolocation', async (importOriginal) => ({ ...(await importOriginal<typeof Geolocation>()), knownLocation: device.knownLocation }));
 
-const suggestion = (id: string, primary: string, secondary = ''): PlaceSuggestion => ({ id, primary, secondary, prediction: {} as google.maps.places.PlacePrediction });
+const suggestion = (id: string, primary: string, secondary = '', distanceMeters: number | null = null): PlaceSuggestion => ({
+  id,
+  primary,
+  secondary,
+  distanceMeters,
+  prediction: {} as google.maps.places.PlacePrediction,
+});
 const PLAZA = suggestion('p1', 'Plaza Zaragoza', 'Centro, Hermosillo');
 const CATEDRAL = suggestion('p2', 'Catedral de Hermosillo', 'Centro');
 const PALIZA = suggestion('p3', 'Calle Dr. Paliza 71'); // sin zona
 const PLACE: FoundPlace = { point: { lat: 29.0729, lng: -110.9559 }, address: { street: 'Calle Dr. Paliza', city: 'Hermosillo' }, label: 'Plaza Zaragoza, Hermosillo' };
 const TOKEN = { session: 1 };
+const HERE: GeoPoint = { lat: 29.0729, lng: -110.9559 };
+/** Lo que se pide a Google sin punto de referencia. */
+const ANYWHERE = { country: undefined, near: null };
 
 /** Promesa que la prueba cumple o rechaza cuando quiere. */
 function deferred<T>() {
@@ -34,7 +49,7 @@ function deferred<T>() {
 /** Más que la pausa entre teclas: si iba a consultar, ya lo habría hecho. */
 const pastDebounce = () => new Promise((resolve) => setTimeout(resolve, 400));
 
-function renderSearch(props: { country?: string; disabled?: boolean } = {}) {
+function renderSearch(props: { country?: string; near?: GeoPoint | null; disabled?: boolean } = {}) {
   const onSelect = vi.fn<(place: FoundPlace) => void>();
   const onError = vi.fn<(error: MapsApiError) => void>();
   // Teclas que llegan a lo que contiene al buscador (p. ej. un popup que se cierra con Escape).
@@ -45,7 +60,13 @@ function renderSearch(props: { country?: string; disabled?: boolean } = {}) {
     </div>,
   );
   const input = screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' });
-  return { ...view, input, onSelect, onError, parentKeys };
+  const rerender = (next: { country?: string; near?: GeoPoint | null }) =>
+    view.rerender(
+      <div onKeyDown={(event) => parentKeys.push(event.key)}>
+        <PlaceSearch {...props} {...next} onSelect={onSelect} onError={onError} />
+      </div>,
+    );
+  return { ...view, input, onSelect, onError, parentKeys, rerender };
 }
 
 const list = () => screen.queryByRole('listbox', { name: 'Lugares encontrados' });
@@ -57,6 +78,7 @@ beforeEach(() => {
   maps.newSearchSession.mockReset().mockResolvedValue(TOKEN);
   maps.suggestPlaces.mockReset().mockResolvedValue([PLAZA, CATEDRAL, PALIZA]);
   maps.resolvePlace.mockReset().mockResolvedValue(PLACE);
+  device.knownLocation.mockReset().mockResolvedValue(null);
 });
 
 describe('PlaceSearch: sugerencias', () => {
@@ -75,7 +97,7 @@ describe('PlaceSearch: sugerencias', () => {
     const { input } = renderSearch({ country: 'MX' });
     await userEvent.type(input, 'Plaza');
     const listbox = await screen.findByRole('listbox', { name: 'Lugares encontrados' });
-    expect(maps.suggestPlaces).toHaveBeenCalledExactlyOnceWith('Plaza', TOKEN, 'MX');
+    expect(maps.suggestPlaces).toHaveBeenCalledExactlyOnceWith('Plaza', TOKEN, { country: 'MX', near: null });
     expect(within(listbox).getAllByRole('option')).toHaveLength(3);
     expect(option(/Plaza Zaragoza/)).toHaveTextContent('Plaza ZaragozaCentro, Hermosillo');
     expect(option(/Calle Dr\. Paliza 71/).querySelector('small')).toBeNull(); // sin zona no hay segunda línea
@@ -85,7 +107,7 @@ describe('PlaceSearch: sugerencias', () => {
     expect(input).toHaveAttribute('aria-activedescendant', option(/Plaza Zaragoza/).id);
 
     await userEvent.type(input, ' Z');
-    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Plaza Z', TOKEN, 'MX'));
+    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Plaza Z', TOKEN, { country: 'MX', near: null }));
     expect(maps.newSearchSession).toHaveBeenCalledTimes(1); // la misma sesión para toda la búsqueda
   });
 
@@ -93,7 +115,7 @@ describe('PlaceSearch: sugerencias', () => {
     const { input, onSelect } = renderSearch();
     await userEvent.type(input, 'Plaza');
     await screen.findByRole('listbox');
-    expect(maps.suggestPlaces).toHaveBeenCalledWith('Plaza', TOKEN, undefined);
+    expect(maps.suggestPlaces).toHaveBeenCalledWith('Plaza', TOKEN, ANYWHERE);
     expect(option(/Plaza Zaragoza/)).toHaveAttribute('aria-selected', 'true');
 
     await userEvent.keyboard('{ArrowDown}');
@@ -121,7 +143,7 @@ describe('PlaceSearch: sugerencias', () => {
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith(PLACE));
     await userEvent.clear(input);
     await userEvent.type(input, 'Catedral');
-    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Catedral', TOKEN, undefined));
+    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Catedral', TOKEN, ANYWHERE));
     expect(maps.newSearchSession).toHaveBeenCalledTimes(2);
   });
 
@@ -215,7 +237,7 @@ describe('PlaceSearch: respuestas tardías y fallas', () => {
     await userEvent.type(input, 'e');
     late.reject(new MapsApiError('places', 'denied'));
     expect(await screen.findByRole('listbox')).toBeInTheDocument();
-    expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Cate', TOKEN, undefined);
+    expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Cate', TOKEN, ANYWHERE);
     expect(onError).not.toHaveBeenCalled();
   });
 
@@ -293,5 +315,77 @@ describe('PlaceSearch: respuestas tardías y fallas', () => {
     pending.resolve(PLACE);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlaceSearch: los lugares más cercanos', () => {
+  it('con un punto de referencia pide los cercanos y muestra la distancia de cada uno', async () => {
+    maps.suggestPlaces.mockResolvedValue([suggestion('a', 'Oxxo Centro', 'Hermosillo', 350), suggestion('b', 'Oxxo Norte', 'Hermosillo', 1500), suggestion('c', 'Oxxo', '')]);
+    const { input } = renderSearch({ country: 'MX', near: HERE });
+    await userEvent.type(input, 'Oxxo');
+    await screen.findByRole('listbox');
+    expect(maps.suggestPlaces).toHaveBeenCalledExactlyOnceWith('Oxxo', TOKEN, { country: 'MX', near: HERE });
+    expect(option(/Oxxo Centro/)).toHaveTextContent('350 m');
+    expect(option(/Oxxo Norte/).querySelector('.place-search__distance')).toHaveTextContent('1.5 km');
+    expect(option(/^Oxxo$/).querySelector('.place-search__distance')).toBeNull(); // sin distancia conocida
+    expect(screen.getByText('Los más cercanos primero · Resultados de Google')).toBeInTheDocument();
+  });
+
+  it('mover la referencia (el mapa) no lanza otra búsqueda; la siguiente ya la usa', async () => {
+    const { input, rerender } = renderSearch({ near: HERE });
+    await userEvent.type(input, 'Plaza');
+    await screen.findByRole('listbox');
+    const moved = { lat: 19.4326, lng: -99.1332 };
+    rerender({ near: moved });
+    await pastDebounce();
+    expect(maps.suggestPlaces).toHaveBeenCalledTimes(1);
+    await userEvent.type(input, ' Z');
+    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Plaza Z', TOKEN, { country: undefined, near: moved }));
+  });
+
+  it('sin referencia usa la ubicación que el dispositivo ya conoce (se consulta una vez, al enfocar)', async () => {
+    device.knownLocation.mockResolvedValue({ latitude: 29.1, longitude: -110.9, accuracy: 40 });
+    const { input } = renderSearch();
+    expect(device.knownLocation).not.toHaveBeenCalled(); // nada se consulta hasta usar el buscador
+    await userEvent.click(input);
+    await userEvent.type(input, 'Plaza');
+    await screen.findByRole('listbox');
+    expect(maps.suggestPlaces).toHaveBeenCalledWith('Plaza', TOKEN, { country: undefined, near: { lat: 29.1, lng: -110.9 } });
+    await userEvent.click(document.body);
+    await userEvent.click(input);
+    expect(device.knownLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('el punto de referencia manda sobre la ubicación del dispositivo', async () => {
+    device.knownLocation.mockResolvedValue({ latitude: 1, longitude: 2, accuracy: 10 });
+    const { input } = renderSearch({ near: HERE });
+    await userEvent.click(input);
+    await userEvent.type(input, 'Plaza');
+    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenCalledWith('Plaza', TOKEN, { country: undefined, near: HERE }));
+  });
+});
+
+describe('PlaceSearch: solo cuenta lo último que se escribió', () => {
+  it('si se escribe más mientras se abre la sesión, no se pide a Google la búsqueda anterior', async () => {
+    const opening = deferred<unknown>();
+    maps.newSearchSession.mockReturnValueOnce(opening.promise);
+    const { input } = renderSearch();
+    await userEvent.type(input, 'Cat');
+    await waitFor(() => expect(maps.newSearchSession).toHaveBeenCalledTimes(1));
+    await userEvent.type(input, 'edral');
+    opening.resolve(TOKEN);
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+    expect(maps.suggestPlaces).toHaveBeenCalledExactlyOnceWith('Catedral', TOKEN, ANYWHERE);
+  });
+
+  it('borrar hasta menos de 3 letras mientras busca deja de indicar que busca', async () => {
+    maps.suggestPlaces.mockReturnValue(new Promise<never>(() => undefined));
+    const { input } = renderSearch();
+    await userEvent.type(input, 'Plaza');
+    await waitFor(() => expect(spinner()).toBeInTheDocument());
+    await userEvent.type(input, '{Backspace}{Backspace}{Backspace}');
+    expect(spinner()).toBeNull();
+    expect(clearButton()).toBeInTheDocument();
+    expect(list()).toBeNull();
   });
 });

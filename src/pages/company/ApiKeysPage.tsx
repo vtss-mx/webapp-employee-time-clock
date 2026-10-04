@@ -1,7 +1,5 @@
 import { Ban, Code2, KeyRound, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
 import { apiKeySecretMessage } from '../../components/integrations/apiKeySecret';
-import { ConfirmDialog } from '../../components/Modal';
 import { ApiKeyStatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { CopyField } from '../../components/ui/CopyField';
@@ -14,17 +12,56 @@ import { usePagedList } from '../../hooks/usePagedList';
 import { paths } from '../../routes/paths';
 import { apiKeyService } from '../../services/apiKeyService';
 import type { ApiKey } from '../../types';
+import type { ConfirmDetail, ConfirmInput } from '../../types/confirm';
 import { formatDate, formatDateTime, timeAgo } from '../../utils/format';
 
-type Pending = { kind: 'rotate' | 'revoke'; key: ApiKey } | null;
+type KeyAction = 'rotate' | 'revoke';
+/** Qué llave se está procesando y con qué botón (cada uno muestra su propio "ocupado"). */
+type Busy = `${KeyAction}:${number}`;
 
 /** Base de la API de integración (mismo dominio de la aplicación). */
 function integrationBaseUrl(origin = window.location.origin): string {
   return `${origin}/api/integrations/v1`;
 }
 
+/** La llave en la confirmación: cómo reconocerla, qué permite y si se está usando. */
+function keyDetails(key: ApiKey, scopeName: (scope: string) => string): ConfirmDetail[] {
+  return [
+    { label: 'Llave', value: `${key.prefix}…` },
+    { label: 'Permisos', value: key.scopes.map((scope) => scopeName(scope)).join(', ') },
+    { label: 'Último uso', value: key.last_used_at ? timeAgo(key.last_used_at) : 'Aún sin usar' },
+  ];
+}
+
+/** Rotar (una llave nueva con los mismos permisos; la actual deja de servir) o revocar (no se deshace). */
+function keyConfirm(kind: KeyAction, key: ApiKey, details: ConfirmDetail[]): ConfirmInput {
+  return kind === 'rotate'
+    ? {
+        tone: 'warning',
+        icon: <RefreshCw size={30} />,
+        eyebrow: 'Rotar llave',
+        title: `¿Rotar «${key.name}»?`,
+        message: 'Se generará una llave nueva con los mismos permisos y vigencia. Tendrás que actualizarla en el sistema que se conecta.',
+        details,
+        note: 'La llave actual dejará de funcionar de inmediato.',
+        confirmLabel: 'Rotar llave',
+        confirmIcon: <RefreshCw size={18} />,
+      }
+    : {
+        tone: 'danger',
+        icon: <Ban size={30} />,
+        eyebrow: 'Revocar llave',
+        title: `¿Revocar «${key.name}»?`,
+        message: 'La llave dejará de funcionar de inmediato y el sistema que la usa ya no podrá conectarse.',
+        details,
+        note: 'Esta acción no se puede deshacer.',
+        confirmLabel: 'Revocar llave',
+        confirmIcon: <Ban size={18} />,
+      };
+}
+
 /** Una llave: nombre, cómo reconocerla, quién la creó, su uso, vigencia, permisos y acciones. */
-function ApiKeyRow({ apiKey, busy, onAsk }: { apiKey: ApiKey; busy: boolean; onAsk: (pending: Pending) => void }) {
+function ApiKeyRow({ apiKey, busy, onAction }: { apiKey: ApiKey; busy: Busy | null; onAction: (kind: KeyAction, key: ApiKey) => void }) {
   const { nameOf } = useCatalogs();
   const usable = apiKey.status !== 'REVOKED';
   return (
@@ -59,10 +96,10 @@ function ApiKeyRow({ apiKey, busy, onAsk }: { apiKey: ApiKey; busy: boolean; onA
       </span>
       {usable && (
         <span className="validator-list__actions">
-          <Button size="sm" variant="secondary" icon={<RefreshCw size={16} />} disabled={busy} onClick={() => onAsk({ kind: 'rotate', key: apiKey })}>
+          <Button size="sm" variant="secondary" icon={<RefreshCw size={16} />} loading={busy === `rotate:${apiKey.id}`} disabled={busy !== null} onClick={() => onAction('rotate', apiKey)}>
             Rotar
           </Button>
-          <Button size="sm" variant="danger-outline" icon={<Ban size={16} />} disabled={busy} onClick={() => onAsk({ kind: 'revoke', key: apiKey })}>
+          <Button size="sm" variant="danger-outline" icon={<Ban size={16} />} loading={busy === `revoke:${apiKey.id}`} disabled={busy !== null} onClick={() => onAction('revoke', apiKey)}>
             Revocar
           </Button>
         </span>
@@ -112,12 +149,11 @@ function ConnectionGuide() {
 export function ApiKeysPage() {
   const feedback = useFeedback();
   const list = usePagedList((page, signal) => apiKeyService.list(page, signal), { errorTitle: 'No se pudieron cargar las llaves' });
-  const [pending, setPending] = useState<Pending>(null);
-  const action = useAction();
-  const busy = action.busy !== null;
+  const { nameOf } = useCatalogs();
+  const action = useAction<Busy>();
 
-  // La confirmación solo existe mientras hay una llave elegida: recibe esa llave (nunca "ninguna").
-  const confirm = ({ kind, key }: NonNullable<Pending>) => {
+  // Rotar y revocar preguntan antes (cancelar no envía nada); el botón de esa llave queda ocupado.
+  const act = (kind: KeyAction, key: ApiKey) => {
     const rotating = kind === 'rotate';
     void action.run(
       async () => {
@@ -126,10 +162,11 @@ export function ApiKeysPage() {
         else await apiKeyService.revoke(key.id);
       },
       {
+        busy: `${kind}:${key.id}`,
+        confirm: keyConfirm(kind, key, keyDetails(key, (scope) => nameOf('api_scopes', scope))),
         errorTitle: rotating ? 'No se pudo rotar la llave' : 'No se pudo revocar la llave',
         success: rotating ? undefined : ['Llave revocada', `«${key.name}» dejó de funcionar. El sistema que la usaba ya no puede conectarse.`],
         onSuccess: list.retry,
-        onSettled: () => setPending(null),
       },
     );
   };
@@ -163,7 +200,7 @@ export function ApiKeysPage() {
             {(keys) => (
               <ul className={`validator-list stagger ${list.loading ? 'is-loading' : ''}`}>
                 {keys.map((apiKey) => (
-                  <ApiKeyRow key={apiKey.id} apiKey={apiKey} busy={busy} onAsk={setPending} />
+                  <ApiKeyRow key={apiKey.id} apiKey={apiKey} busy={action.busy} onAction={act} />
                 ))}
               </ul>
             )}
@@ -179,23 +216,6 @@ export function ApiKeysPage() {
           </p>
         </PanelFooter>
       </Panel>
-
-      {pending && (
-        <ConfirmDialog
-          open
-          title={pending.kind === 'rotate' ? `Rotar «${pending.key.name}»` : `Revocar «${pending.key.name}»`}
-          message={
-            pending.kind === 'rotate'
-              ? 'Se generará una llave nueva con los mismos permisos y vigencia, y la actual dejará de funcionar de inmediato. Tendrás que actualizarla en el sistema que se conecta.'
-              : 'La llave dejará de funcionar de inmediato y el sistema que la usa ya no podrá conectarse. No se puede deshacer.'
-          }
-          confirmLabel={pending.kind === 'rotate' ? 'Rotar llave' : 'Revocar llave'}
-          tone="danger"
-          loading={busy}
-          onConfirm={() => confirm(pending)}
-          onCancel={() => setPending(null)}
-        />
-      )}
     </div>
   );
 }

@@ -91,7 +91,7 @@ describe('salidas', () => {
     const { calls } = mockFetch((call) => (call.url.includes('/settings/') ? apiOk(samplePolicy) : apiOk(live)));
     renderWithProviders(<QrCodePanel employeeId={5} />);
     await userEvent.click(await screen.findByRole('button', { name: 'Invalidar código vigente' }));
-    await userEvent.click(within(screen.getByRole('alertdialog', { name: 'Invalidar el código vigente' })).getByRole('button', { name: 'Cancelar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Invalidar el código vigente?' })).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.getByText('En pantalla')).toBeInTheDocument();
     expect(calls.some((call) => call.init.method === 'DELETE')).toBe(false);

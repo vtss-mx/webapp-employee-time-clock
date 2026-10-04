@@ -64,7 +64,15 @@ export interface AddressPart {
   types: string[];
 }
 
-/** Qué tipo de componente de Google llena cada campo (en orden de preferencia). */
+/**
+ * Qué tipo de componente de Google llena cada campo (en orden de preferencia). En México:
+ * - `administrative_area_level_2` es el municipio (la alcaldía en la CDMX) y `locality` la ciudad;
+ *   si falta uno se usa el otro (una ciudad pequeña suele traer solo uno de los dos).
+ * - `sublocality`/`neighborhood` es la COLONIA: no es la ciudad ni el municipio y aquí no se usa
+ *   (el domicilio no tiene campo de colonia).
+ * - `premise` es el nombre de un edificio: no es la calle ni el número.
+ * `postal_town` (Reino Unido) y `administrative_area_level_3` (otros países) cubren la ciudad fuera de México.
+ */
 const SOURCES: Array<[keyof AddressValues, string[], 'longText' | 'shortText']> = [
   ['street', ['route'], 'longText'],
   ['exterior_number', ['street_number'], 'longText'],
@@ -72,9 +80,8 @@ const SOURCES: Array<[keyof AddressValues, string[], 'longText' | 'shortText']> 
   ['postal_code', ['postal_code'], 'longText'],
   ['country_code', ['country'], 'shortText'],
   ['state', ['administrative_area_level_1'], 'longText'],
-  // En México el municipio (o la alcaldía en la CDMX) es el nivel 2.
-  ['municipality', ['administrative_area_level_2', 'locality'], 'longText'],
-  ['city', ['locality', 'postal_town', 'administrative_area_level_3', 'sublocality', 'administrative_area_level_2'], 'longText'],
+  ['municipality', ['administrative_area_level_2', 'locality', 'administrative_area_level_3'], 'longText'],
+  ['city', ['locality', 'postal_town', 'administrative_area_level_3', 'administrative_area_level_2'], 'longText'],
 ];
 
 /** Campos del domicilio que se pueden llenar con los componentes de Google (solo los que trae). */
@@ -84,6 +91,31 @@ export function addressFromParts(parts: AddressPart[]): Partial<AddressValues> {
     const part = types.map((type) => parts.find((p) => p.types.includes(type))).find(Boolean);
     const value = part?.[text]?.trim();
     if (value) found[field] = field === 'country_code' ? value.toUpperCase() : value;
+  }
+  return found;
+}
+
+/** Lo que es de la zona del punto (no de una casa en particular): se puede tomar de otro resultado. */
+const AREA_FIELDS: (keyof AddressValues)[] = ['street', 'postal_code', 'state', 'municipality', 'city', 'country_code'];
+
+/** ¿Le falta algún dato de la zona? (p. ej. un negocio de Google que no trae su código postal). */
+export function missingAreaFields(found: Partial<AddressValues>): boolean {
+  return AREA_FIELDS.some((field) => !found[field]);
+}
+
+/**
+ * El domicilio más completo posible de un punto: Google devuelve varios resultados que lo contienen
+ * (la dirección exacta, la calle, la colonia, el código postal, la ciudad...). Manda el más preciso
+ * (el primero) y lo que le falte de la zona se completa con los demás; el número exterior solo sale
+ * del más preciso (de otro resultado sería el de otra casa).
+ */
+export function addressFromResults(results: AddressPart[][]): Partial<AddressValues> {
+  const [best, ...rest] = results;
+  if (!best) return {};
+  const found = addressFromParts(best);
+  for (const parts of rest) {
+    const more = addressFromParts(parts);
+    for (const field of AREA_FIELDS) if (!found[field] && more[field]) found[field] = more[field];
   }
   return found;
 }

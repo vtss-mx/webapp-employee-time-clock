@@ -38,6 +38,12 @@ function deferred() {
   return { promise, resolve };
 }
 
+/** La confirmación con esa pregunta (azul: dialog; roja o de advertencia: alertdialog). */
+const confirmation = (title: string, role: 'dialog' | 'alertdialog' = 'dialog') => screen.findByRole(role, { name: title });
+
+/** Pulsa un botón dentro de la confirmación. */
+const press = (dialog: HTMLElement, button: string) => userEvent.click(within(dialog).getByRole('button', { name: button }));
+
 /** Cierra el popup de error de carga y pide de nuevo con "Volver a cargar". */
 async function reloadAfter(title: string) {
   await screen.findByRole('alertdialog', { name: title });
@@ -85,20 +91,37 @@ describe('Departamentos: formulario', () => {
     expect(validateDepartmentName('Ventas')).toBeUndefined();
   });
 
-  it('crea con el nombre verificado en vivo y abre su detalle', async () => {
+  it('crea con el nombre verificado en vivo y abre su detalle (antes confirma qué se creará)', async () => {
     const { calls } = mockFetch((call) => (call.url.startsWith('/api/validation') ? liveCheck('AVAILABLE', 'Nombre disponible', 'department_name') : apiOk(production, { status: 201 })));
     renderAt('/company/departments/new', '/company/departments/new', <DepartmentFormPage />);
     await userEvent.type(screen.getByLabelText(/Nombre/), ' Producción ');
     await userEvent.type(screen.getByLabelText(/Descripción/), 'Línea de pan dulce');
     expect(await screen.findByText('Nombre disponible')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Crear departamento' }));
+    const dialog = await confirmation('¿Crear el departamento Producción?');
+    expect(dialog).toHaveTextContent('Después podrás nombrar a sus responsables y asignarle empleados.');
+    expect(within(within(dialog).getByRole('region', { name: 'Se creará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['NombreProducción', 'DescripciónLínea de pan dulce']);
+    await press(dialog, 'Crear departamento');
     expect(await screen.findByText('Detalle del departamento')).toBeInTheDocument();
     const post = calls.find((c) => c.init.method === 'POST');
     expect(JSON.parse(post?.init.body as string)).toEqual({ name: 'Producción', description: 'Línea de pan dulce' });
     expect(calls.some((c) => c.url.includes('field=department_name'))).toBe(true);
   });
 
-  it('edita; un nombre ya usado se marca en su campo', async () => {
+  it('cancelar el alta no envía nada y el formulario sigue con lo escrito', async () => {
+    const { calls } = mockFetch(() => liveCheck('AVAILABLE', 'Nombre disponible', 'department_name'));
+    renderAt('/company/departments/new', '/company/departments/new', <DepartmentFormPage />);
+    await userEvent.type(screen.getByLabelText(/Nombre/), 'Almacén');
+    expect(await screen.findByText('Nombre disponible')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Crear departamento' }));
+    await press(await confirmation('¿Crear el departamento Almacén?'), 'Cancelar');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
+    expect(screen.getByLabelText(/Nombre/, { selector: 'input' })).toHaveValue('Almacén');
+    expect(screen.getByRole('button', { name: 'Crear departamento' })).toBeEnabled();
+  });
+
+  it('edita; confirma el cambio y un nombre ya usado se marca en su campo', async () => {
     mockFetch((call) => {
       if (call.url.startsWith('/api/validation')) return liveCheck('AVAILABLE', 'Nombre disponible', 'department_name');
       if (call.init.method === 'PUT') return apiFail(409, 'DEPARTMENT_NAME_TAKEN', 'Ya existe un departamento con ese nombre en tu empresa');
@@ -110,7 +133,29 @@ describe('Departamentos: formulario', () => {
     await userEvent.clear(name);
     await userEvent.type(name, 'Almacén');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const dialog = await confirmation('¿Guardar los cambios de Producción?');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('1 cambioNombreAntes: ProducciónDespués: Almacén');
+    await press(dialog, 'Guardar cambios');
     expect(await screen.findAllByText('Ya existe un departamento con ese nombre en tu empresa')).not.toHaveLength(0);
+  });
+
+  it('editar sin cambios avisa "Sin cambios" y no envía nada; cancelar deja lo escrito', async () => {
+    const { calls } = mockFetch((call) => (call.url.startsWith('/api/validation') ? liveCheck() : apiOk(production)));
+    renderAt('/company/departments/:id/edit', '/company/departments/3/edit', <DepartmentFormPage />);
+    const description = await screen.findByLabelText(/Descripción/);
+    await userEvent.type(description, '  '); // solo espacios: no cuenta como cambio
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No modificaste ningún dato');
+    expect(screen.queryByRole('dialog', { name: '¿Guardar los cambios de Producción?' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+
+    await userEvent.clear(description);
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const dialog = await confirmation('¿Guardar los cambios de Producción?');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('DescripciónAntes: Línea de pan dulceDespués: Sin capturar');
+    await press(dialog, 'Cancelar');
+    expect(calls.some((c) => c.init.method === 'PUT')).toBe(false);
+    expect(description).toHaveValue('');
   });
 
   it('un formulario vacío no se envía', async () => {
@@ -143,22 +188,47 @@ describe('Departamentos: detalle', () => {
     expect(calls.find((c) => c.url.startsWith('/api/employees'))?.url).toContain('department_id=3');
 
     await userEvent.click(screen.getByRole('button', { name: 'Retirar a Ana Ruiz como responsable' }));
+    const manager = await confirmation('¿Retirar a Ana Ruiz como responsable de Producción?', 'alertdialog');
+    expect(manager).toHaveTextContent('Sigue en tu empresa y su departamento asignado no cambia.');
+    expect(within(manager).getByRole('region', { name: 'Cambios' })).toHaveTextContent('ResponsablesAntes: Ana Ruiz, Luis Paz, Eva SolDespués: Luis Paz, Eva Sol');
+    expect(within(manager).getByRole('region', { name: 'Detalles' })).toHaveTextContent('ResponsableAna Ruiz · No. EMP-7');
+    await press(manager, 'Retirar responsable');
     expect(await screen.findByText('Responsable retirado')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     expect(calls.some((c) => c.init.method === 'DELETE' && c.url === '/api/departments/3/managers/7')).toBe(true);
 
     await userEvent.click(screen.getByRole('button', { name: 'Quitar a Juan Paz del departamento' }));
+    const member = await confirmation('¿Quitar a Juan Paz de Producción?', 'alertdialog');
+    expect(member).toHaveTextContent('Quedará sin departamento hasta que lo asignes a otro.');
+    expect(within(member).getByRole('region', { name: 'Cambios' })).toHaveTextContent('DepartamentoAntes: ProducciónDespués: Sin departamento');
+    await press(member, 'Quitar del departamento');
     expect(await screen.findByText('Empleado quitado')).toBeInTheDocument();
     expect(calls.some((c) => c.init.method === 'DELETE' && c.url === '/api/departments/3/employees/10')).toBe(true);
   });
 
-  it('eliminar pide confirmación; si tiene empleados el servidor lo impide y se explica', async () => {
+  it('cancelar retirar o quitar no envía nada y la lista sigue igual', async () => {
+    const { calls } = serve();
+    renderAt('/company/departments/:id', '/company/departments/3', <DepartmentDetailPage />);
+    expect(await screen.findByText('Juan Paz')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar a Eva Sol como responsable' }));
+    await press(await confirmation('¿Retirar a Eva Sol como responsable de Producción?', 'alertdialog'), 'Cancelar');
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar a Juan Paz del departamento' }));
+    await press(await confirmation('¿Quitar a Juan Paz de Producción?', 'alertdialog'), 'Cancelar');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false);
+    expect(screen.getByText('Eva Sol')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Quitar a Juan Paz del departamento' })).toBeEnabled();
+  });
+
+  it('eliminar pide confirmación; si tiene empleados la confirmación y el servidor lo explican', async () => {
     serve((call) => (call.init.method === 'DELETE' ? apiFail(409, 'DEPARTMENT_HAS_EMPLOYEES', 'El departamento tiene empleados asignados') : undefined));
     renderAt('/company/departments/:id', '/company/departments/3', <DepartmentDetailPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Eliminar departamento' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Eliminar departamento' });
-    expect(dialog).toHaveTextContent('quítalos o asígnalos a otro departamento');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Eliminar' }));
+    const dialog = await confirmation('¿Eliminar el departamento Producción?', 'alertdialog');
+    expect(dialog).toHaveTextContent('Producción tiene 2 empleados asignados: quítalos o asígnalos a otro departamento antes de eliminarlo.');
+    expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('ResponsablesAna Ruiz, Luis Paz, Eva SolEmpleados asignados2');
+    expect(dialog).toHaveTextContent('Esta acción no se puede deshacer.');
+    await press(dialog, 'Eliminar departamento');
     expect(await screen.findByText('El departamento tiene empleados asignados')).toBeInTheDocument();
   });
 
@@ -172,7 +242,10 @@ describe('Departamentos: detalle', () => {
     expect(await screen.findByText('Sin responsables')).toBeInTheDocument();
     expect(await screen.findByText('Sin empleados asignados')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Eliminar departamento' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Eliminar' }));
+    const dialog = await confirmation('¿Eliminar el departamento Producción?', 'alertdialog');
+    expect(dialog).toHaveTextContent('Se eliminará Producción y se retirarán sus responsables.');
+    expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('ResponsablesSin responsablesEmpleados asignados0');
+    await press(dialog, 'Eliminar departamento');
     expect(await screen.findByText('Lista de departamentos')).toBeInTheDocument();
   });
 });
@@ -192,15 +265,34 @@ describe('Departamentos: asignar y nombrar responsables', () => {
     expect(screen.getByText('No. EMP-11 · En Almacén')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Cambiar aquí: Raúl Soto' }));
+    const move = await confirmation('¿Cambiar a Raúl Soto a Producción?', 'alertdialog');
+    expect(move).toHaveTextContent('Dejará Almacén: cada empleado está en un solo departamento.');
+    expect(within(move).getByRole('region', { name: 'Cambios' })).toHaveTextContent('DepartamentoAntes: AlmacénDespués: Producción');
+    expect(within(move).getByRole('region', { name: 'Detalles' })).toHaveTextContent('EmpleadoRaúl Soto · No. EMP-11');
+    await press(move, 'Cambiar aquí');
     expect(await screen.findByText('Empleado asignado')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     expect(screen.getAllByText('Asignado')).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: 'Asignar: Iris Luna' }));
+    const assign = await confirmation('¿Asignar a Iris Luna a Producción?');
+    expect(within(assign).getByRole('region', { name: 'Cambios' })).toHaveTextContent('DepartamentoAntes: Sin departamentoDespués: Producción');
+    await press(assign, 'Asignar');
     await waitFor(() => expect(calls.filter((c) => c.init.method === 'POST')).toHaveLength(2));
     expect(calls.filter((c) => c.init.method === 'POST').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([{ employee_id: 11 }, { employee_id: 12 }]);
   });
 
-  it('responsables: nombrar a quien aún no lo es', async () => {
+  it('cancelar la asignación no envía nada y el empleado sigue donde estaba', async () => {
+    const { calls } = mockFetch((call) => apiOk(call.url.startsWith('/api/employees') ? page(staff) : production));
+    renderAt('/company/departments/:id/assign/:role', '/company/departments/3/assign/employees', <DepartmentAssignPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Cambiar aquí: Raúl Soto' }));
+    await press(await confirmation('¿Cambiar a Raúl Soto a Producción?', 'alertdialog'), 'Cancelar');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
+    expect(screen.getByText('No. EMP-11 · En Almacén')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cambiar aquí: Raúl Soto' })).toBeEnabled();
+  });
+
+  it('responsables: nombrar a quien aún no lo es (cancelar primero no envía nada)', async () => {
     const { calls } = mockFetch((call) => {
       if (call.url.startsWith('/api/employees')) return apiOk(page(staff));
       if (call.init.method === 'POST') return apiOk({ ...production, managers: [...production.managers, { employee_id: 11, full_name: 'Raúl Soto', employee_number: 'EMP-11', active: true }] });
@@ -210,6 +302,13 @@ describe('Departamentos: asignar y nombrar responsables', () => {
     expect(await screen.findByRole('heading', { name: 'Agregar responsables' })).toBeInTheDocument();
     expect(await screen.findByText('Responsable')).toBeInTheDocument(); // Ana ya lo es
     await userEvent.click(screen.getByRole('button', { name: 'Nombrar responsable: Raúl Soto' }));
+    await press(await confirmation('¿Nombrar a Raúl Soto responsable de Producción?'), 'Cancelar');
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Nombrar responsable: Raúl Soto' }));
+    const dialog = await confirmation('¿Nombrar a Raúl Soto responsable de Producción?');
+    expect(dialog).toHaveTextContent('Su departamento asignado no cambia.');
+    expect(within(dialog).queryByRole('region', { name: 'Cambios' })).toBeNull();
+    await press(dialog, 'Nombrar responsable');
     expect(await screen.findByText('Responsable agregado')).toBeInTheDocument();
     expect(calls.find((c) => c.init.method === 'POST')?.url).toBe('/api/departments/3/managers');
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
@@ -263,6 +362,9 @@ describe('Departamentos: más casos del formulario', () => {
     await userEvent.type(screen.getByLabelText(/Descripción/), '   ');
     expect(await screen.findByText('Nombre disponible')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Crear departamento' }));
+    const dialog = await confirmation('¿Crear el departamento Almacén?');
+    expect(within(within(dialog).getByRole('region', { name: 'Se creará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['NombreAlmacén']); // sin descripción: no se lista
+    await press(dialog, 'Crear departamento');
     expect(await screen.findByText('Departamento creado')).toBeInTheDocument();
     expect(JSON.parse(calls.find((c) => c.init.method === 'POST')?.init.body as string)).toEqual({ name: 'Almacén', description: null });
   });
@@ -289,6 +391,9 @@ describe('Departamentos: más casos del formulario', () => {
     await userEvent.clear(description);
     await userEvent.type(description, 'Pan y bolillo');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const dialog = await confirmation('¿Guardar los cambios de Producción?');
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('DescripciónAntes: Línea de pan dulceDespués: Pan y bolillo');
+    await press(dialog, 'Guardar cambios');
     expect(await screen.findByText('Producción quedó actualizado.')).toBeInTheDocument();
     expect(screen.getByText('Detalle del departamento')).toBeInTheDocument();
     expect(JSON.parse(calls.find((c) => c.init.method === 'PUT')?.init.body as string)).toEqual({ name: 'Producción', description: 'Pan y bolillo' });
@@ -324,6 +429,7 @@ describe('Departamentos: más casos del detalle', () => {
     renderAt('/company/departments/:id', '/company/departments/3', <DepartmentDetailPage />);
     expect(await screen.findByText('1 empleado')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Quitar a Ana Ruiz del departamento' }));
+    await press(await confirmation('¿Quitar a Ana Ruiz de Producción?', 'alertdialog'), 'Quitar del departamento');
     expect(await screen.findByText('Empleado quitado')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Quitar a Ana Ruiz del departamento' }).closest('ul')).toHaveClass('is-loading');
     reload.resolve(apiOk(page([])));
@@ -343,7 +449,7 @@ describe('Departamentos: más casos del detalle', () => {
     mockFetch((call) => apiOk(call.url.startsWith('/api/employees') ? page([]) : { ...production, employee_count: 1 }));
     renderAt('/company/departments/:id', '/company/departments/3', <DepartmentDetailPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Eliminar departamento' }));
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent('tiene 1 empleado asignado');
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('tiene 1 empleado asignado: quítalo o asígnalo a otro departamento');
   });
 
   it('si el departamento no carga ofrece volver a cargar', async () => {

@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { EmployeeFormFields, HeadwearExemptField } from '../../components/EmployeeForm';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { Button } from '../../components/ui/Button';
-import { useEmployeeForm } from '../../hooks/useEmployeeForm';
+import { EMPLOYEE_LABELS, useEmployeeForm } from '../../hooks/useEmployeeForm';
 import { useFeedback } from '../../hooks/useFeedback';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
+import { describeValues } from '../../utils/changes';
 
 /** Alta de empleado: solo datos. El rostro lo registra el propio empleado y aquí se valida después. */
 export function EmployeeCreatePage() {
@@ -19,6 +20,7 @@ export function EmployeeCreatePage() {
   const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    const name = `${values.first_name.trim()} ${values.last_name.trim()}`;
     await save(async () => {
       // Persona de otra empresa: se vincula su cuenta y conserva su contraseña (no se envía).
       const { password_confirm: _confirm, ...data } = values;
@@ -42,6 +44,18 @@ export function EmployeeCreatePage() {
         ],
         detailsStyle: 'checks',
       });
+    }, {
+      kind: 'create',
+      icon: <UserPlus size={30} />,
+      title: linking ? `¿Vincular a ${name} a tu empresa?` : `¿Registrar a ${name}?`,
+      message: linking
+        ? 'Ya trabaja en otra empresa: entrará con su misma cuenta y contraseña, y elegirá tu empresa al iniciar sesión.'
+        : 'Podrá iniciar sesión con su correo y la contraseña que asignaste. Registrará su rostro en su primer acceso.',
+      detailsTitle: linking ? 'Se vinculará' : 'Se registrará',
+      // La contraseña nunca se muestra; al vincular no se envía (conserva la suya).
+      details: describeValues({ ...values, password: linking ? '' : values.password, headwear_exempt: headwearExempt || undefined }, EMPLOYEE_LABELS),
+      confirmLabel: linking ? 'Vincular a mi empresa' : 'Registrar empleado',
+      confirmIcon: <UserPlus size={18} />,
     });
   };
 

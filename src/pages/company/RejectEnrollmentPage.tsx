@@ -38,6 +38,20 @@ export function RejectEnrollmentPage() {
       }}
       validate={validateReason}
       submit={{ label: 'Rechazar', icon: <UserX size={18} />, variant: 'danger', disabled: item.status !== 'PENDING', disabledTitle: 'Este registro ya fue revisado' }}
+      confirm={(reason) => ({
+        tone: 'danger',
+        icon: <UserX size={30} />,
+        eyebrow: 'Rechazar registro',
+        title: `¿Rechazar el registro de ${item.full_name}?`,
+        message: 'Se eliminarán la fotografía y los datos biométricos de este registro. El empleado deberá registrarse de nuevo.',
+        details: [
+          { label: 'Empleado', value: `${item.full_name} · ${item.employee_number}` },
+          { label: 'Motivo que verá', value: reason },
+        ],
+        note: 'La fotografía y los datos biométricos no se pueden recuperar.',
+        confirmLabel: 'Rechazar',
+        confirmIcon: <UserX size={18} />,
+      })}
       errorTitle="No se pudo rechazar"
       onSend={async (reason) => {
         const res = await enrollmentService.reject(enrollmentId, reason);

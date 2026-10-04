@@ -48,4 +48,14 @@ describe('Contexto de una ocurrencia', () => {
     rerender(<OccurrenceContext context={{}} />);
     expect(screen.getByText('Registrado por el backend')).toBeInTheDocument();
   });
+
+  it('una falla de la aplicación web dice en qué pantalla, con lo que contó el navegador', () => {
+    const client = { kind: 'CRASH', path: '/company/employees/12/edit', component: 'EmployeeForm', detail: null, app_version: 'b-1', user_agent: 'iPhone', ip: '10.0.0.9' };
+    render(<OccurrenceContext context={{ client, user: { id: 4, email: 'admin@empresa.com', role: 'COMPANY' }, company_id: 2 }} />);
+    expect(screen.getByText('Aplicación web: /company/employees/12/edit')).toBeInTheDocument();
+    expect(screen.getByText('admin@empresa.com · COMPANY · Empresa #2 · IP 10.0.0.9')).toBeInTheDocument();
+    expect(screen.getByText('Aplicación web')).toBeInTheDocument();
+    expect(screen.getByText(/"component": "EmployeeForm"/)).toBeInTheDocument();
+    expect(screen.queryByText('Dónde')).toBeNull();
+  });
 });

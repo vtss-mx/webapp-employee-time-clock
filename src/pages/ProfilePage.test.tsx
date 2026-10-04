@@ -97,6 +97,7 @@ describe('ProfilePage (Mi perfil)', () => {
     await userEvent.type(screen.getByLabelText('Nueva contraseña'), 'Nueva12345');
     await userEvent.type(screen.getByLabelText('Confirmar nueva contraseña'), 'Nueva12345');
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Cambiar tu contraseña?' })).getByRole('button', { name: 'Cambiar contraseña' }));
     expect(await screen.findByRole('dialog', { name: 'Contraseña actualizada' })).toHaveTextContent('Se cerró la sesión en 2 dispositivo(s) más.');
     await waitFor(() => expect(sessionLoads(calls)).toBe(2));
   });

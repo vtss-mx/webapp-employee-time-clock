@@ -16,8 +16,8 @@ const SEARCH_DEBOUNCE_MS = 350;
  * `usePagedList` (página, tamaño, cancelación y "Reintentar"). Lo comparten los listados de
  * empleados y de empresas. Un cambio real de búsqueda o de filtro vuelve a la página 1.
  */
-export function useSearchList<T>(
-  fetchPage: (query: ListQuery, signal: AbortSignal) => Promise<Page<T>>,
+export function useSearchList<T, X extends object = object>(
+  fetchPage: (query: ListQuery, signal: AbortSignal) => Promise<Page<T> & X>,
   { errorTitle, pageSize, filterKey = '' }: { errorTitle: string; pageSize?: number; /** Otros filtros de la pantalla (p. ej. estado y gravedad): al cambiar, vuelve a la página 1. */ filterKey?: string },
 ) {
   const [search, setSearch] = useState('');
@@ -31,11 +31,12 @@ export function useSearchList<T>(
     return () => window.clearTimeout(timer);
   }, [search, debouncedSearch]);
 
-  const list = usePagedList<T>(
+  const list = usePagedList<T, X>(
     (page, signal) => fetchPage({ ...page, search: debouncedSearch || undefined, active: filter === 'all' ? undefined : filter === 'active' }, signal),
     { errorTitle, pageSize, filterKey: `${filter}|${debouncedSearch}|${filterKey}` },
   );
   const filtered = Boolean(debouncedSearch) || filter !== 'all';
 
-  return { ...list, search, setSearch, filter, setFilter, filtered };
+  // `appliedSearch`: la búsqueda con que se pidió la lista visible (sin la pausa entre teclas).
+  return { ...list, search, setSearch, appliedSearch: debouncedSearch, filter, setFilter, filtered };
 }

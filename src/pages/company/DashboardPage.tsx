@@ -1,6 +1,5 @@
 import { ArrowRight, ClipboardCheck, UserCheck, UserMinus, UserPlus, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { FaceLearningPanel } from '../../components/FaceLearningPanel';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { ButtonLink } from '../../components/ui/Button';
@@ -113,7 +112,6 @@ export function DashboardPage() {
             </Link>
           </div>
         </PanelSection>
-        <FaceLearningPanel />
       </Panel>
     </div>
   );

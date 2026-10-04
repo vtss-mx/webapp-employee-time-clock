@@ -63,25 +63,53 @@ describe('ValidatorsPage (COMPANY)', () => {
     expect(screen.getByRole('link', { name: 'Dispositivos de Comedor' })).toHaveAttribute('href', '/company/validators/4/devices');
   });
 
-  it('desactivar pide confirmación; eliminar lo quita de la lista', async () => {
+  it('desactivar y activar confirman el cambio de estado; eliminar confirma y lo quita de la lista', async () => {
     const { calls } = server([sampleValidator]);
     renderWithProviders(<ValidatorsPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Desactivar' }));
-    let dialog = await screen.findByRole('alertdialog');
+    let dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar el validador Recepción planta 1?' });
     expect(within(dialog).getByText(/su sesión se cerrará de inmediato/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: ActivoDespués: Inactivo');
+    expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Correo de accesorecepcion@empresa.com');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }));
     expect(await screen.findByText('Validador desactivado')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' })); // confirmación en popup
     expect(calls.find((c) => c.init.method === 'PATCH')?.url).toBe('/api/validators/3/status');
     await userEvent.click(screen.getByRole('button', { name: 'Activar' }));
+    dialog = await screen.findByRole('dialog', { name: '¿Activar el validador Recepción planta 1?' });
+    expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: InactivoDespués: Activo');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Activar' }));
     expect(await screen.findByText('Validador activado')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Eliminar Recepción planta 1' }));
-    dialog = await screen.findByRole('alertdialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Eliminar' }));
+    dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar el validador Recepción planta 1?' });
+    expect(dialog).toHaveTextContent('La bitácora de sus identificaciones se conserva.');
+    expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent(
+      'Correo de accesorecepcion@empresa.comModoQR o rostroDomicilioCalle Dr. Paliza 71, 83000 Hermosillo, Sonora',
+    );
+    expect(dialog).toHaveTextContent('Esta acción no se puede deshacer.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Eliminar validador' }));
     expect(await screen.findByText('Validador eliminado')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('recepcion@empresa.com')).not.toBeInTheDocument());
+  });
+
+  it('cancelar activar, desactivar o eliminar no envía nada y la lista sigue igual', async () => {
+    const { calls } = server([{ ...sampleValidator, address: null }, { ...busy, active: false }]);
+    renderWithProviders(<ValidatorsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Desactivar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Desactivar el validador Recepción planta 1?' })).getByRole('button', { name: 'Cancelar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Activar' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Activar el validador Comedor?' })).getByRole('button', { name: 'Cancelar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Eliminar Recepción planta 1' }));
+    const remove = await screen.findByRole('alertdialog', { name: '¿Eliminar el validador Recepción planta 1?' });
+    expect(within(remove).getByRole('region', { name: 'Detalles' })).toHaveTextContent('DomicilioSin domicilio');
+    await userEvent.click(within(remove).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(calls.some((c) => c.init.method === 'PATCH' || c.init.method === 'DELETE')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Desactivar' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Activar' })).toBeEnabled();
+    expect(screen.getByText('Comedor')).toBeInTheDocument();
   });
 
   it('editar, restablecer contraseña y dispositivos llevan a su pantalla', async () => {
@@ -137,7 +165,7 @@ describe('ValidatorsPage: más casos', () => {
     });
     renderWithProviders(<ValidatorsPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Eliminar Comedor' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Eliminar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Eliminar el validador Comedor?' })).getByRole('button', { name: 'Eliminar validador' }));
     expect(await screen.findByText('Validador eliminado')).toBeInTheDocument();
     expect(row('Comedor').closest('ul')).toHaveClass('is-loading');
     release(apiOk({ items: [sampleValidator], total: 1, page: 1, size: 10 }));

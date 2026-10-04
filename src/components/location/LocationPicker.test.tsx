@@ -1,15 +1,16 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GoogleMaps from '../../services/maps/googleMaps';
-import { MapsApiError, type FoundPlace, type PlaceSuggestion } from '../../services/maps/googleMaps';
+import { MapsApiError, type FoundPlace, type PlaceSuggestion, type SearchOptions } from '../../services/maps/googleMaps';
 import { renderWithProviders } from '../../test/render';
 import { EMPTY_ADDRESS, type AddressValues, type GeoPoint } from '../../utils/address';
 import type * as ConfigModule from '../../utils/config';
 import type * as Geolocation from '../../utils/geolocation';
 import { LocationError, type DeviceLocation } from '../../utils/geolocation';
 import { LocationPicker } from './LocationPicker';
+import type { MapView } from './MapCanvas';
 
 // Google Maps simulado (el SDK real se valida en navegador) con las APIs que cada prueba habilita.
 const mapsConfig = vi.hoisted(() => ({ apiKey: 'clave-de-prueba', places: false, geocoding: true, geolocation: true }));
@@ -21,7 +22,7 @@ const maps = vi.hoisted(() => ({
   reverseGeocode: vi.fn<(point: GeoPoint) => Promise<Partial<AddressValues>>>(),
   geocodeAddress: vi.fn<(text: string, country: string) => Promise<FoundPlace | null>>(),
   newSearchSession: vi.fn<() => Promise<unknown>>(),
-  suggestPlaces: vi.fn<(input: string, token: unknown, country?: string) => Promise<PlaceSuggestion[]>>(),
+  suggestPlaces: vi.fn<(input: string, token: unknown, options?: SearchOptions) => Promise<PlaceSuggestion[]>>(),
   resolvePlace: vi.fn<(suggestion: PlaceSuggestion) => Promise<FoundPlace>>(),
   approximateLocation: vi.fn<() => Promise<{ point: GeoPoint; accuracy: number }>>(),
 }));
@@ -29,17 +30,27 @@ vi.mock('../../services/maps/googleMaps', async (importOriginal) => ({ ...(await
 // Ubicación del navegador simulada (el aviso nativo de permiso no existe en jsdom).
 const device = vi.hoisted(() => ({ currentLocation: vi.fn<() => Promise<DeviceLocation>>() }));
 vi.mock('../../utils/geolocation', async (importOriginal) => ({ ...(await importOriginal<typeof Geolocation>()), currentLocation: device.currentLocation }));
+// Lo que se reporta al ADMIN (una API de Google sin habilitar): su regla se prueba en clientErrorService.test.
+const reporter = vi.hoisted(() => ({ reportMapsProblem: vi.fn<(problem: GoogleMaps.MapsApiError) => void>() }));
+vi.mock('../../services/clientErrorService', () => reporter);
 // El mapa real se prueba en MapCanvas.test: aquí solo importa lo que entrega.
 vi.mock('./MapCanvas', async () => {
   const { MapsApiError: ProblemError } = await vi.importActual<typeof GoogleMaps>('../../services/maps/googleMaps');
+  type Props = { point: GeoPoint | null; radius: number | null; onPick: (p: GeoPoint) => void; onFailure: (e: GoogleMaps.MapsApiError) => void; onView: (view: MapView) => void };
   return {
-    MapCanvas: ({ point, radius, onPick, onFailure }: { point: GeoPoint | null; radius: number | null; onPick: (p: GeoPoint) => void; onFailure: (e: GoogleMaps.MapsApiError) => void }) => (
+    MapCanvas: ({ point, radius, onPick, onFailure, onView }: Props) => (
       <div data-testid="map" data-point={point ? `${point.lat},${point.lng}` : ''} data-radius={radius ?? ''}>
         <button type="button" onClick={() => onPick({ lat: 29.0729, lng: -110.9559 })}>
           Tocar el mapa
         </button>
         <button type="button" onClick={() => onFailure(new ProblemError('maps', 'denied'))}>
           Rechazar la clave
+        </button>
+        <button type="button" onClick={() => onView({ center: { lat: 20.6597, lng: -103.3496 }, zoom: 13 })}>
+          Acercar a Guadalajara
+        </button>
+        <button type="button" onClick={() => onView({ center: { lat: 23.6, lng: -102.5 }, zoom: 5 })}>
+          Ver todo el país
         </button>
       </div>
     ),
@@ -106,15 +117,11 @@ async function popup(title: string) {
   return dialog;
 }
 
-async function closePopup(title: string) {
-  await userEvent.click(within(await popup(title)).getByRole('button', { name: 'Entendido' }));
-  await waitFor(() => expect(screen.queryByText(title)).toBeNull());
-}
-
 const noPopup = () => expect(screen.queryByRole('dialog') ?? screen.queryByRole('alertdialog')).toBeNull();
 
 beforeEach(() => {
   Object.assign(mapsConfig, DEFAULTS);
+  reporter.reportMapsProblem.mockReset();
   Object.values(maps).forEach((fn) => fn.mockReset());
   device.currentLocation.mockReset();
   maps.reverseGeocode.mockResolvedValue(FOUND);
@@ -260,29 +267,36 @@ describe('LocationPicker: "Mi ubicación"', () => {
     expect(locateButton()).toBeEnabled();
   });
 
-  it('si Google tampoco la estima: sin la API se explica una sola vez; sin red, cada vez; apagada, nunca', async () => {
+  it('si Google tampoco la estima: lo dice bajo el mapa (sin popups); sin red, que revise la conexión; apagada, nada', async () => {
     device.currentLocation.mockRejectedValue(new LocationError('unavailable'));
     maps.approximateLocation.mockRejectedValue(new MapsApiError('geolocation', 'denied'));
     renderPicker();
     await userEvent.click(locateButton() as HTMLElement);
-    expect(await popup('No se pudo estimar tu ubicación')).toHaveTextContent('Geolocation API');
-    await closePopup('No se pudo estimar tu ubicación');
-    await userEvent.click(locateButton() as HTMLElement);
-    await waitFor(() => expect(maps.approximateLocation).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(locateButton()).toBeEnabled());
-    noPopup(); // ya se explicó
+    expect(await screen.findByText('No pudimos estimar tu ubicación: marca el punto directamente en el mapa.')).toBeInTheDocument();
+    noPopup();
+    expect(reporter.reportMapsProblem).toHaveBeenCalledWith(expect.objectContaining({ api: 'geolocation', problem: 'denied' }));
 
     maps.approximateLocation.mockRejectedValue(new MapsApiError('geolocation', 'failed'));
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await userEvent.click(locateButton() as HTMLElement);
-      await closePopup('No se pudo consultar Google Maps');
-    }
+    await userEvent.click(locateButton() as HTMLElement);
+    expect(await screen.findByText('Google Maps no respondió. Revisa tu conexión e inténtalo de nuevo.')).toBeInTheDocument();
+    noPopup();
 
     maps.approximateLocation.mockRejectedValue(new MapsApiError('geolocation', 'off'));
     await userEvent.click(locateButton() as HTMLElement);
-    await waitFor(() => expect(maps.approximateLocation).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(maps.approximateLocation).toHaveBeenCalledTimes(3));
     await waitFor(() => expect(locateButton()).toBeEnabled());
+    expect(document.querySelector('.location-picker__notice')).toBeNull(); // cada acción limpia el aviso anterior
     noPopup();
+  });
+
+  it('si Google no llena el domicilio desde el punto, lo dice bajo el mapa y el punto queda marcado', async () => {
+    maps.reverseGeocode.mockRejectedValue(new MapsApiError('geocoding', 'denied'));
+    const { onPoint } = renderPicker();
+    await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
+    expect(await screen.findByText(/No pudimos completar el domicilio desde el mapa/)).toBeInTheDocument();
+    expect(onPoint).toHaveBeenCalled();
+    noPopup();
+    expect(reporter.reportMapsProblem).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ api: 'geocoding', problem: 'denied' }));
   });
 });
 
@@ -304,28 +318,28 @@ describe('LocationPicker: dirección escrita y búsqueda', () => {
     expect(onAddress).not.toHaveBeenCalled(); // el domicilio escrito se respeta
   });
 
-  it('si Google no encuentra la dirección lo explica', async () => {
+  it('si Google no encuentra la dirección lo dice bajo el mapa (sin popups)', async () => {
     maps.geocodeAddress.mockResolvedValue(null);
     const { onPoint } = renderPicker({ address: WRITTEN });
     await userEvent.click(geocodeButton() as HTMLElement);
-    const dialog = await popup('No encontramos esa dirección');
-    expect(dialog).toHaveAttribute('role', 'dialog');
-    expect(dialog).toHaveTextContent('Revisa el domicilio o marca el punto directamente en el mapa.');
+    expect(await screen.findByText('No encontramos esa dirección: revisa el domicilio o marca el punto directamente en el mapa.')).toBeInTheDocument();
     expect(onPoint).not.toHaveBeenCalled();
+    noPopup();
   });
 
-  it('si el mapa no está disponible se explica y se quita "Mi ubicación"', async () => {
+  it('si el mapa no está disponible se quita "Mi ubicación" (el mapa dice que se escriba a mano)', async () => {
     renderPicker();
     await userEvent.click(screen.getByRole('button', { name: 'Rechazar la clave' }));
-    expect(await popup('El mapa no está disponible')).toHaveTextContent('Maps JavaScript API');
-    expect(locateButton()).toBeNull();
+    await waitFor(() => expect(locateButton()).toBeNull());
+    noPopup();
+    expect(reporter.reportMapsProblem).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ api: 'maps', problem: 'denied' }));
   });
 
   it('con Places, el lugar buscado marca su punto y llena el domicilio; si Places falla se explica', async () => {
     mapsConfig.places = true;
     const place: FoundPlace = { point: { lat: 29.07, lng: -110.95 }, address: FOUND, label: 'Plaza Zaragoza, Hermosillo' };
     maps.newSearchSession.mockResolvedValue({});
-    maps.suggestPlaces.mockResolvedValueOnce([{ id: 'p1', primary: 'Plaza Zaragoza', secondary: 'Centro', prediction: {} as google.maps.places.PlacePrediction }]);
+    maps.suggestPlaces.mockResolvedValueOnce([{ id: 'p1', primary: 'Plaza Zaragoza', secondary: 'Centro', distanceMeters: null, prediction: {} as google.maps.places.PlacePrediction }]);
     maps.resolvePlace.mockResolvedValue(place);
     const { onPoint, onAddress } = renderPicker({ address: { ...EMPTY_ADDRESS, country_code: 'US' } });
     const search = screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' });
@@ -333,12 +347,45 @@ describe('LocationPicker: dirección escrita y búsqueda', () => {
     await userEvent.click(await screen.findByRole('option', { name: /Plaza Zaragoza/ }));
     await waitFor(() => expect(onAddress).toHaveBeenCalledExactlyOnceWith(FOUND));
     expect(onPoint).toHaveBeenCalledExactlyOnceWith(place.point);
-    expect(maps.suggestPlaces).toHaveBeenCalledWith('Plaza', {}, 'US');
+    expect(maps.suggestPlaces).toHaveBeenCalledWith('Plaza', {}, { country: 'US', near: null }); // sin punto ni zona: solo el país
     expect(maps.reverseGeocode).not.toHaveBeenCalled(); // el lugar ya trae su domicilio
 
+    // Sin la API habilitada: la lista dice que no hay resultados (nunca un popup).
     maps.suggestPlaces.mockRejectedValue(new MapsApiError('places', 'denied'));
     await userEvent.clear(search);
     await userEvent.type(search, 'Catedral');
-    expect(await popup('La búsqueda de lugares no está disponible')).toHaveTextContent('Places API (New)');
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
+    expect(search).toHaveAttribute('aria-expanded', 'true');
+    noPopup();
+    expect(reporter.reportMapsProblem).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ api: 'places', problem: 'denied' }));
+  });
+});
+
+describe('LocationPicker: el buscador prefiere lo cercano', () => {
+  const GUADALAJARA = { lat: 20.6597, lng: -103.3496 };
+  const search = () => screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' });
+
+  beforeEach(() => {
+    mapsConfig.places = true;
+    maps.newSearchSession.mockResolvedValue({});
+    maps.suggestPlaces.mockResolvedValue([]);
+  });
+
+  it('sin punto: la zona que se ve del mapa, solo si ya se acercó a una ciudad (no el país completo)', async () => {
+    renderPicker();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver todo el país' }));
+    await userEvent.type(search(), 'Oxxo');
+    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Oxxo', {}, { country: 'MX', near: null }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Acercar a Guadalajara' }));
+    await userEvent.type(search(), ' Centro');
+    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Oxxo Centro', {}, { country: 'MX', near: GUADALAJARA }));
+  });
+
+  it('con punto marcado: el punto manda (aunque el mapa muestre otra zona)', async () => {
+    renderPicker({ initialPoint: TAPPED });
+    await userEvent.click(screen.getByRole('button', { name: 'Acercar a Guadalajara' }));
+    await userEvent.type(search(), 'Oxxo');
+    await waitFor(() => expect(maps.suggestPlaces).toHaveBeenLastCalledWith('Oxxo', {}, { country: 'MX', near: TAPPED }));
   });
 });

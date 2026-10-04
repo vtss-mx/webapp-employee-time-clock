@@ -129,8 +129,11 @@ describe('Validaciones: revisión de identidad', () => {
     expect(screen.getByRole('link', { name: 'Rechazar usuario' })).toHaveAttribute('href', '/company/validations/5/reject');
 
     await userEvent.click(screen.getByRole('button', { name: 'Aceptar usuario' }));
-    const confirm = await screen.findByRole('dialog', { name: 'Aceptar usuario' });
-    expect(confirm).toHaveTextContent('Confirmas que la persona de la fotografía es Ana Ruiz');
+    const confirm = await screen.findByRole('dialog', { name: '¿Aceptar a Ana Ruiz?' });
+    expect(confirm).toHaveTextContent('Confirmas que la persona de la fotografía es este empleado');
+    // Lo que el análisis marcó se recuerda en la confirmación.
+    expect(confirm).toHaveTextContent('Revisa: Posibles lentes');
+    expect(confirm).toHaveTextContent('Revisa: Posible foto o pantalla');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Sí, aceptar' }));
     expect(await screen.findByText('Ana Ruiz ya puede identificarse.')).toBeInTheDocument();
     expect(await screen.findByRole('tab', { name: /Pendiente/ })).toBeInTheDocument(); // de vuelta en la bandeja
@@ -149,7 +152,9 @@ describe('Validaciones: revisión de identidad', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Aceptar usuario' }));
-    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Aceptar usuario' })).getByRole('button', { name: 'Cancelar' }));
+    const confirm = await screen.findByRole('dialog', { name: '¿Aceptar a Ana Ruiz?' });
+    expect(confirm).not.toHaveTextContent('Revisa:');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
   });
@@ -167,9 +172,10 @@ describe('Validaciones: revisión de identidad', () => {
     mockFetch((call) => (call.init.method === 'POST' ? apiFail(409, 'ENROLLMENT_ALREADY_REVIEWED', 'La solicitud ya fue revisada') : apiOk(request())));
     renderAt('/company/validations/5');
     await userEvent.click(await screen.findByRole('button', { name: 'Aceptar usuario' }));
-    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Aceptar usuario' })).getByRole('button', { name: 'Sí, aceptar' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Aceptar a Ana Ruiz?' })).getByRole('button', { name: 'Sí, aceptar' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo aceptar' })).toHaveTextContent('La solicitud ya fue revisada');
-    expect(screen.queryByRole('dialog', { name: 'Aceptar usuario' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: '¿Aceptar a Ana Ruiz?' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Aceptar usuario' })).toBeEnabled(); // se puede volver a intentar
   });
 
   it('rechazada: la foto ya se eliminó; muestra quién la revisó, cuándo y el motivo; sin acciones ni avisos', async () => {

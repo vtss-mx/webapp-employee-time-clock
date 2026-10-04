@@ -1,11 +1,9 @@
 import { Ban, QrCode, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
 import { useAction } from '../hooks/useAction';
 import { useResource } from '../hooks/useResource';
 import { useVerificationPolicy } from '../hooks/useVerificationPolicy';
 import { employeeService } from '../services/employeeService';
 import { formatDateTime, timeAgo } from '../utils/format';
-import { ConfirmDialog } from './Modal';
 import { Button } from './ui/Button';
 import { PanelSection } from './ui/Panel';
 import { RetryState } from './ui/RetryState';
@@ -18,16 +16,23 @@ import { RetryState } from './ui/RetryState';
 export function QrCodePanel({ employeeId }: { employeeId: number }) {
   const { policy } = useVerificationPolicy();
   const { data: summary, setData, error, retry } = useResource((signal) => employeeService.qrSummary(employeeId, signal), employeeId, 'No se pudo cargar la actividad del QR');
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const action = useAction();
   const busy = action.busy !== null;
 
   const revoke = () =>
     action.run(() => employeeService.revokeQr(employeeId), {
+      confirm: {
+        kind: 'delete',
+        icon: <Ban size={30} />,
+        eyebrow: 'Código QR',
+        title: '¿Invalidar el código vigente?',
+        message: 'El código que el empleado tiene en pantalla dejará de servir de inmediato; en su teléfono podrá mostrar uno nuevo.',
+        confirmLabel: 'Invalidar',
+        confirmIcon: <Ban size={18} />,
+      },
       errorTitle: 'No se pudo invalidar el código',
       success: ['Código invalidado', 'El código que tenía en pantalla ya no sirve; en su teléfono podrá mostrar uno nuevo.'],
       onSuccess: setData,
-      onSettled: () => setConfirmOpen(false),
     });
 
   const live = summary?.live ?? false;
@@ -62,21 +67,10 @@ export function QrCodePanel({ employeeId }: { employeeId: number }) {
         <Button variant="secondary" icon={<RefreshCw size={18} />} disabled={busy} onClick={retry}>
           Actualizar
         </Button>
-        <Button variant="danger-outline" icon={<Ban size={18} />} disabled={!live || busy} onClick={() => setConfirmOpen(true)}>
+        <Button variant="danger-outline" icon={<Ban size={18} />} loading={busy} disabled={!live} onClick={() => void revoke()}>
           Invalidar código vigente
         </Button>
       </div>
-
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Invalidar el código vigente"
-        message="El código que el empleado tiene en pantalla dejará de servir de inmediato; en su teléfono podrá mostrar uno nuevo. ¿Deseas continuar?"
-        confirmLabel="Invalidar"
-        tone="danger"
-        loading={busy}
-        onConfirm={() => void revoke()}
-        onCancel={() => setConfirmOpen(false)}
-      />
     </PanelSection>
   );
 }

@@ -15,8 +15,52 @@ import { paths } from '../../routes/paths';
 import { departmentService } from '../../services/departmentService';
 import { employeeService } from '../../services/employeeService';
 import type { Department, Employee } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
 
 type Role = 'employees' | 'managers';
+
+/**
+ * Antes de asignar o nombrar: a quién y qué cambia. Si el empleado viene de otro departamento lo
+ * deja (cada empleado está en uno solo), así que se resalta como un cambio de departamento.
+ */
+function assignConfirm(role: Role, department: Department, employee: Employee): ConfirmInput {
+  const person = { label: 'Empleado', value: `${employee.full_name} · No. ${employee.employee_number}` };
+  if (role === 'managers') {
+    return {
+      icon: <ShieldCheck size={30} />,
+      eyebrow: 'Nuevo responsable',
+      title: `¿Nombrar a ${employee.full_name} responsable de ${department.name}?`,
+      message: 'Un departamento puede tener varios responsables y una persona puede dirigir varios. Su departamento asignado no cambia.',
+      details: [person],
+      confirmLabel: 'Nombrar responsable',
+      confirmIcon: <UserPlus size={18} />,
+    };
+  }
+  const from = employee.department_name;
+  if (from) {
+    return {
+      tone: 'warning',
+      icon: <ArrowRightLeft size={30} />,
+      eyebrow: 'Cambiar de departamento',
+      title: `¿Cambiar a ${employee.full_name} a ${department.name}?`,
+      message: `Dejará ${from}: cada empleado está en un solo departamento.`,
+      changes: [{ label: 'Departamento', before: from, after: department.name }],
+      details: [person],
+      confirmLabel: 'Cambiar aquí',
+      confirmIcon: <ArrowRightLeft size={18} />,
+    };
+  }
+  return {
+    icon: <UserPlus size={30} />,
+    eyebrow: 'Asignar empleado',
+    title: `¿Asignar a ${employee.full_name} a ${department.name}?`,
+    message: 'Formará parte de este departamento.',
+    changes: [{ label: 'Departamento', before: 'Sin departamento', after: department.name }],
+    details: [person],
+    confirmLabel: 'Asignar',
+    confirmIcon: <UserPlus size={18} />,
+  };
+}
 
 const COPY: Record<Role, { title: string; hint: string; icon: typeof Users }> = {
   employees: {
@@ -59,6 +103,7 @@ export function DepartmentAssignPage() {
   const assign = (employee: Employee) =>
     run(() => (role === 'managers' ? departmentService.addManager(department.id, employee.id) : departmentService.assign(department.id, employee.id)), {
       busy: employee.id,
+      confirm: assignConfirm(role, department, employee),
       errorTitle: role === 'managers' ? 'No se pudo agregar al responsable' : 'No se pudo asignar al empleado',
       success: role === 'managers' ? ['Responsable agregado', `${employee.full_name} ahora es responsable de ${department.name}.`] : ['Empleado asignado', `${employee.full_name} ahora está en ${department.name}.`],
       onSuccess: (saved: Department) => {

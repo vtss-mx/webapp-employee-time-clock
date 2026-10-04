@@ -121,8 +121,7 @@ describe('EmployeeFacePage: verificación en persona', () => {
     expect(screen.getByText('Verificando identidad...')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
 
-    const result = await screen.findByRole('alert');
-    expect(within(result).getByRole('heading', { name: 'Identificación exitosa' })).toBeInTheDocument();
+    const result = await screen.findByRole('dialog', { name: 'Identificación exitosa' }); // el resultado es un popup
     expect(calls.find((c) => c.init.method === 'POST')?.url).toBe('/api/employees/7/face/verify');
     await userEvent.click(within(result).getByRole('button', { name: 'Finalizar' }));
     expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
@@ -132,8 +131,7 @@ describe('EmployeeFacePage: verificación en persona', () => {
     serve(() => apiOk(identifiedResult));
     renderFace('verify');
     await userEvent.click(await screen.findByRole('button', { name: 'falla del flujo' }));
-    const result = await screen.findByRole('alert');
-    expect(within(result).getByRole('heading', { name: 'No se pudo verificar a Ana' })).toBeInTheDocument();
+    const result = await screen.findByRole('alertdialog', { name: 'No se pudo verificar a Ana' });
     expect(result).toHaveTextContent('El motor facial no responde');
     await userEvent.click(within(result).getByRole('button', { name: 'Intentar de nuevo' }));
     expect(await screen.findByRole('heading', { name: 'Verificar a Ana Ruiz' })).toBeInTheDocument();

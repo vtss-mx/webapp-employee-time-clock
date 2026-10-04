@@ -22,7 +22,7 @@ interface PagedListOptions {
  * Base de todos los listados (con búsqueda: `useSearchList`; sin ella: validadores, validaciones,
  * bitácoras) para que se comporten igual y se dibujen con el mismo `Paginator`.
  */
-export function usePagedList<T>(fetchPage: (query: PageQuery, signal: AbortSignal) => Promise<Page<T>>, options: PagedListOptions) {
+export function usePagedList<T, X extends object = object>(fetchPage: (query: PageQuery, signal: AbortSignal) => Promise<Page<T> & X>, options: PagedListOptions) {
   const { errorTitle, filterKey = '' } = options;
   const [size, setSizeState] = useState(options.pageSize ?? config.pageSize);
   const [paging, setPaging] = useState({ key: filterKey, page: 1 });
@@ -30,7 +30,8 @@ export function usePagedList<T>(fetchPage: (query: PageQuery, signal: AbortSigna
   if (paging.key !== filterKey) setPaging({ key: filterKey, page: 1 });
   const page = paging.key === filterKey ? paging.page : 1;
 
-  const [data, setData] = useState<Page<T> | null>(null);
+  // `X`: campos propios de la página que envía el backend (p. ej. `as_of` de los errores).
+  const [data, setData] = useState<(Page<T> & X) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);

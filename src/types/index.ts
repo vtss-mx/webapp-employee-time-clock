@@ -2,6 +2,7 @@ import type { ApiKey, ApiKeyStatus, ApiScope } from './apiKeys';
 import type { Department, DepartmentRef } from './departments';
 import type { ErrorOccurrence, ErrorReport, ErrorSeverity, ErrorStatus } from './errors';
 import type { Company, CompanyAdmin } from './platform';
+import type { AssignmentState, AttendanceAction, BoardState, ShiftRequestStatus, WorkMode, WorkSessionStatus } from './shifts';
 
 /**
  * Roles. ADMIN: plataforma (da de alta empresas). COMPANY: administra una empresa. EMPLOYEE: empleado.
@@ -44,6 +45,8 @@ export interface User {
   memberships?: UserMembership[];
   /** Preferencias de la interfaz guardadas en la BD (siguen al usuario en cualquier dispositivo). */
   preferences?: UserPreferences;
+  /** Módulos del menú que usan sus pantallas, en orden (los envía el backend con `screens`). */
+  modules?: MenuModule[];
   /**
    * Pantallas del usuario, en orden: las decide el backend (permiso del rol en la BD y estado del
    * usuario). El menú y las rutas se arman solo con ellas.
@@ -67,6 +70,16 @@ export interface Screen {
   icon: string;
   /** Contador que acompaña la opción (p. ej. PENDING_ENROLLMENTS). */
   badge: string | null;
+  /** Módulo del menú en que va (el menú lateral agrupa por módulo). */
+  module?: string | null;
+}
+
+/** Módulo del menú (encabezado que agrupa pantallas), en el orden que envía el backend. */
+export interface MenuModule {
+  code: string;
+  name: string;
+  /** Nombre del ícono (lucide). */
+  icon: string;
 }
 
 export interface UserPreferences {
@@ -127,6 +140,9 @@ export interface CompanyEmployee {
   phone: string | null;
   active: boolean;
   face_status: FaceStatus;
+  /** Cuánto aprendió el reconocimiento de sus identificaciones (solo cuántas muestras y cuándo). */
+  face_learned_samples: number;
+  face_last_learned_at: string | null;
 }
 
 export type CompanyEmployeeList = Page<CompanyEmployee>;
@@ -189,11 +205,8 @@ export interface Employee {
   face_rejection_reason: string | null;
   latest_enrollment_id: number | null;
   has_face: boolean;
-  /** Muestras activas del rostro: las del registro aprobado más las aprendidas del uso. */
+  /** Muestras activas del rostro (lo que el reconocimiento aprende del uso lo administra el ADMIN). */
   face_samples: number;
-  /** Muestras que el reconocimiento aprendió de identificaciones seguras (galería evolutiva). */
-  face_learned_samples: number;
-  face_last_learned_at: string | null;
   /** Departamento al que está asignado (a lo más uno). */
   department_id?: number | null;
   department_name?: string | null;
@@ -221,7 +234,8 @@ export interface EmployeeListParams {
 }
 
 export type DepartmentList = Page<Department>;
-export type ErrorReportList = Page<ErrorReport>;
+/** `as_of`: hora del servidor al armar la lista ("marcar como solucionados" no toca lo posterior). */
+export type ErrorReportList = Page<ErrorReport> & { as_of: string };
 export type ErrorOccurrenceList = Page<ErrorOccurrence>;
 
 export interface EmployeeFormValues {
@@ -311,18 +325,37 @@ export interface EmployeeQrSummary {
 /** QR_FACE: doble factor del validador (el QR dice quién es y el rostro lo confirma). */
 export type VerificationMethod = 'FACE' | 'QR' | 'QR_FACE';
 
-export type TurnAction = 'TURN_LEFT' | 'TURN_RIGHT';
+/**
+ * Movimientos que puede pedir la prueba de vida (catálogo `liveness_actions`): girar a la izquierda o
+ * a la derecha (de la persona), mirar arriba, mirar abajo o acercarse a la cámara.
+ */
+export type LivenessAction = 'TURN_LEFT' | 'TURN_RIGHT' | 'LOOK_UP' | 'LOOK_DOWN' | 'MOVE_CLOSER';
 
+/**
+ * Reto de prueba de vida (de uso único): la pantalla destella los colores de `flash` (una captura por
+ * color) y la persona hace cada movimiento de `actions` (una captura por movimiento), antes de
+ * `expires_in` segundos. Los mínimos son los vigentes de la plataforma (se endurecen solos).
+ */
 export interface FaceChallenge {
   liveness_required: boolean;
   challenge_id: string | null;
-  /** Primer giro (igual a `actions[0]`). */
-  action: TurnAction | null;
+  /** Primer movimiento (igual a `actions[0]`). */
+  action: LivenessAction | null;
   instruction: string | null;
-  /** Giros en orden (uno o dos, según la empresa): una captura por giro. */
-  actions: TurnAction[];
+  /** Movimientos en orden (de uno a tres; nunca el mismo dos veces seguidas). */
+  actions: LivenessAction[];
   instructions: string[];
+  /** Giro mínimo (nariz respecto a los ojos / distancia entre ojos). */
   min_yaw_ratio: number | null;
+  /** Cambio mínimo de la nariz entre ojos y boca al mirar arriba o abajo (contra las frontales). */
+  min_pitch_delta: number | null;
+  /** Cuántas veces debe crecer el ancho del rostro al acercarse (contra las frontales). */
+  min_closer_scale: number | null;
+  /** Colores del destello en orden ('#RRGGBB'); vacío si la empresa no lo usa. */
+  flash: string[];
+  /** El destello es obligatorio (sin él, el servidor responde LIVENESS_REQUIRED); si no, solo se mide. */
+  flash_required: boolean;
+  /** Segundos de vida del reto (política de la empresa). */
   expires_in: number | null;
 }
 
@@ -343,6 +376,14 @@ export interface VerificationResult {
   name?: string | null;
   confidence?: number | null;
   verified_at?: string | null;
+  /** Validadores: lo que la identificación registró en la asistencia (entrada o salida del turno). */
+  attendance?: ValidatorAttendance | null;
+}
+
+/** `action`: CHECK_IN o CHECK_OUT; null si no registró nada (sin turno ahora o doble lectura). */
+export interface ValidatorAttendance {
+  action: 'CHECK_IN' | 'CHECK_OUT' | null;
+  message: string;
 }
 
 export interface VerificationLog {
@@ -530,6 +571,12 @@ export interface FaceErrorItem extends ReasonItem {
   retryable: boolean;
 }
 
+/** Tipo de ausencia: `phrase` es lo que se le dice al empleado; `requestable`, si él lo puede pedir. */
+export interface DayOffTypeItem extends StatusItem {
+  phrase: string;
+  requestable: boolean;
+}
+
 export interface Catalogs {
   roles: CatalogItem<Role>[];
   verification_methods: CatalogItem<VerificationMethod>[];
@@ -550,9 +597,22 @@ export interface Catalogs {
   reverification_reasons: CatalogItem[];
   confidence_levels: ConfidenceLevelItem[];
   antispoof_levels: AntispoofLevelItem[];
+  /** Destello de colores de la prueba de vida: apagado, solo medir u obligatorio (con su descripción). */
+  flash_modes: CatalogItem[];
   face_errors: FaceErrorItem[];
   /** Marcas del registro facial para el revisor (códigos de `flagged_accessories`). */
   enrollment_flags: CatalogItem[];
+  /** Asistencia por turno: cómo se checó, cada registro, el estado de la jornada y de una solicitud. */
+  work_modes: CatalogItem<WorkMode>[];
+  attendance_actions: CatalogItem<AttendanceAction>[];
+  work_session_statuses: StatusItem<WorkSessionStatus>[];
+  shift_request_statuses: StatusItem<ShiftRequestStatus>[];
+  /** En qué va cada empleado en el tablero del día y la vigencia de una asignación de turno. */
+  board_states: StatusItem<BoardState>[];
+  assignment_states: StatusItem<AssignmentState>[];
+  /** Calendario: tipos de ausencia y motivos sugeridos al registrar o corregir una jornada. */
+  day_off_types: DayOffTypeItem[];
+  attendance_edit_reasons: CatalogItem[];
 }
 
 export type CatalogKey = keyof Catalogs;
@@ -566,18 +626,7 @@ export type { Company, CompanyAdmin, CompanyFormValues, CompanyListParams, Platf
 export type { AvailabilityResult, AvailabilityState, AvailabilityStatus, EmployeeUniqueField, FieldStatus, LiveChecks } from './forms';
 
 export type ApiKeyList = Page<ApiKey>;
-export type {
-  CatalogColumn,
-  CatalogDataset,
-  DatasetOption,
-  FeedbackResult,
-  FilterOp,
-  ReportAnswer,
-  ReportCatalog,
-  ReportFilter,
-  ReportPeriod,
-  ReportPlan,
-  ReportPreview,
-  ReportScalar,
-  SavedReport,
-} from './reports';
+// Turnos, sitios, asignaciones, solicitudes de cambio y asistencia por turno.
+export type * from './shifts';
+// Calendario de días libres, operaciones masivas y jornadas que registra la empresa.
+export type * from './calendar';

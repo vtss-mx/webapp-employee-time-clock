@@ -53,7 +53,17 @@ describe('administradores de empresa (pantallas)', () => {
     await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos123');
     await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Recursos123');
     await waitFor(() => expect(add).toBeEnabled());
+    // Se confirma con qué correo entrará (nunca la contraseña); cancelar no envía nada.
     await userEvent.click(add);
+    const dialog = await screen.findByRole('dialog', { name: '¿Agregar a rh@pan.com como administrador?' });
+    expect(within(within(dialog).getByRole('region', { name: 'Se registrará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Correorh@pan.com', 'EmpresaPanificadora']);
+    expect(dialog).not.toHaveTextContent('Recursos123');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
+    expect(screen.getByLabelText('Correo del administrador')).toHaveValue('rh@pan.com'); // el formulario sigue igual
+
+    await userEvent.click(add);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Agregar a rh@pan.com como administrador?' })).getByRole('button', { name: 'Agregar administrador' }));
     expect(await screen.findByText('Pantalla anterior')).toBeInTheDocument();
     expect(await screen.findByText('Administrador agregado')).toBeInTheDocument();
     const post = calls.find((c) => c.init.method === 'POST');
@@ -66,17 +76,18 @@ describe('administradores de empresa (pantallas)', () => {
       return call.init.method === 'POST' ? apiFail(409, 'EMAIL_TAKEN', 'El correo ya está registrado') : apiOk(company);
     });
     renderAt('/admin/companies/:id/admins/new', '/admin/companies/4/admins/new', <CompanyAdminFormPage />, '/admin/companies/:id');
-    await userEvent.type(await screen.findByLabelText('Correo del administrador'), 'rh@pan.com');
+    await userEvent.type(await screen.findByLabelText('Correo del administrador'), 'RH@pan.com');
     await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos123');
     await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Recursos123');
     const add = screen.getByRole('button', { name: 'Agregar' });
     await waitFor(() => expect(add).toBeEnabled());
     await userEvent.click(add);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Agregar a rh@pan.com como administrador?' })).getByRole('button', { name: 'Agregar administrador' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo agregar el administrador' })).toBeInTheDocument();
     expect(screen.getAllByText('El correo ya está registrado').length).toBeGreaterThan(0);
   });
 
-  it('restablecer: solo pide la contraseña nueva del administrador elegido', async () => {
+  it('restablecer: solo pide la contraseña nueva del administrador elegido y avisa que cierra sus sesiones', async () => {
     const admin = { id: 9, email: 'admin@pan.com', active: true, last_login_at: null, created_at: '2026-01-01T00:00:00Z' };
     const { calls } = mockFetch((call) => apiOk(call.url.endsWith('/admins/9') ? admin : company));
     renderAt('/admin/companies/:id/admins/:adminId/password', '/admin/companies/4/admins/9/password', <CompanyAdminFormPage />, '/admin/companies/:id');
@@ -85,6 +96,15 @@ describe('administradores de empresa (pantallas)', () => {
     await userEvent.type(screen.getByLabelText('Contraseña nueva'), 'Nueva12345');
     await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva12345');
     await userEvent.click(screen.getByRole('button', { name: 'Restablecer' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Restablecer la contraseña de admin@pan.com?' });
+    expect(dialog).toHaveTextContent('Se cerrarán todas sus sesiones abiertas.');
+    expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Administradoradmin@pan.comEmpresaPanificadora');
+    expect(dialog).not.toHaveTextContent('Nueva12345');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(calls.some((c) => c.init.method === 'PUT')).toBe(false); // cancelar no envía nada
+
+    await userEvent.click(screen.getByRole('button', { name: 'Restablecer' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Restablecer la contraseña de admin@pan.com?' })).getByRole('button', { name: 'Restablecer contraseña' }));
     expect(await screen.findByText('Contraseña restablecida')).toBeInTheDocument();
     const put = calls.find((c) => c.init.method === 'PUT');
     expect(put?.url).toBe('/api/admin/companies/4/admins/9/password');
@@ -99,6 +119,11 @@ describe('solicitar nueva verificación (pantalla)', () => {
     expect(await screen.findByText(/Ana deberá registrar su rostro/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cambio importante de apariencia' }));
     await userEvent.click(screen.getByRole('button', { name: 'Solicitar verificación' }));
+    // La confirmación dice el motivo que verá el empleado.
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Solicitar a Ana Ruiz verificar su identidad?' });
+    expect(confirm).toHaveTextContent('Motivo que verá');
+    expect(confirm).toHaveTextContent('Cambio importante de apariencia');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Solicitar verificación' }));
     expect(await screen.findByText('Verificación solicitada')).toBeInTheDocument();
     const post = calls.find((c) => c.init.method === 'POST');
     expect(post?.url).toBe('/api/employees/7/face/reset');
@@ -120,6 +145,8 @@ describe('solicitar nueva verificación a todos (pantalla)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cambio importante de apariencia' }));
     await userEvent.click(screen.getByRole('button', { name: 'Solicitar a todos' }));
     const again = await screen.findByRole('alertdialog', { name: '¿Solicitar nueva verificación a todos?' });
+    expect(again).toHaveTextContent('Esta acción no se puede deshacer.');
+    expect(again).toHaveTextContent('Cambio importante de apariencia');
     await userEvent.click(within(again).getByRole('button', { name: 'Sí, solicitar a todos' }));
     expect(await screen.findByText('12 empleados deberán registrar su rostro de nuevo en su próximo acceso.')).toBeInTheDocument();
     const post = calls.find((c) => c.init.method === 'POST');
@@ -149,13 +176,22 @@ describe('rechazar un registro facial (pantalla)', () => {
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
     await userEvent.type(screen.getByLabelText(/Motivo/), 'La foto está borrosa');
     await userEvent.click(reject);
+    // Antes de enviar se confirma: a quién y con qué motivo; cancelar no envía nada.
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Rechazar el registro de Ana Ruiz?' });
+    expect(confirm).toHaveTextContent('EmpleadoAna Ruiz · EMP-7');
+    expect(confirm).toHaveTextContent('Motivo que veráLa foto está borrosa');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
+    expect(screen.getByLabelText(/Motivo/)).toHaveValue('La foto está borrosa');
+    await userEvent.click(reject);
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Rechazar el registro de Ana Ruiz?' })).getByRole('button', { name: 'Rechazar' }));
     expect(await screen.findByText('Usuario rechazado')).toBeInTheDocument();
     expect(JSON.parse(calls.find((c) => c.init.method === 'POST')?.init.body as string)).toEqual({ reason: 'La foto está borrosa' });
   });
 });
 
 describe('contraseña del validador (pantalla)', () => {
-  it('contraseña nueva escrita dos veces; cierra sus sesiones', async () => {
+  it('contraseña nueva escrita dos veces; confirma (cancelar no envía nada) y cierra sus sesiones', async () => {
     const { calls } = mockFetch(apiOk(sampleValidator));
     renderAt('/company/validators/:id/password', '/company/validators/3/password', <ValidatorPasswordPage />, '/company/validators');
     const reset = await screen.findByRole('button', { name: 'Restablecer' });
@@ -166,6 +202,18 @@ describe('contraseña del validador (pantalla)', () => {
     expect(reset).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), '34');
     await userEvent.click(reset);
+    let confirm = await screen.findByRole('alertdialog', { name: '¿Restablecer la contraseña de Recepción planta 1?' });
+    expect(confirm).toHaveTextContent('Sus sesiones abiertas se cerrarán de inmediato.');
+    expect(within(confirm).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Cuentarecepcion@empresa.com');
+    expect(confirm).not.toHaveTextContent('Nueva1234'); // la contraseña nunca se muestra
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(calls.some((c) => c.init.method === 'PUT')).toBe(false);
+    expect(screen.getByLabelText(/Contraseña nueva/)).toHaveValue('Nueva1234');
+
+    await userEvent.click(reset);
+    confirm = await screen.findByRole('alertdialog', { name: '¿Restablecer la contraseña de Recepción planta 1?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Restablecer contraseña' }));
     const popup = await screen.findByRole('dialog', { name: 'Contraseña restablecida' });
     expect(within(popup).getByText(/sus sesiones abiertas se cerraron/)).toBeInTheDocument();
     expect(calls.find((c) => c.init.method === 'PUT')?.url).toBe('/api/validators/3/password');

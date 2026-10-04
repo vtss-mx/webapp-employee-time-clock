@@ -1,17 +1,15 @@
-import { LocateOff, MapPinOff, SearchX } from 'lucide-react';
+import { LocateOff } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../services/apiClient';
-import { MapsApiError } from '../../services/maps/googleMaps';
 import { LOCATION_MESSAGES, LocationError, type LocationProblem } from '../../utils/geolocation';
-import { locationProblemMessage, loginLocationMessage, mapsProblemMessage } from './locationMessages';
+import { locationProblemMessage, loginLocationMessage } from './locationMessages';
 
 const iconOf = (message: { icon?: unknown }) => (message.icon as ReactElement).type;
 const apiError = (code: string, message = 'Respuesta del servidor') => new ApiError({ statusCode: 403, code, message });
 
 describe('locationProblemMessage', () => {
   it.each<[LocationProblem, 'warning' | 'error']>([
-    ['denied', 'warning'],
     ['insecure', 'warning'],
     ['unsupported', 'error'],
     ['unavailable', 'error'],
@@ -24,7 +22,13 @@ describe('locationProblemMessage', () => {
   });
 
   it('el permiso bloqueado explica cómo permitirlo en cada teléfono', () => {
+    expect(locationProblemMessage('denied')).toMatchObject({ variant: 'warning', title: 'Permite el acceso a tu ubicación', text: expect.stringContaining('validador') as string });
     expect(locationProblemMessage('denied').details).toEqual(expect.arrayContaining([expect.stringContaining('iPhone'), expect.stringContaining('Android')]));
+    // Por qué se pide y cómo seguir dependen de la pantalla; los pasos para permitirla son los mismos.
+    expect(locationProblemMessage('denied').details?.at(-1)).toBe('Vuelve a la aplicación e inicia sesión de nuevo.');
+    expect(locationProblemMessage('denied', 'map')).toMatchObject({ text: expect.stringContaining('mapa') as string });
+    expect(locationProblemMessage('denied', 'map').details?.at(-1)).toContain('Mi ubicación');
+    expect(locationProblemMessage('timeout', 'attendance').details).toBeUndefined();
   });
 });
 
@@ -51,25 +55,5 @@ describe('loginLocationMessage', () => {
   it('otros errores no son de ubicación (los presenta quien llama)', () => {
     expect(loginLocationMessage(apiError('INVALID_CREDENTIALS'))).toBeNull();
     expect(loginLocationMessage(new Error('sin red'))).toBeNull();
-  });
-});
-
-describe('mapsProblemMessage', () => {
-  it('sin respuesta de Google: error para reintentar mientras se escribe a mano', () => {
-    const message = mapsProblemMessage(new MapsApiError('geocoding', 'failed'));
-    expect(message).toMatchObject({ variant: 'error', eyebrow: 'Google Maps', title: 'No se pudo consultar Google Maps', key: 'maps-geocoding-failed' });
-    expect(iconOf(message)).toBe(MapPinOff);
-  });
-
-  it.each([
-    ['maps', 'El mapa no está disponible', 'Maps JavaScript API'],
-    ['places', 'La búsqueda de lugares no está disponible', 'Places API (New)'],
-    ['geocoding', 'El autollenado del domicilio no está disponible', 'Geocoding API'],
-    ['geolocation', 'No se pudo estimar tu ubicación', 'Geolocation API'],
-  ] as const)('%s sin habilitar: advertencia que dice qué API falta', (api, title, apiName) => {
-    const message = mapsProblemMessage(new MapsApiError(api, 'denied'));
-    expect(message).toMatchObject({ variant: 'warning', eyebrow: 'Google Maps', title, key: `maps-${api}-denied` });
-    expect(message.footnote).toContain(`«${apiName}»`);
-    expect(iconOf(message)).toBe(api === 'places' ? SearchX : MapPinOff);
   });
 });

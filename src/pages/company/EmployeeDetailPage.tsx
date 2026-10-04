@@ -1,7 +1,5 @@
-import { Activity, BrainCircuit, Camera, ClipboardCheck, Eraser, Pause, Pencil, Play, RotateCcw, ScanFace, ShieldCheck, Trash2, UserCheck, UserRound } from 'lucide-react';
-import { useState } from 'react';
+import { Activity, CalendarClock, Camera, ClipboardCheck, Pause, Pencil, Play, RotateCcw, ScanFace, ShieldCheck, Trash2, UserCheck, UserRound } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ConfirmDialog } from '../../components/Modal';
 import { VerificationHistory } from '../../components/VerificationHistory';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { QrCodePanel } from '../../components/QrCodePanel';
@@ -9,45 +7,88 @@ import { FaceStatusBadge, StatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useAction } from '../../hooks/useAction';
+import { useAuth } from '../../hooks/useAuth';
 import { useCatalogs } from '../../hooks/useCatalogs';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useResource } from '../../hooks/useResource';
 import { RetryState } from '../../components/ui/RetryState';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
 import type { Employee } from '../../types';
-import { formatDate, formatDateTime, initials, timeAgo } from '../../utils/format';
+import type { ConfirmInput } from '../../types/confirm';
+import { formatDate, formatDateTime, initials } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
 
-type Confirm = 'status' | 'delete' | 'forget' | null;
+/** Activar o desactivar: qué cambia para el empleado (el estado, "antes → después"). */
+function statusConfirm(employee: Employee): ConfirmInput {
+  const state = { label: 'Estado', before: employee.active ? 'Activo' : 'Inactivo', after: employee.active ? 'Inactivo' : 'Activo' };
+  return employee.active
+    ? {
+        tone: 'danger',
+        icon: <Pause size={30} />,
+        eyebrow: 'Cambiar estado',
+        title: `¿Desactivar a ${employee.full_name}?`,
+        message: 'No podrá iniciar sesión ni verificarse hasta que lo reactives. Su sesión actual se cerrará.',
+        changes: [state],
+        confirmLabel: 'Desactivar',
+        confirmIcon: <Pause size={18} />,
+      }
+    : {
+        tone: 'success',
+        icon: <Play size={30} />,
+        eyebrow: 'Cambiar estado',
+        title: `¿Activar a ${employee.full_name}?`,
+        message: 'Podrá volver a iniciar sesión y verificarse.',
+        changes: [state],
+        confirmLabel: 'Activar',
+        confirmIcon: <Play size={18} />,
+      };
+}
+
+/** Eliminar definitivamente: se escribe su número de empleado para habilitarlo (no se deshace). */
+function deleteConfirm(employee: Employee): ConfirmInput {
+  return {
+    kind: 'delete',
+    title: `¿Eliminar a ${employee.full_name}?`,
+    message: (
+      <>
+        Se eliminarán definitivamente su usuario, datos faciales, QR e historial. Si solo deseas bloquear su acceso, usa <em>Desactivar</em>.
+      </>
+    ),
+    details: [
+      { label: 'Número de empleado', value: employee.employee_number },
+      { label: 'Correo', value: employee.email },
+    ],
+    note: 'Esta acción no se puede deshacer.',
+    confirmText: employee.employee_number,
+    confirmLabel: 'Eliminar definitivamente',
+  };
+}
 
 /** Dato del empleado o "Sin capturar" (empleados registrados antes de existir el campo). */
 const orMissing = (value: string | null | undefined) => value || <span className="muted">Sin capturar</span>;
 
-/** Lo que el reconocimiento aprendió del uso del empleado (galería evolutiva del backend). */
-function LearningNote({ employee, onForget }: { employee: Employee; onForget: () => void }) {
-  const learned = employee.face_learned_samples;
-  return (
-    <div className="learning-note">
-      <p className="small muted inline-note">
-        <BrainCircuit size={16} color="var(--primary)" />
-        <span>
-          {learned > 0
-            ? `Aprendizaje continuo: ${learned} ${learned === 1 ? 'muestra aprendida' : 'muestras aprendidas'} de sus identificaciones seguras (la última ${timeAgo(employee.face_last_learned_at)}).`
-            : 'Aprendizaje continuo: aprenderá de sus identificaciones seguras para reconocerle mejor con el tiempo.'}
-        </span>
-      </p>
-      {learned > 0 && (
-        <Button variant="ghost" size="sm" icon={<Eraser size={16} />} onClick={onForget}>
-          Olvidar lo aprendido
-        </Button>
-      )}
-    </div>
-  );
-}
-
 /** Registro facial del empleado: estado, validación y acciones en persona (registrar o verificar). */
-function FaceSection({ employee, onForget }: { employee: Employee; onForget: () => void }) {
+function FaceSection({ employee }: { employee: Employee }) {
   const { byCode } = useCatalogs();
+  const confirm = useConfirm();
+  const navigate = useNavigate();
+  const approved = employee.face_status === 'APPROVED';
+  // Registrar en persona crea (o reemplaza) su registro facial: se confirma antes de abrir la cámara.
+  const enroll = async () => {
+    const ok = await confirm({
+      kind: 'create',
+      icon: <Camera size={30} />,
+      eyebrow: 'Registro en persona',
+      title: `¿Registrar el rostro de ${employee.full_name}?`,
+      message: 'Se abrirá la cámara para capturar su rostro con prueba de vida. Su identidad quedará aprobada al momento porque la registras en persona.',
+      details: ['La persona debe estar frente a la cámara, con el rostro descubierto.', 'Queda constancia de quién lo registró.'],
+      note: employee.face_status === 'NOT_ENROLLED' ? undefined : 'Su registro facial actual se reemplazará por el nuevo.',
+      confirmLabel: 'Abrir cámara',
+      confirmIcon: <Camera size={18} />,
+    });
+    if (ok) void navigate(paths.company.employeeFace(employee.id, 'enroll'));
+  };
   return (
     <PanelSection title="Registro facial" icon={<ScanFace size={20} />} aside={<FaceStatusBadge status={employee.face_status} />}>
       <p className="muted">{byCode('face_statuses', employee.face_status)?.description}</p>
@@ -61,22 +102,17 @@ function FaceSection({ employee, onForget }: { employee: Employee; onForget: () 
           {employee.headwear_exempt && ' Exento de retirar prenda de cabeza.'}
         </span>
       </p>
-      {employee.face_status === 'APPROVED' && <LearningNote employee={employee} onForget={onForget} />}
       <div className="button-row">
         {/* En persona, con la cámara de la empresa: registrar (aprobado al momento) o verificar. */}
-        {employee.active && employee.face_status === 'APPROVED' && (
+        {employee.active && approved && (
           <ButtonLink to={paths.company.employeeFace(employee.id, 'verify')} variant="primary" icon={<UserCheck size={18} />}>
             Verificar identidad
           </ButtonLink>
         )}
         {employee.active && (
-          <ButtonLink
-            to={paths.company.employeeFace(employee.id, 'enroll')}
-            variant={employee.face_status === 'APPROVED' ? 'ghost' : 'primary'}
-            icon={<Camera size={18} />}
-          >
-            {employee.face_status === 'APPROVED' ? 'Registrar de nuevo en persona' : 'Registrar rostro en persona'}
-          </ButtonLink>
+          <Button variant={approved ? 'ghost' : 'primary'} icon={<Camera size={18} />} onClick={() => void enroll()}>
+            {approved ? 'Registrar de nuevo en persona' : 'Registrar rostro en persona'}
+          </Button>
         )}
         {employee.latest_enrollment_id && (
           <ButtonLink
@@ -102,10 +138,10 @@ export function EmployeeDetailPage() {
   const employeeId = Number(id);
   const navigate = useNavigate();
   const { data: employee, error, retry: load } = useResource((signal) => employeeService.get(employeeId, signal), employeeId, 'No se pudo cargar el empleado');
-  const [confirm, setConfirm] = useState<Confirm>(null);
-  const action = useAction();
+  const action = useAction<'status' | 'delete'>();
   const busy = action.busy !== null;
-  const close = () => setConfirm(null);
+  // Los turnos del empleado se ven solo si el backend le dio al usuario la pantalla de Turnos.
+  const canSeeShifts = useAuth().user?.screens.some((screen) => screen.code === 'COMPANY_SHIFTS') ?? false;
 
   if (!employee) {
     return error ? (
@@ -145,9 +181,16 @@ export function EmployeeDetailPage() {
             </>
           }
           actions={
-            <ButtonLink to={paths.company.editEmployee(employee.id)} variant="primary" icon={<Pencil size={18} />}>
-              Editar
-            </ButtonLink>
+            <>
+              {canSeeShifts && (
+                <ButtonLink to={paths.company.employeeShifts(employee.id)} variant="ghost" icon={<CalendarClock size={18} />}>
+                  Turnos
+                </ButtonLink>
+              )}
+              <ButtonLink to={paths.company.editEmployee(employee.id)} variant="primary" icon={<Pencil size={18} />}>
+                Editar
+              </ButtonLink>
+            </>
           }
         />
 
@@ -223,7 +266,7 @@ export function EmployeeDetailPage() {
             </dl>
           </PanelSection>
 
-          <FaceSection employee={employee} onForget={() => setConfirm('forget')} />
+          <FaceSection employee={employee} />
 
           <QrCodePanel employeeId={employee.id} />
 
@@ -236,85 +279,40 @@ export function EmployeeDetailPage() {
           <Button
             variant={employee.active ? 'warning' : 'success'}
             icon={employee.active ? <Pause size={18} /> : <Play size={18} />}
-            onClick={() => setConfirm('status')}
+            loading={action.busy === 'status'}
+            disabled={busy}
+            onClick={() =>
+              void action.run(() => employeeService.setStatus(employee.id, !employee.active), {
+                busy: 'status',
+                confirm: statusConfirm(employee),
+                errorTitle: 'No se pudo completar la acción',
+                success: [employee.active ? 'Empleado desactivado' : 'Empleado activado'],
+                onSuccess: load, // el expediente se vuelve a pedir: el backend decide su estado
+              })
+            }
           >
             {employee.active ? 'Desactivar empleado' : 'Activar empleado'}
           </Button>
-          <Button variant="danger-outline" icon={<Trash2 size={18} />} onClick={() => setConfirm('delete')}>
+          <Button
+            variant="danger-outline"
+            icon={<Trash2 size={18} />}
+            loading={action.busy === 'delete'}
+            disabled={busy}
+            onClick={() =>
+              void action.run(() => employeeService.remove(employee.id), {
+                busy: 'delete',
+                confirm: deleteConfirm(employee),
+                errorTitle: 'No se pudo eliminar',
+                success: ['Empleado eliminado'],
+                onSuccess: () => void navigate(paths.company.employees, { replace: true }),
+                keepBusy: true,
+              })
+            }
+          >
             Eliminar definitivamente
           </Button>
         </PanelFooter>
       </Panel>
-
-      <ConfirmDialog
-        open={confirm === 'status'}
-        title={employee.active ? 'Desactivar empleado' : 'Activar empleado'}
-        message={
-          employee.active
-            ? 'El empleado no podrá iniciar sesión ni verificarse hasta que se reactive. Su sesión actual se cerrará.'
-            : 'El empleado podrá volver a iniciar sesión y verificarse.'
-        }
-        confirmLabel={employee.active ? 'Desactivar' : 'Activar'}
-        tone={employee.active ? 'danger' : 'success'}
-        loading={busy}
-        onCancel={close}
-        onConfirm={() =>
-          action.run(() => employeeService.setStatus(employee.id, !employee.active), {
-            errorTitle: 'No se pudo completar la acción',
-            success: [employee.active ? 'Empleado desactivado' : 'Empleado activado'],
-            onSuccess: load, // el expediente se vuelve a pedir: el backend decide su estado
-            onSettled: close,
-          })
-        }
-      />
-
-      <ConfirmDialog
-        open={confirm === 'forget'}
-        title="Olvidar lo aprendido"
-        message={
-          <>
-            Se borrarán las muestras que el reconocimiento aprendió de las identificaciones de <strong>{employee.full_name}</strong>.
-            Volverá a compararse solo con su registro aprobado: no tendrá que registrarse de nuevo. Úsalo si dudas de alguna
-            identificación.
-          </>
-        }
-        confirmLabel="Olvidar lo aprendido"
-        tone="danger"
-        loading={busy}
-        onCancel={close}
-        onConfirm={() =>
-          action.run(() => employeeService.forgetLearnedFace(employee.id), {
-            errorTitle: 'No se pudo olvidar lo aprendido',
-            success: ['Aprendizaje reiniciado', 'Se compara solo con su registro aprobado; volverá a aprender de sus identificaciones seguras.'],
-            onSuccess: load,
-            onSettled: close,
-          })
-        }
-      />
-
-      <ConfirmDialog
-        open={confirm === 'delete'}
-        title="Eliminar empleado"
-        message={
-          <>
-            Se eliminará definitivamente a <strong>{employee.full_name}</strong>, su usuario, datos faciales, QR e
-            historial. Esta acción no se puede deshacer. Si solo deseas bloquear su acceso, usa <em>Desactivar</em>.
-          </>
-        }
-        confirmLabel="Eliminar definitivamente"
-        tone="danger"
-        loading={busy}
-        onCancel={close}
-        onConfirm={() =>
-          action.run(() => employeeService.remove(employee.id), {
-            errorTitle: 'No se pudo eliminar',
-            success: ['Empleado eliminado'],
-            onSuccess: () => void navigate(paths.company.employees, { replace: true }),
-            onError: close,
-            keepBusy: true,
-          })
-        }
-      />
     </div>
   );
 }

@@ -30,8 +30,6 @@ const ana: Employee = {
   latest_enrollment_id: 3,
   has_face: true,
   face_samples: 5,
-  face_learned_samples: 0,
-  face_last_learned_at: null,
   department_id: 3,
   department_name: 'Producción',
   created_at: '2026-01-01T00:00:00Z',
@@ -102,6 +100,13 @@ const submitForm = (button: string) => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** Responde la confirmación previa al envío (crear, editar...) con el botón indicado. */
+async function answer(role: 'dialog' | 'alertdialog', title: string, button: string) {
+  const dialog = await screen.findByRole(role, { name: title });
+  await userEvent.click(within(dialog).getByRole('button', { name: button }));
+  return dialog;
+}
+
 describe('Empleados: listado', () => {
   it('muestra a cada empleado con su departamento, registro facial y estado; una fila abre su expediente', async () => {
     mockFetch(apiOk(page([ana, luis])));
@@ -160,6 +165,18 @@ describe('Empleados: alta', () => {
     await waitFor(() => expect(register).toBeEnabled());
     expect(register).not.toHaveAttribute('title');
     await userEvent.click(register);
+    // Antes de enviar se confirma lo que se registrará (la contraseña nunca se muestra).
+    const confirm = await answer('dialog', '¿Registrar a Eva Sol?', 'Cancelar');
+    const facts = within(confirm).getByRole('region', { name: 'Se registrará' });
+    expect(facts).toHaveTextContent('Correo electrónicoeva@empresa.com');
+    expect(facts).toHaveTextContent('Fecha de nacimiento');
+    expect(facts).toHaveTextContent('Excepción de prenda de cabezaSí');
+    expect(facts).toHaveTextContent('Contraseña••••••••');
+    expect(facts).not.toHaveTextContent('Segura123');
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false); // cancelar no envía nada
+    expect(screen.getByLabelText('Nombres')).toHaveValue('Eva'); // y el formulario sigue igual
+    await userEvent.click(register);
+    await answer('dialog', '¿Registrar a Eva Sol?', 'Registrar empleado');
 
     expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
     const popup = await screen.findByRole('dialog', { name: 'Empleado registrado' });
@@ -182,6 +199,8 @@ describe('Empleados: alta', () => {
     const register = screen.getByRole('button', { name: 'Registrar empleado' });
     await waitFor(() => expect(register).toBeEnabled());
     await userEvent.click(register);
+    const confirm = await answer('dialog', '¿Vincular a Eva Sol a tu empresa?', 'Vincular a mi empresa');
+    expect(within(confirm).getByRole('region', { name: 'Se vinculará' })).not.toHaveTextContent('Contraseña');
 
     const popup = await screen.findByRole('dialog', { name: 'Persona vinculada a tu empresa' });
     expect(popup).toHaveTextContent('Eva Sol ya trabajaba en otra empresa');
@@ -205,6 +224,7 @@ describe('Empleados: alta', () => {
     const register = screen.getByRole('button', { name: 'Registrar empleado' });
     await waitFor(() => expect(register).toBeEnabled());
     await userEvent.click(register);
+    await answer('dialog', '¿Registrar a Eva Sol?', 'Registrar empleado');
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo guardar' })).toHaveTextContent('Ese número de empleado ya existe');
     expect(screen.getByLabelText('No. de empleado')).toHaveAccessibleDescription(/Ese número de empleado ya existe/);
   });
@@ -247,6 +267,19 @@ describe('Empleados: edición', () => {
     await waitFor(() => expect(save).toBeEnabled());
     expect(save).not.toHaveAttribute('title');
     await userEvent.click(save);
+    // La confirmación muestra solo lo que cambia ("antes → después"); la contraseña nunca se ve.
+    const confirm = await answer('dialog', '¿Guardar los cambios de Ana Ruiz?', 'Cancelar');
+    const rows = within(within(confirm).getByRole('region', { name: 'Cambios' })).getAllByRole('listitem');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'NombresAntes: AnaDespués: Anita',
+      'ContraseñaAntes: ••••••••Después: Nueva',
+      'Excepción de prenda de cabezaAntes: NoDespués: Sí',
+    ]);
+    expect(confirm).toHaveTextContent('Deberá entrar con la nueva contraseña');
+    expect(calls.some((c) => c.init.method === 'PUT')).toBe(false); // cancelar no envía nada
+    expect(screen.getByLabelText('Nombres')).toHaveValue(' Anita ');
+    await userEvent.click(save);
+    await answer('dialog', '¿Guardar los cambios de Ana Ruiz?', 'Guardar cambios');
 
     expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
     expect(await screen.findByText('Cambios guardados')).toBeInTheDocument();
@@ -284,6 +317,8 @@ describe('Empleados: edición', () => {
     const save = screen.getByRole('button', { name: 'Guardar cambios' });
     await waitFor(() => expect(save).toBeEnabled());
     await userEvent.click(save);
+    const confirm = await answer('dialog', '¿Guardar los cambios de Ana Ruiz?', 'Guardar cambios');
+    expect(confirm).not.toHaveTextContent('Deberá entrar con la nueva contraseña'); // la contraseña no cambia
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo guardar' })).toBeInTheDocument();
     expect(email).toHaveAccessibleDescription(/El correo ya está registrado/);
     expect(screen.queryByText('Expediente del empleado')).toBeNull();
@@ -313,6 +348,11 @@ describe('Empleados: solicitar nueva verificación', () => {
     const { calls } = mockFetch(apiOk(ana));
     renderEmployees('/company/employees/7/reverify');
     await userEvent.click(await screen.findByRole('button', { name: 'Solicitar verificación' }));
+    const confirm = await answer('alertdialog', '¿Solicitar a Ana Ruiz verificar su identidad?', 'Cancelar');
+    expect(confirm).toHaveTextContent('Sin motivo: se le indicará que la empresa solicitó verificar su identidad');
+    expect(calls.some((c) => c.init.method === 'POST')).toBe(false); // cancelar no envía nada
+    await userEvent.click(screen.getByRole('button', { name: 'Solicitar verificación' }));
+    await answer('alertdialog', '¿Solicitar a Ana Ruiz verificar su identidad?', 'Solicitar verificación');
     expect(await screen.findByText('Verificación solicitada')).toBeInTheDocument();
     const post = calls.find((c) => c.init.method === 'POST');
     expect(post?.url).toBe('/api/employees/7/face/reset');

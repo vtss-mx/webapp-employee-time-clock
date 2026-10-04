@@ -1,12 +1,15 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../test/http';
 import { renderWithProviders, tokenResponse, sampleUser } from '../test/render';
+import { withScreens } from '../test/screens';
 import { AppLayout } from './AppLayout';
 import { DashboardPage } from '../pages/company/DashboardPage';
 import { useAuth } from '../hooks/useAuth';
+import { notifyAbsenceRequestsChanged } from '../hooks/usePendingAbsenceRequests';
+import { notifyShiftRequestsChanged } from '../hooks/usePendingShiftRequests';
 import { useEffect } from 'react';
 
 function SignIn() {
@@ -15,17 +18,17 @@ function SignIn() {
   return null;
 }
 
-function renderLayout(page = <p>contenido</p>) {
+function renderLayout(page = <p>contenido</p>, route = '/') {
   return renderWithProviders(
     <>
       <SignIn />
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={page} />
+          <Route path="*" element={page} />
         </Route>
       </Routes>
     </>,
-    { auth: true },
+    { auth: true, route },
   );
 }
 
@@ -111,57 +114,108 @@ describe('AppLayout: menú lateral contraíble', () => {
     expect(sidebar).not.toHaveClass('is-open');
   });
 
-  it('la barra muestra la pantalla actual y la suma de pendientes en el botón del menú', async () => {
+  it('la barra muestra la pantalla actual; los pendientes van en el menú, no sobre el botón', async () => {
     companyServer(3);
     renderLayout();
     const bar = await screen.findByRole('banner');
-    await waitFor(() => expect(within(bar).getByRole('button', { name: 'Abrir menú' })).toHaveTextContent('3'));
+    const sidebar = screen.getByRole('complementary', { name: 'Navegación principal' });
+    expect(await within(sidebar).findByText('3')).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Abrir menú' }).querySelector('.mobilebar__badge')).toBeNull();
     expect(within(bar).getByRole('link', { name: 'Inicio' })).toHaveAttribute('href', '/company/dashboard');
   });
 
   it('el dashboard muestra los pendientes de la misma consulta del menú (una sola consulta periódica)', async () => {
-    const { calls } = companyServer(2, (call) => {
-      if (call.url.includes('/face/learning')) return apiOk({ enabled: true, employees_learning: 0, learned_samples: 0 });
-      return call.url.includes('/employees') ? apiOk({ items: [], total: 5, page: 1, size: 1 }) : null;
-    });
+    const { calls } = companyServer(2, (call) => (call.url.includes('/employees') ? apiOk({ items: [], total: 5, page: 1, size: 1 }) : null));
     renderLayout(<DashboardPage />);
     expect(await screen.findByText(/2 registros faciales esperan/)).toBeInTheDocument();
     expect(calls.filter((c) => c.url.includes('/enrollments'))).toHaveLength(1);
   });
 
-  it('el menú son las pantallas que envía el backend (orden, nombres y contadores)', async () => {
-    companyServer(4);
+  it('el menú son las pantallas que envía el backend, en menús y submenús (orden, nombres y contadores)', async () => {
+    const { calls } = companyServer(4, (call) => {
+      if (call.url.endsWith('/shift-requests/summary')) return apiOk({ pending: 2 });
+      return call.url.endsWith('/calendar/absences/summary') ? apiOk({ pending: 3 }) : null;
+    });
     renderLayout();
     const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
-    const links = () => within(sidebar).getAllByRole('link').filter((l) => l.classList.contains('nav-item'));
-    expect(links().map((l) => l.getAttribute('href'))).toEqual([
-      '/company/dashboard',
-      '/company/employees',
-      '/company/departments',
-      '/company/validations',
-      '/company/validators',
-      '/company/reports',
-      '/company/settings',
-      '/company/integrations',
-      '/profile',
-    ]);
-    await waitFor(() => expect(within(sidebar).getByRole('link', { name: /Validaciones/ })).toHaveTextContent('4'));
+    // Lo más simple: un módulo con una sola pantalla es una opción directa; con varias, un submenú (cerrado).
+    const top = () => [...sidebar.querySelectorAll('.sidebar__nav > * > .nav-item')].map((item) => item.textContent);
+    await waitFor(() => expect(top()).toEqual(['Dashboard', 'Personal4', 'Asistencia5', 'Validadores', 'Integraciones (API)', 'Mi perfil']));
+    const people = within(sidebar).getByRole('button', { name: /Personal/ });
+    expect(people).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(people);
+    expect(within(sidebar).getByRole('link', { name: /Validaciones/ })).toHaveTextContent('4');
+    expect(within(sidebar).getByRole('link', { name: 'Empleados' })).toHaveAttribute('href', '/company/employees');
+    expect(people).not.toHaveTextContent('4'); // abierto, el pendiente está en su opción
+    // Solo un submenú abierto a la vez.
+    await userEvent.click(within(sidebar).getByRole('button', { name: /Asistencia/ }));
+    expect(within(sidebar).queryByRole('link', { name: 'Empleados' })).toBeNull();
+    expect(within(sidebar).getByRole('link', { name: /Turnos/ })).toHaveTextContent('2');
+    expect(within(sidebar).getByRole('link', { name: /Calendario/ })).toHaveTextContent('3');
+    await userEvent.click(within(sidebar).getByRole('button', { name: /Asistencia/ }));
+    expect(within(sidebar).queryByRole('link', { name: /Turnos/ })).toBeNull();
+    // Solicitudes de cambio de turno pendientes: una consulta periódica, que se repite al avisar un cambio.
+    const asked = calls.filter((c) => c.url.endsWith('/shift-requests/summary')).length;
+    act(() => notifyShiftRequestsChanged());
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/shift-requests/summary')).length).toBe(asked + 1));
+    // Igual las solicitudes de vacaciones o permisos (contador de Calendario).
+    const absences = calls.filter((c) => c.url.endsWith('/calendar/absences/summary')).length;
+    act(() => notifyAbsenceRequestsChanged());
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/calendar/absences/summary')).length).toBe(absences + 1));
   });
 
-  it('administrador de la plataforma: panel, empresas, errores del sistema (con pendientes) y perfil', async () => {
+  it('el submenú de la pantalla actual se abre solo; con el menú contraído (solo íconos) se ven todas las pantallas', async () => {
+    companyServer();
+    renderLayout(<p>contenido</p>, '/company/shifts/new');
+    const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
+    expect(await within(sidebar).findByRole('button', { name: /Asistencia/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(within(sidebar).getByRole('link', { name: 'Turnos' })).toBeInTheDocument();
+    expect(within(sidebar).queryByRole('link', { name: 'Empleados' })).toBeNull();
+    // Al ir a una pantalla de otro submenú, se abre ese y se cierra el anterior.
+    await userEvent.click(within(sidebar).getByRole('button', { name: /Personal/ }));
+    await userEvent.click(within(sidebar).getByRole('link', { name: 'Empleados' }));
+    expect(within(sidebar).getByRole('button', { name: /Personal/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(within(sidebar).getByRole('button', { name: /Asistencia/ })).toHaveAttribute('aria-expanded', 'false');
+
+    const user = { ...sampleUser, role: 'COMPANY' as const, employee: null, preferences: { sidebar_collapsed: true } };
+    mockFetch((call) => (call.url.includes('/enrollments') ? apiOk({ items: [], total: 0, page: 1, size: 1 }) : apiOk(tokenResponse(user))));
+    cleanup();
+    renderLayout();
+    const compact = await screen.findByRole('complementary', { name: 'Navegación principal' });
+    expect(await within(compact).findByRole('link', { name: 'Empleados' })).toBeInTheDocument();
+    expect(within(compact).getByRole('link', { name: 'Turnos' })).toBeInTheDocument();
+    expect(within(compact).queryByRole('button', { name: /Personal/ })).toBeNull();
+  });
+
+  it('sin módulos (un backend anterior) el menú es una sola lista, sin submenús', async () => {
+    const admin = { ...sampleUser, role: 'ADMIN' as const, employee: null };
+    const legacy = { ...tokenResponse(admin), user: { ...withScreens(admin), modules: [] } };
+    mockFetch((call) => (call.url.includes('/admin/errors/summary') ? apiOk({ by_status: {}, open_by_severity: {}, pending: 0, last_seen_at: null }) : apiOk(legacy)));
+    renderLayout();
+    const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
+    expect(within(sidebar).getByRole('link', { name: 'Empresas' })).toBeInTheDocument();
+    expect(sidebar.querySelector('.nav-menu')).toBeNull();
+  });
+
+  it('administrador de la plataforma: panel, empresas, errores del sistema (con pendientes), seguridad facial y perfil', async () => {
     mockFetch((call) =>
       call.url.includes('/admin/errors/summary')
         ? apiOk({ by_status: { PENDING: 3 }, open_by_severity: {}, pending: 3, last_seen_at: null })
         : apiOk(tokenResponse({ ...sampleUser, role: 'ADMIN', employee: null })),
     );
-    renderLayout();
+    renderLayout(<p>contenido</p>, '/admin/dashboard');
     const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
     const labels = () =>
       within(sidebar)
         .getAllByRole('link')
         .filter((l) => l.classList.contains('nav-item'))
         .map((l) => l.textContent);
-    await waitFor(() => expect(labels()).toEqual(['Panel', 'Empresas', 'Errores del sistema3', 'Mi perfil']));
+    // "Plataforma" abre su submenú porque la pantalla actual (Panel) es suya.
+    await waitFor(() => expect(labels()).toEqual(['Panel', 'Empresas', 'Mi perfil']));
+    expect(within(sidebar).getByRole('button', { name: 'Plataforma' })).toHaveAttribute('aria-expanded', 'true');
+    // "Operación" (errores del sistema y seguridad facial) se abre a demanda; un submenú a la vez.
+    await userEvent.click(within(sidebar).getByRole('button', { name: /Operación/ }));
+    await waitFor(() => expect(labels()).toEqual(['Errores del sistema3', 'Seguridad facial', 'Mi perfil']));
     // Sin empresa ni empleos (dato del backend, no el rol): la consola de la plataforma.
     expect(within(sidebar).getByText('Consola de la plataforma', { selector: '.brand-name small' })).toBeInTheDocument();
   });

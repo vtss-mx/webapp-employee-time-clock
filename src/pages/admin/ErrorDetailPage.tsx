@@ -1,4 +1,4 @@
-import { Activity, Bug, ClipboardList, Code2, ListChecks } from 'lucide-react';
+import { Activity, Bug, CheckCheck, ClipboardList, Code2, ListChecks } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { CatalogStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
@@ -15,7 +15,8 @@ import { notifyErrorsChanged } from '../../hooks/usePendingErrors';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { errorReportService } from '../../services/errorReportService';
-import type { ErrorStatus } from '../../types';
+import type { ErrorReportDetail, ErrorStatus } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
 import { formatDateTime } from '../../utils/format';
 import { whereOf } from './ErrorsPage';
 
@@ -23,12 +24,34 @@ const SOURCES: Record<string, string> = {
   HTTP: 'Respuesta de la API',
   LOG: 'Proceso del backend (segundo plano o interno)',
   WEBSOCKET: 'Canal en vivo (WebSocket)',
+  CLIENT: 'Aplicación web (navegador)',
 };
+
+/** Cambiar el seguimiento: "antes → después" con los nombres del catálogo y de qué error se trata. */
+function statusConfirm(report: ErrorReportDetail, status: ErrorStatus, current: string, next: string): ConfirmInput {
+  const resolved = status === 'RESOLVED';
+  return {
+    kind: 'edit',
+    tone: resolved ? 'success' : 'primary',
+    icon: resolved ? <CheckCheck size={30} /> : <ListChecks size={30} />,
+    eyebrow: 'Seguimiento del error',
+    title: `¿Marcar ${report.code} como ${next.toLowerCase()}?`,
+    message: resolved ? 'Si vuelve a ocurrir, se reabre solo como pendiente.' : 'Queda registrado quién lo cambió y cuándo.',
+    changes: [{ label: 'Seguimiento', before: current, after: next }],
+    details: [
+      { label: 'Mensaje', value: report.message },
+      { label: 'Dónde', value: whereOf(report) },
+      { label: 'Ocurrencias', value: report.occurrences.toLocaleString('es-MX') },
+    ],
+    confirmLabel: `Marcar como ${next.toLowerCase()}`,
+    confirmIcon: resolved ? <CheckCheck size={18} /> : <ListChecks size={18} />,
+  };
+}
 
 /** Detalle de un error del sistema: dónde y cuántas veces, su stack trace, quién lo provocó y su seguimiento. */
 export function ErrorDetailPage() {
   const reportId = Number(useParams().id);
-  const { active } = useCatalogs();
+  const { active, nameOf } = useCatalogs();
   const { data: report, setData, error, retry } = useResource((signal) => errorReportService.get(reportId, signal), reportId, 'No se pudo cargar el error');
   const occurrences = usePagedList((page, signal) => errorReportService.occurrences(reportId, page, signal), {
     errorTitle: 'No se pudieron cargar sus ocurrencias',
@@ -54,6 +77,7 @@ export function ErrorDetailPage() {
   const mark = (status: ErrorStatus, name: string) =>
     run(() => errorReportService.setStatus(report.id, status), {
       busy: status,
+      confirm: statusConfirm(report, status, nameOf('error_statuses', report.status), name),
       errorTitle: 'No se pudo actualizar el seguimiento',
       success: ['Seguimiento actualizado', `El error quedó como «${name}».`],
       onSuccess: (saved) => {

@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Camera, ScanFace, ShieldCheck, UserCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaceRequirements } from '../../components/FaceRequirements';
@@ -7,6 +7,7 @@ import { LiveFaceFlow, type CapturedFace } from '../../components/LiveFaceFlow';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { useAuth } from '../../hooks/useAuth';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { paths } from '../../routes/paths';
@@ -46,6 +47,7 @@ export function EnrollmentPage() {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const feedback = useFeedback();
+  const confirm = useConfirm();
   const [started, setStarted] = useState(false);
   const { policy } = useVerificationPolicy();
   // Las mismas etapas que contará el escáner ("n / N"): cinco con prueba de vida, cuatro sin ella.
@@ -73,6 +75,22 @@ export function EnrollmentPage() {
       });
     }
   }, [rejected, reverify, rejectionReason, feedback]);
+
+  /** El registro crea sus datos biométricos: se confirma antes de abrir la cámara. */
+  const start = async () => {
+    const ok = await confirm({
+      kind: 'create',
+      icon: <ScanFace size={30} />,
+      eyebrow: 'Registro facial',
+      title: '¿Registrar tu rostro?',
+      message: 'Se abrirá la cámara para capturar tu rostro con prueba de vida. Al terminar, tu empresa validará tu identidad.',
+      details: ['Ubícate en un lugar bien iluminado.', 'Mira de frente a la cámara, con el rostro descubierto.'],
+      note: rejected || reverify ? 'Tu registro anterior se reemplazará por este.' : undefined,
+      confirmLabel: 'Abrir cámara',
+      confirmIcon: <Camera size={18} />,
+    });
+    if (ok) setStarted(true);
+  };
 
   if (started) {
     return (
@@ -142,7 +160,7 @@ export function EnrollmentPage() {
           <p className="inline-note small muted">
             <ShieldCheck size={16} color="var(--success)" /> Solo guardamos datos cifrados; nunca se comparten.
           </p>
-          <Button variant="primary" size="lg" iconRight={<ArrowRight size={20} />} onClick={() => setStarted(true)}>
+          <Button variant="primary" size="lg" iconRight={<ArrowRight size={20} />} onClick={() => void start()}>
             Comenzar registro
           </Button>
         </PanelFooter>

@@ -46,7 +46,7 @@ const renderPage = () =>
   );
 
 describe('ValidatorDevicesPage (COMPANY)', () => {
-  it('autoriza uno pendiente, rechaza otro y revoca uno autorizado (con confirmación)', async () => {
+  it('autoriza uno pendiente, rechaza otro y revoca uno autorizado (cada decisión se confirma)', async () => {
     const { calls } = server([device(1, 'PENDING'), device(2, 'PENDING'), device(3, 'APPROVED', { reviewed_by: 'rh@empresa.com' })]);
     renderPage();
     expect(await screen.findByText('Recepción planta 1 · recepcion@empresa.com')).toBeInTheDocument();
@@ -55,17 +55,25 @@ describe('ValidatorDevicesPage (COMPANY)', () => {
     expect(screen.getAllByText(/IP 10.0.0.5/, { selector: 'small' })).toHaveLength(3);
 
     await userEvent.click(screen.getByRole('button', { name: 'Autorizar Tableta 1' }));
+    const approve = await screen.findByRole('dialog', { name: '¿Autorizar «Tableta 1»?' });
+    expect(approve).toHaveTextContent('El validador podrá iniciar sesión e identificar a tu personal en este dispositivo.');
+    expect(within(approve).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: Por autorizarDespués: Autorizado');
+    expect(within(approve).getByRole('region', { name: 'Detalles' })).toHaveTextContent(/^EquipoSafari · iOSRegistrado.+$/);
+    await userEvent.click(within(approve).getByRole('button', { name: 'Autorizar' }));
     expect(await screen.findByText('Dispositivo autorizado')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Rechazar Tableta 2' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Rechazar' }));
+    const reject = await screen.findByRole('alertdialog', { name: '¿Rechazar «Tableta 2»?' });
+    expect(within(reject).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: Por autorizarDespués: Rechazado');
+    await userEvent.click(within(reject).getByRole('button', { name: 'Rechazar' }));
     expect(await screen.findByText('Dispositivo rechazado')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Revocar Tableta 3' }));
-    const confirm = await screen.findByRole('alertdialog');
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Revocar «Tableta 3»?' });
     expect(confirm).toHaveTextContent('Se cerrarán las sesiones abiertas del validador');
+    expect(within(confirm).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: AutorizadoDespués: Revocado');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Revocar' }));
     expect(await screen.findByText('Autorización revocada')).toBeInTheDocument();
 
@@ -109,14 +117,22 @@ describe('ValidatorDevicesPage: tipos de dispositivo, cancelar y páginas', () =
     expect(screen.getByRole('button', { name: 'Autorizar Tableta vieja' })).toBeInTheDocument(); // rechazado: se puede autorizar
   });
 
-  it('cancelar la confirmación no cambia el dispositivo', async () => {
-    const { calls } = server([device(1, 'APPROVED')]);
+  it('cancelar la confirmación (autorizar o revocar) no cambia el dispositivo', async () => {
+    const { calls } = server([device(1, 'APPROVED'), device(2, 'REVOKED', { user_agent: null })]);
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Revocar Tableta 1' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Revocar «Tableta 1»' });
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Revocar «Tableta 1»?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Autorizar Tableta 2' }));
+    const approve = await screen.findByRole('dialog', { name: '¿Autorizar «Tableta 2»?' });
+    expect(within(approve).getByRole('region', { name: 'Cambios' })).toHaveTextContent('EstadoAntes: RevocadoDespués: Autorizado');
+    expect(within(approve).getByRole('region', { name: 'Detalles' })).toHaveTextContent('EquipoDispositivo desconocido');
+    await userEvent.click(within(approve).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(calls.some((c) => c.init.method === 'PATCH')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Revocar Tableta 1' })).toBeEnabled();
+    expect(screen.getByText('Revocado')).toBeInTheDocument();
   });
 
   it('al cambiar de página la lista anterior se atenúa mientras llega la siguiente', async () => {

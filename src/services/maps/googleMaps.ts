@@ -1,4 +1,4 @@
-import { addressFromParts, type AddressPart, type AddressValues, type GeoPoint } from '../../utils/address';
+import { addressFromParts, addressFromResults, missingAreaFields, type AddressPart, type AddressValues, type GeoPoint } from '../../utils/address';
 import { config } from '../../utils/config';
 
 /**
@@ -32,6 +32,14 @@ const REGION = 'MX';
 const CALLBACK = '__timeClockMapsReady';
 /** Si Google no responde en este tiempo, el mapa se da por no disponible (no se queda cargando). */
 const LOAD_TIMEOUT_MS = 20_000;
+/** Una petición a Google (sugerencias, lugar, geocodificación) sin respuesta en este tiempo es una falla pasajera. */
+const REQUEST_TIMEOUT_MS = 10_000;
+/** Completar el domicilio de un lugar elegido es accesorio: si Google tarda más, se queda con lo que trae. */
+const COMPLETE_TIMEOUT_MS = 3_000;
+/** Sugerencias que muestra el buscador: las más cercanas al punto de referencia. */
+export const MAX_SUGGESTIONS = 5;
+/** Zona preferida alrededor del punto de referencia (m): el máximo que acepta Google (50 km). */
+const BIAS_RADIUS_M = 50_000;
 
 let loading: Promise<void> | null = null;
 const authListeners = new Set<() => void>();
@@ -90,6 +98,15 @@ function asMapsError(api: MapsApi, error: unknown): MapsApiError {
   return new MapsApiError(api, denied ? 'denied' : 'failed', text.trim().slice(0, 160));
 }
 
+/** La respuesta de Google o, si no llega a tiempo, una falla pasajera ("timeout"): nada se queda esperando. */
+function inTime<T>(api: MapsApi, task: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
+  let timer = 0;
+  const late = new Promise<never>((_resolve, reject) => {
+    timer = window.setTimeout(() => reject(new MapsApiError(api, 'failed', 'timeout')), ms);
+  });
+  return Promise.race([task, late]).finally(() => window.clearTimeout(timer));
+}
+
 function requireApi(api: 'places' | 'geocoding') {
   if (!config.maps.apiKey || !config.maps[api]) throw new MapsApiError(api, 'off');
 }
@@ -106,13 +123,55 @@ function bestResult(results: google.maps.GeocoderResult[]): google.maps.Geocoder
   return results.find((r) => r.types.some((t) => precise.includes(t))) ?? results[0];
 }
 
+/**
+ * Componentes de TODOS los resultados de Google para un punto (la dirección exacta, la calle, la
+ * colonia, el código postal, la ciudad...), el más preciso primero: así el domicilio se arma con todo
+ * lo que Google sabe de ese lugar (`addressFromResults`).
+ */
+async function partsAt(point: GeoPoint): Promise<AddressPart[][]> {
+  const { Geocoder } = await library<google.maps.GeocodingLibrary>('geocoding');
+  const { results } = await new Geocoder().geocode({ location: point, language: LANGUAGE });
+  const best = bestResult(results);
+  const ordered = best ? [best, ...results.filter((r) => r !== best)] : [];
+  return ordered.map((r) => fromGeocoder(r.address_components));
+}
+
+/**
+ * Domicilio de un lugar elegido: lo que trae el lugar y, si le falta algo de la zona (un negocio sin
+ * código postal, p. ej.), lo completa la geocodificación de su punto. Es accesorio: sin Geocoding, con
+ * una falla o si tarda, el lugar se queda con lo que trae, sin avisos (tocar el mapa sí avisa y reporta
+ * una API sin habilitar).
+ */
+async function completeAddress(point: GeoPoint, own: AddressPart[]): Promise<Partial<AddressValues>> {
+  const address = addressFromParts(own);
+  if (!config.maps.geocoding || !missingAreaFields(address)) return address;
+  const nearby = await inTime('geocoding', partsAt(point), COMPLETE_TIMEOUT_MS).catch((): AddressPart[][] => []);
+  return addressFromResults([own, ...nearby]);
+}
+
+/** Las más cercanas primero; las de distancia desconocida, al final en el orden de Google (su relevancia). */
+function nearestFirst(list: PlaceSuggestion[]): PlaceSuggestion[] {
+  const far = (s: PlaceSuggestion) => s.distanceMeters ?? Number.POSITIVE_INFINITY;
+  // Dos desconocidas dan NaN, que `sort` trata como empate (conserva el orden de Google).
+  return list.sort((a, b) => far(a) - far(b));
+}
+
 export interface PlaceSuggestion {
   id: string;
   /** Nombre del lugar o calle y número. */
   primary: string;
   /** Colonia, ciudad, estado... */
   secondary: string;
+  /** Distancia en línea recta desde el punto de referencia (m); null sin referencia. */
+  distanceMeters: number | null;
   prediction: google.maps.places.PlacePrediction;
+}
+
+export interface SearchOptions {
+  /** País del domicilio (ISO 3166): las sugerencias se limitan a él. */
+  country?: string;
+  /** Punto de referencia (el marcado, lo que se ve del mapa o el dispositivo): se prefieren los lugares cercanos. */
+  near?: GeoPoint | null;
 }
 
 export interface FoundPlace {
@@ -126,10 +185,7 @@ export const mapsService = {
   async reverseGeocode(point: GeoPoint): Promise<Partial<AddressValues>> {
     requireApi('geocoding');
     try {
-      const { Geocoder } = await library<google.maps.GeocodingLibrary>('geocoding');
-      const { results } = await new Geocoder().geocode({ location: point, language: LANGUAGE });
-      const best = bestResult(results);
-      return best ? addressFromParts(fromGeocoder(best.address_components)) : {};
+      return addressFromResults(await inTime('geocoding', partsAt(point)));
     } catch (error) {
       if ((error as { code?: string })?.code === 'ZERO_RESULTS') return {};
       throw asMapsError('geocoding', error);
@@ -141,7 +197,7 @@ export const mapsService = {
     requireApi('geocoding');
     try {
       const { Geocoder } = await library<google.maps.GeocodingLibrary>('geocoding');
-      const { results } = await new Geocoder().geocode({ address: text, region: country, language: LANGUAGE });
+      const { results } = await inTime('geocoding', new Geocoder().geocode({ address: text, region: country, language: LANGUAGE }));
       const best = bestResult(results);
       if (!best) return null;
       return { point: best.geometry.location.toJSON(), address: addressFromParts(fromGeocoder(best.address_components)), label: best.formatted_address };
@@ -162,34 +218,46 @@ export const mapsService = {
     }
   },
 
-  /** Sugerencias de lugares y direcciones mientras se escribe. */
-  async suggestPlaces(input: string, sessionToken: google.maps.places.AutocompleteSessionToken, country?: string): Promise<PlaceSuggestion[]> {
+  /**
+   * Sugerencias de lugares y direcciones mientras se escribe, con Autocomplete de Places (New): la
+   * respuesta más rápida de Google, hecha para cada tecla (la sesión agrupa las sugerencias y el lugar
+   * elegido en un solo cobro). Con un punto de referencia, Google prefiere los lugares a 50 km de él y
+   * mide la distancia a cada uno: se devuelven las 5 más cercanas primero.
+   */
+  async suggestPlaces(input: string, sessionToken: google.maps.places.AutocompleteSessionToken, { country, near }: SearchOptions = {}): Promise<PlaceSuggestion[]> {
     requireApi('places');
     try {
       const { AutocompleteSuggestion } = await library<google.maps.PlacesLibrary>('places');
-      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      const request: google.maps.places.AutocompleteRequest = {
         input,
         sessionToken,
         language: LANGUAGE,
         region: (country || REGION).toLowerCase(),
         includedRegionCodes: country ? [country.toLowerCase()] : undefined,
-      });
-      return suggestions.flatMap(({ placePrediction: p }) =>
-        p ? [{ id: p.placeId, primary: p.mainText?.text ?? p.text.text, secondary: p.secondaryText?.text ?? '', prediction: p }] : [],
+        ...(near && { origin: near, locationBias: { center: near, radius: BIAS_RADIUS_M } }),
+      };
+      const { suggestions } = await inTime('places', AutocompleteSuggestion.fetchAutocompleteSuggestions(request));
+      const found = suggestions.flatMap(({ placePrediction: p }) =>
+        p ? [{ id: p.placeId, primary: p.mainText?.text ?? p.text.text, secondary: p.secondaryText?.text ?? '', distanceMeters: p.distanceMeters ?? null, prediction: p }] : [],
       );
+      return nearestFirst(found).slice(0, MAX_SUGGESTIONS);
     } catch (error) {
       throw asMapsError('places', error);
     }
   },
 
-  /** Punto y domicilio del lugar sugerido que se eligió (cierra la sesión de búsqueda). */
+  /**
+   * Punto y domicilio del lugar sugerido que se eligió (cierra la sesión de búsqueda). Lo que el lugar
+   * no traiga de su zona se completa con la geocodificación de su punto (de mejor esfuerzo).
+   */
   async resolvePlace(suggestion: PlaceSuggestion): Promise<FoundPlace> {
     requireApi('places');
     try {
       const place = suggestion.prediction.toPlace();
-      await place.fetchFields({ fields: ['location', 'addressComponents', 'formattedAddress'] });
+      await inTime('places', place.fetchFields({ fields: ['location', 'addressComponents', 'formattedAddress'] }));
       if (!place.location) throw new MapsApiError('places', 'failed', 'sin ubicación');
-      return { point: place.location.toJSON(), address: addressFromParts(fromPlaces(place.addressComponents)), label: place.formattedAddress ?? suggestion.primary };
+      const point = place.location.toJSON();
+      return { point, address: await completeAddress(point, fromPlaces(place.addressComponents)), label: place.formattedAddress ?? suggestion.primary };
     } catch (error) {
       throw asMapsError('places', error);
     }
@@ -202,6 +270,7 @@ export const mapsService = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ considerIp: true }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), // sin respuesta a tiempo: falla pasajera
     }).catch((error: unknown) => {
       throw asMapsError('geolocation', error);
     });

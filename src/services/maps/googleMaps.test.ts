@@ -85,6 +85,7 @@ function suggestionFor(fields: FakePlaceFields | Error) {
     id: 'p1',
     primary: 'Plaza Zaragoza',
     secondary: 'Centro, Hermosillo',
+    distanceMeters: null,
     prediction: { toPlace } as unknown as google.maps.places.PlacePrediction,
   };
   return { suggestion, place, toPlace };
@@ -230,6 +231,24 @@ describe('mapsService.reverseGeocode', () => {
     expect(sdk.geocode).toHaveBeenCalledWith({ location: POINT, language: 'es' });
   });
 
+  it('junta TODOS los resultados: lo que le falte a la dirección exacta sale de los demás (nunca el número)', async () => {
+    const sdk = stubSdk();
+    const withoutZone = geocoded(['street_address'], 'Calle Dr. Paliza 71', PALIZA.slice(0, 2)); // calle y número
+    const postal = geocoded(['postal_code'], '83000 Hermosillo, Son., México', [component('83000', ['postal_code']), ...PALIZA.slice(3)]);
+    const otherHouse = geocoded(['premise'], 'Calle Dr. Paliza 99', [component('99', ['street_number']), component('Calle Dr. Paliza', ['route'])]);
+    // Google ordena por precisión, pero el más preciso manda aunque llegue después de la colonia.
+    sdk.geocode.mockResolvedValue({ results: [CENTRO, withoutZone, otherHouse, postal] });
+    await expect(mapsService.reverseGeocode(POINT)).resolves.toEqual(FOUND);
+  });
+
+  it('si Google no responde a tiempo es una falla pasajera (no se queda buscando)', async () => {
+    vi.useFakeTimers();
+    stubSdk().geocode.mockReturnValue(new Promise<never>(() => undefined));
+    const pending = failure(mapsService.reverseGeocode(POINT));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await pending).toMatchObject({ api: 'geocoding', problem: 'failed', message: 'geocoding: failed (timeout)' });
+  });
+
   it('sin dirección exacta usa el primer resultado; sin resultados (o ZERO_RESULTS) no llena nada', async () => {
     const sdk = stubSdk();
     sdk.geocode.mockResolvedValueOnce({ results: [CENTRO] });
@@ -326,11 +345,44 @@ describe('mapsService: búsqueda de lugares', () => {
     const street = prediction('p2', 'Calle 5 de Mayo 12');
     sdk.fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [{ placePrediction: plaza }, { placePrediction: street }, { placePrediction: null }] });
     const token = new FakeSessionToken();
-    await expect(mapsService.suggestPlaces('Plaza', token, 'US')).resolves.toEqual([
-      { id: 'p1', primary: 'Plaza Zaragoza', secondary: 'Centro, Hermosillo', prediction: plaza },
-      { id: 'p2', primary: 'Calle 5 de Mayo 12', secondary: '', prediction: street },
+    await expect(mapsService.suggestPlaces('Plaza', token, { country: 'US' })).resolves.toEqual([
+      { id: 'p1', primary: 'Plaza Zaragoza', secondary: 'Centro, Hermosillo', distanceMeters: null, prediction: plaza },
+      { id: 'p2', primary: 'Calle 5 de Mayo 12', secondary: '', distanceMeters: null, prediction: street },
     ]);
+    // Sin punto de referencia: ni distancia ni zona preferida (Google ordena por relevancia).
     expect(sdk.fetchAutocompleteSuggestions).toHaveBeenCalledWith({ input: 'Plaza', sessionToken: token, language: 'es', region: 'us', includedRegionCodes: ['us'] });
+    expect(sdk.fetchAutocompleteSuggestions.mock.calls[0][0]).not.toHaveProperty('origin');
+  });
+
+  it('con un punto de referencia: prefiere su zona (50 km) y devuelve las 5 más cercanas primero', async () => {
+    const sdk = stubSdk();
+    const at = (placeId: string, distanceMeters: number | null) => ({ placePrediction: { ...prediction(placeId, `Lugar ${placeId}`), distanceMeters } });
+    // Google responde por relevancia; las de distancia desconocida van al final, en el orden de Google.
+    sdk.fetchAutocompleteSuggestions.mockResolvedValue({
+      suggestions: [at('lejos', 48_000), at('sin-a', null), at('cerca', 350), at('medio', 1200), at('sin-b', null), at('aqui', 0), at('otro', 9000)],
+    });
+    const token = new FakeSessionToken();
+    const found = await mapsService.suggestPlaces('Oxxo', token, { country: 'MX', near: POINT });
+    expect(found.map((s) => [s.id, s.distanceMeters])).toEqual([
+      ['aqui', 0],
+      ['cerca', 350],
+      ['medio', 1200],
+      ['otro', 9000],
+      ['lejos', 48_000],
+    ]);
+    expect(sdk.fetchAutocompleteSuggestions).toHaveBeenCalledWith({
+      input: 'Oxxo',
+      sessionToken: token,
+      language: 'es',
+      region: 'mx',
+      includedRegionCodes: ['mx'],
+      origin: POINT,
+      locationBias: { center: POINT, radius: 50_000 },
+    });
+
+    sdk.fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [at('sin-a', null), at('cerca', 350), at('sin-b', null)] });
+    const fewer = await mapsService.suggestPlaces('Oxxo', token, { near: POINT });
+    expect(fewer.map((s) => s.id)).toEqual(['cerca', 'sin-a', 'sin-b']);
   });
 
   it('sin país busca en todo el mundo con preferencia por México', async () => {
@@ -338,18 +390,28 @@ describe('mapsService: búsqueda de lugares', () => {
     sdk.fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [] });
     const token = new FakeSessionToken();
     await expect(mapsService.suggestPlaces('Plaza', token)).resolves.toEqual([]);
-    await expect(mapsService.suggestPlaces('Plaza', token, '')).resolves.toEqual([]);
+    await expect(mapsService.suggestPlaces('Plaza', token, { country: '', near: null })).resolves.toEqual([]);
     for (const [request] of sdk.fetchAutocompleteSuggestions.mock.calls) expect(request).toMatchObject({ region: 'mx', includedRegionCodes: undefined });
   });
 
   it('una falla de Places se clasifica (API no habilitada)', async () => {
     stubSdk().fetchAutocompleteSuggestions.mockRejectedValue(new Error('Places API (New) has not been used in project 123 before or it is disabled'));
-    const error = await failure(mapsService.suggestPlaces('Plaza', new FakeSessionToken(), 'MX'));
+    const error = await failure(mapsService.suggestPlaces('Plaza', new FakeSessionToken(), { country: 'MX' }));
     expect(error).toBeInstanceOf(MapsApiError);
     expect(error).toMatchObject({ api: 'places', problem: 'denied' });
   });
 
-  it('el lugar elegido trae su punto, su domicilio y su dirección', async () => {
+  it('si Google no sugiere a tiempo es una falla pasajera (la lista no se queda buscando)', async () => {
+    vi.useFakeTimers();
+    stubSdk().fetchAutocompleteSuggestions.mockReturnValue(new Promise<never>(() => undefined));
+    const pending = failure(mapsService.suggestPlaces('Plaza', new FakeSessionToken()));
+    await vi.advanceTimersByTimeAsync(9_999);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ api: 'places', problem: 'failed', message: 'places: failed (timeout)' });
+  });
+
+  it('el lugar elegido trae su punto, su domicilio y su dirección (completo: no se geocodifica)', async () => {
+    const sdk = stubSdk();
     const { suggestion, place } = suggestionFor({
       location: { toJSON: () => POINT },
       addressComponents: PALIZA.map((p) => ({ longText: p.long_name, shortText: p.short_name, types: p.types })),
@@ -357,13 +419,54 @@ describe('mapsService: búsqueda de lugares', () => {
     });
     await expect(mapsService.resolvePlace(suggestion)).resolves.toEqual({ point: POINT, address: FOUND, label: 'Plaza Zaragoza, Centro, 83000 Hermosillo, Son., México' });
     expect(place.fetchFields).toHaveBeenCalledWith({ fields: ['location', 'addressComponents', 'formattedAddress'] });
+    expect(sdk.geocode).not.toHaveBeenCalled();
   });
 
-  it('sin dirección usa el nombre sugerido; sin componentes (o vacíos) el domicilio no se llena', async () => {
+  it('sin dirección usa el nombre sugerido; sin componentes (o vacíos) ni geocodificación, el domicilio no se llena', async () => {
+    stubSdk().geocode.mockResolvedValue({ results: [] });
     const bare = suggestionFor({ location: { toJSON: () => POINT }, formattedAddress: null });
     await expect(mapsService.resolvePlace(bare.suggestion)).resolves.toEqual({ point: POINT, address: {}, label: 'Plaza Zaragoza' });
     const empty = suggestionFor({ location: { toJSON: () => POINT }, addressComponents: [{ longText: null, shortText: null, types: ['route'] }] });
     await expect(mapsService.resolvePlace(empty.suggestion)).resolves.toMatchObject({ address: {} });
+  });
+
+  describe('lugar al que le faltan datos de su zona (p. ej. un negocio sin código postal)', () => {
+    /** Un negocio con calle y número, pero sin código postal, estado ni municipio. */
+    const business = () =>
+      suggestionFor({
+        location: { toJSON: () => POINT },
+        addressComponents: [
+          { longText: '71', shortText: '71', types: ['street_number'] },
+          { longText: 'Calle Dr. Paliza', shortText: 'Calle Dr. Paliza', types: ['route'] },
+        ],
+        formattedAddress: 'Plaza Zaragoza',
+      });
+    const NEIGHBOR = geocoded(['street_address'], 'Calle Dr. Paliza 99', [component('99', ['street_number']), component('Otra calle', ['route']), ...PALIZA.slice(2)]);
+
+    it('se completa con la geocodificación de su punto (el número y la calle del lugar se respetan)', async () => {
+      const sdk = stubSdk();
+      sdk.geocode.mockResolvedValue({ results: [NEIGHBOR] });
+      await expect(mapsService.resolvePlace(business().suggestion)).resolves.toEqual({ point: POINT, address: FOUND, label: 'Plaza Zaragoza' });
+      expect(sdk.geocode).toHaveBeenCalledExactlyOnceWith({ location: POINT, language: 'es' });
+    });
+
+    it('es de mejor esfuerzo: sin Geocoding, con una falla o si tarda, queda lo que trae el lugar (sin error)', async () => {
+      const OWN = { street: 'Calle Dr. Paliza', exterior_number: '71' };
+      const sdk = stubSdk();
+      mapsConfig.geocoding = false;
+      await expect(mapsService.resolvePlace(business().suggestion)).resolves.toMatchObject({ address: OWN });
+      expect(sdk.geocode).not.toHaveBeenCalled();
+
+      mapsConfig.geocoding = true;
+      sdk.geocode.mockRejectedValueOnce(new Error('REQUEST_DENIED'));
+      await expect(mapsService.resolvePlace(business().suggestion)).resolves.toEqual({ point: POINT, address: OWN, label: 'Plaza Zaragoza' });
+
+      vi.useFakeTimers();
+      sdk.geocode.mockReturnValueOnce(new Promise<never>(() => undefined));
+      const slow = mapsService.resolvePlace(business().suggestion);
+      await vi.advanceTimersByTimeAsync(3_000); // no espera los 10 s de una petición: es accesorio
+      await expect(slow).resolves.toMatchObject({ address: OWN });
+    });
   });
 
   it('un lugar sin ubicación o una falla al pedir sus datos se informan', async () => {
@@ -371,6 +474,15 @@ describe('mapsService: búsqueda de lugares', () => {
     expect(error).toBeInstanceOf(MapsApiError);
     expect(error).toMatchObject({ api: 'places', problem: 'failed', message: 'places: failed (sin ubicación)' });
     expect(await failure(mapsService.resolvePlace(suggestionFor(new Error('PERMISSION_DENIED')).suggestion))).toMatchObject({ api: 'places', problem: 'denied' });
+  });
+
+  it('si Google no trae los datos del lugar a tiempo es una falla pasajera', async () => {
+    vi.useFakeTimers();
+    const { suggestion, place } = suggestionFor({});
+    place.fetchFields.mockReturnValue(new Promise<never>(() => undefined));
+    const pending = failure(mapsService.resolvePlace(suggestion));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await pending).toMatchObject({ api: 'places', problem: 'failed', message: 'places: failed (timeout)' });
   });
 });
 
@@ -381,6 +493,7 @@ describe('mapsService.approximateLocation', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('https://www.googleapis.com/geolocation/v1/geolocate?key=clave%20de%20prueba');
     expect(calls[0].init).toMatchObject({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"considerIp":true}' });
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal); // con tiempo límite: nunca se queda esperando
   });
 
   it('sin red falla como "failed"', async () => {
