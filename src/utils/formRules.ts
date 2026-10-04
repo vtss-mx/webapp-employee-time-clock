@@ -16,6 +16,21 @@ import {
   type FieldErrors,
 } from './validation';
 
+/** Formulario de empleado vacío (alta): lo comparten el hook del formulario, sus campos y las pruebas. */
+export const emptyEmployeeForm: EmployeeFormValues = {
+  first_name: '',
+  last_name: '',
+  birth_date: '',
+  curp: '',
+  rfc: '',
+  nss: '',
+  employee_number: '',
+  phone: '',
+  email: '',
+  password: '',
+  password_confirm: '',
+};
+
 /**
  * Reglas completas de cada formulario. Viven aparte de `validation.ts` porque usan la validación
  * internacional de teléfonos (libphonenumber): así el login, que solo valida correo y contraseña,

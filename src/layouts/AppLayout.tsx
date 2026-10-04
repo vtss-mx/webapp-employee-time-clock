@@ -8,21 +8,28 @@ import { BrandLogo } from '../components/ui/BrandLogo';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../hooks/useAuth';
 import { useCatalogs } from '../hooks/useCatalogs';
-import { usePendingEnrollments } from '../hooks/usePendingEnrollments';
+import { PendingEnrollmentsContext, usePendingEnrollments } from '../hooks/usePendingEnrollments';
+import { usePendingErrors } from '../hooks/usePendingErrors';
 import { homeForUser } from '../routes/paths';
+import type { User } from '../types';
 import { config } from '../utils/config';
 import { MobileBar, useDrawer } from './MobileBar';
 import { MOBILE_MENU } from './mobileMenu';
+import { useFeedback } from '../hooks/useFeedback';
 import { navFor, usesBadge } from './navigation';
+import { useConfirmLogout } from '../components/auth/logoutConfirm';
 
 /** Menú contraído (escritorio): preferencia del usuario en la BD y atajo Ctrl/⌘ + B. */
 function useSidebarCollapse() {
   const { user, updatePreferences } = useAuth();
+  const feedback = useFeedback();
   const collapsed = Boolean(user?.preferences?.sidebar_collapsed);
   const toggleCollapsed = useCallback(() => {
-    // Si el servidor no responde, el contexto revierte el cambio (sin interrumpir al usuario).
-    updatePreferences({ sidebar_collapsed: !collapsed }).catch(() => undefined);
-  }, [collapsed, updatePreferences]);
+    // Si el servidor no responde, el contexto revierte el cambio y se avisa (una vez aunque se insista).
+    updatePreferences({ sidebar_collapsed: !collapsed }).catch((error: unknown) => {
+      void feedback.fromError(error, { title: 'No se pudo guardar la preferencia del menú', key: 'sidebar-preference' });
+    });
+  }, [collapsed, updatePreferences, feedback]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') {
@@ -36,15 +43,28 @@ function useSidebarCollapse() {
   return { collapsed, toggleCollapsed };
 }
 
+/**
+ * Dónde opera el usuario, bajo el nombre de la app: su empresa; sin empresa ni empleos, la consola
+ * de la plataforma. Sale de los datos que envía el backend, no del rol.
+ */
+function workspaceName(user: User): string {
+  if (user.company) return user.company.name;
+  return user.employee || user.memberships?.length ? 'Identidad verificada' : 'Consola de la plataforma';
+}
+
 export function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const confirmLogout = useConfirmLogout();
   const { nameOf } = useCatalogs();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   useDrawer(menuOpen, closeMenu);
   const { collapsed, toggleCollapsed } = useSidebarCollapse();
+  // Única consulta periódica de la cola de validaciones: alimenta el contador del menú y, por el
+  // contexto, a las pantallas que la muestran (dashboard). Solo si el menú del usuario lo lleva.
   const pending = usePendingEnrollments(usesBadge(user, 'PENDING_ENROLLMENTS'));
+  const pendingErrors = usePendingErrors(usesBadge(user, 'PENDING_ERRORS'));
 
   // En móvil, el menú lateral se cierra al navegar (configurable).
   useEffect(() => {
@@ -60,7 +80,7 @@ export function AppLayout() {
     .map((p) => p[0]?.toUpperCase())
     .join('');
 
-  const nav = navFor(user, { PENDING_ENROLLMENTS: pending });
+  const nav = navFor(user, { PENDING_ENROLLMENTS: pending, PENDING_ERRORS: pendingErrors });
   const role = nameOf('roles', user.role);
 
   return (
@@ -76,8 +96,7 @@ export function AppLayout() {
           <BrandLogo />
           <span className="brand-name">
             <strong>{config.appName}</strong>
-            {/* Empresa del usuario (multiempresa); la plataforma, para su administrador. */}
-            <small className="truncate">{user.company?.name ?? (user.role === 'ADMIN' ? 'Consola de la plataforma' : 'Identidad verificada')}</small>
+            <small className="truncate">{workspaceName(user)}</small>
           </span>
         </Link>
         {/* Teléfonos: el menú se cierra desde dentro (la barra queda detrás del fondo oscuro). */}
@@ -100,7 +119,7 @@ export function AppLayout() {
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
-        <nav style={{ display: 'grid', gap: 4 }}>
+        <nav className="sidebar__nav" style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
           {nav.map(({ to, label, icon: Icon, badge }) => (
             <NavLink key={to} to={to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`} data-tooltip={label}>
               <Icon size={20} />
@@ -117,7 +136,7 @@ export function AppLayout() {
               <strong className="truncate">{displayName}</strong>
               <small>{role}</small>
             </span>
-            <Button iconOnly variant="ghost" onClick={() => void logout()} aria-label="Cerrar sesión" title="Cerrar sesión">
+            <Button iconOnly variant="ghost" onClick={() => void confirmLogout()} aria-label="Cerrar sesión" title="Cerrar sesión">
               <LogOut size={18} />
             </Button>
           </div>
@@ -132,7 +151,9 @@ export function AppLayout() {
             <ErrorBoundary inline>
               {/* Mientras llega el código de la pantalla (carga diferida), el menú sigue visible. */}
               <Suspense fallback={<PageLoader text="Cargando..." />}>
-                <Outlet />
+                <PendingEnrollmentsContext.Provider value={pending}>
+                  <Outlet />
+                </PendingEnrollmentsContext.Provider>
               </Suspense>
             </ErrorBoundary>
           </div>

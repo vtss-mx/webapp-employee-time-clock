@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';
+import { testSession } from './http';
 
 // Margen para equipos cargados (la suite corre en paralelo): las esperas de findBy/waitFor no
 // deben depender de la velocidad de la máquina.
@@ -11,6 +12,8 @@ Element.prototype.scrollIntoView ??= function scrollIntoView() {};
 
 afterEach(() => {
   cleanup();
+  testSession.signedIn = false;
+  window.history.replaceState(null, ''); // la marca de recarga vive en history.state
   window.localStorage.clear();
   window.sessionStorage.clear();
 });

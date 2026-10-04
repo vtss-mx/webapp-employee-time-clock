@@ -1,8 +1,8 @@
-import { ApiError } from '../services/apiClient';
+import { fieldErrorsFrom } from '../services/apiClient';
 import type { CompanyFormValues } from '../types';
 import { validateCompanyForm } from '../utils/formRules';
 import { normalizeRfc, validateEmail, type FieldErrors } from '../utils/validation';
-import { useAvailability, type AvailabilityState } from './useAvailability';
+import { availabilityBlocks, availabilityError, useAvailability } from './useAvailability';
 import { useFormState } from './useFormState';
 
 export const emptyCompanyForm: CompanyFormValues = {
@@ -17,16 +17,8 @@ export const emptyCompanyForm: CompanyFormValues = {
 };
 
 /** Errores del servidor llevados al campo (RFC o correo ya registrados, validación). */
-export function companyServerErrors(err: unknown): FieldErrors<CompanyFormValues> {
-  if (!(err instanceof ApiError)) return {};
-  const result = { ...(err.fieldErrors as FieldErrors<CompanyFormValues>) };
-  if (err.code === 'COMPANY_RFC_TAKEN') result.rfc = err.message;
-  if (err.code === 'EMAIL_TAKEN') result.admin_email = err.message;
-  return result;
-}
-
-const blocking = (state: AvailabilityState) => state.status === 'checking' || state.status === 'taken' || state.status === 'invalid';
-const liveMessage = (state: AvailabilityState) => (state.status === 'taken' || state.status === 'invalid' ? state.message : undefined);
+export const companyServerErrors = (err: unknown): FieldErrors<CompanyFormValues> =>
+  fieldErrorsFrom<CompanyFormValues>(err, { COMPANY_RFC_TAKEN: 'rfc', EMAIL_TAKEN: 'admin_email' });
 
 interface CompanyFormOptions {
   /** Alta: incluye el primer administrador. Edición: solo datos de la empresa. */
@@ -62,8 +54,8 @@ export function useCompanyForm({ withAdmin, excludeId, originalRfc }: CompanyFor
   const clientErrors = validateCompanyForm(values, { withAdmin });
   const errors = form.visibleErrors(clientErrors);
   const liveFields = ['rfc', 'admin_email', 'phone'] as const;
-  for (const field of liveFields) errors[field] ??= liveMessage(live[field]);
-  const canSubmit = Object.keys(clientErrors).length === 0 && !liveFields.some((field) => blocking(live[field])) && !form.saving;
+  for (const field of liveFields) errors[field] ??= availabilityError(live[field]);
+  const canSubmit = Object.keys(clientErrors).length === 0 && !liveFields.some((field) => availabilityBlocks(live[field])) && !form.saving;
 
   return {
     values,

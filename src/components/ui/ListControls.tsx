@@ -7,8 +7,9 @@ interface ListToolbarProps {
   onSearch: (value: string) => void;
   placeholder: string;
   label: string;
-  filter: ActiveFilter;
-  onFilter: (value: ActiveFilter) => void;
+  /** Filtro por estado (los listados sin estado, como departamentos, lo omiten). */
+  filter?: ActiveFilter;
+  onFilter?: (value: ActiveFilter) => void;
   /** Texto de las opciones del filtro (p. ej. "Activos" / "Activas"). */
   labels?: { active: string; inactive: string };
 }
@@ -21,8 +22,9 @@ export function ListToolbar({ search, onSearch, placeholder, label, filter, onFi
         <Search size={18} />
         <input type="search" className="input" placeholder={placeholder} value={search} onChange={(e) => onSearch(e.target.value)} aria-label={label} />
       </div>
+      {onFilter && (
       <Select<ActiveFilter>
-        value={filter}
+        value={filter ?? 'all'}
         onChange={onFilter}
         aria-label="Filtrar por estado"
         options={[
@@ -31,6 +33,7 @@ export function ListToolbar({ search, onSearch, placeholder, label, filter, onFi
           { value: 'inactive', label: labels?.inactive ?? 'Inactivos' },
         ]}
       />
+      )}
     </div>
   );
 }

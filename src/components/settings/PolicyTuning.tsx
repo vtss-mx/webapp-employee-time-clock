@@ -51,7 +51,7 @@ const secondsLabel = (seconds: number) => (seconds >= 60 && seconds % 60 === 0 ?
  * candado está apagado.
  */
 export function PolicyTuning({ policy, saving, onSave }: PolicyTuningProps) {
-  const { active, byCode } = useCatalogs();
+  const { active, byCode, nameOf } = useCatalogs();
   const level = byCode('antispoof_levels', policy.anti_spoofing_level);
   return (
     <div className="stack">
@@ -62,7 +62,7 @@ export function PolicyTuning({ policy, saving, onSave }: PolicyTuningProps) {
             value={policy.anti_spoofing_level}
             disabled={!policy.anti_spoofing || saving === 'anti_spoofing_level'}
             options={active('antispoof_levels').map((item) => ({ value: item.code, label: item.name, description: item.description ?? undefined }))}
-            onChange={(code) => onSave('anti_spoofing_level', { anti_spoofing_level: code }, `Anti-spoofing: nivel ${byCode('antispoof_levels', code)?.name ?? code}`, byCode('antispoof_levels', code)?.description ?? '')}
+            onChange={(code) => onSave('anti_spoofing_level', { anti_spoofing_level: code }, `Anti-spoofing: nivel ${nameOf('antispoof_levels', code)}`, byCode('antispoof_levels', code)?.description ?? '')}
           />
         )}
       </TuningRow>

@@ -115,6 +115,27 @@ export const catalogsFixture: Catalogs = {
     ['REJECTED', 'Rechazado', 'La empresa no autorizó el dispositivo.', { tone: 'danger' }],
     ['REVOKED', 'Revocado', 'La empresa retiró la autorización: sus sesiones se cerraron.', { tone: 'muted' }],
   ]),
+  api_scopes: rows([
+    ['EMPLOYEES_READ', 'Empleados', 'Consultar los empleados (GET /employees y /employees/{id}).'],
+    ['ATTENDANCE_READ', 'Identificaciones', 'Consultar la bitácora de identificaciones (GET /attendance).'],
+    ['VALIDATORS_READ', 'Validadores', 'Consultar los validadores de identidad (GET /validators).'],
+  ]),
+  api_key_statuses: rows([
+    ['ACTIVE', 'Activa', 'La llave da acceso a la API con sus permisos.', { tone: 'success' }],
+    ['EXPIRED', 'Vencida', 'Llegó a su fecha de vencimiento: ya no da acceso.', { tone: 'warning' }],
+    ['REVOKED', 'Revocada', 'La empresa la revocó (o la rotó): ya no da acceso.', { tone: 'muted' }],
+  ]),
+  error_statuses: rows([
+    ['PENDING', 'Pendiente', 'Nadie lo ha tomado todavía (o volvió a ocurrir después de solucionarse).', { tone: 'danger' }],
+    ['IN_PROGRESS', 'En proceso', 'Alguien está trabajando en la causa.', { tone: 'warning' }],
+    ['IN_REVIEW', 'En revisión', 'La corrección está hecha y se está verificando.', { tone: 'info' }],
+    ['RESOLVED', 'Solucionado', 'Corregido. Si vuelve a ocurrir, se reabre solo como pendiente.', { tone: 'success' }],
+  ]),
+  error_severities: rows([
+    ['CRITICAL', 'Crítico', 'Falla no controlada (500) o en un proceso en segundo plano.', { tone: 'danger' }],
+    ['ERROR', 'Error', 'Servicio no disponible u ocupado (5xx controlado).', { tone: 'warning' }],
+    ['WARNING', 'Advertencia', 'Solicitud rechazada: validación, permisos o reglas de negocio (4xx).', { tone: 'info' }],
+  ]),
   verification_reasons: reasons([
     ['NO_MATCH', 'Rostro no coincide', 'Rostro no reconocido'],
     ['LIVENESS_FAILED', 'Prueba de vida no superada', 'No se detectó el giro de cabeza solicitado'],

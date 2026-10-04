@@ -22,8 +22,8 @@ export const enrollmentService = {
     });
   },
 
-  get(id: number): Promise<FaceEnrollmentDetail> {
-    return apiRequest<FaceEnrollmentDetail>(`/enrollments/${id}`, { validate: isDetail });
+  get(id: number, signal?: AbortSignal): Promise<FaceEnrollmentDetail> {
+    return apiRequest<FaceEnrollmentDetail>(`/enrollments/${id}`, { signal, validate: isDetail });
   },
 
   approve(id: number): Promise<FaceEnrollmentDetail> {

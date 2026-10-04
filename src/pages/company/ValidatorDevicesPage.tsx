@@ -6,7 +6,7 @@ import { DeviceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { PagedItems } from '../../components/ui/PagedItems';
-import { useFeedback } from '../../hooks/useFeedback';
+import { useAction } from '../../hooks/useAction';
 import { useResource } from '../../hooks/useResource';
 import { usePagedList } from '../../hooks/usePagedList';
 import { paths } from '../../routes/paths';
@@ -54,28 +54,24 @@ function DeviceIcon({ device }: { device: ValidatorDevice }) {
  */
 export function ValidatorDevicesPage() {
   const validatorId = Number(useParams().id);
-  const feedback = useFeedback();
-  const { data: validator } = useResource(() => validatorService.get(validatorId), validatorId, 'No se pudo cargar el validador');
-  const [busy, setBusy] = useState<number | null>(null);
-  const [confirm, setConfirm] = useState<{ device: ValidatorDevice; decision: Decision } | null>(null);
+  const { data: validator } = useResource((signal) => validatorService.get(validatorId, signal), validatorId, 'No se pudo cargar el validador');
+  const { busy, run } = useAction<number>();
+  // Solo las decisiones con texto de confirmación pasan por aquí: el texto viaja con la decisión.
+  const [confirm, setConfirm] = useState<{ device: ValidatorDevice; decision: Decision; message: string } | null>(null);
 
   const list = usePagedList((page, signal) => validatorService.devices(validatorId, page, signal), {
     errorTitle: 'No se pudieron cargar los dispositivos',
     filterKey: String(validatorId),
   });
 
-  const decide = async (device: ValidatorDevice, decision: Decision) => {
-    setBusy(device.id);
+  const decide = (device: ValidatorDevice, decision: Decision) => {
     setConfirm(null);
-    try {
-      const saved = await validatorService.setDeviceStatus(validatorId, device.id, decision);
-      list.updateItems((items) => items.map((d) => (d.id === saved.id ? saved : d)));
-      void feedback.success(DECISIONS[decision].done, `${saved.name}: ${DECISIONS[decision].detail}`);
-    } catch (err) {
-      void feedback.fromError(err, { title: 'No se pudo actualizar el dispositivo' });
-    } finally {
-      setBusy(null);
-    }
+    return run(() => validatorService.setDeviceStatus(validatorId, device.id, decision), {
+      busy: device.id,
+      errorTitle: 'No se pudo actualizar el dispositivo',
+      success: (saved) => [DECISIONS[decision].done, `${saved.name}: ${DECISIONS[decision].detail}`],
+      onSuccess: (saved) => list.updateItems((items) => items.map((d) => (d.id === saved.id ? saved : d))),
+    });
   };
 
   return (
@@ -136,7 +132,11 @@ export function ValidatorDevicesPage() {
                         loading={busy === device.id}
                         disabled={busy !== null}
                         aria-label={`${DECISIONS[decision].label} ${device.name}`}
-                        onClick={() => (DECISIONS[decision].confirm ? setConfirm({ device, decision }) : void decide(device, decision))}
+                        onClick={() => {
+                          const message = DECISIONS[decision].confirm;
+                          if (message) setConfirm({ device, decision, message });
+                          else void decide(device, decision);
+                        }}
                       >
                         {DECISIONS[decision].label}
                       </Button>
@@ -157,7 +157,7 @@ export function ValidatorDevicesPage() {
       <ConfirmDialog
         open={confirm !== null}
         title={confirm ? `${DECISIONS[confirm.decision].label} «${confirm.device.name}»` : ''}
-        message={confirm ? (DECISIONS[confirm.decision].confirm ?? '') : ''}
+        message={confirm ? confirm.message : ''}
         confirmLabel={confirm ? DECISIONS[confirm.decision].label : ''}
         tone="danger"
         loading={busy !== null}

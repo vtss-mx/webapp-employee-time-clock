@@ -1,21 +1,15 @@
 import { ArrowRight, ClipboardCheck, UserCheck, UserMinus, UserPlus, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaceLearningPanel } from '../../components/FaceLearningPanel';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { useErrorPopup } from '../../hooks/useFeedback';
 import { RetryState } from '../../components/ui/RetryState';
 import { ButtonLink } from '../../components/ui/Button';
 import { KpiCard, KpiValue, type Kpi } from '../../components/ui/KpiCard';
-import { usePendingEnrollments } from '../../hooks/usePendingEnrollments';
+import { usePendingEnrollmentsCount } from '../../hooks/usePendingEnrollments';
+import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
 import { businessHour } from '../../utils/format';
-
-interface Stats {
-  total: number;
-  active: number;
-  inactive: number;
-}
 
 function greeting() {
   const h = businessHour();
@@ -23,21 +17,18 @@ function greeting() {
 }
 
 export function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [reload, setReload] = useState(0);
-  const retry = () => setReload((n) => n + 1);
-  useErrorPopup(error, { title: 'No se pudo cargar el resumen', retry });
-  const pending = usePendingEnrollments(true);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setError(null);
-    Promise.all([employeeService.list({ size: 1 }, controller.signal), employeeService.list({ size: 1, active: true }, controller.signal)])
-      .then(([all, active]) => setStats({ total: all.total, active: active.total, inactive: all.total - active.total }))
-      .catch((e) => !controller.signal.aborted && setError(e));
-    return () => controller.abort();
-  }, [reload]);
+  const { data: stats, error, retry } = useResource(
+    (signal) =>
+      Promise.all([employeeService.list({ size: 1 }, signal), employeeService.list({ size: 1, active: true }, signal)]).then(([all, active]) => ({
+        total: all.total,
+        active: active.total,
+        inactive: all.total - active.total,
+      })),
+    'summary',
+    'No se pudo cargar el resumen',
+  );
+  // La cola de validaciones la consulta una sola vez el layout (el mismo valor que el contador del menú).
+  const pending = usePendingEnrollmentsCount();
 
   const kpis: Kpi[] = [
     { key: 'total', label: 'Empleados registrados', icon: Users, value: stats?.total, tile: '' },
@@ -122,6 +113,7 @@ export function DashboardPage() {
             </Link>
           </div>
         </PanelSection>
+        <FaceLearningPanel />
       </Panel>
     </div>
   );

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { apiFail, apiOk, jsonResponse, mockFetch } from '../test/http';
@@ -42,6 +42,9 @@ describe('ChangePasswordSection', () => {
     expect(JSON.parse(calls[0].init.body as string)).toEqual({ current_password: 'Actual123', new_password: 'NuevaClave1' });
     expect(onChanged).toHaveBeenCalledOnce();
     expect(screen.getByLabelText('Contraseña actual')).toHaveValue('');
+    // La sección sigue en pantalla: se libera para volver a usarse y sin errores de lo anterior.
+    expect(screen.getByLabelText('Contraseña actual')).toBeEnabled();
+    expect(screen.getByLabelText('Contraseña actual')).not.toHaveAccessibleDescription();
   });
 
   it('muestra los errores del servidor en el campo correcto', async () => {
@@ -80,6 +83,33 @@ describe('ChangePasswordSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
     const second = await screen.findByRole('alertdialog', { name: 'No se pudo cambiar la contraseña' });
     expect(second).toHaveTextContent('Ocupado');
+  });
+});
+
+describe('ChangePasswordSection: casos límite', () => {
+  it('la nueva contraseña debe ser distinta de la actual', async () => {
+    mockFetch(apiOk({ revoked_sessions: 0 }));
+    renderWithProviders(<ChangePasswordSection />);
+    await fill('Actual123', 'Actual123');
+    expect(screen.getByLabelText('Nueva contraseña')).toHaveAccessibleDescription('Debe ser distinta de la actual');
+    expect(screen.getByRole('button', { name: 'Actualizar contraseña' })).toBeDisabled();
+  });
+
+  it('un envío sin el botón (p. ej. un gestor de contraseñas) con campos inválidos marca los errores y no llama al servidor', async () => {
+    const { fn } = mockFetch(apiOk({ revoked_sessions: 0 }));
+    renderWithProviders(<ChangePasswordSection />);
+    fireEvent.submit(screen.getByLabelText('Contraseña actual').closest('form') as HTMLFormElement);
+    const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
+    expect(popup).toHaveTextContent('Escribe tu contraseña actual');
+    expect(screen.getByLabelText('Contraseña actual')).toHaveAccessibleDescription('Escribe tu contraseña actual');
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('sin otras sesiones abiertas: avisa que la sesión actual sigue activa', async () => {
+    mockFetch(apiOk({ revoked_sessions: 0 }));
+    renderWithProviders(<ChangePasswordSection />);
+    await fill('Actual123', 'NuevaClave1');
+    expect(await screen.findByText('Tu sesión actual sigue activa.')).toBeInTheDocument();
   });
 });
 

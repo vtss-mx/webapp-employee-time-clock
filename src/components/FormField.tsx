@@ -1,11 +1,6 @@
 import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2 } from 'lucide-react';
-import { useId, useState, type InputHTMLAttributes, type ReactNode, type Ref } from 'react';
-import type { AvailabilityState } from '../hooks/useAvailability';
-
-export interface FieldStatus {
-  tone: 'checking' | 'success' | 'info';
-  text?: string;
-}
+import { useId, useState, type InputHTMLAttributes, type ReactNode, type Ref, type TextareaHTMLAttributes } from 'react';
+import type { FieldStatus } from '../types';
 
 interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
@@ -31,6 +26,9 @@ export function FormField({ label, error, hint, icon, type, id, status, inputRef
   const inputId = id ?? generatedId;
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
+  // Lo que se ve bajo el control (y lo que lee el lector de pantalla): el texto de la validación en
+  // vivo tiene prioridad sobre la ayuda; el error, sobre ambos.
+  const message = !error && status?.text ? status.text : hint;
 
   return (
     <div
@@ -46,7 +44,7 @@ export function FormField({ label, error, hint, icon, type, id, status, inputRef
           id={inputId}
           type={isPassword && showPassword ? 'text' : type}
           aria-invalid={Boolean(error)}
-          aria-describedby={describedBy(inputId, error, hint)}
+          aria-describedby={describedBy(inputId, error, message)}
           {...inputProps}
         />
         {!error && status && (
@@ -65,7 +63,7 @@ export function FormField({ label, error, hint, icon, type, id, status, inputRef
           </button>
         )}
       </div>
-      <FieldMessage id={inputId} error={error} hint={!error && status?.text ? status.text : hint} />
+      <FieldMessage id={inputId} error={error} hint={message} />
     </div>
   );
 }
@@ -109,20 +107,32 @@ export function FieldMessage({ id, error, hint }: { id: string; error?: string; 
 export const describedBy = (id: string, error?: string, hint?: string) =>
   error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
-/** Estado en vivo → error inmediato (duplicado/formato) o indicador (verificando / disponible). */
-export function liveFeedback(state: AvailabilityState | undefined): { error?: string; status?: FieldStatus } {
-  if (!state) return {};
-  switch (state.status) {
-    case 'checking':
-      return { status: { tone: 'checking', text: 'Verificando disponibilidad…' } };
-    case 'available':
-      return { status: { tone: 'success', text: state.message } };
-    case 'linkable':
-      return { status: { tone: 'info', text: state.message } };
-    case 'taken':
-    case 'invalid':
-      return { error: state.message };
-    default:
-      return {};
-  }
+interface TextAreaFieldProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange'> {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+}
+
+/** Texto largo (motivos, descripciones) con la misma etiqueta, error y ayuda que los demás campos. */
+export function TextAreaField({ label, value, onChange, error, hint, required, id: givenId, ...props }: TextAreaFieldProps) {
+  const generated = useId();
+  const id = givenId ?? generated;
+  return (
+    <div className={`field ${error ? 'field--error' : ''}`}>
+      <FieldLabel htmlFor={id} label={label} required={required} />
+      <textarea
+        {...props}
+        id={id}
+        className="textarea"
+        value={value}
+        required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={describedBy(id, error, hint)}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <FieldMessage id={id} error={error} hint={hint} />
+    </div>
+  );
 }

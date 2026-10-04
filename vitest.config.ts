@@ -15,31 +15,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text-summary', 'text', 'html', 'json-summary', 'lcov'],
       reportsDirectory: './coverage',
-      // Lógica testeable en unidad. Lo que depende de cámara/WASM (MediaPipe, getUserMedia,
-      // jsQR sobre video) se valida con pruebas E2E en navegador real.
+      // Todo el código de la aplicación. La cámara, MediaPipe, jsQR y Google Maps se prueban con
+      // dobles (getUserMedia, detector y SDK simulados) además de la prueba real en navegador.
       include: ['src/**/*.{ts,tsx}'],
-      exclude: [
-        'src/**/*.test.{ts,tsx}',
-        'src/test/**',
-        'src/main.tsx',
-        'src/vite-env.d.ts',
-        'src/types/**',
-        'src/hooks/useCamera.ts',
-        'src/hooks/useFaceDetection.ts',
-        'src/hooks/useQrScanner.ts',
-        'src/components/CameraCapture.tsx',
-        'src/components/LiveFaceFlow.tsx',
-        'src/components/QrScanPanel.tsx',
-        'src/components/FaceGuide.tsx',
-        // SDK de Google Maps (script externo, mapa y consultas reales): se validan en navegador.
-        'src/services/maps/googleMaps.ts',
-        'src/components/location/MapCanvas.tsx',
-        'src/pages/**',
-        // Fábricas de carga diferida: cada una solo importa una pantalla (las pantallas ya se excluyen).
-        'src/routes/lazyPages.ts',
-        'src/layouts/**',
-      ],
-      thresholds: { lines: 90, statements: 90, functions: 90, branches: 85 },
+      // Solo lo que no tiene lógica en tiempo de ejecución: pruebas, utilidades de prueba y tipos.
+      // Pantallas, layouts, cámara, mapas y el arranque se prueban como todo lo demás.
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/vite-env.d.ts', 'src/types/**'],
+      thresholds: { lines: 100, statements: 100, functions: 100, branches: 100 },
     },
   },
 });

@@ -13,7 +13,6 @@ export const STRICT_RULES: VerificationRules = {
   liveness_challenge: true,
   anti_spoofing: true,
   qr_enabled: true,
-  employee_mobile_only: true,
   validator_mobile_only: true,
   anti_spoofing_level: 'STANDARD',
   liveness_steps: 2,
@@ -29,6 +28,7 @@ export const STRICT_RULES: VerificationRules = {
   lockout_minutes: 15,
   validator_device_approval: true,
   qr_lifetime_seconds: 30,
+  adaptive_learning: true,
   // Sin la lista del servidor no se bloquea ninguna en pantalla (el backend la exige igual).
   blocked_cameras: [],
 };

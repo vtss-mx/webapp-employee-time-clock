@@ -10,9 +10,11 @@ import { useCatalogs } from '../hooks/useCatalogs';
 import { useErrorPopup } from '../hooks/useFeedback';
 import { formatDateTime, initials } from '../utils/format';
 import { formatPhone } from '../utils/phone';
+import { useConfirmLogout } from '../components/auth/logoutConfirm';
 
 export function ProfilePage() {
-  const { user, refreshUser, logout } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const confirmLogout = useConfirmLogout();
   const { nameOf } = useCatalogs();
   const [error, setError] = useState<unknown>(null);
   const [sessionsVersion, setSessionsVersion] = useState(0);
@@ -97,7 +99,7 @@ export function ProfilePage() {
             variant="danger-outline"
             size="lg"
             icon={<LogOut size={18} />}
-            onClick={() => void logout()}
+            onClick={() => void confirmLogout()}
           >
             Cerrar sesión
           </Button>

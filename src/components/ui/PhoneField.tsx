@@ -4,7 +4,8 @@ import { countryDirectory, foldText, formatNational, joinPhone, type CountryOpti
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
-import { describedBy, FieldLabel, FieldMessage, type FieldStatus } from '../FormField';
+import type { FieldStatus } from '../../types';
+import { describedBy, FieldLabel, FieldMessage } from '../FormField';
 import { Floating } from './Floating';
 
 interface PhoneFieldProps {

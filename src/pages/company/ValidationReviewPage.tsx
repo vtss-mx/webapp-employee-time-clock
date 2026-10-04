@@ -6,13 +6,14 @@ import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../
 import { EnrollmentBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonRows } from '../../components/ui/Skeleton';
+import { useAction } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { notifyEnrollmentsChanged } from '../../hooks/usePendingEnrollments';
-import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
+import { useFeedback } from '../../hooks/useFeedback';
+import { useResource } from '../../hooks/useResource';
 import { RetryState } from '../../components/ui/RetryState';
 import { paths } from '../../routes/paths';
 import { enrollmentService } from '../../services/enrollmentService';
-import type { FaceEnrollmentDetail } from '../../types';
 import type { CatalogApi } from '../../utils/catalogs';
 import { ageFrom, formatDate, formatDateTime, formatPercent } from '../../utils/format';
 
@@ -32,17 +33,9 @@ export function ValidationReviewPage() {
   const navigate = useNavigate();
   const feedback = useFeedback();
   const catalogs = useCatalogs();
-  const [item, setItem] = useState<FaceEnrollmentDetail | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [reload, setReload] = useState(0);
+  const { data: item, error, retry } = useResource((signal) => enrollmentService.get(enrollmentId, signal), enrollmentId, 'No se pudo cargar la solicitud');
   const [confirmApprove, setConfirmApprove] = useState(false);
-  const [busy, setBusy] = useState<'approve' | null>(null);
-
-  useEffect(() => {
-    setError(null);
-    enrollmentService.get(enrollmentId).then(setItem).catch(setError);
-  }, [enrollmentId, reload]);
-  useErrorPopup(error, { title: 'No se pudo cargar la solicitud', retry: () => setReload((n) => n + 1) });
+  const { busy, run } = useAction();
 
   const flags = item?.flagged_accessories ?? [];
   const flagged = describeFlags(flags, catalogs);
@@ -60,20 +53,16 @@ export function ValidationReviewPage() {
     });
   }, [item, feedback, catalogs]);
 
-  const approve = async () => {
-    setBusy('approve');
-    try {
-      const res = await enrollmentService.approve(enrollmentId);
-      notifyEnrollmentsChanged();
-      void feedback.success('Usuario aceptado', `${res.full_name} ya puede identificarse.`);
-      void navigate(paths.company.validations);
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo aceptar' });
-      setConfirmApprove(false);
-    } finally {
-      setBusy(null);
-    }
-  };
+  const approve = () =>
+    run(() => enrollmentService.approve(enrollmentId), {
+      errorTitle: 'No se pudo aceptar',
+      success: (res) => ['Usuario aceptado', `${res.full_name} ya puede identificarse.`],
+      onSuccess: () => {
+        notifyEnrollmentsChanged();
+        void navigate(paths.company.validations);
+      },
+      onError: () => setConfirmApprove(false),
+    });
 
   if (error) {
     return (
@@ -81,7 +70,7 @@ export function ValidationReviewPage() {
         <Panel>
           <PanelHeader title="Validación de identidad" backTo={paths.company.validations} backLabel="Validaciones" />
           <PanelSection>
-            <RetryState onRetry={() => setReload((n) => n + 1)} />
+            <RetryState onRetry={retry} />
           </PanelSection>
         </Panel>
       </div>
@@ -243,7 +232,7 @@ export function ValidationReviewPage() {
           </>
         }
         confirmLabel="Sí, aceptar"
-        loading={busy === 'approve'}
+        loading={busy !== null}
         onConfirm={approve}
         onCancel={() => setConfirmApprove(false)}
       />

@@ -15,3 +15,16 @@ describe('MobileBar: pantalla actual', () => {
     expect(currentEntry(nav, '/otra')).toBeUndefined();
   });
 });
+
+describe('MobileBar: rutas anidadas en el menú', () => {
+  it('con varias opciones que contienen la ruta actual, gana la más específica', () => {
+    const nested = [
+      { to: '/company', label: 'Empresa', icon: Users },
+      { to: '/company/employees', label: 'Empleados', icon: Users },
+      { to: '/company/employees/new', label: 'Alta', short: 'Nuevo', icon: Users },
+    ];
+    expect(currentEntry(nested, '/company/employees/new')?.label).toBe('Alta');
+    expect(currentEntry(nested, '/company/employees/9')?.label).toBe('Empleados');
+    expect(currentEntry(nested, '/company/settings')?.label).toBe('Empresa');
+  });
+});

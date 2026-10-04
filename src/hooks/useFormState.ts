@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { useAction } from './useAction';
 import { useFeedback } from './useFeedback';
 import type { FieldErrors } from '../utils/validation';
 
@@ -10,6 +11,11 @@ interface FormStateOptions<T extends StringValues<T>> {
   serverErrors: (error: unknown) => FieldErrors<T>;
   /** Campos que NO se marcan como tocados al cargar valores (p. ej. contraseña vacía = no cambiar). */
   untouchedOnLoad?: Array<keyof T>;
+  /**
+   * El formulario sigue en pantalla después de guardar (una sección de Mi perfil): el botón se
+   * libera al terminar. Por omisión la pantalla se cierra al guardar y sigue "Guardando…" hasta salir.
+   */
+  staysOpen?: boolean;
 }
 
 /**
@@ -18,11 +24,11 @@ interface FormStateOptions<T extends StringValues<T>> {
  * - Cambiar un campo descarta el error que el servidor había puesto en él.
  * - Guardar: estado de carga, campos marcados y el motivo del error en un popup.
  */
-export function useFormState<T extends StringValues<T>>(initial: T, { serverErrors: fromServer, untouchedOnLoad = [] }: FormStateOptions<T>) {
+export function useFormState<T extends StringValues<T>>(initial: T, { serverErrors: fromServer, untouchedOnLoad = [], staysOpen = false }: FormStateOptions<T>) {
   const [values, setRawValues] = useState<T>(initial);
   const [serverErrors, setServerErrors] = useState<FieldErrors<T>>({});
   const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
-  const [saving, setSaving] = useState(false);
+  const { busy, run } = useAction();
   const feedback = useFeedback();
   const fields = Object.keys(initial) as Array<keyof T>;
 
@@ -59,16 +65,17 @@ export function useFormState<T extends StringValues<T>>(initial: T, { serverErro
     return errors;
   };
 
+  /** Guarda; si falla, los errores del servidor quedan en sus campos y el motivo se explica en un popup. */
   const save = async (action: () => Promise<void>, title = 'No se pudo guardar'): Promise<void> => {
-    setSaving(true);
-    try {
-      await action();
-    } catch (err) {
-      setServerErrors((prev) => ({ ...prev, ...fromServer(err) }));
-      setSaving(false);
-      void feedback.fromError(err, { title });
-    }
+    await run(action, { errorTitle: title, keepBusy: !staysOpen, onError: (err) => setServerErrors((prev) => ({ ...prev, ...fromServer(err) })) });
   };
 
-  return { values, setValues, loadValues, touch, touchAll, visibleErrors, saving, save, feedback };
+  /** Vuelve al formulario inicial (vacío y sin errores), p. ej. tras guardar uno que sigue en pantalla. */
+  const reset = () => {
+    setRawValues(initial);
+    setTouched({});
+    setServerErrors({});
+  };
+
+  return { values, setValues, loadValues, touch, touchAll, visibleErrors, saving: busy !== null, save, reset, feedback };
 }

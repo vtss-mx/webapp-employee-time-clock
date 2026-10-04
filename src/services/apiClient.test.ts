@@ -7,6 +7,7 @@ import {
   buildUrl,
   configureApiClient,
   errorMessage,
+  fieldErrorsFrom,
   newTraceId,
   normalizeResponse,
   parseRetryAfter,
@@ -78,6 +79,28 @@ describe('ApiError', () => {
     expect(error.isTransient).toBe(false);
     expect(new ApiError({ statusCode: 503, code: 'X', message: 'm' }).isTransient).toBe(true);
     expect(new ApiError({ statusCode: 503, code: 'X', message: 'm' }).details).toBeNull();
+  });
+  it('fieldErrorsFrom: errores por campo y de negocio llevados a los campos del formulario', () => {
+    type Form = { email: string; street: string; radius: string };
+    const validation = new ApiError({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+      message: 'm',
+      errors: [
+        { code: 'a', message: 'Correo inválido', field: 'email', details: null },
+        { code: 'b', message: 'Falta la calle', field: 'address.street', details: null },
+        { code: 'c', message: 'Radio inválido', field: 'location_radius_m', details: null },
+      ],
+    });
+    const rename = { 'address.street': 'street', location_radius_m: 'radius', EMAIL_TAKEN: 'email' } as const;
+    // Sin traducción, cada campo conserva su nombre; con ella, toma el del formulario.
+    expect(fieldErrorsFrom<Form>(validation)).toEqual({ email: 'Correo inválido', 'address.street': 'Falta la calle', location_radius_m: 'Radio inválido' });
+    expect(fieldErrorsFrom<Form>(validation, rename)).toEqual({ email: 'Correo inválido', street: 'Falta la calle', radius: 'Radio inválido' });
+    // El error de negocio va al campo que le corresponde y tiene prioridad.
+    const taken = new ApiError({ statusCode: 409, code: 'EMAIL_TAKEN', message: 'Ya registrado', errors: [{ code: 'x', message: 'otro', field: 'email', details: null }] });
+    expect(fieldErrorsFrom<Form>(taken, rename)).toEqual({ email: 'Ya registrado' });
+    expect(fieldErrorsFrom<Form>(new ApiError({ statusCode: 409, code: 'OTRO', message: 'm' }), rename)).toEqual({});
+    expect(fieldErrorsFrom<Form>(new Error('sin red'), rename)).toEqual({});
   });
   it('mensajes de error legibles', () => {
     expect(errorMessage(new Error('boom'))).toBe('boom');
@@ -199,6 +222,75 @@ describe('apiRequest', () => {
     await expect(apiRequest('/x')).rejects.toMatchObject({ code: 'SESSION_REVOKED' });
     expect(hooks.refreshSession).not.toHaveBeenCalled();
     expect(hooks.onUnauthorized).toHaveBeenCalledWith('Sesión revocada');
+  });
+  it('retries: 0 no reintenta lecturas (consultas que deben rendirse rápido)', async () => {
+    const { fn } = mockFetch(apiFail(503, 'SERVER_BUSY'), apiOk('ok'));
+    await expect(apiRequest('/x', { retries: 0 })).rejects.toMatchObject({ code: 'SERVER_BUSY' });
+    expect(fn).toHaveBeenCalledOnce();
+  });
+  it('retries explícito también aplica a escrituras', async () => {
+    vi.useFakeTimers();
+    const { fn } = mockFetch(apiFail(502, 'SERVICE_UNAVAILABLE'), apiOk('ok'));
+    const promise = apiRequest('/x', { method: 'POST', retries: 1 });
+    await vi.runAllTimersAsync();
+    await expect(promise).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+  it('cancelada durante la espera entre reintentos: no hace otro intento', async () => {
+    vi.useFakeTimers();
+    const { fn } = mockFetch(apiFail(503, 'SERVER_BUSY', 'ocupado', { 'Retry-After': '5' }), apiOk('ok'));
+    const controller = new AbortController();
+    const promise = apiRequest('/x', { signal: controller.signal });
+    const assertion = expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.advanceTimersByTimeAsync(100); // ya está esperando el reintento
+    controller.abort();
+    await assertion;
+    await vi.runAllTimersAsync();
+    expect(fn).toHaveBeenCalledOnce();
+  });
+  it('401 con un token que otra petición ya renovó: repite con el nuevo sin renovar otra vez', async () => {
+    let token = 'token-1';
+    hooks.getToken.mockImplementation(() => token);
+    const { calls } = mockFetch(() => {
+      token = 'token-2'; // otra petición renovó mientras esta viajaba
+      return apiFail(401, 'TOKEN_EXPIRED');
+    }, apiOk('ok'));
+    await expect(apiRequest('/x')).resolves.toBe('ok');
+    expect(hooks.refreshSession).not.toHaveBeenCalled();
+    expect(hooks.onUnauthorized).not.toHaveBeenCalled();
+    expect((calls[1].init.headers as Record<string, string>).Authorization).toBe('Bearer token-2');
+  });
+  it('401 tras cerrar la sesión por otro lado (sin token): rechaza sin volver a cerrarla', async () => {
+    let token: string | null = 'token-1';
+    hooks.getToken.mockImplementation(() => token);
+    const { fn } = mockFetch(() => {
+      token = null;
+      return apiFail(401, 'SESSION_REVOKED');
+    });
+    await expect(apiRequest('/x')).rejects.toMatchObject({ code: 'SESSION_REVOKED' });
+    expect(fn).toHaveBeenCalledOnce();
+    expect(hooks.onUnauthorized).not.toHaveBeenCalled();
+  });
+  it('401 de una petición cancelada: rechaza sin renovar ni cerrar la sesión', async () => {
+    const controller = new AbortController();
+    mockFetch(() => {
+      controller.abort(); // la persona salió de la pantalla mientras llegaba la respuesta
+      return apiFail(401, 'TOKEN_EXPIRED');
+    });
+    await expect(apiRequest('/x', { signal: controller.signal })).rejects.toMatchObject({ status: 401 });
+    expect(hooks.refreshSession).not.toHaveBeenCalled();
+    expect(hooks.onUnauthorized).not.toHaveBeenCalled();
+  });
+  it('401 cuya renovación termina con la petición ya cancelada: no cierra la sesión', async () => {
+    const controller = new AbortController();
+    hooks.refreshSession.mockImplementation(() => {
+      controller.abort();
+      return Promise.resolve(false);
+    });
+    mockFetch(apiFail(401, 'TOKEN_EXPIRED'));
+    await expect(apiRequest('/x', { signal: controller.signal })).rejects.toMatchObject({ status: 401 });
+    expect(hooks.refreshSession).toHaveBeenCalledOnce();
+    expect(hooks.onUnauthorized).not.toHaveBeenCalled();
   });
   it('401 en peticiones sin sesión no dispara cierre', async () => {
     hooks.getToken.mockReturnValue(null);

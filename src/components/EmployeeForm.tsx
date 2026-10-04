@@ -1,7 +1,7 @@
 import { Check, FileBadge, Hash, HeartPulse, IdCard, KeyRound, Mail, ShieldCheck, UserRound } from 'lucide-react';
 import type { ChangeEvent } from 'react';
-import type { LiveChecks } from '../hooks/useEmployeeForm';
-import type { EmployeeFormValues } from '../types';
+import { liveFeedback } from '../hooks/useAvailability';
+import type { EmployeeFormValues, LiveChecks } from '../types';
 import {
   CURP_LENGTH,
   MIN_EMPLOYEE_AGE,
@@ -12,7 +12,7 @@ import {
   RFC_LENGTH,
   type FieldErrors,
 } from '../utils/validation';
-import { ConfirmPasswordField, FormField, liveFeedback } from './FormField';
+import { ConfirmPasswordField, FormField } from './FormField';
 import { DateField } from './ui/DateField';
 import { PhoneField } from './ui/PhoneField';
 
@@ -42,20 +42,6 @@ const NORMALIZE: Partial<Record<Field, (value: string) => string>> = {
   rfc: (v) => normalizeRfc(v).slice(0, RFC_LENGTH),
   curp: (v) => normalizeCurp(v).slice(0, CURP_LENGTH),
   nss: (v) => v.replace(/\D/g, '').slice(0, NSS_LENGTH),
-};
-
-export const emptyEmployeeForm: EmployeeFormValues = {
-  first_name: '',
-  last_name: '',
-  birth_date: '',
-  curp: '',
-  rfc: '',
-  nss: '',
-  employee_number: '',
-  phone: '',
-  email: '',
-  password: '',
-  password_confirm: '',
 };
 
 /**

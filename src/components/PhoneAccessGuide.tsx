@@ -1,5 +1,6 @@
 import { Check, Copy, Info } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCopy } from '../hooks/useCopy';
+import { useQrImage } from '../hooks/useQrImage';
 import { paths } from '../routes/paths';
 
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
@@ -9,47 +10,19 @@ export function phoneAccessUrl(location: Pick<Location, 'origin' | 'hostname'> =
   return LOCAL_HOSTS.includes(location.hostname) ? null : `${location.origin}${paths.login}`;
 }
 
-/** Código QR (data URL) generado en el navegador; la librería se carga solo cuando hace falta. */
-function useQrImage(text: string | null): string | null {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    if (!text) return;
-    let cancelled = false;
-    import('qrcode')
-      .then(({ toDataURL }) =>
-        toDataURL(text, { margin: 1, width: 232, errorCorrectionLevel: 'M', color: { dark: '#0b1b3f', light: '#ffffff' } }),
-      )
-      .then((url) => !cancelled && setSrc(url))
-      .catch(() => undefined); // sin QR queda la dirección escrita
-    return () => {
-      cancelled = true;
-    };
-  }, [text]);
-  return src;
-}
-
-const DEVICE_TEXT = {
-  phone: { open: 'Abre tu teléfono.', scan: 'Escanéalo con tu teléfono', already: '¿Ya estás en tu teléfono?' },
-  touch: { open: 'Abre la tableta o el teléfono.', scan: 'Escanéalo con la tableta o el teléfono', already: '¿Ya estás en una tableta o un teléfono?' },
-} as const;
+const TEXT = { open: 'Abre la tableta o el teléfono.', scan: 'Escanéalo con la tableta o el teléfono', already: '¿Ya estás en una tableta o un teléfono?' };
 
 /**
- * Cómo continuar en el dispositivo permitido (teléfono del empleado; tableta o teléfono del
- * validador): pasos, dirección para copiar y código QR para escanear.
+ * Cómo continuar en el dispositivo permitido de un validador (tableta o teléfono): pasos, dirección
+ * para copiar y código QR para escanear.
  */
-export function PhoneAccessGuide({ device = 'phone' }: { device?: keyof typeof DEVICE_TEXT }) {
-  const text = DEVICE_TEXT[device];
+export function PhoneAccessGuide() {
+  const text = TEXT;
   const url = phoneAccessUrl();
-  const qr = useQrImage(url);
-  const [copied, setCopied] = useState(false);
-
-  const copy = () => {
-    if (!url) return;
-    void navigator.clipboard
-      ?.writeText(url)
-      .then(() => setCopied(true))
-      .catch(() => undefined);
-  };
+  // Si el código no se puede dibujar queda su lugar vacío: la dirección está escrita al lado para copiarla.
+  const qr = useQrImage(url).src;
+  const { copied, copy: copyText } = useCopy();
+  const copy = () => url && copyText(url);
 
   return (
     <div className="phone-guide">

@@ -35,9 +35,27 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      // Nada en Web Storage (texto plano, síncrono, legible por cualquier script): BD, cookie HttpOnly,
+      // IndexedDB (utils/deviceStore, utils/deviceKey), memoria o history.state. Ver utils/legacyStorage.
+      'no-restricted-globals': [
+        'error',
+        { name: 'localStorage', message: 'Prohibido: usa la BD, deviceStore (IndexedDB), memoria o history.state.' },
+        { name: 'sessionStorage', message: 'Prohibido: usa memoria o history.state (o deviceStore si es del dispositivo).' },
+      ],
+      'no-restricted-properties': [
+        'error',
+        { object: 'window', property: 'localStorage', message: 'Prohibido: usa la BD, deviceStore (IndexedDB), memoria o history.state.' },
+        { object: 'window', property: 'sessionStorage', message: 'Prohibido: usa memoria o history.state (o deviceStore si es del dispositivo).' },
+      ],
       complexity: ['warn', 20],
       'max-lines': ['warn', { max: 450, skipBlankLines: true, skipComments: true }],
     },
+  },
+  {
+    // Único lugar con Web Storage: borra lo que dejaron versiones anteriores. Las pruebas lo verifican
+    // (y su preparación lo limpia entre pruebas).
+    files: ['src/utils/legacyStorage.ts', 'src/**/*.test.{ts,tsx}', 'src/test/**'],
+    rules: { 'no-restricted-globals': 'off', 'no-restricted-properties': 'off' },
   },
   {
     files: ['src/**/*.test.{ts,tsx}', 'src/test/**'],

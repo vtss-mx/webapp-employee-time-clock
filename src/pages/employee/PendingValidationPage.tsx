@@ -1,32 +1,24 @@
 import { Check, Clock, RefreshCw, ScanFace, UserCheck } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { FaceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { StatusMark } from '../../components/ui/StatusMark';
+import { useAction } from '../../hooks/useAction';
 import { useAuth } from '../../hooks/useAuth';
 import { usePolling } from '../../hooks/usePolling';
 import { config } from '../../utils/config';
 
-
 /** Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. */
 export function PendingValidationPage() {
   const { user, refreshUser } = useAuth();
-  const [checking, setChecking] = useState(false);
+  const { busy, run } = useAction();
 
   // Al aprobarse, el backend cambia las pantallas del empleado y la ruta lleva a su nuevo inicio.
   const poll = useCallback(() => refreshUser(), [refreshUser]);
   usePolling(poll, { intervalMs: config.validationStatusPollMs, immediate: false });
 
-  const check = useCallback(async () => {
-    setChecking(true);
-    try {
-      await refreshUser();
-    } catch {
-      /* el cliente ya muestra errores de red; se reintenta en el siguiente ciclo */
-    } finally {
-      setChecking(false);
-    }
-  }, [refreshUser]);
+  // A mano: si falla (sin red, servidor ocupado) se avisa con su popup; la revisión automática sigue.
+  const check = () => run(refreshUser, { errorTitle: 'No se pudo actualizar el estado' });
 
   return (
     <div className="page page--narrow page-transition">
@@ -73,7 +65,7 @@ export function PendingValidationPage() {
           </li>
         </ol>
 
-        <Button variant="secondary" size="lg" block loading={checking} icon={<RefreshCw size={18} />} onClick={() => void check()}>
+        <Button variant="secondary" size="lg" block loading={busy !== null} icon={<RefreshCw size={18} />} onClick={() => void check()}>
           Actualizar estado
         </Button>
         <p className="inline-note inline-note--center small muted">

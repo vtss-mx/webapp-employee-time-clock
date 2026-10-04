@@ -3,6 +3,18 @@
  * sistema operativo y navegador del usuario (en vez de un mensaje genérico).
  */
 export type CameraProblemKind = 'insecure' | 'unsupported' | 'denied' | 'not-found' | 'busy' | 'unknown';
+
+/**
+ * La cámara no da imagen al capturar: aún se está abriendo o se cortó (llamada o Siri en iOS, permiso
+ * retirado, cámara desconectada). Es pasajero: el flujo facial espera y continúa al volver la imagen
+ * en lugar de abandonar el proceso.
+ */
+export class CameraNotReadyError extends Error {
+  constructor() {
+    super('La cámara aún no está lista');
+    this.name = 'CameraNotReadyError';
+  }
+}
 type Os = 'macos' | 'windows' | 'ios' | 'android' | 'linux' | 'other';
 type Browser = 'safari' | 'chrome' | 'edge' | 'firefox' | 'other';
 

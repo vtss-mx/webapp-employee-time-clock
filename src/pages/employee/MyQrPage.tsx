@@ -1,6 +1,6 @@
-import { BadgeCheck, Maximize2, QrCode, RefreshCw, ShieldCheck, Sun, Timer, X } from 'lucide-react';
+import { BadgeCheck, Maximize2, QrCode, RefreshCw, ShieldCheck, Sun, X } from 'lucide-react';
 import { useState } from 'react';
-import { DynamicQrCode } from '../../components/DynamicQrCode';
+import { DynamicQrCode, QrCountdown } from '../../components/DynamicQrCode';
 import { Modal } from '../../components/Modal';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
@@ -27,17 +27,11 @@ export function MyQrPage() {
   const shared = {
     qr: code.qr,
     phase: code.phase,
-    progress: code.progress,
-    remaining: code.remaining,
+    deadline: code.deadline,
     alt: `Código QR de ${fullName}`,
     onRenew: () => void code.renew(),
   };
-  const countdown =
-    code.phase === 'ready' ? (
-      <p className="dynamic-qr__countdown" aria-live="off">
-        <Timer size={16} aria-hidden /> Se renueva en <strong>{code.remaining} s</strong>
-      </p>
-    ) : null;
+  const countdown = code.phase === 'ready' ? <QrCountdown key={code.deadline} deadline={code.deadline} /> : null;
 
   return (
     <div className="page page-transition">

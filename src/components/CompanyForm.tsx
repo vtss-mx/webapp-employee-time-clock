@@ -1,9 +1,9 @@
 import { Building2, IdCard, KeyRound, Landmark, UserCog, Users } from 'lucide-react';
 import type { ChangeEvent } from 'react';
-import type { AvailabilityState } from '../hooks/useAvailability';
-import type { CompanyFormValues } from '../types';
+import { liveFeedback } from '../hooks/useAvailability';
+import type { AvailabilityState, CompanyFormValues } from '../types';
 import { normalizeRfc, type FieldErrors } from '../utils/validation';
-import { ConfirmPasswordField, FormField, liveFeedback } from './FormField';
+import { ConfirmPasswordField, FormField } from './FormField';
 import { PhoneField } from './ui/PhoneField';
 
 type Field = keyof CompanyFormValues;

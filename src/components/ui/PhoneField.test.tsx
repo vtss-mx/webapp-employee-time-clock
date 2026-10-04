@@ -136,3 +136,29 @@ describe('PhoneField: teléfono con lada internacional', () => {
     expect(toggle).toHaveTextContent('MX');
   });
 });
+
+describe('PhoneField: búsqueda escrita y validación en vivo', () => {
+  it('escribir en la búsqueda filtra sin mover la selección; Enter elige el primero', async () => {
+    render(<Harness />, { wrapper: WithCatalogs });
+    await userEvent.click(countryButton());
+    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar país o lada' }), 'espa');
+    await userEvent.keyboard('{Enter}');
+    expect(countryButton()).toHaveTextContent('+34');
+  });
+
+  it('Enter sin resultados no elige nada y la lista sigue abierta', async () => {
+    render(<Harness />, { wrapper: WithCatalogs });
+    await userEvent.click(countryButton());
+    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar país o lada' }), 'zzz');
+    await userEvent.keyboard('{Enter}');
+    expect(screen.getByRole('listbox', { name: 'Países' })).toBeInTheDocument();
+    expect(countryButton()).toHaveTextContent('+52');
+  });
+
+  it('el estado de la validación en vivo se muestra en lugar de la ayuda', () => {
+    render(<PhoneField label="Teléfono" value="" onChange={() => undefined} hint="Con lada" status={{ tone: 'success', text: 'Teléfono disponible' }} />, { wrapper: WithCatalogs });
+    expect(screen.getByLabelText('Teléfono').closest('.field')).toHaveClass('field--success');
+    expect(screen.getByLabelText('Teléfono')).toHaveAccessibleDescription('Teléfono disponible');
+  });
+});
+

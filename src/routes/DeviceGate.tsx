@@ -1,15 +1,13 @@
-import { LogOut, Smartphone, TabletSmartphone } from 'lucide-react';
+import { LogOut, TabletSmartphone } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { PhoneAccessGuide } from '../components/PhoneAccessGuide';
 import { useAuth } from '../hooks/useAuth';
 import { useFeedback } from '../hooks/useFeedback';
 
-const DEVICE_LABEL = { desktop: 'Estás usando una computadora', tablet: 'Estás usando una tableta' } as const;
-
 /**
- * Si el servidor rechaza el dispositivo (empleado en computadora o tableta; validador en
- * computadora), se muestra el popup "continúa desde tu teléfono" (o "desde una tableta o un
- * teléfono"). La decisión es del backend (política de la empresa).
+ * Si el servidor rechaza el dispositivo (un validador en una computadora: su empresa exige tableta o
+ * teléfono), se muestra el popup "continúa desde una tableta o un teléfono". Es la única restricción
+ * de dispositivo de la aplicación y la decide el backend (política de la empresa).
  */
 export function DeviceGate({ children }: { children: ReactNode }) {
   const { deviceBlock, dismissDeviceBlock, isAuthenticated } = useAuth();
@@ -17,16 +15,15 @@ export function DeviceGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!deviceBlock) return;
-    const touch = deviceBlock.requires === 'touch';
     void feedback
       .show({
         variant: 'info',
-        icon: touch ? <TabletSmartphone size={30} /> : <Smartphone size={30} />,
-        eyebrow: DEVICE_LABEL[deviceBlock.device],
-        title: touch ? 'Continúa desde una tableta o un teléfono' : 'Continúa desde tu teléfono celular',
+        icon: <TabletSmartphone size={30} />,
+        eyebrow: 'Estás usando una computadora',
+        title: 'Continúa desde una tableta o un teléfono',
         text: deviceBlock.message,
-        body: <PhoneAccessGuide device={touch ? 'touch' : 'phone'} />,
-        footnote: '¿Necesitas ayuda? Comunícate con Recursos Humanos o con el administrador del sistema.',
+        body: <PhoneAccessGuide />,
+        footnote: '¿Necesitas ayuda? Comunícate con el administrador de tu empresa.',
         actions: [{ id: 'exit', label: isAuthenticated ? 'Cerrar sesión' : 'Entendido', icon: <LogOut size={18} /> }],
         dismissible: false,
         wide: true,

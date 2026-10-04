@@ -9,6 +9,7 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useFeedback } from '../../hooks/useFeedback';
 import { homeForUser } from '../../routes/paths';
 import type { UserMembership } from '../../types';
+import { useConfirmLogout } from '../../components/auth/logoutConfirm';
 
 function unavailableReason(membership: UserMembership): string | null {
   if (!membership.company.active) return 'Empresa desactivada';
@@ -25,7 +26,8 @@ const initialsOf = (name: string) =>
 
 /** Empleado que trabaja en varias empresas: elige a cuál entrar (o cambia de empresa). */
 export function CompanySelectPage() {
-  const { user, selectCompany, logout } = useAuth();
+  const { user, selectCompany } = useAuth();
+  const confirmLogout = useConfirmLogout();
   const { byCode } = useCatalogs();
   const navigate = useNavigate();
   const feedback = useFeedback();
@@ -88,7 +90,7 @@ export function CompanySelectPage() {
           })}
         </ul>
 
-        <Button variant="ghost" icon={<LogOut size={18} />} onClick={() => void logout()} disabled={entering !== null}>
+        <Button variant="ghost" icon={<LogOut size={18} />} onClick={() => void confirmLogout()} disabled={entering !== null}>
           Cerrar sesión
         </Button>
       </div>

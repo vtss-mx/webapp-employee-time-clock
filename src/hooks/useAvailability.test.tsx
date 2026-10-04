@@ -1,9 +1,10 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { EmployeeFormFields, emptyEmployeeForm } from '../components/EmployeeForm';
+import { EmployeeFormFields } from '../components/EmployeeForm';
+import { emptyEmployeeForm } from '../utils/formRules';
 import * as availabilityService from '../services/availabilityService';
 import { WithCatalogs } from '../test/render';
-import { useAvailability } from './useAvailability';
+import { availabilityBlocks, availabilityError, liveFeedback, useAvailability } from './useAvailability';
 
 const result = (code: string, message: string) => ({
   field: 'employee_number' as const, value: 'x', normalized: 'X', valid: code !== 'INVALID_FORMAT', available: code === 'AVAILABLE', code, message, via: 'websocket' as const,
@@ -49,6 +50,15 @@ describe('useAvailability', () => {
     expect(hook.current.status).toBe('idle');
   });
 
+  it('un código que esta versión no conoce no bloquea (el servidor valida al guardar)', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(availabilityService, 'checkAvailability').mockResolvedValue(result('RESERVED', 'Reservado'));
+    const { result: hook } = renderHook(() => useAvailability('employee_number', 'EMP-9'));
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(hook.current).toMatchObject({ status: 'unknown', message: 'Reservado' });
+    expect(availabilityBlocks(hook.current)).toBe(false);
+  });
+
   it('si no se puede verificar no bloquea', async () => {
     vi.useFakeTimers();
     vi.spyOn(availabilityService, 'checkAvailability').mockRejectedValue(new Error('sin red'));
@@ -75,5 +85,27 @@ describe('EmployeeFormFields en vivo', () => {
     );
     expect(screen.getByText('Número de empleado disponible')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('El correo electrónico ya está registrado');
+  });
+});
+
+describe('lectura del estado en vivo (única regla para formularios y campos)', () => {
+  it('error: solo duplicado o formato inválido; bloquea además mientras se verifica', () => {
+    expect(availabilityError({ status: 'taken', message: 'Ya registrado' })).toBe('Ya registrado');
+    expect(availabilityError({ status: 'invalid', message: 'Formato inválido' })).toBe('Formato inválido');
+    expect(availabilityError({ status: 'available', message: 'Disponible' })).toBeUndefined();
+    expect(availabilityError(undefined)).toBeUndefined();
+    expect(availabilityBlocks({ status: 'checking' })).toBe(true);
+    expect(availabilityBlocks({ status: 'taken', message: 'Ya registrado' })).toBe(true);
+    expect(availabilityBlocks({ status: 'linkable', message: 'Ya tiene cuenta' })).toBe(false);
+    expect(availabilityBlocks({ status: 'unknown' })).toBe(false); // sin verificar no bloquea: valida el servidor
+  });
+
+  it('liveFeedback: indicador junto al control o error inmediato', () => {
+    expect(liveFeedback({ status: 'checking' }).status).toEqual({ tone: 'checking', text: 'Verificando disponibilidad…' });
+    expect(liveFeedback({ status: 'available', message: 'Disponible' }).status).toEqual({ tone: 'success', text: 'Disponible' });
+    expect(liveFeedback({ status: 'linkable', message: 'Ya tiene cuenta' }).status).toEqual({ tone: 'info', text: 'Ya tiene cuenta' });
+    expect(liveFeedback({ status: 'taken', message: 'Ya registrado' })).toEqual({ error: 'Ya registrado' });
+    expect(liveFeedback({ status: 'idle' })).toEqual({});
+    expect(liveFeedback(undefined)).toEqual({});
   });
 });

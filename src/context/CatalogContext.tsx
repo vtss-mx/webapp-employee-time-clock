@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useErrorPopup } from '../hooks/useFeedback';
+import { useRetryOnReconnect } from '../hooks/useRetryOnReconnect';
 import { catalogService } from '../services/catalogService';
 import { createCatalogApi, type CatalogApi } from '../utils/catalogs';
 
@@ -42,6 +43,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     setAttempt((n) => n + 1);
   }, []);
   useErrorPopup(error, { title: 'No se pudieron cargar los catálogos', retry });
+  useRetryOnReconnect(error, retry);
 
   const state = useMemo<CatalogState>(() => {
     if (catalogs) return { status: 'ready', catalogs };

@@ -3,9 +3,8 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../hooks/useAuth';
 import { apiRequest } from '../services/apiClient';
-import { apiFail, apiOk, mockFetch } from '../test/http';
+import { apiFail, apiOk, mockFetch, testSession } from '../test/http';
 import { sampleUser, tokenResponse } from '../test/render';
-import { preferenceStore } from '../utils/storage';
 import { AuthProvider } from './AuthContext';
 
 const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>;
@@ -15,11 +14,13 @@ const route = (handlers: Record<string, () => Response>) => (call: { url: string
 };
 
 describe('AuthProvider', () => {
-  it('inicia anónimo sin indicador de sesión', () => {
-    mockFetch(apiFail(500, 'NO_DEBE_LLAMARSE'));
+  it('sin sesión en el backend queda anónimo sin intentar renovar (nada guardado en el navegador)', async () => {
+    const { calls } = mockFetch(apiFail(500, 'NO_DEBE_LLAMARSE'));
     const { result } = renderHook(() => useAuth(), { wrapper });
-    expect(result.current.status).toBe('anonymous');
+    expect(result.current.status).toBe('restoring'); // primero pregunta al backend
+    await waitFor(() => expect(result.current.status).toBe('anonymous'));
     expect(result.current.isAuthenticated).toBe(false);
+    expect(calls).toEqual([]); // ni /auth/refresh: no había cookie de sesión
   });
 
   it('login guarda el token SOLO en memoria y marca la sesión', async () => {
@@ -29,8 +30,7 @@ describe('AuthProvider', () => {
     expect(result.current.isAuthenticated).toBe(true);
     expect(result.current.user?.email).toBe('ana@empresa.com');
     expect(JSON.parse(calls[0].init.body as string)).toEqual({ email: 'ana@empresa.com', password: 'Clave123', remember: false });
-    expect(preferenceStore.get('tc.signed-in')).toBe('1');
-    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain('token-');
+    expect(localStorage.length + sessionStorage.length).toBe(0); // nada en el navegador: ni token ni indicador
 
     // El token se inyecta en las peticiones autenticadas.
     await act(() => apiRequest('/users/me'));
@@ -38,7 +38,7 @@ describe('AuthProvider', () => {
   });
 
   it('restaura la sesión al recargar usando la cookie (refresh)', async () => {
-    preferenceStore.set('tc.signed-in', '1');
+    testSession.signedIn = true;
     mockFetch(route({ '/auth/refresh': () => apiOk(tokenResponse()) }));
     const { result } = renderHook(() => useAuth(), { wrapper });
     expect(result.current.status).toBe('restoring');
@@ -47,19 +47,65 @@ describe('AuthProvider', () => {
   });
 
   it('si la cookie ya no es válida queda anónimo', async () => {
-    preferenceStore.set('tc.signed-in', '1');
+    testSession.signedIn = true;
     mockFetch(route({ '/auth/refresh': () => apiFail(401, 'SESSION_INVALID') }));
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => expect(result.current.status).toBe('anonymous'));
-    expect(preferenceStore.get('tc.signed-in')).toBeNull();
   });
 
-  it('sin red al restaurar: anónimo pero conserva el indicador para reintentar', async () => {
-    preferenceStore.set('tc.signed-in', '1');
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('offline'))));
+  it('falla pasajera al restaurar: reintenta con espera creciente y restaura sin pedir la contraseña', async () => {
+    vi.useFakeTimers();
+    testSession.signedIn = true;
+    let refreshes = 0;
+    mockFetch(route({ '/auth/refresh': () => (++refreshes < 3 ? apiFail(503, 'SERVICE_UNAVAILABLE') : apiOk(tokenResponse())) }));
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(refreshes).toBe(1);
+    expect(result.current.status).toBe('restoring'); // la sesión puede seguir viva: no manda al login
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(refreshes).toBe(3);
+    expect(result.current.status).toBe('authenticated');
+    vi.useRealTimers();
+  });
+
+  it('el servidor no responde (ni a la consulta de sesión): intenta renovar con reintentos y queda anónimo', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn((_url: string) => Promise.reject(new TypeError('Failed to fetch')));
+    vi.stubGlobal('fetch', fetch);
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(result.current.status).toBe('anonymous');
+    const refreshes = fetch.mock.calls.filter(([url]) => url.endsWith('/auth/refresh'));
+    expect(refreshes).toHaveLength(6); // sin saber si hay sesión se intenta: el intento y 5 reintentos, no más
+    vi.useRealTimers();
+  });
+
+  it('sin conexión: espera a recuperarla antes de volver a intentar', async () => {
+    vi.useFakeTimers();
+    testSession.signedIn = true;
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    let refreshes = 0;
+    mockFetch(() => (++refreshes === 1 ? Promise.reject(new TypeError('Failed to fetch')) : apiOk(tokenResponse())));
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(refreshes).toBe(1); // sin red no gasta reintentos
+    expect(result.current.status).toBe('restoring');
+    online.mockReturnValue(true);
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(refreshes).toBe(2);
+    expect(result.current.status).toBe('authenticated');
+    vi.useRealTimers();
+  });
+
+  it('un error que no se arregla reintentando (403) no se reintenta', async () => {
+    testSession.signedIn = true;
+    const { calls } = mockFetch(route({ '/auth/refresh': () => apiFail(403, 'FORBIDDEN') }));
     const { result } = renderHook(() => useAuth(), { wrapper });
     await waitFor(() => expect(result.current.status).toBe('anonymous'));
-    expect(preferenceStore.get('tc.signed-in')).toBe('1');
+    expect(calls).toHaveLength(1);
   });
 
   it('renueva el token en un 401 TOKEN_EXPIRED y repite la petición', async () => {

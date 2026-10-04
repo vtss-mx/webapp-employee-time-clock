@@ -7,11 +7,15 @@ import type { Role, Screen, User } from '../types';
 export const SEED_SCREENS: Screen[] = [
   { code: 'ADMIN_DASHBOARD', name: 'Panel', short_name: null, path: '/admin/dashboard', icon: 'LayoutDashboard', badge: null },
   { code: 'ADMIN_COMPANIES', name: 'Empresas', short_name: null, path: '/admin/companies', icon: 'Building2', badge: null },
+  { code: 'ADMIN_ERRORS', name: 'Errores del sistema', short_name: 'Errores', path: '/admin/errors', icon: 'Bug', badge: 'PENDING_ERRORS' },
   { code: 'COMPANY_DASHBOARD', name: 'Dashboard', short_name: 'Inicio', path: '/company/dashboard', icon: 'LayoutDashboard', badge: null },
   { code: 'COMPANY_EMPLOYEES', name: 'Empleados', short_name: null, path: '/company/employees', icon: 'Users', badge: null },
+  { code: 'COMPANY_DEPARTMENTS', name: 'Departamentos', short_name: 'Áreas', path: '/company/departments', icon: 'Network', badge: null },
   { code: 'COMPANY_VALIDATIONS', name: 'Validaciones', short_name: 'Validar', path: '/company/validations', icon: 'ClipboardCheck', badge: 'PENDING_ENROLLMENTS' },
   { code: 'COMPANY_VALIDATORS', name: 'Validadores', short_name: null, path: '/company/validators', icon: 'ScanLine', badge: null },
+  { code: 'COMPANY_REPORTS', name: 'Reportes', short_name: null, path: '/company/reports', icon: 'FileSpreadsheet', badge: null },
   { code: 'COMPANY_SETTINGS', name: 'Configuración', short_name: 'Ajustes', path: '/company/settings', icon: 'Settings2', badge: null },
+  { code: 'COMPANY_API', name: 'Integraciones (API)', short_name: 'API', path: '/company/integrations', icon: 'KeyRound', badge: null },
   { code: 'VALIDATOR_CHECKPOINT', name: 'Identificar empleados', short_name: 'Identificar', path: '/validator/checkpoint', icon: 'ScanFace', badge: null },
   { code: 'EMPLOYEE_ENROLL', name: 'Registro facial', short_name: 'Mi rostro', path: '/employee/enroll', icon: 'ScanFace', badge: null },
   { code: 'EMPLOYEE_PENDING', name: 'Registro facial', short_name: 'Mi rostro', path: '/employee/pending', icon: 'ScanFace', badge: null },
@@ -22,8 +26,8 @@ export const SEED_SCREENS: Screen[] = [
 ];
 
 export const SEED_GRANTS: Record<Role, string[]> = {
-  ADMIN: ['ADMIN_DASHBOARD', 'ADMIN_COMPANIES', 'PROFILE'],
-  COMPANY: ['COMPANY_DASHBOARD', 'COMPANY_EMPLOYEES', 'COMPANY_VALIDATIONS', 'COMPANY_VALIDATORS', 'COMPANY_SETTINGS', 'PROFILE'],
+  ADMIN: ['ADMIN_DASHBOARD', 'ADMIN_COMPANIES', 'ADMIN_ERRORS', 'PROFILE'],
+  COMPANY: ['COMPANY_DASHBOARD', 'COMPANY_EMPLOYEES', 'COMPANY_DEPARTMENTS', 'COMPANY_VALIDATIONS', 'COMPANY_VALIDATORS', 'COMPANY_REPORTS', 'COMPANY_SETTINGS', 'COMPANY_API', 'PROFILE'],
   VALIDATOR: ['VALIDATOR_CHECKPOINT', 'PROFILE'],
   EMPLOYEE: ['EMPLOYEE_ENROLL', 'EMPLOYEE_PENDING', 'EMPLOYEE_VERIFY', 'EMPLOYEE_QR', 'EMPLOYEE_SELECT_COMPANY', 'PROFILE'],
 };

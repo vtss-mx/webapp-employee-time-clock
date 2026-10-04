@@ -9,7 +9,7 @@ import { renderWithProviders } from '../test/render';
 import type { CompanyDetail } from '../types';
 import { CompanyAdminFormPage } from './admin/CompanyAdminFormPage';
 import { RejectEnrollmentPage } from './company/RejectEnrollmentPage';
-import { ReverifyIdentityPage } from './company/ReverifyIdentityPage';
+import { ReverifyAllPage, ReverifyIdentityPage } from './company/ReverifyIdentityPage';
 import { ValidatorPasswordPage } from './company/ValidatorPasswordPage';
 
 /** Todos los formularios son pantallas: al guardar vuelven a la pantalla de origen. */
@@ -31,6 +31,7 @@ const company: CompanyDetail = {
   phone: '+526621234567',
   active: true,
   max_employees: 50,
+  api_enabled: false,
   employee_count: 3,
   admin_count: 1,
   created_at: '2026-01-01T00:00:00Z',
@@ -103,6 +104,37 @@ describe('solicitar nueva verificación (pantalla)', () => {
     expect(post?.url).toBe('/api/employees/7/face/reset');
     expect(JSON.parse(post?.init.body as string)).toEqual({ reason: 'Cambio importante de apariencia' });
     expect(screen.getByText('Pantalla anterior')).toBeInTheDocument();
+  });
+});
+
+describe('solicitar nueva verificación a todos (pantalla)', () => {
+  it('pide confirmar antes de afectar a toda la empresa; cancelar no envía nada', async () => {
+    const { calls } = mockFetch(apiOk({ employees: 12 }));
+    renderAt('/company/employees/reverify-all', '/company/employees/reverify-all', <ReverifyAllPage />, '/company/employees');
+    await userEvent.click(await screen.findByRole('button', { name: 'Solicitar a todos' }));
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Solicitar nueva verificación a todos?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(calls.filter((c) => c.init.method === 'POST')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cambio importante de apariencia' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Solicitar a todos' }));
+    const again = await screen.findByRole('alertdialog', { name: '¿Solicitar nueva verificación a todos?' });
+    await userEvent.click(within(again).getByRole('button', { name: 'Sí, solicitar a todos' }));
+    expect(await screen.findByText('12 empleados deberán registrar su rostro de nuevo en su próximo acceso.')).toBeInTheDocument();
+    const post = calls.find((c) => c.init.method === 'POST');
+    expect(post?.url).toBe('/api/employees/face/reset');
+    expect(JSON.parse(post?.init.body as string)).toEqual({ reason: 'Cambio importante de apariencia' });
+    expect(screen.getByText('Pantalla anterior')).toBeInTheDocument();
+  });
+
+  it('sin motivo no envía cuerpo y con un solo empleado lo dice en singular', async () => {
+    const { calls } = mockFetch(apiOk({ employees: 1 }));
+    renderAt('/company/employees/reverify-all', '/company/employees/reverify-all', <ReverifyAllPage />, '/company/employees');
+    await userEvent.click(await screen.findByRole('button', { name: 'Solicitar a todos' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Sí, solicitar a todos' }));
+    expect(await screen.findByText('1 empleado deberá registrar su rostro de nuevo en su próximo acceso.')).toBeInTheDocument();
+    expect(calls.find((c) => c.init.method === 'POST')?.init.body).toBeUndefined();
   });
 });
 

@@ -5,7 +5,7 @@ import { FeedbackProvider } from '../context/FeedbackContext';
 import { ApiError } from '../services/apiClient';
 import { apiOk, mockFetch } from '../test/http';
 import { serverFieldErrors, useEmployeeForm } from './useEmployeeForm';
-import { notifyEnrollmentsChanged, usePendingEnrollments } from './usePendingEnrollments';
+import { notifyEnrollmentsChanged, PendingEnrollmentsContext, usePendingEnrollments, usePendingEnrollmentsCount } from './usePendingEnrollments';
 import { usePolling } from './usePolling';
 import { useFeedback } from './useFeedback';
 import * as availability from '../services/availabilityService';
@@ -32,6 +32,19 @@ describe('usePolling', () => {
     expect(task).toHaveBeenCalledTimes(4);
   });
 
+  it('al desmontar cancela la consulta en curso (no sigue reintentando sin pantalla)', async () => {
+    let received: AbortSignal | undefined;
+    const task = vi.fn((signal: AbortSignal) => {
+      received = signal;
+      return new Promise<void>(() => undefined); // queda en curso
+    });
+    const { unmount } = renderHook(() => usePolling(task, { intervalMs: 1000 }));
+    await waitFor(() => expect(task).toHaveBeenCalledTimes(1));
+    expect(received?.aborted).toBe(false);
+    unmount();
+    expect(received?.aborted).toBe(true);
+  });
+
   it('se pausa con la pestaña oculta y reanuda al volver (sin ráfagas)', async () => {
     vi.useFakeTimers();
     const task = vi.fn(() => Promise.resolve());
@@ -51,6 +64,20 @@ describe('usePolling', () => {
     expect(task).toHaveBeenCalledTimes(1);
   });
 
+  it('nunca hay dos consultas a la vez: volver a la pestaña con una en curso no lanza otra', async () => {
+    vi.useFakeTimers();
+    let finish: () => void = () => undefined;
+    const task = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    renderHook(() => usePolling(task, { intervalMs: 60_000 }));
+    expect(task).toHaveBeenCalledOnce();
+    await act(() => vi.advanceTimersByTimeAsync(6_000)); // la consulta sigue en curso (red lenta)
+    window.dispatchEvent(new Event('focus'));
+    expect(task).toHaveBeenCalledOnce();
+    await act(() => Promise.resolve().then(() => finish()));
+    window.dispatchEvent(new Event('focus')); // ya terminó: ahora sí consulta
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
   it('no consulta deshabilitado', () => {
     const task = vi.fn(() => Promise.resolve());
     renderHook(() => usePolling(task, { intervalMs: 1000, enabled: false }));
@@ -67,6 +94,14 @@ describe('usePendingEnrollments', () => {
     total = 1;
     act(() => notifyEnrollmentsChanged());
     await waitFor(() => expect(result.current).toBe(1));
+  });
+
+  it('las pantallas leen la consulta única del layout (sin consultar por su cuenta)', () => {
+    const { fn } = mockFetch(() => apiOk({ items: [], total: 9, page: 1, size: 1 }));
+    const shared = ({ children }: { children: ReactNode }) => <PendingEnrollmentsContext.Provider value={4}>{children}</PendingEnrollmentsContext.Provider>;
+    expect(renderHook(() => usePendingEnrollmentsCount(), { wrapper: shared }).result.current).toBe(4);
+    expect(renderHook(() => usePendingEnrollmentsCount()).result.current).toBeNull(); // sin el contador en su menú
+    expect(fn).not.toHaveBeenCalled();
   });
 });
 

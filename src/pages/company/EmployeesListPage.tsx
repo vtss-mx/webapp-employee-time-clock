@@ -1,4 +1,4 @@
-import { SearchX, UserPlus, Users } from 'lucide-react';
+import { RotateCcw, SearchX, UserPlus, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { useSearchList } from '../../hooks/useSearchList';
@@ -25,9 +25,16 @@ export function EmployeesListPage() {
           title="Empleados"
           subtitle={data ? `${data.total} registrados` : 'Cargando...'}
           actions={
-            <ButtonLink to={paths.company.newEmployee} variant="primary" icon={<UserPlus size={18} />}>
-              Registrar empleado
-            </ButtonLink>
+            <>
+              {data && data.total > 0 && (
+                <ButtonLink to={paths.company.reverifyAll} variant="ghost" icon={<RotateCcw size={18} />}>
+                  Solicitar verificación a todos
+                </ButtonLink>
+              )}
+              <ButtonLink to={paths.company.newEmployee} variant="primary" icon={<UserPlus size={18} />}>
+                Registrar empleado
+              </ButtonLink>
+            </>
           }
         />
         <PanelSection>
@@ -43,7 +50,7 @@ export function EmployeesListPage() {
           <ListResults
             list={list}
             pager={{ noun: { one: 'empleado', other: 'empleados' } }}
-            columns={['Empleado', 'Correo', 'Registro facial', 'Estado']}
+            columns={['Empleado', 'Correo', 'Departamento', 'Registro facial', 'Estado']}
             onOpen={(emp) => open(emp.id)}
             empty={
               list.filtered
@@ -73,6 +80,7 @@ export function EmployeesListPage() {
                 <td data-label="Correo" className="table__wide">
                   <span className="truncate">{emp.email}</span>
                 </td>
+                <td data-label="Departamento">{emp.department_name ?? <span className="muted">Sin departamento</span>}</td>
                 <td data-label="Registro facial">
                   <FaceStatusBadge status={emp.face_status} />
                 </td>

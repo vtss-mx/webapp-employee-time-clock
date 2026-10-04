@@ -1,7 +1,8 @@
 import { AlertOctagon, Home, RotateCcw } from 'lucide-react';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { reloadForNewVersion } from '../services/versionReload';
+import { retryFailedLazy } from './retryableLazy';
 import { Button } from './ui/Button';
-import { tabStore } from '../utils/storage';
 
 interface Props {
   children: ReactNode;
@@ -13,16 +14,16 @@ interface State {
   error: Error | null;
 }
 
-const CHUNK_RELOAD_KEY = 'tc.chunk-reload';
-
 function isChunkLoadError(error: Error): boolean {
   return /Loading chunk|dynamically imported module|Importing a module script failed/i.test(error.message);
 }
 
 /**
  * Captura errores de render en tiempo de ejecución para que un fallo en una pantalla no deje
- * la aplicación en blanco. Ofrece reintentar sin perder la sesión. Si el error se debe a que
- * se publicó una nueva versión (chunk no encontrado), recarga la página una sola vez.
+ * la aplicación en blanco. Ofrece reintentar sin perder la sesión: con una pantalla que no se pudo
+ * descargar, "Reintentar" la descarga de nuevo (`retryFailedLazy`). Si no se descargó porque se
+ * publicó una versión nueva, recarga la página (una sola vez, `reloadForNewVersion`); si fue la red,
+ * no recarga (sin conexión el navegador mostraría su página de error en lugar de la app).
  */
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null };
@@ -33,16 +34,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
-    if (isChunkLoadError(error)) {
-      // Con el storage bloqueado no se recarga (evita ciclos) y se muestra el fallback.
-      if (!tabStore.get(CHUNK_RELOAD_KEY)) {
-        tabStore.set(CHUNK_RELOAD_KEY, '1');
-        if (tabStore.get(CHUNK_RELOAD_KEY)) window.location.reload();
-      }
-    }
+    if (isChunkLoadError(error)) void reloadForNewVersion();
   }
 
-  private reset = () => this.setState({ error: null });
+  private reset = () => {
+    retryFailedLazy(); // una pantalla que no se descargó se vuelve a descargar
+    this.setState({ error: null });
+  };
 
   override render() {
     if (!this.state.error) return this.props.children;

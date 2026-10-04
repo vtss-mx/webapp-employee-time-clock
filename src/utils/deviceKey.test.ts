@@ -14,7 +14,7 @@ function fakeIndexedDB() {
     return req;
   };
   const store = { get: (key: string) => request(() => data.get(key)), put: (value: unknown, key: string) => request(() => data.set(key, value)) };
-  const db = { createObjectStore: () => store, transaction: () => ({ objectStore: () => store }) };
+  const db = { objectStoreNames: { contains: () => false }, createObjectStore: () => store, transaction: () => ({ objectStore: () => store }) };
   return { open: () => request(() => db), data };
 }
 
@@ -46,5 +46,20 @@ describe('llave del dispositivo', () => {
     vi.stubGlobal('indexedDB', idb);
     vi.stubGlobal('crypto', {});
     await expect(deviceKeyPair()).rejects.toThrow(/no permite registrar el dispositivo/);
+  });
+
+  it('IndexedDB que falla al abrirse (modo privado, sin espacio): rechaza con su error o con DeviceKeyError', async () => {
+    const failing = (error: DOMException | null) => ({
+      open: () => {
+        const req = { error, onerror: null as null | (() => void), onsuccess: null, onupgradeneeded: null };
+        queueMicrotask(() => req.onerror?.());
+        return req;
+      },
+    });
+    const blocked = new DOMException('Base de datos bloqueada', 'InvalidStateError');
+    vi.stubGlobal('indexedDB', failing(blocked));
+    await expect(deviceKeyPair()).rejects.toBe(blocked);
+    vi.stubGlobal('indexedDB', failing(null)); // el navegador no dice la causa
+    await expect(deviceKeyPair()).rejects.toBeInstanceOf(DeviceKeyError);
   });
 });

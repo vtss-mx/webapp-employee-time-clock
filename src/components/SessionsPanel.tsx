@@ -1,7 +1,7 @@
 import { Laptop, LogOut, MonitorSmartphone, ShieldAlert, Smartphone } from 'lucide-react';
 import { useState } from 'react';
+import { useAction } from '../hooks/useAction';
 import { useAuth } from '../hooks/useAuth';
-import { useFeedback } from '../hooks/useFeedback';
 import { usePagedList } from '../hooks/usePagedList';
 import { authService } from '../services/authService';
 import { formatDateTime, timeAgo } from '../utils/format';
@@ -14,34 +14,21 @@ import { PanelSection } from './ui/Panel';
 /** Sección "Sesiones activas" (dispositivos) con revocación individual o total. */
 export function SessionsPanel() {
   const { logoutEverywhere } = useAuth();
-  const feedback = useFeedback();
   const list = usePagedList((page, signal) => authService.sessions(page, signal), { errorTitle: 'No se pudieron cargar tus sesiones' });
-  const [busy, setBusy] = useState<string | null>(null);
+  const { busy, run } = useAction<string>();
   const [confirmAll, setConfirmAll] = useState(false);
 
-  const revoke = async (id: string) => {
-    setBusy(id);
-    try {
-      await authService.revokeSession(id);
-      void feedback.success('Sesión cerrada', 'Ese dispositivo deberá iniciar sesión de nuevo.');
-      list.retry();
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo cerrar la sesión' });
-    } finally {
-      setBusy(null);
-    }
-  };
+  const revoke = (id: string) =>
+    run(() => authService.revokeSession(id), {
+      busy: id,
+      errorTitle: 'No se pudo cerrar la sesión',
+      success: ['Sesión cerrada', 'Ese dispositivo deberá iniciar sesión de nuevo.'],
+      onSuccess: list.retry,
+    });
 
-  const revokeAll = async () => {
-    setBusy('all');
-    try {
-      await logoutEverywhere();
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo cerrar sesión en todos los dispositivos' });
-      setBusy(null);
-      setConfirmAll(false);
-    }
-  };
+  // Al salir bien se cierra la sesión (la pantalla se va): sigue ocupada hasta entonces.
+  const revokeAll = () =>
+    run(logoutEverywhere, { busy: 'all', errorTitle: 'No se pudo cerrar sesión en todos los dispositivos', onError: () => setConfirmAll(false), keepBusy: true });
 
   return (
     <PanelSection

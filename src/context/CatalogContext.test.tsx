@@ -108,6 +108,20 @@ describe('CatalogProvider: catálogos en memoria, una carga por sesión', () => 
     expect(catalogCalls(calls)).toHaveLength(3);
   });
 
+  it('sin conexión: al recuperarla los vuelve a cargar solos', async () => {
+    let offline = true;
+    mockFetch((call) => {
+      if (call.url.endsWith('/catalogs')) return offline ? Promise.reject(new TypeError('Failed to fetch')) : apiOk(catalogsFixture);
+      return apiOk(tokenResponse());
+    });
+    renderApp(gated);
+    await userEvent.click(screen.getByRole('button', { name: 'entrar' }));
+    await screen.findByRole('alertdialog', { name: 'No se pudieron cargar los catálogos' });
+    offline = false;
+    act(() => void window.dispatchEvent(new Event('online')));
+    expect(await screen.findByText('Validator')).toBeInTheDocument();
+  });
+
   it('si la sesión se cierra mientras cargan, la respuesta tardía se descarta', async () => {
     let release: () => void = () => undefined;
     const late = new Promise<void>((resolve) => (release = resolve));

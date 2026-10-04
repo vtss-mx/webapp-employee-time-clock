@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, useContext } from 'react';
 import { enrollmentService } from '../services/enrollmentService';
-import { usePolling } from './usePolling';
+import { usePolledCount } from './usePolledCount';
 import { config } from '../utils/config';
 
 const EVENT = 'tc:enrollments-changed';
@@ -10,23 +10,20 @@ export function notifyEnrollmentsChanged() {
   window.dispatchEvent(new Event(EVENT));
 }
 
+const countPending = (signal?: AbortSignal) => enrollmentService.list('PENDING', { page: 1, size: 1 }, signal).then((page) => page.total);
+
 /** Número de registros faciales pendientes de validación (se actualiza periódicamente). */
 export function usePendingEnrollments(enabled: boolean): number | null {
-  const [count, setCount] = useState<number | null>(null);
+  return usePolledCount(countPending, { enabled, intervalMs: config.pendingEnrollmentsPollMs, changedEvent: EVENT });
+}
 
-  const load = useCallback(async () => {
-    const res = await enrollmentService.list('PENDING', { page: 1, size: 1 });
-    setCount(res.total);
-  }, []);
+/**
+ * Pendientes de la consulta única que hace el layout (solo si el menú del usuario lleva ese
+ * contador): las pantallas leen este valor en lugar de consultar por su cuenta, así no hay dos
+ * consultas periódicas iguales a la vez. null: aún no se sabe o el usuario no lo tiene.
+ */
+export const PendingEnrollmentsContext = createContext<number | null>(null);
 
-  usePolling(load, { intervalMs: config.pendingEnrollmentsPollMs, enabled });
-
-  useEffect(() => {
-    if (!enabled) return;
-    const onChange = () => void load().catch(() => undefined);
-    window.addEventListener(EVENT, onChange);
-    return () => window.removeEventListener(EVENT, onChange);
-  }, [enabled, load]);
-
-  return count;
+export function usePendingEnrollmentsCount(): number | null {
+  return useContext(PendingEnrollmentsContext);
 }

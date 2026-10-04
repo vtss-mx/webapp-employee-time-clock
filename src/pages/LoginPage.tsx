@@ -1,5 +1,5 @@
 import { Check, KeyRound, LogIn, Mail } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/auth/AuthLayout';
 import { loginRuleMessage } from '../components/auth/loginMessages';
@@ -46,7 +46,7 @@ export function LoginPage() {
 
   // Con sesión iniciada, GuestOnlyRoute lleva al inicio del rol (no se llega aquí).
 
-  const onSubmit = async (e: FormEvent) => {
+  const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     const nextErrors = {
       email: validateEmail(email),

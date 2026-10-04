@@ -18,7 +18,7 @@ const SEARCH_DEBOUNCE_MS = 350;
  */
 export function useSearchList<T>(
   fetchPage: (query: ListQuery, signal: AbortSignal) => Promise<Page<T>>,
-  { errorTitle, pageSize }: { errorTitle: string; pageSize?: number },
+  { errorTitle, pageSize, filterKey = '' }: { errorTitle: string; pageSize?: number; /** Otros filtros de la pantalla (p. ej. estado y gravedad): al cambiar, vuelve a la página 1. */ filterKey?: string },
 ) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -33,7 +33,7 @@ export function useSearchList<T>(
 
   const list = usePagedList<T>(
     (page, signal) => fetchPage({ ...page, search: debouncedSearch || undefined, active: filter === 'all' ? undefined : filter === 'active' }, signal),
-    { errorTitle, pageSize, filterKey: `${filter}|${debouncedSearch}` },
+    { errorTitle, pageSize, filterKey: `${filter}|${debouncedSearch}|${filterKey}` },
   );
   const filtered = Boolean(debouncedSearch) || filter !== 'all';
 

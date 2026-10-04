@@ -9,7 +9,7 @@ interface FloatingProps {
   /** Elemento junto al que se abre (el control del campo). */
   anchorRef: RefObject<HTMLElement | null>;
   /** Para el cierre al tocar fuera: el campo y la superficie cuentan como "dentro". */
-  floatingRef?: RefObject<HTMLDivElement>;
+  floatingRef?: RefObject<HTMLDivElement | null>;
   className: string;
   /** Mismo ancho que el campo (p. ej. la lista de países bajo el teléfono). */
   matchWidth?: boolean;
@@ -62,7 +62,7 @@ export function Floating({ anchorRef, floatingRef, className, matchWidth = false
     place();
     // Si cambia su alto (al filtrar países o cambiar de vista), se recoloca (importa al abrir hacia arriba).
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
-    if (ref.current) observer?.observe(ref.current);
+    if (observer && ref.current) observer.observe(ref.current);
     // En captura: también el desplazamiento de contenedores internos (ventanas, listas).
     window.addEventListener('scroll', schedule, true);
     window.addEventListener('resize', schedule);

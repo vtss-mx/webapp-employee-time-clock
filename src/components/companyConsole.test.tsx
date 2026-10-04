@@ -31,6 +31,7 @@ const company: CompanyDetail = {
   phone: '+526621234567',
   active: true,
   max_employees: 50,
+  api_enabled: false,
   employee_count: 3,
   admin_count: 1,
   created_at: '2026-01-01T00:00:00Z',

@@ -1,18 +1,23 @@
 import { KeyRound, Save } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
-import { useFeedback } from '../hooks/useFeedback';
-import { ApiError } from '../services/apiClient';
+import type { ChangeEvent, SubmitEvent } from 'react';
+import { useFormState } from '../hooks/useFormState';
+import { fieldErrorsFrom } from '../services/apiClient';
 import { authService } from '../services/authService';
-import { validatePassword, validatePasswordConfirm } from '../utils/validation';
+import { validatePassword, validatePasswordConfirm, type FieldErrors } from '../utils/validation';
 import { ConfirmPasswordField, FormField } from './FormField';
 import { Button } from './ui/Button';
 import { PanelSection } from './ui/Panel';
 
-type Field = 'current' | 'next' | 'confirm';
-const EMPTY: Record<Field, string> = { current: '', next: '', confirm: '' };
+interface PasswordValues {
+  current: string;
+  next: string;
+  confirm: string;
+}
+type Field = keyof PasswordValues;
+const EMPTY: PasswordValues = { current: '', next: '', confirm: '' };
 
-function validate(values: Record<Field, string>): Partial<Record<Field, string>> {
-  const errors: Partial<Record<Field, string>> = {
+function validate(values: PasswordValues): FieldErrors<PasswordValues> {
+  const errors: FieldErrors<PasswordValues> = {
     current: values.current ? undefined : 'Escribe tu contraseña actual',
     next: validatePassword(values.next) ?? (values.next === values.current ? 'Debe ser distinta de la actual' : undefined),
     confirm: validatePasswordConfirm(values.next, values.confirm),
@@ -21,62 +26,42 @@ function validate(values: Record<Field, string>): Partial<Record<Field, string>>
 }
 
 /** Errores del servidor llevados al campo correspondiente. */
-function serverErrors(err: unknown): Partial<Record<Field, string>> {
-  if (!(err instanceof ApiError)) return {};
-  if (err.code === 'CURRENT_PASSWORD_INVALID') return { current: err.message };
-  if (err.code === 'PASSWORD_REUSED') return { next: err.message };
-  const field = err.fieldErrors.new_password;
-  return field ? { next: field } : {};
-}
+const serverErrors = (err: unknown) =>
+  fieldErrorsFrom<PasswordValues>(err, { CURRENT_PASSWORD_INVALID: 'current', PASSWORD_REUSED: 'next', new_password: 'next' });
 
 /** Sección "Cambiar contraseña" (Mi perfil). Al guardar, se cierran las sesiones de otros dispositivos. */
 export function ChangePasswordSection({ onChanged }: { onChanged?: () => void }) {
-  const feedback = useFeedback();
-  const [values, setValues] = useState(EMPTY);
-  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
-  const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
-  const [saving, setSaving] = useState(false);
+  // La sección sigue en pantalla al guardar: el formulario se vacía y el botón se libera.
+  const form = useFormState(EMPTY, { serverErrors, staysOpen: true });
+  const { values, saving } = form;
   // El botón se habilita solo con los tres campos correctos; cada error se ve al salir del campo.
   const live = validate(values);
+  const errors = form.visibleErrors(live);
   const canSubmit = Object.keys(live).length === 0 && !saving;
 
   const bind = (field: Field) => ({
     value: values[field],
-    error: errors[field] ?? (touched[field] ? live[field] : undefined),
+    error: errors[field],
     disabled: saving,
     required: true,
-    onBlur: () => setTouched((t) => ({ ...t, [field]: true })),
-    onChange: (e: { target: { value: string } }) => {
-      setValues((prev) => ({ ...prev, [field]: e.target.value }));
-      setErrors(({ [field]: _, ...rest }) => rest); // el error del servidor se descarta al corregir
-    },
+    onBlur: () => form.touch(field),
+    // Cambiar el campo descarta el error que el servidor había puesto en él.
+    onChange: (e: ChangeEvent<HTMLInputElement>) => form.setValues({ ...values, [field]: e.target.value }),
   });
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent) => {
     event.preventDefault();
-    const found = validate(values);
-    setErrors(found);
-    if (Object.keys(found).length) {
-      void feedback.invalidForm(found);
+    if (Object.keys(live).length) {
+      form.touchAll();
+      void form.feedback.invalidForm(live);
       return;
     }
-    setSaving(true);
-    try {
+    await form.save(async () => {
       const { revoked_sessions: revoked } = await authService.changePassword(values.current, values.next);
-      void feedback.success(
-        'Contraseña actualizada',
-        revoked ? `Se cerró la sesión en ${revoked} dispositivo(s) más.` : 'Tu sesión actual sigue activa.',
-      );
-      setValues(EMPTY);
-      setTouched({});
+      void form.feedback.success('Contraseña actualizada', revoked ? `Se cerró la sesión en ${revoked} dispositivo(s) más.` : 'Tu sesión actual sigue activa.');
+      form.reset();
       onChanged?.();
-    } catch (err) {
-      const mapped = serverErrors(err);
-      setErrors(mapped); // el campo queda marcado y el motivo se explica en el popup
-      void feedback.fromError(err, { title: 'No se pudo cambiar la contraseña' });
-    } finally {
-      setSaving(false);
-    }
+    }, 'No se pudo cambiar la contraseña');
   };
 
   return (

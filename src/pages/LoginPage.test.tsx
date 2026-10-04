@@ -1,14 +1,22 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect } from 'react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { apiFail, apiOk, envelope, jsonResponse, mockFetch } from '../test/http';
-import { renderWithProviders, sampleUser, tokenResponse } from '../test/render';
-import { preferenceStore } from '../utils/storage';
+import { AuthProvider } from '../context/AuthContext';
+import { FeedbackProvider } from '../context/FeedbackContext';
+import { useAuth } from '../hooks/useAuth';
+import { apiFail, apiOk, envelope, jsonResponse, mockFetch, type MockCall } from '../test/http';
+import { WithCatalogs, renderWithProviders, sampleUser, tokenResponse } from '../test/render';
+import { withScreens } from '../test/screens';
 import { DeviceKeyError } from '../utils/deviceKey';
 import { LoginPage } from './LoginPage';
 
 const deviceKey = vi.hoisted(() => ({ deviceProof: vi.fn() }));
+const version = vi.hoisted(() => ({ reloadApp: vi.fn() }));
 vi.mock('../utils/deviceKey', async (importOriginal) => ({ ...(await importOriginal<object>()), deviceProof: deviceKey.deviceProof }));
+// Recargar la página no existe en jsdom: se registra que la app lo pidió.
+vi.mock('../services/versionService', async (importOriginal) => ({ ...(await importOriginal<object>()), reloadApp: version.reloadApp }));
 
 describe('LoginPage: todos los mensajes en popup', () => {
   it('el botón se habilita solo con correo válido y contraseña; el correo inválido se marca al salir', async () => {
@@ -64,9 +72,8 @@ describe('LoginPage: Recordar mi cuenta (dato en la BD)', () => {
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'ana@empresa.com');
     await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
-    await waitFor(() => expect(preferenceStore.get('tc.signed-in')).toBe('1'));
-    expect(loginBody(calls)).toMatchObject({ remember: false });
-    expect(JSON.stringify({ ...localStorage })).not.toContain('ana@empresa.com');
+    await waitFor(() => expect(loginBody(calls)).toMatchObject({ remember: false }));
+    expect(localStorage.length + sessionStorage.length).toBe(0); // nada en el navegador
   });
 
   it('marcada: el servidor recuerda la cuenta (nunca la contraseña ni el correo en el navegador)', async () => {
@@ -201,5 +208,105 @@ describe('LoginPage: validador en un dispositivo autorizado por su empresa', () 
     loginServer(deviceError('DEVICE_PROOF_REQUIRED', 'Verificando', { nonce: 'reto-1' }));
     await submit();
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo registrar el dispositivo' })).toBeInTheDocument();
+  });
+});
+
+/** Pantalla de destino tras entrar: muestra a qué ruta se llegó. */
+function RouteName() {
+  return <p>Ruta: {useLocation().pathname}</p>;
+}
+
+describe('LoginPage: al llegar y al enviar', () => {
+  const companyUser = withScreens({ ...sampleUser, role: 'COMPANY' as const, employee: null });
+  /** Servidor: versión publicada, cuenta recordada y el login (COMPANY). */
+  const server = ({ build = 'test-build', remembered = null, forget = () => apiOk(null) }: { build?: string; remembered?: unknown; forget?: () => Response } = {}) =>
+    mockFetch((call: MockCall) => {
+      if (call.url.includes('version.json')) return jsonResponse({ build });
+      if (call.url.endsWith('/auth/remembered')) return call.init.method === 'DELETE' ? forget() : apiOk(remembered);
+      if (call.url.endsWith('/auth/logout')) return apiOk(null);
+      return apiOk(tokenResponse(companyUser));
+    });
+  async function signIn() {
+    await userEvent.type(screen.getByLabelText('Correo electrónico'), 'rh@empresa.com');
+    await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234');
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+  }
+  /** Login al que se llegó desde una pantalla protegida (`state.from`), con las rutas de destino. */
+  function renderFrom(from: string) {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { from } }]}>
+        <FeedbackProvider>
+          <WithCatalogs>
+            <AuthProvider>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="*" element={<RouteName />} />
+              </Routes>
+            </AuthProvider>
+          </WithCatalogs>
+        </FeedbackProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('sesión cerrada por el sistema: al llegar explica el motivo en un popup', async () => {
+    server();
+    function EndSession() {
+      const { logout } = useAuth();
+      useEffect(() => void logout('Tu sesión expiró por inactividad.'), [logout]);
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <EndSession />
+        <LoginPage />
+      </>,
+      { auth: true },
+    );
+    expect(await screen.findByRole('dialog', { name: 'Tu sesión terminó' })).toHaveTextContent('Tu sesión expiró por inactividad.');
+  });
+
+  it('un envío forzado incompleto marca los campos y avisa en popup; escribir quita el error', async () => {
+    const { calls } = server();
+    renderWithProviders(<LoginPage />, { auth: true });
+    fireEvent.submit(screen.getByRole('button', { name: 'Iniciar sesión' }).closest('form') as HTMLFormElement);
+    const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
+    expect(popup).toHaveTextContent('La contraseña es obligatoria');
+    const password = screen.getByLabelText('Contraseña', { selector: 'input' });
+    expect(password).toHaveAccessibleDescription('La contraseña es obligatoria');
+    await userEvent.click(within(popup).getAllByRole('button', { name: 'Cerrar' })[0]);
+    await userEvent.type(password, 'C');
+    expect(password).not.toHaveAccessibleDescription('La contraseña es obligatoria');
+    expect(calls.some((c) => c.url.endsWith('/auth/login'))).toBe(false);
+  });
+
+  it('si ya se publicó una versión nueva, la carga antes de entrar (no inicia sesión con código anterior)', async () => {
+    const { calls } = server({ build: 'build-nuevo' });
+    renderWithProviders(<LoginPage />, { auth: true });
+    await signIn();
+    await waitFor(() => expect(version.reloadApp).toHaveBeenCalledOnce());
+    expect(calls.some((c) => c.url.endsWith('/auth/login'))).toBe(false);
+  });
+
+  it('vuelve a la pantalla de la que vino si es de su área', async () => {
+    server();
+    renderFrom('/company/employees/7');
+    await signIn();
+    expect(await screen.findByText('Ruta: /company/employees/7')).toBeInTheDocument();
+  });
+
+  it('una pantalla de otra área no se retoma: entra a su inicio', async () => {
+    server();
+    renderFrom('/admin/errors');
+    await signIn();
+    expect(await screen.findByText(`Ruta: ${companyUser.home}`)).toBeInTheDocument();
+  });
+
+  it('"Usar otra cuenta" que falla: lo avisa y conserva la cuenta recordada', async () => {
+    server({ remembered: { email: 'ana@empresa.com' }, forget: () => apiFail(500, 'INTERNAL_ERROR', 'Falló el servidor') });
+    renderWithProviders(<LoginPage />, { auth: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Usar otra cuenta' }));
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo cambiar de cuenta' })).toHaveTextContent('Falló el servidor');
+    expect(screen.getByLabelText('Correo electrónico')).toHaveValue('ana@empresa.com');
   });
 });

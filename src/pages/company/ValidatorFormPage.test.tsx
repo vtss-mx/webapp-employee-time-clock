@@ -240,6 +240,18 @@ describe('ValidatorFormPage: edición', () => {
     expect(screen.getByLabelText('Código postal')).not.toHaveAccessibleDescription('Ese código postal no existe');
   });
 
+  it('sin ubicación exigida: puede iniciar sesión desde cualquier lugar y su sesión sigue abierta', async () => {
+    const { calls } = mockFetch(apiOk(sampleValidator), apiOk({ ...sampleValidator, name: 'Acceso sur' }));
+    renderAt('/company/validators/3/edit');
+    await userEvent.clear(await screen.findByLabelText(/Nombre o ubicación/));
+    await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Acceso sur');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    const popup = await screen.findByRole('dialog', { name: 'Validador actualizado' });
+    expect(popup).toHaveTextContent('Puede iniciar sesión desde cualquier lugar.');
+    expect(popup).not.toHaveTextContent('Su sesión abierta se cerró');
+    expect(JSON.parse(calls[1].init.body as string)).toMatchObject({ name: 'Acceso sur', location_required: false });
+  });
+
   it('si no carga ofrece reintentar', async () => {
     mockFetch(apiFail(404, 'VALIDATOR_NOT_FOUND', 'Validador no encontrado'), apiOk(sampleValidator));
     renderAt('/company/validators/9/edit');

@@ -1,11 +1,12 @@
 import { KeyRound } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import type { SubmitEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FormFooter } from '../../components/FormFooter';
 import { NewPasswordFields, useNewPassword } from '../../components/NewPasswordFields';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
+import { useSubmit } from '../../hooks/useAction';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
@@ -17,22 +18,18 @@ export function ValidatorPasswordPage() {
   const navigate = useNavigate();
   const feedback = useFeedback();
   const form = useNewPassword();
-  const { data: validator, error, retry } = useResource(() => validatorService.get(validatorId), validatorId, 'No se pudo cargar el validador');
-  const [saving, setSaving] = useState(false);
+  const { data: validator, error, retry } = useResource((signal) => validatorService.get(validatorId, signal), validatorId, 'No se pudo cargar el validador');
+  const { saving, submit: send } = useSubmit();
 
   const back = () => void navigate(paths.company.validators);
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent) => {
     event.preventDefault();
     if (!form.valid) return;
-    setSaving(true);
-    try {
+    await send(async () => {
       const saved = await validatorService.resetPassword(validatorId, form.password);
       void feedback.success('Contraseña restablecida', `${saved.email} debe iniciar sesión de nuevo: sus sesiones abiertas se cerraron.`);
       back();
-    } catch (err) {
-      setSaving(false);
-      void feedback.fromError(err, { title: 'No se pudo restablecer la contraseña' });
-    }
+    }, 'No se pudo restablecer la contraseña');
   };
 
   if (!validator) return error ? <RetryState onRetry={retry} /> : <SkeletonCard lines={4} />;

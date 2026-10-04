@@ -95,8 +95,9 @@ export function validateRfc(value: string, birthDate?: string): string | undefin
   const match = RFC_RE.exec(rfc);
   if (!match) return 'El RFC no tiene un formato válido (p. ej. PEGJ900515AB1)';
   if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha del RFC (aammdd) no es válida';
-  const birth = /^\d{2}(\d{2})-(\d{2})-(\d{2})$/.exec(birthDate ?? '');
-  if (birth && rfc.slice(4, 10) !== `${birth[1]}${birth[2]}${birth[3]}`) return birthDateMismatch('El RFC', rfc.slice(4, 10), birthDate ?? '');
+  const birthIso = birthDate ?? '';
+  const birth = /^\d{2}(\d{2})-(\d{2})-(\d{2})$/.exec(birthIso);
+  if (birth && rfc.slice(4, 10) !== `${birth[1]}${birth[2]}${birth[3]}`) return birthDateMismatch('El RFC', rfc.slice(4, 10), birthIso);
   return undefined;
 }
 
@@ -124,9 +125,10 @@ export function validateCurp(value: string, birthDate?: string): string | undefi
   if (!match) return 'La CURP no tiene un formato válido (p. ej. HEGG560427MVZRRL04)';
   if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha de la CURP (aammdd) no es válida';
   if (curpCheckDigit(curp.slice(0, 17)) !== curp[17]) return 'La CURP no es válida: el dígito verificador no corresponde';
-  const birth = /^(\d{2})(\d{2})-(\d{2})-(\d{2})$/.exec(birthDate ?? '');
+  const birthIso = birthDate ?? '';
+  const birth = /^(\d{2})(\d{2})-(\d{2})-(\d{2})$/.exec(birthIso);
   if (birth) {
-    if (curp.slice(4, 10) !== `${birth[2]}${birth[3]}${birth[4]}`) return birthDateMismatch('La CURP', curp.slice(4, 10), birthDate ?? '');
+    if (curp.slice(4, 10) !== `${birth[2]}${birth[3]}${birth[4]}`) return birthDateMismatch('La CURP', curp.slice(4, 10), birthIso);
     if (/\d/.test(curp[16]) !== Number(`${birth[1]}${birth[2]}`) < 2000) {
       return 'La CURP no corresponde al siglo de la fecha de nacimiento: su carácter 17 es un número para quienes nacieron antes de 2000 y una letra a partir de 2000';
     }
@@ -160,8 +162,8 @@ const COMPANY_RFC_RE = /^[A-ZÑ&]{3}(\d{2})(\d{2})(\d{2})[A-Z\d]{2}[\dA]$/;
 export function validateCompanyRfc(value: string): string | undefined {
   const rfc = normalizeRfc(value);
   if (!rfc) return 'El RFC es obligatorio';
+  // 13 caracteres: persona física (validateRfc también rechaza los RFC genéricos, que tienen 13).
   if (rfc.length === RFC_LENGTH) return validateRfc(rfc);
-  if (GENERIC_RFCS.has(rfc)) return 'Captura el RFC de la empresa; el RFC genérico no es válido';
   const match = COMPANY_RFC_RE.exec(rfc);
   if (!match) return 'El RFC debe tener 12 caracteres (persona moral) o 13 (persona física)';
   if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha del RFC (aammdd) no es válida';

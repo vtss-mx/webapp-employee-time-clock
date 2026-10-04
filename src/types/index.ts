@@ -1,3 +1,8 @@
+import type { ApiKey, ApiKeyStatus, ApiScope } from './apiKeys';
+import type { Department, DepartmentRef } from './departments';
+import type { ErrorOccurrence, ErrorReport, ErrorSeverity, ErrorStatus } from './errors';
+import type { Company, CompanyAdmin } from './platform';
+
 /**
  * Roles. ADMIN: plataforma (da de alta empresas). COMPANY: administra una empresa. EMPLOYEE: empleado.
  * VALIDATOR: validador de identidad de una empresa (tableta o teléfono; identifica a sus empleados).
@@ -106,63 +111,30 @@ export interface PageQuery {
 
 // ---------- Plataforma (ADMIN) ----------
 
-export interface Company {
+export type CompanyAdminList = Page<CompanyAdmin>;
+
+/**
+ * Empleado de una empresa visto por el ADMIN de la plataforma: solo su ficha de trabajo, de solo
+ * lectura (sin RFC, CURP, NSS, fecha de nacimiento ni nada biométrico: el backend no los envía).
+ */
+export interface CompanyEmployee {
   id: number;
-  name: string;
-  legal_name: string | null;
-  rfc: string | null;
+  employee_number: string;
+  first_name: string;
+  last_name: string;
+  department_name: string | null;
+  email: string;
   phone: string | null;
   active: boolean;
-  max_employees: number | null;
-  employee_count: number;
-  admin_count: number;
-  created_at: string;
-  updated_at: string;
+  face_status: FaceStatus;
 }
 
-export interface CompanyAdmin {
-  id: number;
-  email: string;
-  active: boolean;
-  last_login_at: string | null;
-  created_at: string;
-}
-
-export type CompanyAdminList = Page<CompanyAdmin>;
+export type CompanyEmployeeList = Page<CompanyEmployee>;
 
 /** Detalle de una empresa: sus administradores se piden aparte, paginados (`adminService.admins`). */
 export type CompanyDetail = Company;
 
 export type CompanyList = Page<Company>;
-
-export interface CompanyListParams {
-  search?: string;
-  active?: boolean;
-  page?: number;
-  size?: number;
-}
-
-/** Formulario de empresa; los datos del administrador solo se capturan al dar de alta. */
-export interface CompanyFormValues {
-  name: string;
-  legal_name: string;
-  rfc: string;
-  /** 10 dígitos. */
-  phone: string;
-  /** Vacío = sin límite. */
-  max_employees: string;
-  admin_email: string;
-  admin_password: string;
-  /** Solo en el cliente: la contraseña repetida (no se envía). */
-  admin_password_confirm: string;
-}
-
-export interface PlatformStats {
-  companies: number;
-  active_companies: number;
-  employees: number;
-  company_admins: number;
-}
 
 /** Respuesta de /auth/login y /auth/refresh. El refresh token viaja en una cookie HttpOnly. */
 export interface AuthTokenResponse {
@@ -217,19 +189,40 @@ export interface Employee {
   face_rejection_reason: string | null;
   latest_enrollment_id: number | null;
   has_face: boolean;
+  /** Muestras activas del rostro: las del registro aprobado más las aprendidas del uso. */
   face_samples: number;
+  /** Muestras que el reconocimiento aprendió de identificaciones seguras (galería evolutiva). */
+  face_learned_samples: number;
+  face_last_learned_at: string | null;
+  /** Departamento al que está asignado (a lo más uno). */
+  department_id?: number | null;
+  department_name?: string | null;
+  /** Departamentos de los que es responsable (solo en el detalle). */
+  managed_departments?: DepartmentRef[];
   created_at: string;
   updated_at: string;
 }
 
 export type EmployeeList = Page<Employee>;
 
+/** Resultado de solicitar nueva verificación de identidad a toda la empresa. */
+export interface IdentityReverifySummary {
+  /** Empleados con registro facial que deberán registrar su rostro de nuevo. */
+  employees: number;
+}
+
 export interface EmployeeListParams {
   search?: string;
   active?: boolean;
+  /** Solo los asignados a ese departamento. */
+  department_id?: number;
   page?: number;
   size?: number;
 }
+
+export type DepartmentList = Page<Department>;
+export type ErrorReportList = Page<ErrorReport>;
+export type ErrorOccurrenceList = Page<ErrorOccurrence>;
 
 export interface EmployeeFormValues {
   first_name: string;
@@ -293,7 +286,8 @@ export interface DynamicQr {
   created_at: string;
   expires_at: string;
   lifetime_seconds: number;
-  image_base64: string;
+  /** Lo que codifica el QR ("TCQR2:..."): el teléfono lo dibuja; sirve una sola vez. */
+  content: string;
 }
 
 /** Estado de un QR emitido: vigente, ya usado, vencido o reemplazado/invalidado. */
@@ -362,49 +356,6 @@ export interface VerificationLog {
 }
 
 export type VerificationLogList = Page<VerificationLog>;
-
-/** Política de verificación de la empresa (editable por COMPANY en Configuración). */
-export interface VerificationPolicy {
-  block_glasses: boolean;
-  block_headwear: boolean;
-  block_mask: boolean;
-  liveness_challenge: boolean;
-  anti_spoofing: boolean;
-  qr_enabled: boolean;
-  employee_mobile_only: boolean;
-  /** Los validadores de identidad solo operan desde una tableta o un teléfono. */
-  validator_mobile_only: boolean;
-  /** Confianza mínima: exactamente el `value` de un nivel activo del catálogo confidence_levels. */
-  min_confidence: number;
-  // --- Candados contra engaños (cada uno lo activa o desactiva la empresa) ---
-  /** Sensibilidad del anti-spoofing: código del catálogo antispoof_levels. */
-  anti_spoofing_level: string;
-  /** Giros aleatorios de la prueba de vida (1 o 2). */
-  liveness_steps: number;
-  block_virtual_cameras: boolean;
-  reject_foreign_images: boolean;
-  detect_static_captures: boolean;
-  detect_replays: boolean;
-  check_capture_continuity: boolean;
-  enforce_human_timing: boolean;
-  detect_duplicate_faces: boolean;
-  lockout_enabled: boolean;
-  lockout_max_failures: number;
-  lockout_minutes: number;
-  /** Cada dispositivo de un validador lo autoriza la empresa antes de operar. */
-  validator_device_approval: boolean;
-  /** Segundos que vive cada QR dinámico del empleado antes de renovarse solo. */
-  qr_lifetime_seconds: number;
-  /** Nombres de cámaras virtuales que no se aceptan (la app avisa antes de capturar). */
-  blocked_cameras: string[];
-  updated_at: string | null;
-  updated_by: string | null;
-}
-
-export type VerificationPolicyUpdate = Partial<Omit<VerificationPolicy, 'updated_at' | 'updated_by' | 'blocked_cameras'>>;
-
-/** Reglas que la app aplica en pantalla (el umbral de confianza solo lo evalúa el servidor). */
-export type VerificationRules = Omit<VerificationPolicy, 'min_confidence' | 'updated_at' | 'updated_by'>;
 
 // ---------- Validadores de identidad (VALIDATOR) ----------
 
@@ -586,6 +537,12 @@ export interface Catalogs {
   face_statuses: FaceStatusItem[];
   enrollment_statuses: StatusItem<EnrollmentStatus>[];
   device_statuses: StatusItem<DeviceStatus>[];
+  /** Permisos que puede tener una llave de la API de integración. */
+  api_scopes: CatalogItem<ApiScope>[];
+  api_key_statuses: StatusItem<ApiKeyStatus>[];
+  /** Seguimiento y gravedad de los errores del sistema (pantalla del ADMIN). */
+  error_statuses: StatusItem<ErrorStatus>[];
+  error_severities: StatusItem<ErrorSeverity>[];
   verification_reasons: ReasonItem[];
   accessories: AccessoryItem[];
   countries: CountryItem[];
@@ -600,3 +557,27 @@ export interface Catalogs {
 
 export type CatalogKey = keyof Catalogs;
 export type CatalogEntry<K extends CatalogKey> = Catalogs[K][number];
+
+export type { ApiKey, ApiKeyCreated, ApiKeyCreatePayload, ApiKeyStatus, ApiScope } from './apiKeys';
+export type { FaceLearningSummary, VerificationPolicy, VerificationPolicyUpdate, VerificationRules } from './policy';
+export type { Department, DepartmentPayload, DepartmentPerson, DepartmentRef } from './departments';
+export type { ApiDemand, ErrorContext, ErrorOccurrence, ErrorReport, ErrorReportDetail, ErrorSeverity, ErrorStatus, ErrorSummary, ServerStatus } from './errors';
+export type { Company, CompanyAdmin, CompanyFormValues, CompanyListParams, PlatformStats } from './platform';
+export type { AvailabilityResult, AvailabilityState, AvailabilityStatus, EmployeeUniqueField, FieldStatus, LiveChecks } from './forms';
+
+export type ApiKeyList = Page<ApiKey>;
+export type {
+  CatalogColumn,
+  CatalogDataset,
+  DatasetOption,
+  FeedbackResult,
+  FilterOp,
+  ReportAnswer,
+  ReportCatalog,
+  ReportFilter,
+  ReportPeriod,
+  ReportPlan,
+  ReportPreview,
+  ReportScalar,
+  SavedReport,
+} from './reports';

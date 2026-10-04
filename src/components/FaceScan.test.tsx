@@ -24,7 +24,9 @@ describe('FaceScan: etapas del escáner facial', () => {
     const base = { progress: 0.5, turnProgress: 0.25, capture: null };
     expect(stageFill('align', base)).toBe(0.5);
     expect(stageFill('scan', { ...base, capture: { current: 2, total: 4 } })).toBe(0.5);
+    expect(stageFill('scan', base)).toBe(1); // capturas tomadas: se valida
     expect(stageFill('liveness', base)).toBe(0.25);
+    expect(stageFill('confirm', base)).toBe(0.6); // esperando al servidor
     expect(stageFill('prepare', base)).toBeGreaterThan(0);
   });
 

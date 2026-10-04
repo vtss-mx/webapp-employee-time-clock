@@ -30,3 +30,14 @@ export function KpiCard({ label, icon: Icon, value, tile = '' }: Omit<Kpi, 'key'
     </div>
   );
 }
+
+/** Fila de indicadores de una sección (con la entrada escalonada de la aplicación). */
+export function KpiGrid({ kpis }: { kpis: Kpi[] }) {
+  return (
+    <div className="kpis stagger">
+      {kpis.map(({ key, ...kpi }) => (
+        <KpiCard key={key} {...kpi} />
+      ))}
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { preferenceStore } from '../utils/storage';
-import { describeCameraProblem, errorKind, type CameraProblem, type CameraProblemKind } from '../utils/cameraDiagnostics';
+import { deviceStore } from '../utils/deviceStore';
+import { CameraNotReadyError, describeCameraProblem, errorKind, type CameraProblem, type CameraProblemKind } from '../utils/cameraDiagnostics';
 import {
   activeKind,
   cameraConstraints,
@@ -32,7 +32,7 @@ export interface CaptureOptions {
 }
 
 export interface CameraController {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   facing: CameraFacing;
   status: CameraStatus;
   error: string | null;
@@ -84,6 +84,8 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
   const requestIdRef = useRef(0);
   const activeDeviceRef = useRef<string | null>(null);
   const pausedByVisibilityRef = useRef(false);
+  /** El sistema silenció la cámara (sin imagen) sin cerrarla. */
+  const mutedRef = useRef(false);
   const prefKey = `tc.camera.${facing}`;
 
   const [status, setStatus] = useState<CameraStatus>('idle');
@@ -107,6 +109,36 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
     setProblem(describeCameraProblem(kind));
   }, []);
 
+  // La cámara se puede cortar sin aviso (llamada o Siri en iOS, permiso retirado, cámara
+  // desconectada): sin esto el visor quedaría congelado o en negro como si siguiera activo.
+  // - `ended`: ya no volverá; se libera y queda "Cámara en pausa" con "Activar cámara".
+  // - `mute`: el sistema la tomó un momento; en pausa hasta `unmute` (o hasta "Activar cámara").
+  const watchTrack = useCallback(
+    (stream: MediaStream) => {
+      const track = stream.getVideoTracks()[0];
+      if (!track) return;
+      const isCurrent = () => streamRef.current === stream;
+      track.addEventListener('ended', () => {
+        if (!isCurrent()) return;
+        requestIdRef.current++;
+        mutedRef.current = false;
+        releaseStream();
+        setStatus('idle');
+      });
+      track.addEventListener('mute', () => {
+        if (!isCurrent()) return;
+        mutedRef.current = true;
+        setStatus('idle');
+      });
+      track.addEventListener('unmute', () => {
+        if (!isCurrent() || !mutedRef.current) return;
+        mutedRef.current = false;
+        setStatus('active');
+      });
+    },
+    [releaseStream],
+  );
+
   const refreshDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return [];
     const all = await navigator.mediaDevices.enumerateDevices();
@@ -116,7 +148,7 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
   }, []);
 
   const open = useCallback(
-    async (target: CameraTarget = {}): Promise<void> => {
+    async (requested: CameraTarget = {}, remembered = false): Promise<void> => {
       const requestId = ++requestIdRef.current;
       setProblem(null);
 
@@ -128,6 +160,11 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
       // Liberar la cámara anterior antes de abrir otra (obligatorio en iOS y muchos Android).
       releaseStream();
       setStatus('requesting');
+
+      // La cámara que eligió este dispositivo (IndexedDB) se lee aquí, ya con el turno tomado: si se
+      // detuvo mientras se leía, no se abre nada.
+      const target = remembered ? { deviceId: rememberedFor(parseRemembered(await deviceStore.get(prefKey)), facing) } : requested;
+      if (requestId !== requestIdRef.current) return;
 
       let stream: MediaStream;
       try {
@@ -149,6 +186,8 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
       }
 
       streamRef.current = stream;
+      mutedRef.current = false;
+      watchTrack(stream);
       if (videoRef.current) await attachStream(videoRef.current, stream);
 
       const opened = openedCamera(stream, target.deviceId);
@@ -158,7 +197,7 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
       setKind(opened.kind);
       setTrackLabel(opened.label);
       // Se recuerda con su lado: solo se reabre si sirve para este propósito (rememberedFor).
-      if (opened.id) preferenceStore.set(prefKey, JSON.stringify({ deviceId: opened.id, kind: opened.kind }));
+      if (opened.id) void deviceStore.set(prefKey, { deviceId: opened.id, kind: opened.kind });
 
       // Tras conceder permiso, enumerateDevices ya devuelve etiquetas reales.
       const list = await refreshDevices().catch(() => [] as CameraDevice[]);
@@ -167,7 +206,7 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
       setIsMirrored(shouldMirror(opened.kind, facing, list.length));
       setStatus('active');
     },
-    [facing, fail, prefKey, refreshDevices, releaseStream],
+    [facing, fail, prefKey, refreshDevices, releaseStream, watchTrack],
   );
 
   const stop = useCallback(() => {
@@ -179,8 +218,8 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
   const start = useCallback((deviceId?: string) => open({ deviceId }), [open]);
   const selectCamera = useCallback((deviceId: string) => void open({ deviceId }), [open]);
   const requestAccess = useCallback(
-    () => void open({ deviceId: rememberedFor(parseRemembered(preferenceStore.get(prefKey)), facing) }),
-    [facing, open, prefKey],
+    () => void open({}, true),
+    [open],
   );
 
   // Teléfono: alterna frontal ↔ trasera (lente principal). Computadora: siguiente webcam.
@@ -191,7 +230,8 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
 
   const captureFrame = useCallback(async ({ maxSide = 1280, quality = 0.92 }: CaptureOptions = {}) => {
     const video = videoRef.current;
-    if (!video || video.readyState < 2 || !video.videoWidth) throw new Error('La cámara aún no está lista');
+    // Sin imagen (abriéndose, en pausa o cortada): error pasajero, el flujo espera y reintenta.
+    if (!video || video.readyState < 2 || !video.videoWidth || mutedRef.current) throw new CameraNotReadyError();
     const scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(video.videoWidth * scale);

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useFeedback } from '../hooks/useFeedback';
 import { ApiError } from '../services/apiClient';
+import { reloadForNewVersion } from '../services/versionReload';
 
 const GENERIC_TEXT = 'Intenta nuevamente. Si persiste, recarga la página.';
 
@@ -33,8 +34,11 @@ export function GlobalErrorHandler() {
       console.error('[error]', event.error);
       notify(event.error);
     };
-    // Vite: falla al precargar un módulo tras una nueva publicación → recargar.
-    const onPreloadError = () => window.location.reload();
+    // Vite no pudo descargar un módulo (pantalla, detector facial, generador de QR). Se recarga solo
+    // si ya se publicó una versión nueva, y una vez (`reloadForNewVersion`). El error sigue su curso
+    // hasta quien importó el módulo: la pantalla ofrece "Reintentar" y el detector pasa a captura
+    // manual. Sin preventDefault(): con él, Vite se traga el error y la importación devuelve undefined.
+    const onPreloadError = () => void reloadForNewVersion();
 
     window.addEventListener('unhandledrejection', onRejection);
     window.addEventListener('error', onError);

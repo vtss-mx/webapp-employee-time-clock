@@ -37,12 +37,23 @@ export function apiFail(status: number, code: string, message = 'falló', header
   return jsonResponse(envelope(null, { status, code, message, errors: [{ code, message, field: null, details: null }] }), status, headers);
 }
 
-/** Sustituye fetch por una cola de respuestas (o una función) y registra las llamadas. */
+/**
+ * ¿Hay cookie de sesión en el navegador simulado? Es lo que responde `GET /auth/session` (la app lo
+ * pregunta al cargar, en lugar de guardar algo en el navegador). Cada prueba empieza sin sesión.
+ */
+export const testSession = { signedIn: false };
+
+/**
+ * Sustituye fetch por una cola de respuestas (o una función) y registra las llamadas. La consulta de
+ * sesión al cargar (`/auth/session`) la responde siempre `testSession`, sin consumir la cola ni contar
+ * como llamada: así las pruebas no dependen de en qué momento la hace la app.
+ */
 export function mockFetch(...responders: Array<Response | Responder>) {
   const calls: MockCall[] = [];
   const queue = [...responders];
   const fn = vi.fn((input: RequestInfo | URL, init: RequestInit = {}) => {
     const call = { url: typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, init };
+    if (call.url.endsWith('/auth/session')) return Promise.resolve(apiOk({ signed_in: testSession.signedIn }));
     calls.push(call);
     const next = queue.length > 1 ? queue.shift() : queue[0];
     if (!next) return Promise.reject(new TypeError('Failed to fetch'));

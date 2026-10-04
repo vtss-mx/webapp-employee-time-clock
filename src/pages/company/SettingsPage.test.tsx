@@ -60,6 +60,21 @@ describe('SettingsPage (COMPANY)', () => {
     ]);
   });
 
+  it('aprendizaje continuo: se apaga sin confirmación (no reduce la seguridad)', async () => {
+    const { calls } = mockFetch((call) => {
+      if (call.init.method !== 'PUT') return apiOk(policy);
+      return apiOk({ ...policy, ...(JSON.parse(call.init.body as string) as object) });
+    });
+    renderWithProviders(<SettingsPage />);
+    const learning = await screen.findByRole('switch', { name: 'Aprender de cada identificación segura' });
+    expect(learning).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(learning);
+    await waitFor(() => expect(learning).toHaveAttribute('aria-checked', 'false'));
+    expect(screen.queryByRole('alertdialog', { name: /Desactivar/ })).not.toBeInTheDocument();
+    expect(await screen.findByText('Cada empleado se compara solo con las muestras de su registro aprobado.', { selector: '.message-dialog *, [role=dialog] *' })).toBeInTheDocument();
+    expect(calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([{ adaptive_learning: false }]);
+  });
+
   it('los ajustes de un candado apagado no se pueden cambiar', async () => {
     mockFetch(apiOk({ ...policy, anti_spoofing: false, liveness_challenge: false, lockout_enabled: false, qr_enabled: false }));
     renderWithProviders(<SettingsPage />);
@@ -105,19 +120,12 @@ describe('SettingsPage (COMPANY)', () => {
     );
   });
 
-  it('controla el acceso solo desde teléfono con una confirmación específica', async () => {
-    const { calls } = mockFetch((call) =>
-      call.init.method === 'PUT' ? apiOk({ ...policy, employee_mobile_only: false }) : apiOk(policy),
-    );
+  it('solo los validadores tienen restricciones de dispositivo (no hay interruptor para empleados)', async () => {
+    mockFetch(apiOk(policy));
     renderWithProviders(<SettingsPage />);
-    const mobileOnly = await screen.findByRole('switch', { name: 'Solo desde teléfono celular' });
-    expect(mobileOnly).toHaveAttribute('aria-checked', 'true');
-    await userEvent.click(mobileOnly);
-    const dialog = await screen.findByRole('alertdialog');
-    expect(within(dialog).getByText(/computadoras y tabletas compartidas/)).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }));
-    await waitFor(() => expect(mobileOnly).toHaveAttribute('aria-checked', 'false'));
-    expect(JSON.parse(calls.find((c) => c.init.method === 'PUT')?.init.body as string)).toEqual({ employee_mobile_only: false });
+    expect(await screen.findByText('Dispositivos de los validadores')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Solo desde teléfono celular' })).toBeNull();
+    expect(screen.getByText(/Empleados y administradores usan la aplicación desde cualquier dispositivo/)).toBeInTheDocument();
   });
 
   it('validadores solo desde tableta o teléfono (confirmación propia al desactivarlo)', async () => {

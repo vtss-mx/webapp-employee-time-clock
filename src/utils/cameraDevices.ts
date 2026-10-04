@@ -86,15 +86,11 @@ export function switchTarget(devices: CameraDevice[], activeId: string | null, c
   return { deviceId: devices[(index + 1) % devices.length].deviceId };
 }
 
-/** Cámara guardada (formato anterior: solo el id, sin lado; se ignora para no abrir la equivocada). */
-export function parseRemembered(raw: string | null): RememberedCamera | null {
-  if (!raw?.startsWith('{')) return null;
-  try {
-    const value = JSON.parse(raw) as Partial<RememberedCamera>;
-    return typeof value.deviceId === 'string' && value.deviceId && value.kind ? { deviceId: value.deviceId, kind: value.kind } : null;
-  } catch {
-    return null;
-  }
+/** Cámara guardada en el dispositivo (IndexedDB guarda el objeto tal cual); sin id o sin lado se ignora. */
+export function parseRemembered(value: unknown): RememberedCamera | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { deviceId, kind } = value as Partial<RememberedCamera>;
+  return typeof deviceId === 'string' && deviceId && kind ? { deviceId, kind } : null;
 }
 
 /**

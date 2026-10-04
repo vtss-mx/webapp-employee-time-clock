@@ -11,8 +11,8 @@ export const validatorService = {
     return apiRequest<ValidatorList>('/validators', { query: { ...query }, signal, validate: isPage(isValidator) });
   },
 
-  get(id: number): Promise<Validator> {
-    return apiRequest<Validator>(`/validators/${id}`, { validate: isValidator });
+  get(id: number, signal?: AbortSignal): Promise<Validator> {
+    return apiRequest<Validator>(`/validators/${id}`, { signal, validate: isValidator });
   },
 
   /** Alta: cuenta, modo, domicilio y (si se exige) ubicación permitida para iniciar sesión. */

@@ -1,31 +1,34 @@
 import { config } from '../utils/config';
+import { sleep } from '../utils/waits';
 import { ApiError, clientError, normalizeResponse, type ApiEnvelope } from './http/envelope';
 
-export { ApiError, normalizeResponse } from './http/envelope';
+export { ApiError, fieldErrorsFrom, normalizeResponse } from './http/envelope';
 export type { ApiEnvelope, ApiErrorItem } from './http/envelope';
 
 /* ------------------------------------------------------------------------------------------
  * Configuración (la inyecta AuthProvider)
  * ------------------------------------------------------------------------------------------ */
 
-/** El servidor rechaza el dispositivo: los empleados solo pueden usar la app desde un teléfono. */
-export const MOBILE_DEVICE_REQUIRED = 'MOBILE_DEVICE_REQUIRED';
-/** Validador en una computadora (su empresa exige tableta o teléfono). */
+/**
+ * Validador en una computadora (su empresa exige tableta o teléfono). Es la ÚNICA restricción de
+ * dispositivo: empleados y administradores usan la aplicación desde cualquier dispositivo.
+ */
 export const TOUCH_DEVICE_REQUIRED = 'TOUCH_DEVICE_REQUIRED';
-export const DEVICE_NOT_ALLOWED_CODES: ReadonlySet<string> = new Set([MOBILE_DEVICE_REQUIRED, TOUCH_DEVICE_REQUIRED]);
+export const DEVICE_NOT_ALLOWED_CODES: ReadonlySet<string> = new Set([TOUCH_DEVICE_REQUIRED]);
 
 interface ApiClientHooks {
   getToken: () => string | null;
-  onUnauthorized: (message: string) => void;
-  /** Respuesta MOBILE_DEVICE_REQUIRED (en el login o en cualquier petición posterior). */
+  /** Sesión rechazada (401 sin renovación posible). Sin quien la escuche, la petición solo se rechaza. */
+  onUnauthorized?: (message: string) => void;
+  /** Respuesta TOUCH_DEVICE_REQUIRED (en el login o en cualquier petición posterior). */
   onDeviceNotAllowed?: (error: ApiError) => void;
   /** Renueva el access token (refresh token en cookie). true si se obtuvo uno nuevo. */
   refreshSession: () => Promise<boolean>;
 }
 
+// Hasta que AuthProvider lo configure no hay sesión: sin token, un 401 nunca llega a cerrarla.
 let hooks: ApiClientHooks = {
   getToken: () => null,
-  onUnauthorized: () => undefined,
   refreshSession: () => Promise.resolve(false),
 };
 
@@ -51,8 +54,23 @@ export interface RequestOptions<T> {
   signal?: AbortSignal;
   /** Tiempo máximo por intento. */
   timeoutMs?: number;
+  /**
+   * Reintentos ante errores transitorios (red, 502/503/504). Por omisión solo las lecturas (GET) los
+   * hacen (`config.apiGetRetries`); 0 para consultas que deben responder rápido o rendirse (p. ej.
+   * la validación en vivo, que no debe dejar el formulario "verificando" durante minutos).
+   */
+  retries?: number;
   /** Valida la forma de `data`; si no coincide se lanza ApiError INVALID_RESPONSE. */
   validate?: (data: unknown) => data is T;
+  /** La respuesta exitosa es un archivo (p. ej. un Excel): `data` es `DownloadedFile`. Un error sigue
+   * siendo el sobre JSON de siempre. */
+  download?: boolean;
+}
+
+/** Archivo descargado: su contenido y el nombre que propone el servidor (`Content-Disposition`). */
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string | null;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -78,6 +96,12 @@ async function readBody(response: Response): Promise<{ body: unknown; isJson: bo
     }
   }
   return { body: text, isJson: false };
+}
+
+async function readFile(response: Response): Promise<{ body: DownloadedFile; isJson: boolean }> {
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? null;
+  return { body: { blob: await response.blob(), filename }, isJson: true };
 }
 
 export function buildUrl(path: string, query?: RequestOptions<unknown>['query']): string {
@@ -115,16 +139,13 @@ export function retryDelay(attemptIndex: number, retryAfterMs: number | null): n
   return Math.max(backoff, hinted) * (0.75 + Math.random() * 0.5);
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function buildRequest(options: RequestOptions<unknown>, traceId: string): { headers: Record<string, string>; payload?: BodyInit } {
+function buildRequest(options: RequestOptions<unknown>, traceId: string, token: string | null): { headers: Record<string, string>; payload?: BodyInit } {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Request-ID': traceId,
     // Evita la página intermedia de advertencia de ngrok (plan gratuito) en llamadas a la API.
     'ngrok-skip-browser-warning': 'true',
   };
-  const token = options.auth !== false ? hooks.getToken() : null;
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body instanceof FormData) return { headers, payload: options.body }; // boundary lo define el navegador
   if (options.body === undefined) return { headers };
@@ -136,11 +157,11 @@ function buildRequest(options: RequestOptions<unknown>, traceId: string): { head
  * Peticiones
  * ------------------------------------------------------------------------------------------ */
 
-async function attempt<T>(path: string, options: RequestOptions<T>): Promise<ApiEnvelope<T>> {
+async function attempt<T>(path: string, options: RequestOptions<T>, token: string | null): Promise<ApiEnvelope<T>> {
   const { method = 'GET', query, signal, timeoutMs = config.apiTimeoutMs, validate } = options;
   // El traceId se genera en el cliente para poder reportarlo aunque no haya respuesta.
   const traceId = newTraceId();
-  const { headers, payload } = buildRequest(options, traceId);
+  const { headers, payload } = buildRequest(options, traceId, token);
 
   // Tiempo límite por intento combinado con la señal de cancelación del llamador.
   const controller = new AbortController();
@@ -153,7 +174,7 @@ async function attempt<T>(path: string, options: RequestOptions<T>): Promise<Api
   try {
     // credentials: la cookie HttpOnly del refresh token (el navegador solo la adjunta a /api/auth).
     response = await fetch(buildUrl(path, query), { method, headers, body: payload, signal: controller.signal, credentials: 'include' });
-    parsed = await readBody(response);
+    parsed = options.download && response.ok ? await readFile(response) : await readBody(response);
   } catch (error) {
     if (signal?.aborted) throw error;
     throw clientError(controller.signal.aborted ? 408 : 0, traceId);
@@ -177,12 +198,21 @@ async function attempt<T>(path: string, options: RequestOptions<T>): Promise<Api
   return envelope as ApiEnvelope<T>;
 }
 
-/** Access token vencido: se renueva UNA vez (refresh compartido entre peticiones simultáneas). */
-async function recoverFromUnauthorized(error: ApiError, alreadyRefreshed: boolean, signal?: AbortSignal): Promise<boolean> {
-  if (error.code === 'TOKEN_EXPIRED' && !alreadyRefreshed && !signal?.aborted && (await hooks.refreshSession())) {
-    return true;
-  }
-  hooks.onUnauthorized(error.message);
+/**
+ * 401 de una petición con sesión: ¿se repite? (si no, se rechaza con el error).
+ * - Cancelada por el llamador: solo se rechaza; nunca cierra la sesión (la persona salió de la pantalla).
+ * - El token ya cambió mientras viajaba (otra petición lo renovó): se repite con el nuevo, sin otra
+ *   renovación. Si ya no hay token, la sesión se cerró por otro lado: solo se rechaza.
+ * - TOKEN_EXPIRED: se renueva UNA vez (refresh compartido entre peticiones simultáneas) y se repite.
+ * - Cualquier otro caso cierra la sesión (revocada, reemplazada, vencida).
+ */
+async function recoverFromUnauthorized(error: ApiError, usedToken: string, alreadyRetried: boolean, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) return false;
+  const current = hooks.getToken();
+  if (current !== usedToken) return current !== null && !alreadyRetried;
+  if (error.code === 'TOKEN_EXPIRED' && !alreadyRetried && (await hooks.refreshSession())) return true;
+  if (signal?.aborted) return false;
+  hooks.onUnauthorized?.(error.message);
   return false;
 }
 
@@ -192,23 +222,26 @@ async function recoverFromUnauthorized(error: ApiError, alreadyRefreshed: boolea
  * errores transitorios (red, 502/503/504) y errores normalizados (ApiError).
  */
 export async function apiEnvelope<T>(path: string, options: RequestOptions<T> = {}): Promise<ApiEnvelope<T>> {
-  const retries = (options.method ?? 'GET') === 'GET' ? config.apiGetRetries : 0;
-  let refreshed = false;
+  const retries = options.retries ?? ((options.method ?? 'GET') === 'GET' ? config.apiGetRetries : 0);
+  let retriedAuth = false;
   for (let i = 0; ; i++) {
-    const authenticated = options.auth !== false && hooks.getToken() !== null;
+    // El token con que sale ESTE intento: al recibir un 401 se compara con el vigente.
+    const token = options.auth !== false ? hooks.getToken() : null;
     try {
-      return await attempt<T>(path, options);
+      return await attempt<T>(path, options, token);
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
       if (DEVICE_NOT_ALLOWED_CODES.has(error.code)) hooks.onDeviceNotAllowed?.(error);
-      if (authenticated && error.status === 401) {
-        if (!(await recoverFromUnauthorized(error, refreshed, options.signal))) throw error;
-        refreshed = true;
+      if (token !== null && error.status === 401) {
+        if (!(await recoverFromUnauthorized(error, token, retriedAuth, options.signal))) throw error;
+        retriedAuth = true;
         i--; // el reintento tras renovar no consume reintentos por errores transitorios
         continue;
       }
       if (!error.isTransient || error.status === 429 || i >= retries || options.signal?.aborted) throw error;
-      await wait(retryDelay(i, error.retryAfterMs));
+      await sleep(retryDelay(i, error.retryAfterMs), options.signal);
+      // Cancelada durante la espera: no se hace otro intento.
+      options.signal?.throwIfAborted();
     }
   }
 }
@@ -216,6 +249,11 @@ export async function apiEnvelope<T>(path: string, options: RequestOptions<T> = 
 /** Petición que devuelve solo `data` (lo más común en servicios). */
 export async function apiRequest<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
   return (await apiEnvelope<T>(path, options)).data;
+}
+
+/** Descarga un archivo con la misma sesión, tiempo límite y manejo de errores que cualquier petición. */
+export function apiDownload(path: string, options: RequestOptions<DownloadedFile> = {}): Promise<DownloadedFile> {
+  return apiRequest<DownloadedFile>(path, { ...options, download: true });
 }
 
 export function errorMessage(error: unknown): string {

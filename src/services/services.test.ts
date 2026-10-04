@@ -1,20 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { catalogsFixture, testCatalogs } from '../test/catalogs';
 import { apiOk, mockFetch } from '../test/http';
-import { detectedAccessories, isRetryableFaceError } from '../utils/faceErrors';
+import { CameraNotReadyError } from '../utils/cameraDiagnostics';
+import { config } from '../utils/config';
+import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, isRetryableFaceError, isTransientFaceError, MAX_TRANSIENT_FACE_FAILURES } from '../utils/faceErrors';
 import { ApiError } from './apiClient';
 import { authService } from './authService';
 import { catalogService } from './catalogService';
+import { departmentService } from './departmentService';
 import { employeeService } from './employeeService';
 import { enrollmentService } from './enrollmentService';
+import { errorReportService } from './errorReportService';
+import { apiKeyService } from './apiKeyService';
 import { meService } from './meService';
 import { settingsService } from './settingsService';
 import { faceService, verificationService } from './verificationService';
 
 const employee = { id: 1, employee_number: 'EMP-1', first_name: 'Ana', last_name: 'Ruiz' };
-const qr = { id: 1, image_base64: 'data:', employee_number: 'EMP-1', expires_at: 'x', lifetime_seconds: 30 };
+const qr = { id: 1, content: 'TCQR2:abc', employee_number: 'EMP-1', expires_at: 'x', lifetime_seconds: 30 };
+const apiKey = { id: 3, name: 'ERP', prefix: 'tck_Ab3dE9fG', scopes: ['EMPLOYEES_READ'], status: 'ACTIVE' };
 const qrSummary = { live: true, live_until: null, last_issued_at: null, last_used_at: null };
 const detail = { id: 3, status: 'PENDING', employee_id: 1 };
+const department = { id: 3, name: 'Producción', employee_count: 0, managers: [] };
+const errorReport = { id: 9, code: 'INTERNAL_ERROR', status: 'PENDING', severity: 'CRITICAL', occurrences: 2 };
 const result = { verified: true, method: 'FACE', message: 'ok' };
 const policy = { block_glasses: true, block_headwear: true, block_mask: false, liveness_challenge: true, anti_spoofing: true, qr_enabled: true };
 
@@ -28,9 +36,26 @@ describe('servicios', () => {
     ['employees.setStatus', () => employeeService.setStatus(1, false), employee, 'PATCH', '/api/employees/1/status'],
     ['employees.remove', () => employeeService.remove(1), null, 'DELETE', '/api/employees/1'],
     ['employees.resetFace', () => employeeService.resetFace(1), employee, 'POST', '/api/employees/1/face/reset'],
+    ['employees.resetAllFaces', () => employeeService.resetAllFaces('Cambio de cámaras'), { employees: 12 }, 'POST', '/api/employees/face/reset'],
+    ['employees.faceLearning', () => employeeService.faceLearning(), { enabled: true, employees_learning: 1, learned_samples: 2 }, 'GET', '/api/employees/face/learning'],
+    ['employees.forgetLearnedFace', () => employeeService.forgetLearnedFace(1), employee, 'DELETE', '/api/employees/1/face/learned'],
     ['employees.qrSummary', () => employeeService.qrSummary(1), qrSummary, 'GET', '/api/employees/1/qr'],
     ['employees.revokeQr', () => employeeService.revokeQr(1), qrSummary, 'DELETE', '/api/employees/1/qr'],
     ['employees.history', () => employeeService.history(1, { page: 1, size: 10 }), { items: [{ id: 1, method: 'QR', success: true }], total: 1, page: 1, size: 10 }, 'GET', '/api/employees/1/verifications?page=1&size=10'],
+    ['departments.list', () => departmentService.list({ page: 1, size: 10, search: 'pro' }), { items: [department], total: 1 }, 'GET', '/api/departments?page=1&size=10&search=pro'],
+    ['departments.get', () => departmentService.get(3), department, 'GET', '/api/departments/3'],
+    ['departments.create', () => departmentService.create({ name: 'Producción', description: null }), department, 'POST', '/api/departments'],
+    ['departments.update', () => departmentService.update(3, { name: 'Producción', description: 'x' }), department, 'PUT', '/api/departments/3'],
+    ['departments.remove', () => departmentService.remove(3), null, 'DELETE', '/api/departments/3'],
+    ['departments.assign', () => departmentService.assign(3, 7), department, 'POST', '/api/departments/3/employees'],
+    ['departments.unassign', () => departmentService.unassign(3, 7), department, 'DELETE', '/api/departments/3/employees/7'],
+    ['departments.addManager', () => departmentService.addManager(3, 7), department, 'POST', '/api/departments/3/managers'],
+    ['departments.removeManager', () => departmentService.removeManager(3, 7), department, 'DELETE', '/api/departments/3/managers/7'],
+    ['errors.list', () => errorReportService.list({ page: 1, size: 10, status: 'PENDING' }), { items: [errorReport], total: 1 }, 'GET', '/api/admin/errors?page=1&size=10&status=PENDING'],
+    ['errors.summary', () => errorReportService.summary(), { by_status: {}, pending: 0 }, 'GET', '/api/admin/errors/summary'],
+    ['errors.get', () => errorReportService.get(9), errorReport, 'GET', '/api/admin/errors/9'],
+    ['errors.occurrences', () => errorReportService.occurrences(9, { page: 1, size: 10 }), { items: [{ id: 1, occurred_at: 'x' }], total: 1 }, 'GET', '/api/admin/errors/9/occurrences?page=1&size=10'],
+    ['errors.setStatus', () => errorReportService.setStatus(9, 'RESOLVED'), errorReport, 'PATCH', '/api/admin/errors/9/status'],
     ['enrollments.submit', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
     ['enrollments.list', () => enrollmentService.list('PENDING', { page: 1, size: 10 }), { items: [detail], total: 1 }, 'GET', '/api/enrollments?status=PENDING&page=1&size=10'],
     ['enrollments.get', () => enrollmentService.get(3), detail, 'GET', '/api/enrollments/3'],
@@ -40,6 +65,10 @@ describe('servicios', () => {
     ['face.challenge', () => faceService.getChallenge(), { liveness_required: true }, 'POST', '/api/face/challenge'],
     ['face.check', () => faceService.check([new Blob(['a']), new Blob(['b'])], true), { detection_score: 0.9 }, 'POST', '/api/face/check'],
     ['me.issueQr', () => meService.issueQr(), qr, 'POST', '/api/users/me/qr'],
+    ['apiKeys.list', () => apiKeyService.list({ page: 1, size: 10 }), { items: [apiKey], total: 1, page: 1, size: 10 }, 'GET', '/api/api-keys?page=1&size=10'],
+    ['apiKeys.create', () => apiKeyService.create({ name: ' ERP ', scopes: ['EMPLOYEES_READ'], expires_in_days: 90 }), { ...apiKey, secret: 'tck_x' }, 'POST', '/api/api-keys'],
+    ['apiKeys.rotate', () => apiKeyService.rotate(3), { ...apiKey, secret: 'tck_y' }, 'POST', '/api/api-keys/3/rotate'],
+    ['apiKeys.revoke', () => apiKeyService.revoke(3), apiKey, 'DELETE', '/api/api-keys/3'],
     ['me.qrStatus', () => meService.qrStatus(7), { id: 7, status: 'USED' }, 'GET', '/api/users/me/qr/7'],
     ['settings.get', () => settingsService.getVerificationPolicy(), policy, 'GET', '/api/settings/verification'],
     ['settings.update', () => settingsService.updateVerificationPolicy({ block_mask: false }), policy, 'PUT', '/api/settings/verification'],
@@ -99,6 +128,32 @@ describe('errores faciales', () => {
     expect(isRetryableFaceError(apiError(0, 'NETWORK_ERROR'), testCatalogs)).toBe(true);
     expect(isRetryableFaceError(apiError(503, 'SERVER_BUSY'), testCatalogs)).toBe(true);
     expect(isRetryableFaceError(apiError(408, 'TIMEOUT'), testCatalogs)).toBe(true);
+    // La cámara sin imagen en ese momento (abriéndose, cortada por una llamada): se espera, no se abandona.
+    expect(isRetryableFaceError(new CameraNotReadyError(), testCatalogs)).toBe(true);
+    expect(new CameraNotReadyError().message).toBe('La cámara aún no está lista');
+  });
+
+  it('la red que sigue fallando no se reintenta sin fin: a la segunda falla seguida se rinde', () => {
+    const busy = apiError(503, 'SERVER_BUSY');
+    expect(isTransientFaceError(busy)).toBe(true);
+    expect(isTransientFaceError(apiError(422, 'POSE_TILTED'))).toBe(false);
+    expect(isTransientFaceError(new CameraNotReadyError())).toBe(false);
+    const first = faceErrorOutcome(busy, testCatalogs, 0);
+    expect(first).toEqual({ fatal: false, streak: 1 });
+    expect(faceErrorOutcome(apiError(0, 'NETWORK_ERROR'), testCatalogs, first.streak)).toEqual({ fatal: true, streak: 0 });
+    expect(MAX_TRANSIENT_FACE_FAILURES).toBe(2);
+    // Un error corregible entre medias (el servidor sí respondió) reinicia la cuenta.
+    expect(faceErrorOutcome(apiError(422, 'POSE_TILTED'), testCatalogs, 1)).toEqual({ fatal: false, streak: 0 });
+    expect(faceErrorOutcome(apiError(403, 'FORBIDDEN'), testCatalogs, 0)).toEqual({ fatal: true, streak: 0 });
+  });
+
+  it('reanuda tras la pausa del flujo o la que pide el servidor (Retry-After, con tope)', () => {
+    const hinted = (ms: number) => new ApiError({ statusCode: 503, code: 'SERVER_BUSY', message: 'x' }, ms);
+    expect(faceResumeDelayMs(apiError(0, 'NETWORK_ERROR'))).toBe(config.faceResumeAfterBlockMs);
+    expect(faceResumeDelayMs(hinted(1_000))).toBe(config.faceResumeAfterBlockMs);
+    expect(faceResumeDelayMs(hinted(8_000))).toBe(8_000);
+    expect(faceResumeDelayMs(hinted(3_600_000))).toBe(config.apiMaxRetryAfterMs);
+    expect(faceResumeDelayMs(new Error('x'))).toBe(config.faceResumeAfterBlockMs);
   });
 });
 

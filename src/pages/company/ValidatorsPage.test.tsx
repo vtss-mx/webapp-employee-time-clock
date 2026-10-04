@@ -1,12 +1,13 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
 import { samplePolicy, sampleValidator } from '../../test/fixtures';
-import { apiOk, liveCheck, mockFetch } from '../../test/http';
+import { apiFail, apiOk, liveCheck, mockFetch } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import type { Validator } from '../../types';
 import { Route, Routes } from 'react-router-dom';
+import { ValidatorPasswordPage } from './ValidatorPasswordPage';
 import { ValidatorsPage } from './ValidatorsPage';
 
 const busy: Validator = { ...sampleValidator, id: 4, name: 'Comedor', email: 'comedor@empresa.com', mode: 'QR_AND_FACE', identifications_today: 1, last_login_at: '2026-10-01T09:00:00Z' };
@@ -107,5 +108,75 @@ describe('ValidatorsPage (COMPANY)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Editar Recepción planta 1' }));
     expect(await screen.findByText('Pantalla de edición')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull(); // ningún formulario en popup
+  });
+});
+
+describe('ValidatorsPage: más casos', () => {
+  const row = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
+
+  it('desactivar uno no toca a los demás; un solo dispositivo pendiente se dice en singular', async () => {
+    server([sampleValidator, { ...busy, devices_pending: 1 }]);
+    renderWithProviders(<ValidatorsPage />);
+    expect(await screen.findByText('1 dispositivo por autorizar')).toBeInTheDocument();
+    await userEvent.click(within(row('Recepción planta 1')).getByRole('button', { name: 'Desactivar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Desactivar' }));
+    expect(await screen.findByText('Validador desactivado')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+    expect(within(row('Recepción planta 1')).getByRole('button', { name: 'Activar' })).toBeInTheDocument();
+    expect(within(row('Comedor')).getByRole('button', { name: 'Desactivar' })).toBeInTheDocument();
+  });
+
+  it('tras eliminar vuelve a pedir la lista; mientras llega se atenúa', async () => {
+    let release: (response: Response) => void = () => undefined;
+    let lists = 0;
+    mockFetch((call) => {
+      if (call.url === '/api/settings/verification') return apiOk(samplePolicy);
+      if (call.init.method === 'DELETE') return apiOk(null);
+      lists += 1;
+      return lists === 1 ? apiOk({ items: [sampleValidator, busy], total: 2, page: 1, size: 10 }) : new Promise<Response>((done) => (release = done));
+    });
+    renderWithProviders(<ValidatorsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar Comedor' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Eliminar' }));
+    expect(await screen.findByText('Validador eliminado')).toBeInTheDocument();
+    expect(row('Comedor').closest('ul')).toHaveClass('is-loading');
+    release(apiOk({ items: [sampleValidator], total: 1, page: 1, size: 10 }));
+    expect(await screen.findByText('1 registrado · identifican a tu personal por QR, rostro o ambos')).toBeInTheDocument();
+    expect(screen.queryByText('Comedor')).toBeNull();
+  });
+
+  it('si la empresa permite computadoras, el pie lo dice de otra forma', async () => {
+    mockFetch((call) => apiOk(call.url === '/api/settings/verification' ? { ...samplePolicy, validator_mobile_only: false } : { items: [sampleValidator], total: 1, page: 1, size: 10 }));
+    renderWithProviders(<ValidatorsPage />);
+    expect(await screen.findByText('Cada identificación queda registrada en la bitácora con el validador que la hizo.')).toBeInTheDocument();
+  });
+});
+
+describe('ValidatorPasswordPage: más casos', () => {
+  const renderPassword = () =>
+    renderWithProviders(
+      <Routes>
+        <Route path="/company/validators/:id/password" element={<ValidatorPasswordPage />} />
+      </Routes>,
+      { route: '/company/validators/3/password' },
+    );
+
+  it('enviar con Enter sin una contraseña válida no llama a la API', async () => {
+    const { calls } = mockFetch(apiOk(sampleValidator));
+    renderPassword();
+    const reset = await screen.findByRole('button', { name: 'Restablecer' });
+    await userEvent.type(screen.getByLabelText(/Contraseña nueva/), 'corta');
+    fireEvent.submit(reset.closest('form')!);
+    expect(calls.some((c) => c.init.method === 'PUT')).toBe(false);
+    expect(reset).toBeDisabled();
+  });
+
+  it('si el validador no carga ofrece volver a cargar', async () => {
+    mockFetch(apiFail(404, 'VALIDATOR_NOT_FOUND', 'Validador no encontrado'), apiOk(sampleValidator));
+    renderPassword();
+    await screen.findByRole('alertdialog', { name: 'No se pudo cargar el validador' });
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a cargar' }));
+    expect(await screen.findByText('Recepción planta 1 · recepcion@empresa.com')).toBeInTheDocument();
   });
 });

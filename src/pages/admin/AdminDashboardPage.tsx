@@ -1,5 +1,4 @@
 import { ArrowRight, Building2, Building, CheckCircle2, Plus, UserCog, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ButtonLink } from '../../components/ui/Button';
@@ -8,33 +7,21 @@ import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { KpiCard, type Kpi } from '../../components/ui/KpiCard';
 import { SkeletonRows } from '../../components/ui/Skeleton';
-import { useErrorPopup } from '../../hooks/useFeedback';
+import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { config } from '../../utils/config';
 import { adminService } from '../../services/adminService';
-import type { Company, PlatformStats } from '../../types';
 import { formatDate } from '../../utils/format';
 
 /** Panel del administrador de la plataforma: indicadores y empresas recientes. */
 export function AdminDashboardPage() {
-  const [stats, setStats] = useState<PlatformStats | null>(null);
-  const [recent, setRecent] = useState<Company[] | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [reload, setReload] = useState(0);
-  const retry = () => setReload((n) => n + 1);
-  useErrorPopup(error, { title: 'No se pudo cargar el panel', retry });
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setError(null);
-    Promise.all([adminService.stats(controller.signal), adminService.list({ size: 5 }, controller.signal)])
-      .then(([s, list]) => {
-        setStats(s);
-        setRecent(list.items);
-      })
-      .catch((e: unknown) => !controller.signal.aborted && setError(e));
-    return () => controller.abort();
-  }, [reload]);
+  const { data, error, retry } = useResource(
+    (signal) => Promise.all([adminService.stats(signal), adminService.list({ size: 5 }, signal)]),
+    'platform',
+    'No se pudo cargar el panel',
+  );
+  const stats = data?.[0];
+  const recent = data?.[1].items;
 
   const kpis: Kpi[] = [
     { key: 'companies', label: 'Empresas', icon: Building2, value: stats?.companies, tile: '' },

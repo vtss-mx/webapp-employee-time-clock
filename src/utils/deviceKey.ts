@@ -5,8 +5,8 @@
  * se puede leer ni copiar, la sesión no se puede trasladar a otro equipo.
  */
 
-const DB_NAME = 'tc-device';
-const STORE = 'keys';
+import { deviceObjectStore, idbRequest } from './indexedDb';
+
 const KEY_ID = 'validator-device';
 
 export class DeviceKeyError extends Error {
@@ -24,20 +24,9 @@ export interface DeviceProof {
   name: string;
 }
 
-function request<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new DeviceKeyError());
-  });
-}
-
-async function openStore(mode: IDBTransactionMode): Promise<IDBObjectStore> {
-  if (typeof indexedDB === 'undefined') throw new DeviceKeyError();
-  const open = indexedDB.open(DB_NAME, 1);
-  open.onupgradeneeded = () => open.result.createObjectStore(STORE);
-  const db = await request(open);
-  return db.transaction(STORE, mode).objectStore(STORE);
-}
+const unavailable = () => new DeviceKeyError();
+const request = <T>(req: IDBRequest<T>) => idbRequest(req, unavailable);
+const openStore = (mode: IDBTransactionMode) => deviceObjectStore('keys', mode, unavailable);
 
 /** La llave de este dispositivo; la primera vez se genera (la privada, no exportable). */
 export async function deviceKeyPair(): Promise<CryptoKeyPair> {

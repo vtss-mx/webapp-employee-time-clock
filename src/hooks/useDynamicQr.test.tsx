@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiFail, apiOk, mockFetch } from '../test/http';
 import { useDynamicQr } from './useDynamicQr';
 
-const qr = (id: number) => ({ id, employee_number: 'EMP-7', created_at: 'x', expires_at: 'y', lifetime_seconds: 30, image_base64: `data:image/png;base64,${id}` });
+const qr = (id: number, lifetime = 30) => ({ id, employee_number: 'EMP-7', created_at: 'x', expires_at: 'y', lifetime_seconds: lifetime, content: `TCQR2:token-${id}` });
 
 /** Servidor de prueba: cada POST emite el siguiente código; el estado de cada uno se cambia en `statuses`. */
 function server(statuses: Record<number, string> = {}) {
@@ -41,17 +41,17 @@ describe('useDynamicQr', () => {
     const { calls } = server(statuses);
     const { result } = renderHook(() => useDynamicQr());
     await tick(0);
-    expect(result.current).toMatchObject({ phase: 'ready', remaining: 30 });
+    expect(result.current.phase).toBe('ready');
     expect(result.current.qr?.id).toBe(1);
-    expect(result.current.progress).toBeCloseTo(1);
+    expect(result.current.deadline - Date.now()).toBe(30_000); // vence con la vigencia, en el reloj del teléfono
 
     await tick(15_000);
-    expect(result.current.remaining).toBe(15);
+    expect(result.current.qr?.id).toBe(1);
     await tick(15_000); // venció: otro
     expect(result.current.qr?.id).toBe(2);
 
     statuses[2] = 'USED';
-    await tick(2_000); // la consulta lo ve usado
+    await tick(3_000); // la consulta lo ve usado
     expect(result.current.phase).toBe('used');
     await tick(1_800); // "¡Listo!" y el siguiente
     expect(result.current).toMatchObject({ phase: 'ready' });
@@ -63,7 +63,7 @@ describe('useDynamicQr', () => {
     const { calls } = server({ 1: 'REVOKED' });
     const { result } = renderHook(() => useDynamicQr());
     await tick(0);
-    await tick(2_000);
+    await tick(3_000);
     expect(result.current.phase).toBe('replaced');
     await tick(60_000);
     expect(issued(calls)).toBe(1); // sin reemplazos en cadena entre dos teléfonos
@@ -106,5 +106,110 @@ describe('useDynamicQr', () => {
     unmount();
     expect(release).toHaveBeenCalled();
     Reflect.deleteProperty(navigator, 'wakeLock');
+  });
+
+  it('pedir otro mientras se genera uno no duplica la petición', async () => {
+    const { calls } = server();
+    const { result } = renderHook(() => useDynamicQr());
+    await act(() => result.current.renew()); // la del inicio sigue en curso
+    await tick(0);
+    expect(issued(calls)).toBe(1);
+    expect(result.current.qr?.id).toBe(1);
+  });
+
+  it('al salir mientras se genera (o falla) no actualiza la pantalla', async () => {
+    server();
+    const ok = renderHook(() => useDynamicQr());
+    ok.unmount();
+    await tick(0);
+    expect(ok.result.current).toMatchObject({ phase: 'loading', qr: null });
+
+    mockFetch(apiFail(503, 'SERVER_BUSY', 'Ocupado'));
+    const failing = renderHook(() => useDynamicQr());
+    failing.unmount();
+    await tick(0);
+    expect(failing.result.current).toMatchObject({ phase: 'loading', error: null });
+  });
+
+  /** Servidor cuya respuesta de estado ("ya lo usaron") llega cuando la prueba la libera. */
+  function slowStatusServer(lifetime = 30) {
+    let next = 0;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const { calls } = mockFetch(async (call) => {
+      if (call.init.method === 'POST') return apiOk(qr(++next, lifetime));
+      await gate;
+      return apiOk({ id: Number(call.url.split('/').pop()), status: 'USED', expires_at: null, used_at: null });
+    });
+    return { calls, release: () => act(() => Promise.resolve().then(() => release())) };
+  }
+
+  it('la respuesta de un código que ya se reemplazó no afecta al nuevo', async () => {
+    const { release } = slowStatusServer();
+    const { result } = renderHook(() => useDynamicQr());
+    await tick(0);
+    await tick(3_000); // consulta el código 1 (lenta)
+    await act(() => result.current.renew());
+    expect(result.current.qr?.id).toBe(2);
+    await release(); // "el 1 ya se usó": llega tarde
+    expect(result.current.phase).toBe('ready');
+    expect(result.current.qr?.id).toBe(2);
+  });
+
+  it('si mientras se consultaba el código se pausó (pantalla oculta) o se salió, la respuesta se ignora', async () => {
+    const paused = slowStatusServer(4);
+    const view = renderHook(() => useDynamicQr());
+    await tick(0);
+    await tick(3_000); // consulta en curso
+    visibility = 'hidden';
+    await tick(1_000); // vence con la pantalla oculta
+    expect(view.result.current.phase).toBe('paused');
+    await paused.release();
+    expect(view.result.current.phase).toBe('paused');
+
+    const left = slowStatusServer();
+    const other = renderHook(() => useDynamicQr());
+    visibility = 'visible';
+    await tick(0);
+    await tick(3_000);
+    other.unmount();
+    await left.release();
+    expect(other.result.current.phase).toBe('ready');
+  });
+
+  describe('pantalla encendida (Wake Lock)', () => {
+    afterEach(() => Reflect.deleteProperty(navigator, 'wakeLock'));
+    const install = (request: () => Promise<unknown>) => Object.defineProperty(navigator, 'wakeLock', { value: { request: vi.fn(request) }, configurable: true });
+
+    it('con la pantalla oculta espera a que vuelva para pedirlo', async () => {
+      server();
+      const release = vi.fn(() => Promise.resolve());
+      install(() => Promise.resolve({ release }));
+      visibility = 'hidden';
+      renderHook(() => useDynamicQr());
+      await tick(0);
+      expect(navigator.wakeLock.request).not.toHaveBeenCalled();
+      visibility = 'visible';
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(navigator.wakeLock.request).toHaveBeenCalledWith('screen');
+    });
+
+    it('si se sale antes de obtenerlo, se suelta en cuanto llega', async () => {
+      server();
+      const release = vi.fn(() => Promise.resolve());
+      install(() => Promise.resolve({ release }));
+      const { unmount } = renderHook(() => useDynamicQr());
+      unmount();
+      await tick(0);
+      expect(release).toHaveBeenCalledOnce();
+    });
+
+    it('batería baja o sin permiso: el código se muestra igual', async () => {
+      server();
+      install(() => Promise.reject(new DOMException('Batería baja', 'NotAllowedError')));
+      const { result } = renderHook(() => useDynamicQr());
+      await tick(0);
+      expect(result.current.phase).toBe('ready');
+    });
   });
 });

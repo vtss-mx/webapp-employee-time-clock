@@ -12,8 +12,12 @@ export const paths = {
     newCompany: '/admin/companies/new',
     company: (id: number | string) => `/admin/companies/${id}`,
     editCompany: (id: number | string) => `/admin/companies/${id}/edit`,
+    /** Empleados de la empresa: solo consulta (ficha de trabajo, sin biometría). */
+    companyEmployees: (id: number | string) => `/admin/companies/${id}/employees`,
     newCompanyAdmin: (id: number | string) => `/admin/companies/${id}/admins/new`,
     companyAdminPassword: (id: number | string, adminId: number | string) => `/admin/companies/${id}/admins/${adminId}/password`,
+    errors: '/admin/errors',
+    error: (id: number | string) => `/admin/errors/${id}`,
   },
   company: {
     dashboard: '/company/dashboard',
@@ -22,8 +26,16 @@ export const paths = {
     employee: (id: number | string) => `/company/employees/${id}`,
     editEmployee: (id: number | string) => `/company/employees/${id}/edit`,
     reverifyEmployee: (id: number | string) => `/company/employees/${id}/reverify`,
+    /** Nueva verificación de identidad para toda la empresa. */
+    reverifyAll: '/company/employees/reverify-all',
     /** Rostro en persona: registrar (enroll) o verificar (verify) con el empleado presente. */
     employeeFace: (id: number | string, mode: 'enroll' | 'verify' | ':mode') => `/company/employees/${id}/face/${mode}`,
+    departments: '/company/departments',
+    newDepartment: '/company/departments/new',
+    department: (id: number | string) => `/company/departments/${id}`,
+    editDepartment: (id: number | string) => `/company/departments/${id}/edit`,
+    /** Elegir empleados para asignar al departamento o nombrar responsables. */
+    assignDepartment: (id: number | string, role: 'employees' | 'managers' | ':role') => `/company/departments/${id}/assign/${role}`,
     validations: '/company/validations',
     validation: (id: number | string) => `/company/validations/${id}`,
     rejectValidation: (id: number | string) => `/company/validations/${id}/reject`,
@@ -32,7 +44,11 @@ export const paths = {
     editValidator: (id: number | string) => `/company/validators/${id}/edit`,
     validatorDevices: (id: number | string) => `/company/validators/${id}/devices`,
     validatorPassword: (id: number | string) => `/company/validators/${id}/password`,
+    /** Asistente de reportes: preguntas sobre los datos de la empresa y exportación a Excel. */
+    reports: '/company/reports',
     settings: '/company/settings',
+    integrations: '/company/integrations',
+    newApiKey: '/company/integrations/new',
   },
   /** Validador de identidad (tableta o teléfono en un acceso). */
   validator: {
@@ -55,7 +71,10 @@ export function homeForUser(user: HomeUser): string {
   return user.home ?? paths.profile;
 }
 
-/** Empleado que trabaja en varias empresas y aún no elige a cuál entrar. */
-export function needsCompanySelection(user: Pick<User, 'role' | 'employee'>): boolean {
-  return user.role === 'EMPLOYEE' && !user.employee;
+/**
+ * Persona que trabaja en varias empresas y aún no elige a cuál entrar: el backend le da como
+ * inicio el selector de empresa (lo decide su estado, no el rol).
+ */
+export function needsCompanySelection(user: HomeUser): boolean {
+  return user.home === paths.selectCompany;
 }

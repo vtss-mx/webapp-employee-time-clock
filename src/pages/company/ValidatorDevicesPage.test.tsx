@@ -85,3 +85,54 @@ describe('ValidatorDevicesPage (COMPANY)', () => {
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });
 });
+
+describe('ValidatorDevicesPage: tipos de dispositivo, cancelar y páginas', () => {
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1';
+  const WINDOWS = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36';
+  const icon = (name: string) => screen.getByText(name).closest('li')?.querySelector('.icon-tile svg');
+
+  it('cada dispositivo con el ícono de su tipo; sin último acceso ni IP solo dice cuándo se registró', async () => {
+    server([
+      device(1, 'PENDING', { name: 'Teléfono de recepción', user_agent: IPHONE }),
+      device(2, 'PENDING', { name: 'Computadora', user_agent: WINDOWS, last_seen_at: null, last_ip: null }),
+      device(3, 'PENDING', { name: 'Equipo sin datos', user_agent: null }),
+      device(4, 'REJECTED', { name: 'Tableta vieja', reviewed_by: 'rh@empresa.com', reviewed_at: null }),
+    ]);
+    renderPage();
+    expect(await screen.findByText('Teléfono de recepción')).toBeInTheDocument();
+    expect(icon('Teléfono de recepción')).toHaveClass('lucide-smartphone');
+    expect(icon('Computadora')).toHaveClass('lucide-monitor-smartphone');
+    expect(icon('Equipo sin datos')).toHaveClass('lucide-monitor-smartphone');
+    expect(icon('Tableta vieja')).toHaveClass('lucide-tablet');
+    expect(screen.getByText('Computadora').closest('li')).not.toHaveTextContent(/Último acceso|IP/);
+    expect(screen.getByText('Revisado por rh@empresa.com')).toBeInTheDocument(); // sin fecha de revisión
+    expect(screen.getByRole('button', { name: 'Autorizar Tableta vieja' })).toBeInTheDocument(); // rechazado: se puede autorizar
+  });
+
+  it('cancelar la confirmación no cambia el dispositivo', async () => {
+    const { calls } = server([device(1, 'APPROVED')]);
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Revocar Tableta 1' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Revocar «Tableta 1»' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(calls.some((c) => c.init.method === 'PATCH')).toBe(false);
+  });
+
+  it('al cambiar de página la lista anterior se atenúa mientras llega la siguiente', async () => {
+    let release: (response: Response) => void = () => undefined;
+    const first = Array.from({ length: 10 }, (_, i) => device(i + 1, 'APPROVED'));
+    mockFetch((call) => {
+      if (!call.url.includes('/devices')) return apiOk(sampleValidator);
+      if (call.url.includes('page=2')) return new Promise<Response>((done) => (release = done));
+      return apiOk({ items: first, total: 11, page: 1, size: 10 });
+    });
+    renderPage();
+    const list = (await screen.findByText('Tableta 1')).closest('ul');
+    await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(list).toHaveClass('is-loading');
+    release(apiOk({ items: [device(11, 'PENDING')], total: 11, page: 2, size: 10 }));
+    expect(await screen.findByText('Tableta 11')).toBeInTheDocument();
+    expect(screen.getByText('Tableta 11').closest('ul')).not.toHaveClass('is-loading');
+  });
+});

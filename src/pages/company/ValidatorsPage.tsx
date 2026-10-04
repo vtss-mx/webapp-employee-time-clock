@@ -7,7 +7,7 @@ import { ValidatorModeBadge } from '../../components/ValidatorModes';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { PagedItems } from '../../components/ui/PagedItems';
-import { useFeedback } from '../../hooks/useFeedback';
+import { useAction } from '../../hooks/useAction';
 import { usePagedList } from '../../hooks/usePagedList';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { paths } from '../../routes/paths';
@@ -25,41 +25,32 @@ const today = (count: number) => (count === 1 ? '1 identificación hoy' : `${cou
  * identifican a los empleados por QR, por rostro o por ambos.
  */
 export function ValidatorsPage() {
-  const feedback = useFeedback();
   const { policy } = useVerificationPolicy();
   const list = usePagedList((page, signal) => validatorService.list(page, signal), { errorTitle: 'No se pudieron cargar los validadores' });
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState<Confirm>(null);
-  const [busy, setBusy] = useState<number | null>(null);
+  const { busy, run } = useAction<number>();
+  const close = () => setConfirm(null);
 
   const replace = (saved: Validator) => list.updateItems((current) => current.map((v) => (v.id === saved.id ? saved : v)));
 
-  const setActive = async (validator: Validator, active: boolean) => {
-    setBusy(validator.id);
-    try {
-      replace(await validatorService.setStatus(validator.id, active));
-      void feedback.success(active ? 'Validador activado' : 'Validador desactivado', active ? `${validator.name} ya puede iniciar sesión.` : 'Su sesión se cerró y no podrá iniciar sesión hasta que lo actives.');
-    } catch (err) {
-      void feedback.fromError(err, { title: 'No se pudo cambiar el estado' });
-    } finally {
-      setBusy(null);
-      setConfirm(null);
-    }
-  };
+  const setActive = (validator: Validator, active: boolean) =>
+    run(() => validatorService.setStatus(validator.id, active), {
+      busy: validator.id,
+      errorTitle: 'No se pudo cambiar el estado',
+      success: [active ? 'Validador activado' : 'Validador desactivado', active ? `${validator.name} ya puede iniciar sesión.` : 'Su sesión se cerró y no podrá iniciar sesión hasta que lo actives.'],
+      onSuccess: replace,
+      onSettled: close,
+    });
 
-  const remove = async (validator: Validator) => {
-    setBusy(validator.id);
-    try {
-      await validatorService.remove(validator.id);
-      list.retry();
-      void feedback.success('Validador eliminado', 'Su cuenta se eliminó; la bitácora de sus identificaciones se conserva.');
-    } catch (err) {
-      void feedback.fromError(err, { title: 'No se pudo eliminar el validador' });
-    } finally {
-      setBusy(null);
-      setConfirm(null);
-    }
-  };
+  const remove = (validator: Validator) =>
+    run(() => validatorService.remove(validator.id), {
+      busy: validator.id,
+      errorTitle: 'No se pudo eliminar el validador',
+      success: ['Validador eliminado', 'Su cuenta se eliminó; la bitácora de sus identificaciones se conserva.'],
+      onSuccess: list.retry,
+      onSettled: close,
+    });
 
   const addButton = (
     <ButtonLink to={paths.company.newValidator} variant="primary" icon={<ScanLine size={18} />}>
@@ -163,7 +154,7 @@ export function ValidatorsPage() {
         confirmLabel="Desactivar"
         tone="danger"
         loading={busy !== null}
-        onCancel={() => setConfirm(null)}
+        onCancel={close}
         onConfirm={() => confirm && void setActive(confirm.validator, false)}
       />
       <ConfirmDialog
@@ -173,7 +164,7 @@ export function ValidatorsPage() {
         confirmLabel="Eliminar"
         tone="danger"
         loading={busy !== null}
-        onCancel={() => setConfirm(null)}
+        onCancel={close}
         onConfirm={() => confirm && void remove(confirm.validator)}
       />
     </div>

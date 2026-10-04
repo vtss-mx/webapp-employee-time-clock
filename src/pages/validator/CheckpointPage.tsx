@@ -1,5 +1,5 @@
 import { ArrowRight, CheckCircle2, CircleSlash, History, QrCode, ScanFace, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { LiveFaceFlow } from '../../components/LiveFaceFlow';
 import { QrScanPanel } from '../../components/QrScanPanel';
 import { VerificationAttempt, type VerificationOutcome } from '../../components/VerificationAttempt';
@@ -10,12 +10,12 @@ import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useCatalogs } from '../../hooks/useCatalogs';
-import { useErrorPopup } from '../../hooks/useFeedback';
 import { usePagedList, type PagedList } from '../../hooks/usePagedList';
+import { useResource } from '../../hooks/useResource';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { errorMessage } from '../../services/apiClient';
 import { checkpointService } from '../../services/checkpointService';
-import type { CheckpointEmployee, CheckpointEvent, CheckpointProfile, VerificationMethod } from '../../types';
+import type { CheckpointEmployee, CheckpointEvent, VerificationMethod } from '../../types';
 import { config } from '../../utils/config';
 import { timeAgo } from '../../utils/format';
 
@@ -173,17 +173,9 @@ function RecentList({ list }: { list: PagedList<CheckpointEvent> }) {
  */
 export function CheckpointPage() {
   const catalogs = useCatalogs();
-  const [profile, setProfile] = useState<CheckpointProfile | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  const { data: profile, error, retry: load } = useResource((signal) => checkpointService.profile(signal), 'profile', 'No se pudo cargar el punto de control');
   const [method, setMethod] = useState<VerificationMethod | null>(null);
-
-  const load = useCallback(() => {
-    setError(null);
-    checkpointService.profile().then(setProfile).catch(setError);
-  }, []);
   const recent = usePagedList((page, signal) => checkpointService.recent(page, signal), { errorTitle: 'No se pudieron cargar las identificaciones recientes' });
-  useEffect(load, [load]);
-  useErrorPopup(error, { title: 'No se pudo cargar el punto de control', retry: load });
 
   if (!profile) return error ? <RetryState onRetry={load} /> : <SkeletonCard lines={5} />;
 

@@ -7,12 +7,9 @@ import type { ConfidenceLevelItem } from '../types';
 import { formatConfidence } from '../utils/format';
 import { Button } from './ui/Button';
 
-/** Nivel activo más cercano a un valor guardado o a una posición del control. */
-function nearestLevel(levels: ConfidenceLevelItem[], target: number, measure: (level: ConfidenceLevelItem) => number) {
-  return levels.reduce<ConfidenceLevelItem | undefined>(
-    (best, level) => (!best || Math.abs(measure(level) - target) < Math.abs(measure(best) - target) ? level : best),
-    undefined,
-  );
+/** Nivel activo más cercano a un valor guardado o a una posición del control (en empate, el primero). */
+function nearestLevel([first, ...rest]: ConfidenceLevelItem[], target: number, measure: (level: ConfidenceLevelItem) => number) {
+  return rest.reduce((best, level) => (Math.abs(measure(level) - target) < Math.abs(measure(best) - target) ? level : best), first);
 }
 const byValue = (level: ConfidenceLevelItem) => level.value;
 const byPosition = (level: ConfidenceLevelItem) => level.sort_order;
@@ -33,8 +30,8 @@ interface ConfidenceSliderProps {
 export function ConfidenceSlider(props: ConfidenceSliderProps) {
   const levels = useCatalogs().active('confidence_levels');
   // La API solo acepta valores de niveles activos; uno anterior se muestra en el nivel más cercano.
-  const saved = nearestLevel(levels, props.value, byValue);
-  return saved ? <LevelSlider {...props} levels={levels} saved={saved} /> : null;
+  if (!levels.length) return null;
+  return <LevelSlider {...props} levels={levels} saved={nearestLevel(levels, props.value, byValue)} />;
 }
 
 interface LevelSliderProps extends ConfidenceSliderProps {
@@ -49,7 +46,7 @@ function LevelSlider({ levels, saved, busy = false, onSave }: LevelSliderProps) 
   const feedback = useFeedback();
 
   // Posiciones sin nivel activo se ajustan al más cercano.
-  const step = nearestLevel(levels, position, byPosition) ?? saved;
+  const step = nearestLevel(levels, position, byPosition);
   const current = step.sort_order;
   const min = levels[0].sort_order;
   const max = levels[levels.length - 1].sort_order;

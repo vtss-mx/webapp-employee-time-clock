@@ -13,7 +13,8 @@ import type { EmployeeFormValues, VerificationResult } from '../types';
 import { Ban, Glasses } from 'lucide-react';
 import { accessoryIcon, ruledAccessories } from './accessories';
 import { CountUp } from './CountUp';
-import { EmployeeFormFields, emptyEmployeeForm, HeadwearExemptField } from './EmployeeForm';
+import { EmployeeFormFields, HeadwearExemptField } from './EmployeeForm';
+import { emptyEmployeeForm } from '../utils/formRules';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FaceRequirements } from './FaceRequirements';
 import { GlobalErrorHandler } from './GlobalErrorHandler';
@@ -349,6 +350,7 @@ describe('manejo global de errores', () => {
 
 describe('rutas protegidas', () => {
   it('redirige al login sin sesión', async () => {
+    mockFetch(apiFail(500, 'NO_DEBE_LLAMARSE')); // el backend dice que no hay sesión (testSession)
     const { ProtectedRoute } = await import('../routes/ProtectedRoute');
     const { AuthProvider } = await import('../context/AuthContext');
     render(
@@ -363,7 +365,7 @@ describe('rutas protegidas', () => {
         </AuthProvider>
       </MemoryRouter>,
     );
-    expect(screen.getByText('pantalla de login')).toBeInTheDocument();
+    expect(await screen.findByText('pantalla de login')).toBeInTheDocument();
     expect(screen.queryByText('secreto')).toBeNull();
   });
 });

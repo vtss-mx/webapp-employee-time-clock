@@ -6,11 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { SessionsPanel } from '../components/SessionsPanel';
 import { AuthProvider } from '../context/AuthContext';
 import { FeedbackProvider } from '../context/FeedbackContext';
-import { apiFail, apiOk, mockFetch } from '../test/http';
+import { apiFail, apiOk, mockFetch, testSession } from '../test/http';
 import { sampleUser, tokenResponse } from '../test/render';
 import { withScreens } from '../test/screens';
 import type { FaceStatus, User } from '../types';
-import { preferenceStore } from '../utils/storage';
 import { AppRouter } from './AppRouter';
 import { homeForUser, paths } from './paths';
 
@@ -25,7 +24,7 @@ vi.mock('./CatalogGate', () => ({ CatalogGate: () => <Outlet /> }));
 vi.mock('../layouts/AppLayout', () => ({ AppLayout: () => <Outlet /> }));
 
 function renderApp(route: string, user: Omit<User, 'screens' | 'home'> = sampleUser, extra: Record<string, () => Response> = {}) {
-  preferenceStore.set('tc.signed-in', '1');
+  testSession.signedIn = true;
   mockFetch((call) => {
     const key = Object.keys(extra).find((p) => call.url.includes(p));
     if (key) return extra[key]();

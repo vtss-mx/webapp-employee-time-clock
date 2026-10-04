@@ -1,18 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { checkAvailability, type Availability, type AvailabilityField } from '../services/availabilityService';
+import { checkAvailability, type AvailabilityField } from '../services/availabilityService';
+import type { AvailabilityState, AvailabilityStatus, FieldStatus } from '../types';
 import { config } from '../utils/config';
-
-/** linkable: el correo o teléfono es de una persona de otra empresa (se vincula su cuenta). */
-export type AvailabilityStatus = 'idle' | 'checking' | 'available' | 'linkable' | 'taken' | 'invalid' | 'unknown';
-
-/** Lo mínimo que entrega cualquier verificación de disponibilidad. */
-export type AvailabilityResult = Pick<Availability, 'code' | 'message'>;
-
-export interface AvailabilityState {
-  status: AvailabilityStatus;
-  message?: string;
-  result?: AvailabilityResult;
-}
 
 interface Options {
   /** Al editar: id del registro (su propio valor no cuenta como duplicado). */
@@ -67,4 +56,36 @@ export function useAvailability(field: AvailabilityField, value: string, options
   }, [field, value, excludeId, unchangedValue, enabled, related]);
 
   return state;
+}
+
+/*
+ * Lectura del estado en vivo (única implementación): los formularios y sus campos la comparten para
+ * que "qué impide guardar" y "qué error se muestra" sean siempre la misma regla.
+ */
+
+/** Duplicado o con formato incorrecto: así no se puede guardar. */
+const isRejected = (state: AvailabilityState) => state.status === 'taken' || state.status === 'invalid';
+
+/** Mensaje del dato verificado en vivo que impide guardar (duplicado o formato), si lo hay. */
+export function availabilityError(state: AvailabilityState | undefined): string | undefined {
+  return state && isRejected(state) ? state.message : undefined;
+}
+
+/** El dato aún no deja guardar: se está verificando o ya se sabe que no sirve. */
+export function availabilityBlocks(state: AvailabilityState): boolean {
+  return state.status === 'checking' || isRejected(state);
+}
+
+/** Estado en vivo → error inmediato (duplicado/formato) o indicador junto al control (verificando / disponible / aviso). */
+export function liveFeedback(state: AvailabilityState | undefined): { error?: string; status?: FieldStatus } {
+  switch (state?.status) {
+    case 'checking':
+      return { status: { tone: 'checking', text: 'Verificando disponibilidad…' } };
+    case 'available':
+      return { status: { tone: 'success', text: state.message } };
+    case 'linkable':
+      return { status: { tone: 'info', text: state.message } };
+    default:
+      return { error: availabilityError(state) };
+  }
 }

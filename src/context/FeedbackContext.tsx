@@ -10,6 +10,9 @@ export interface ErrorMessageOptions {
   retry?: () => void;
   /** Mostrar también los 401 (solo en el login: credenciales o cuenta desactivada). */
   showAuthErrors?: boolean;
+  /** Clave del popup: el mismo error de varias cargas a la vez se muestra una vez y se puede cerrar
+   * con `dismiss(key)` cuando se recupera solo. */
+  key?: string;
 }
 
 type Shortcut = (title: string, text?: ReactNode, extra?: Partial<MessageInput>) => Promise<string | null>;
@@ -47,7 +50,7 @@ const RETRY_ACTIONS: MessageAction[] = [
 const textKey = (text: ReactNode) => (typeof text === 'string' || typeof text === 'number' ? String(text) : '');
 
 /**
- * Único punto de salida de los mensajes de la aplicación: TODO es un popup (error, advertencia,
+ * Único punto de salida de los mensajes de la aplicación: todo mensaje es un popup (error, advertencia,
  * información y éxito), uno a la vez, en cola y sin duplicados. La aplicación no usa toasts.
  * Cada popup se personaliza con `MessageInput`: variante, ícono, etiqueta, detalles (viñetas,
  * pasos o palomitas), contenido propio, acciones, nota al pie y si se puede cerrar.
@@ -77,7 +80,8 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       const key = message.key ?? `${message.variant}|${message.title}|${textKey(message.text)}`;
       const existing = queueRef.current.find((m) => m.key === key);
       if (existing) return existing.done;
-      let resolve: (actionId: string | null) => void = () => undefined;
+      // El ejecutor de la promesa corre de inmediato: `resolve` queda asignada antes de usarse.
+      let resolve!: (actionId: string | null) => void;
       const done = new Promise<string | null>((r) => (resolve = r));
       update((list) => [...list, { ...message, key, id: nextId.current++, done, resolve }]);
       return done;
@@ -94,10 +98,11 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   );
 
   const fromError = useCallback(
-    async (error: unknown, { title, retry, showAuthErrors }: ErrorMessageOptions = {}) => {
+    async (error: unknown, { title, retry, showAuthErrors, key }: ErrorMessageOptions = {}) => {
       if (isHandledGlobally(error, { showAuthErrors })) return null;
       const info = describeError(error, title);
       const result = await show({
+        key,
         variant: info.variant,
         title: info.title,
         text: info.text,

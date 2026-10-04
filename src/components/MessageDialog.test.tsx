@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { useErrorPopup, useFeedback } from '../hooks/useFeedback';
-import { ApiError, MOBILE_DEVICE_REQUIRED } from '../services/apiClient';
+import { ApiError, TOUCH_DEVICE_REQUIRED } from '../services/apiClient';
 import { describeError, isHandledGlobally } from '../utils/errorPresentation';
 import { lockScroll } from '../utils/scrollLock';
 import { cameraProblemMessage } from './cameraMessages';
@@ -40,7 +40,7 @@ describe('describeError', () => {
   });
 
   it('dispositivo no permitido y sesión vencida se presentan de forma global', () => {
-    expect(isHandledGlobally(apiError(403, MOBILE_DEVICE_REQUIRED, 'x'))).toBe(true);
+    expect(isHandledGlobally(apiError(403, TOUCH_DEVICE_REQUIRED, 'x'))).toBe(true);
     expect(isHandledGlobally(apiError(401, 'TOKEN_EXPIRED', 'x'))).toBe(true);
     expect(isHandledGlobally(apiError(401, 'INVALID_CREDENTIALS', 'x'), { showAuthErrors: true })).toBe(false);
     expect(isHandledGlobally(new Error('x'))).toBe(false);
@@ -139,7 +139,7 @@ describe('popup de mensajes', () => {
   it('no repite los avisos globales (dispositivo, sesión) salvo en el login', async () => {
     const feedback = setup();
     await act(async () => {
-      await expect(feedback.current.fromError(apiError(403, MOBILE_DEVICE_REQUIRED, 'x'))).resolves.toBeNull();
+      await expect(feedback.current.fromError(apiError(403, TOUCH_DEVICE_REQUIRED, 'x'))).resolves.toBeNull();
       await expect(feedback.current.fromError(apiError(401, 'TOKEN_EXPIRED', 'x'))).resolves.toBeNull();
     });
     expect(screen.queryByRole('alertdialog')).toBeNull();

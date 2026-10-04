@@ -1,6 +1,6 @@
-import { Activity, Camera, ClipboardCheck, Pause, Pencil, Play, RotateCcw, ScanFace, ShieldCheck, Trash2, UserCheck, UserRound } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Activity, BrainCircuit, Camera, ClipboardCheck, Eraser, Pause, Pencil, Play, RotateCcw, ScanFace, ShieldCheck, Trash2, UserCheck, UserRound } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '../../components/Modal';
 import { VerificationHistory } from '../../components/VerificationHistory';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
@@ -8,22 +8,45 @@ import { QrCodePanel } from '../../components/QrCodePanel';
 import { FaceStatusBadge, StatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonCard } from '../../components/ui/Skeleton';
+import { useAction } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
-import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
+import { useResource } from '../../hooks/useResource';
 import { RetryState } from '../../components/ui/RetryState';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
 import type { Employee } from '../../types';
-import { formatDate, formatDateTime, initials } from '../../utils/format';
+import { formatDate, formatDateTime, initials, timeAgo } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
 
-type Confirm = 'status' | 'delete' | null;
+type Confirm = 'status' | 'delete' | 'forget' | null;
 
 /** Dato del empleado o "Sin capturar" (empleados registrados antes de existir el campo). */
 const orMissing = (value: string | null | undefined) => value || <span className="muted">Sin capturar</span>;
 
+/** Lo que el reconocimiento aprendió del uso del empleado (galería evolutiva del backend). */
+function LearningNote({ employee, onForget }: { employee: Employee; onForget: () => void }) {
+  const learned = employee.face_learned_samples;
+  return (
+    <div className="learning-note">
+      <p className="small muted inline-note">
+        <BrainCircuit size={16} color="var(--primary)" />
+        <span>
+          {learned > 0
+            ? `Aprendizaje continuo: ${learned} ${learned === 1 ? 'muestra aprendida' : 'muestras aprendidas'} de sus identificaciones seguras (la última ${timeAgo(employee.face_last_learned_at)}).`
+            : 'Aprendizaje continuo: aprenderá de sus identificaciones seguras para reconocerle mejor con el tiempo.'}
+        </span>
+      </p>
+      {learned > 0 && (
+        <Button variant="ghost" size="sm" icon={<Eraser size={16} />} onClick={onForget}>
+          Olvidar lo aprendido
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** Registro facial del empleado: estado, validación y acciones en persona (registrar o verificar). */
-function FaceSection({ employee }: { employee: Employee }) {
+function FaceSection({ employee, onForget }: { employee: Employee; onForget: () => void }) {
   const { byCode } = useCatalogs();
   return (
     <PanelSection title="Registro facial" icon={<ScanFace size={20} />} aside={<FaceStatusBadge status={employee.face_status} />}>
@@ -38,6 +61,7 @@ function FaceSection({ employee }: { employee: Employee }) {
           {employee.headwear_exempt && ' Exento de retirar prenda de cabeza.'}
         </span>
       </p>
+      {employee.face_status === 'APPROVED' && <LearningNote employee={employee} onForget={onForget} />}
       <div className="button-row">
         {/* En persona, con la cámara de la empresa: registrar (aprobado al momento) o verificar. */}
         {employee.active && employee.face_status === 'APPROVED' && (
@@ -77,40 +101,11 @@ export function EmployeeDetailPage() {
   const { id } = useParams();
   const employeeId = Number(id);
   const navigate = useNavigate();
-  const feedback = useFeedback();
-  const [employee, setEmployee] = useState<Employee | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  const { data: employee, error, retry: load } = useResource((signal) => employeeService.get(employeeId, signal), employeeId, 'No se pudo cargar el empleado');
   const [confirm, setConfirm] = useState<Confirm>(null);
-  const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setEmployee(await employeeService.get(employeeId));
-      setError(null);
-    } catch (e) {
-      setError(e);
-    }
-  }, [employeeId]);
-  useErrorPopup(error, { title: 'No se pudo cargar el empleado', retry: () => void load() });
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const runAction = async (action: () => Promise<unknown>, success: string, detail?: string) => {
-    setBusy(true);
-    try {
-      await action();
-      void feedback.success(success, detail);
-      setConfirm(null);
-      await load();
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo completar la acción' });
-      setConfirm(null);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const action = useAction();
+  const busy = action.busy !== null;
+  const close = () => setConfirm(null);
 
   if (!employee) {
     return error ? (
@@ -118,7 +113,7 @@ export function EmployeeDetailPage() {
         <Panel>
           <PanelHeader title="Empleado" backTo={paths.company.employees} backLabel="Empleados" />
           <PanelSection>
-            <RetryState onRetry={() => void load()} />
+            <RetryState onRetry={load} />
           </PanelSection>
         </Panel>
       </div>
@@ -200,13 +195,35 @@ export function EmployeeDetailPage() {
                 <dd>{employee.email}</dd>
               </div>
               <div>
+                <dt>Departamento</dt>
+                <dd>
+                  {employee.department_id && employee.department_name ? (
+                    <Link to={paths.company.department(employee.department_id)}>{employee.department_name}</Link>
+                  ) : (
+                    <span className="muted">Sin departamento</span>
+                  )}
+                </dd>
+              </div>
+              {employee.managed_departments && employee.managed_departments.length > 0 && (
+                <div>
+                  <dt>Responsable de</dt>
+                  <dd className="inline-links">
+                    {employee.managed_departments.map((d) => (
+                      <Link key={d.id} to={paths.company.department(d.id)}>
+                        {d.name}
+                      </Link>
+                    ))}
+                  </dd>
+                </div>
+              )}
+              <div>
                 <dt>Registrado</dt>
                 <dd>{formatDateTime(employee.created_at)}</dd>
               </div>
             </dl>
           </PanelSection>
 
-          <FaceSection employee={employee} />
+          <FaceSection employee={employee} onForget={() => setConfirm('forget')} />
 
           <QrCodePanel employeeId={employee.id} />
 
@@ -240,15 +257,40 @@ export function EmployeeDetailPage() {
         confirmLabel={employee.active ? 'Desactivar' : 'Activar'}
         tone={employee.active ? 'danger' : 'success'}
         loading={busy}
-        onCancel={() => setConfirm(null)}
+        onCancel={close}
         onConfirm={() =>
-          runAction(
-            () => employeeService.setStatus(employee.id, !employee.active),
-            employee.active ? 'Empleado desactivado' : 'Empleado activado',
-          )
+          action.run(() => employeeService.setStatus(employee.id, !employee.active), {
+            errorTitle: 'No se pudo completar la acción',
+            success: [employee.active ? 'Empleado desactivado' : 'Empleado activado'],
+            onSuccess: load, // el expediente se vuelve a pedir: el backend decide su estado
+            onSettled: close,
+          })
         }
       />
 
+      <ConfirmDialog
+        open={confirm === 'forget'}
+        title="Olvidar lo aprendido"
+        message={
+          <>
+            Se borrarán las muestras que el reconocimiento aprendió de las identificaciones de <strong>{employee.full_name}</strong>.
+            Volverá a compararse solo con su registro aprobado: no tendrá que registrarse de nuevo. Úsalo si dudas de alguna
+            identificación.
+          </>
+        }
+        confirmLabel="Olvidar lo aprendido"
+        tone="danger"
+        loading={busy}
+        onCancel={close}
+        onConfirm={() =>
+          action.run(() => employeeService.forgetLearnedFace(employee.id), {
+            errorTitle: 'No se pudo olvidar lo aprendido',
+            success: ['Aprendizaje reiniciado', 'Se compara solo con su registro aprobado; volverá a aprender de sus identificaciones seguras.'],
+            onSuccess: load,
+            onSettled: close,
+          })
+        }
+      />
 
       <ConfirmDialog
         open={confirm === 'delete'}
@@ -262,19 +304,16 @@ export function EmployeeDetailPage() {
         confirmLabel="Eliminar definitivamente"
         tone="danger"
         loading={busy}
-        onCancel={() => setConfirm(null)}
-        onConfirm={async () => {
-          setBusy(true);
-          try {
-            await employeeService.remove(employee.id);
-            void feedback.success('Empleado eliminado');
-            void navigate(paths.company.employees, { replace: true });
-          } catch (e) {
-            void feedback.fromError(e, { title: 'No se pudo eliminar' });
-            setConfirm(null);
-            setBusy(false);
-          }
-        }}
+        onCancel={close}
+        onConfirm={() =>
+          action.run(() => employeeService.remove(employee.id), {
+            errorTitle: 'No se pudo eliminar',
+            success: ['Empleado eliminado'],
+            onSuccess: () => void navigate(paths.company.employees, { replace: true }),
+            onError: close,
+            keepBusy: true,
+          })
+        }
       />
     </div>
   );

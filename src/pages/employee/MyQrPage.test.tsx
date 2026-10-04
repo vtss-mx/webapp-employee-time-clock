@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DynamicQrCode } from '../../components/DynamicQrCode';
+import { DynamicQrCode, QrCountdown } from '../../components/DynamicQrCode';
+import { FeedbackProvider } from '../../context/FeedbackContext';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
 import { samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch } from '../../test/http';
@@ -9,8 +10,10 @@ import { renderWithProviders, sampleUser } from '../../test/render';
 import { MyQrPage } from './MyQrPage';
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: sampleUser }) }));
+// El teléfono dibuja el código a partir de su contenido: la imagen de prueba lo lleva tal cual.
+vi.mock('qrcode', () => ({ toDataURL: (text: string) => Promise.resolve(`data:image/png;base64,${text}`) }));
 
-const qr = (id: number) => ({ id, employee_number: 'EMP-7', created_at: 'x', expires_at: 'y', lifetime_seconds: 30, image_base64: `data:image/png;base64,${id}` });
+const qr = (id: number) => ({ id, employee_number: 'EMP-7', created_at: 'x', expires_at: 'y', lifetime_seconds: 30, content: `TCQR2:token-${id}` });
 
 afterEach(() => resetPolicyCache());
 
@@ -23,13 +26,13 @@ describe('MyQrPage (QR dinámico)', () => {
       return apiOk({ id: next, status: 'ACTIVE', expires_at: null, used_at: null });
     });
     renderWithProviders(<MyQrPage />);
-    expect(await screen.findByAltText('Código QR de Ana Ruiz')).toHaveAttribute('src', 'data:image/png;base64,1');
+    expect(await screen.findByAltText('Código QR de Ana Ruiz')).toHaveAttribute('src', 'data:image/png;base64,TCQR2:token-1');
     expect(screen.getByText(/Se renueva en/)).toHaveTextContent(/30 s|29 s/);
     expect(screen.getByText(/Cambia cada 30 s y sirve una sola vez/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Descargar/ })).toBeNull(); // un QR dinámico no se descarga
 
     await userEvent.click(screen.getByRole('button', { name: 'Generar otro' }));
-    await waitFor(() => expect(screen.getAllByAltText('Código QR de Ana Ruiz')[0]).toHaveAttribute('src', 'data:image/png;base64,2'));
+    await waitFor(() => expect(screen.getAllByAltText('Código QR de Ana Ruiz')[0]).toHaveAttribute('src', 'data:image/png;base64,TCQR2:token-2'));
     expect(calls.filter((c) => c.init.method === 'POST')).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: 'Mostrar en grande' }));
@@ -63,7 +66,7 @@ describe('DynamicQrCode', () => {
     ['paused', 'En pausa', 'Mostrar código'],
   ] as const)('estado %s', async (phase, title, action) => {
     const onRenew = vi.fn();
-    renderWithProviders(<DynamicQrCode qr={qr(1)} phase={phase} progress={0} remaining={0} alt="QR" onRenew={onRenew} />);
+    renderWithProviders(<DynamicQrCode qr={qr(1)} phase={phase} deadline={0} alt="QR" onRenew={onRenew} />);
     expect(screen.getByText(title)).toBeInTheDocument();
     if (action) {
       await userEvent.click(screen.getByRole('button', { name: action }));
@@ -71,10 +74,28 @@ describe('DynamicQrCode', () => {
     }
   });
 
-  it('cargando: esqueleto; últimos segundos: aviso en el anillo', () => {
-    const { container, rerender } = renderWithProviders(<DynamicQrCode qr={null} phase="loading" progress={0} remaining={0} alt="QR" onRenew={vi.fn()} />);
+  it('cargando: esqueleto; vigente: el anillo sigue la vigencia desde el punto en que va', () => {
+    // El código explica en el popup si no se puede dibujar: necesita los mensajes también al redibujarse.
+    const { container, rerender } = render(<DynamicQrCode qr={null} phase="loading" deadline={0} alt="QR" onRenew={vi.fn()} />, { wrapper: FeedbackProvider });
     expect(container.querySelector('.skeleton')).not.toBeNull();
-    rerender(<DynamicQrCode qr={qr(1)} phase="ready" progress={0.1} remaining={3} alt="QR" onRenew={vi.fn()} />);
-    expect(container.querySelector('.dynamic-qr')).toHaveClass('is-ending');
+    const deadline = Date.now() + 3_000; // faltan 3 de 30 s: ya en los últimos segundos
+    rerender(<DynamicQrCode qr={qr(1)} phase="ready" deadline={deadline} alt="QR" onRenew={vi.fn()} />);
+    const ring = container.querySelector<HTMLElement>('.dynamic-qr--ready');
+    expect(ring?.style.getPropertyValue('--qr-life')).toBe('30s');
+    expect(parseFloat(ring?.style.getPropertyValue('--qr-drain-delay') ?? '')).toBeCloseTo(-27, 0);
+    expect(parseFloat(ring?.style.getPropertyValue('--qr-warn-delay') ?? '')).toBeLessThan(0); // ámbar desde ya
+  });
+
+  it('la cuenta regresiva baja cada segundo hasta cero', async () => {
+    vi.useFakeTimers();
+    renderWithProviders(<QrCountdown deadline={Date.now() + 2_500} />);
+    expect(screen.getByText(/Se renueva en/)).toHaveTextContent('3 s');
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(screen.getByText(/Se renueva en/)).toHaveTextContent('2 s');
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(screen.getByText(/Se renueva en/)).toHaveTextContent('0 s');
+    await act(() => vi.advanceTimersByTimeAsync(5_000)); // ya no programa más
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
   });
 });

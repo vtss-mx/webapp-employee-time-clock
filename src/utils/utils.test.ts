@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { downloadUrl } from './download';
 import { haptic } from './haptics';
 import { envBoolean, envNumber, envNumberList, envString } from './env';
 import {
   ageFrom,
   businessDate,
   businessHour,
-  businessTimeZone,
   businessToday,
   DEFAULT_TIME_ZONE,
   formatConfidence,
@@ -18,7 +16,7 @@ import {
   timeAgo,
 } from './format';
 import { hasKeys, isArrayOf, isNothing, isPage, isRecord } from './guards';
-import { preferenceStore, tabStore } from './storage';
+import { purgeLegacyStorage } from './legacyStorage';
 import {
   curpCheckDigit,
   luhnValid,
@@ -106,15 +104,14 @@ describe('format', () => {
   });
   it('fechas y horas en la zona del negocio (hora del Centro), no en la del dispositivo', () => {
     const instant = '2026-10-03T05:30:00Z'; // 23:30 del 2 de octubre en el Centro (UTC−6)
-    expect(businessTimeZone()).toBe(DEFAULT_TIME_ZONE);
     expect(businessToday(new Date(instant))).toBe('2026-10-02');
     expect(businessHour(new Date(instant))).toBe(23);
     expect(formatDateTime(instant)).toMatch(/2 oct 2026/);
     expect(formatDate('2026-03-15')).toMatch(/15 mar 2026/); // fecha de calendario: no se desplaza
     setBusinessTimeZone('Asia/Tokyo');
     expect(businessToday(new Date(instant))).toBe('2026-10-03');
-    setBusinessTimeZone('Zona/Inexistente'); // se ignora
-    expect(businessTimeZone()).toBe('Asia/Tokyo');
+    setBusinessTimeZone('Zona/Inexistente'); // se ignora: sigue la de Tokio
+    expect(businessToday(new Date(instant))).toBe('2026-10-03');
     setBusinessTimeZone(null);
     setBusinessTimeZone(DEFAULT_TIME_ZONE);
     expect(businessDate(new Date(instant)).getDate()).toBe(2);
@@ -289,26 +286,22 @@ describe('catálogos', () => {
   });
 });
 
-describe('storage y descarga', () => {
-  it('guarda y elimina valores sin lanzar excepciones', () => {
-    preferenceStore.set('k', 'v');
-    expect(preferenceStore.get('k')).toBe('v');
-    preferenceStore.remove('k');
-    expect(preferenceStore.get('k')).toBeNull();
-    tabStore.set('t', '1');
-    expect(tabStore.get('t')).toBe('1');
+describe('almacenamiento heredado', () => {
+  it('la app no guarda en Web Storage: solo borra lo que dejaron versiones anteriores', () => {
+    const legacy = ['tc.login.email', 'tc.sidebar.collapsed', 'tc.camera.granted', 'tc.signed-in', 'tc.camera.user', 'tc.camera.environment'];
+    legacy.forEach((key) => localStorage.setItem(key, '1'));
+    sessionStorage.setItem('tc.chunk-reload', '1');
+    localStorage.setItem('otra-app', 'x'); // lo ajeno no se toca
+    purgeLegacyStorage();
+    expect(legacy.map((key) => localStorage.getItem(key))).toEqual(legacy.map(() => null));
+    expect(sessionStorage.getItem('tc.chunk-reload')).toBeNull();
+    expect(localStorage.getItem('otra-app')).toBe('x');
   });
-  it('tolera un storage bloqueado', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+  it('tolera un almacenamiento bloqueado', () => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('bloqueado');
     });
-    expect(preferenceStore.get('x')).toBeNull();
-  });
-  it('descarga mediante un enlace temporal', () => {
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    downloadUrl('data:image/png;base64,AAA', 'qr.png');
-    expect(click).toHaveBeenCalledOnce();
-    expect(document.querySelector('a')).toBeNull();
+    expect(() => purgeLegacyStorage()).not.toThrow();
   });
 });
 

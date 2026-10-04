@@ -1,5 +1,5 @@
 # ---------- Build ----------
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts ./scripts
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 # ---------- Runtime ----------
-FROM nginx:1.27-alpine
+FROM nginx:1.30-alpine
 RUN apk add --no-cache openssl
 COPY docker/nginx.main.conf /etc/nginx/nginx.conf
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

@@ -30,7 +30,6 @@ export function useDynamicQr() {
   const [phase, setPhase] = useState<DynamicQrPhase>('loading');
   const [error, setError] = useState<unknown>(null);
   const [deadline, setDeadline] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
   const issuing = useRef(false);
   const current = useRef({ phase, qr });
   useLayoutEffect(() => {
@@ -47,7 +46,6 @@ export function useDynamicQr() {
       setQr(next);
       // Reloj del dispositivo + vigencia: no depende de que su hora coincida con la del servidor.
       setDeadline(Date.now() + next.lifetime_seconds * 1000);
-      setNow(Date.now());
       setPhase('ready');
     } catch (e) {
       if (!mounted.current) return;
@@ -62,19 +60,16 @@ export function useDynamicQr() {
     void renew();
   }, [renew]);
 
-  // Cuenta regresiva del código vigente.
+  // Al vencer, otro (con la pantalla oculta se pausa y se renueva al volver). Un solo temporizador:
+  // la cuenta regresiva y el anillo se dibujan aparte (QrCountdown y CSS), sin redibujar la pantalla.
   useEffect(() => {
     if (phase !== 'ready') return undefined;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, [phase]);
-
-  // Venció: otro (con la pantalla oculta se pausa y se renueva al volver).
-  useEffect(() => {
-    if (phase !== 'ready' || now < deadline) return;
-    if (document.visibilityState === 'hidden') setPhase('paused');
-    else void renew();
-  }, [phase, now, deadline, renew]);
+    const timer = window.setTimeout(() => {
+      if (document.visibilityState === 'hidden') setPhase('paused');
+      else void renew();
+    }, Math.max(0, deadline - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [phase, deadline, renew]);
 
   // Recién usado: "¡Listo!" un instante y el siguiente.
   useEffect(() => {
@@ -95,10 +90,10 @@ export function useDynamicQr() {
 
   // ¿Ya lo usó un validador? (se consulta seguido: la persona está frente al lector).
   usePolling(
-    async () => {
-      const shown = current.current.qr;
-      if (!shown) return;
-      const status = await meService.qrStatus(shown.id);
+    async (signal) => {
+      // Solo se consulta en la fase 'ready', que `renew` fija junto con el código: siempre hay uno en pantalla.
+      const shown = current.current.qr as DynamicQr;
+      const status = await meService.qrStatus(shown.id, signal);
       if (!mounted.current || current.current.qr?.id !== status.id || current.current.phase !== 'ready') return;
       if (status.status === 'USED') setPhase('used');
       else if (status.status === 'REVOKED') setPhase('replaced');
@@ -106,16 +101,12 @@ export function useDynamicQr() {
     { intervalMs: config.qrStatusPollSeconds * 1000, enabled: phase === 'ready', immediate: false },
   );
 
-  const total = (qr?.lifetime_seconds ?? 1) * 1000;
-  const left = Math.max(0, deadline - now);
   return {
     qr,
     phase,
     error,
-    /** Segundos para que se renueve. */
-    remaining: Math.ceil(left / 1000),
-    /** Vigencia restante (1 → 0), para el anillo de la cuenta regresiva. */
-    progress: phase === 'ready' ? Math.min(1, left / total) : 0,
+    /** Momento (reloj del dispositivo, ms) en que vence el código vigente. */
+    deadline,
     renew,
   };
 }

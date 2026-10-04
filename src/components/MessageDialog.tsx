@@ -1,5 +1,6 @@
 import { Check, Copy } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
+import { useCopy } from '../hooks/useCopy';
 import type { MessageVariant } from '../utils/errorPresentation';
 import { Button, type ButtonVariant } from './ui/Button';
 import { DialogHero } from './ui/DialogHero';
@@ -57,15 +58,8 @@ export function MessageDialog({ message, position, total, onAction, onClose }: M
   const actions = message.actions?.length ? message.actions : DEFAULT_ACTIONS;
   const titleId = useId();
   const textId = useId();
-  const [copied, setCopied] = useState(false);
-
-  const copyTrace = () => {
-    if (!traceId) return;
-    void navigator.clipboard
-      ?.writeText(traceId)
-      .then(() => setCopied(true))
-      .catch(() => undefined);
-  };
+  const { copied, copy } = useCopy();
+  const copyTrace = () => traceId && copy(traceId);
 
   const List = detailsStyle === 'steps' ? 'ol' : 'ul';
 

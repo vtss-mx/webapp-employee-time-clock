@@ -109,6 +109,20 @@ describe('Paginator', () => {
   });
 });
 
+describe('Paginator: muchas páginas y un solo resultado', () => {
+  it('con muchas páginas muestra "…" entre los extremos y las vecinas de la actual', () => {
+    render(<Paginator page={10} size={10} total={200} onPage={() => undefined} />);
+    expect(nav().querySelectorAll('.pager__gap')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Página 9' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Página 5' })).toBeNull();
+  });
+
+  it('un solo resultado sin sustantivo propio: "resultado" en singular', () => {
+    render(<Paginator page={1} size={10} total={1} onPage={() => undefined} />);
+    expect(range()).toHaveTextContent('Mostrando 1 de 1 resultado');
+  });
+});
+
 describe('usePagedList', () => {
   const pageOf = (query: PageQuery, total: number): Page<number> => {
     const from = (query.page - 1) * query.size;

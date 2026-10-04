@@ -251,9 +251,9 @@ function selectView<T extends string>(props: SelectProps<T>, selected: SelectOpt
 }
 
 interface SelectListProps<T extends string> {
-  anchorRef: RefObject<HTMLButtonElement>;
-  menuRef: RefObject<HTMLDivElement>;
-  listRef: RefObject<HTMLUListElement>;
+  anchorRef: RefObject<HTMLButtonElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
+  listRef: RefObject<HTMLUListElement | null>;
   listId: string;
   baseId: string;
   tone: 'light' | 'dark';
@@ -324,7 +324,7 @@ function DefaultOption<T extends string>({ option, selected }: { option: SelectO
 }
 
 interface SelectSearchProps {
-  inputRef: RefObject<HTMLInputElement>;
+  inputRef: RefObject<HTMLInputElement | null>;
   listId: string;
   activeId?: string;
   options: { placeholder?: string; empty?: string };

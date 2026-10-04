@@ -7,6 +7,11 @@ import { Spinner } from '../Spinner';
 import { Floating } from '../ui/Floating';
 
 const DEBOUNCE_MS = 300;
+
+/** Toda falla se informa (nunca se calla): lo que no venga del servicio de mapas cuenta como falla de Places. */
+function asPlacesProblem(error: unknown): MapsApiError {
+  return error instanceof MapsApiError ? error : new MapsApiError('places', 'failed', String(error));
+}
 const MIN_CHARS = 3;
 
 interface PlaceSearchProps {
@@ -34,11 +39,13 @@ export function PlaceSearch({ country, disabled = false, onSelect, onError }: Pl
   const menuRef = useRef<HTMLDivElement>(null);
   const session = useRef<Promise<google.maps.places.AutocompleteSessionToken> | null>(null);
   const failed = useRef(false);
+  /** El texto del lugar elegido: no es una búsqueda nueva (no se abre otra sesión ni la lista). */
+  const chosen = useRef<string | null>(null);
   useDismissOnOutsidePointer([controlRef, menuRef], open, () => setOpen(false));
 
   useEffect(() => {
     const term = query.trim();
-    if (term.length < MIN_CHARS || failed.current) {
+    if (term.length < MIN_CHARS || failed.current || query === chosen.current) {
       setSuggestions([]);
       return;
     }
@@ -55,9 +62,12 @@ export function PlaceSearch({ country, disabled = false, onSelect, onError }: Pl
           setOpen(true);
         })
         .catch((error: unknown) => {
-          if (cancelled || !(error instanceof MapsApiError)) return;
-          failed.current = error.problem !== 'failed'; // sin la API habilitada no se vuelve a intentar
-          onError(error);
+          // La siguiente búsqueda empieza otra sesión: una que falló (p. ej. sin red) no se reutiliza.
+          session.current = null;
+          if (cancelled) return;
+          const problem = asPlacesProblem(error);
+          failed.current = problem.problem !== 'failed'; // sin la API habilitada no se vuelve a intentar
+          onError(problem);
         })
         .finally(() => !cancelled && setBusy(false));
     }, DEBOUNCE_MS);
@@ -67,18 +77,18 @@ export function PlaceSearch({ country, disabled = false, onSelect, onError }: Pl
     };
   }, [query, country, onError]);
 
-  const choose = async (suggestion: PlaceSuggestion | undefined) => {
-    if (!suggestion) return;
+  const choose = async (suggestion: PlaceSuggestion) => {
     setOpen(false);
     setBusy(true);
     try {
       const place = await mapsService.resolvePlace(suggestion);
       session.current = null; // la sesión de búsqueda termina al elegir
       if (!mounted.current) return;
+      chosen.current = place.label;
       setQuery(place.label);
       onSelect(place);
     } catch (error) {
-      if (error instanceof MapsApiError) onError(error);
+      onError(asPlacesProblem(error));
     } finally {
       if (mounted.current) setBusy(false);
     }

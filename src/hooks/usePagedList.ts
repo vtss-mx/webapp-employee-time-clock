@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { Page, PageQuery } from '../types';
 import { config } from '../utils/config';
 import { useErrorPopup } from './useFeedback';
+import { useRetryOnReconnect } from './useRetryOnReconnect';
 
 interface PagedListOptions {
   errorTitle: string;
@@ -16,7 +17,8 @@ interface PagedListOptions {
 
 /**
  * Listado paginado por el backend: página y elementos por página, carga con cancelación de la
- * petición anterior, "Reintentar" y vuelta a la página 1 al cambiar los filtros o el tamaño.
+ * petición anterior, "Reintentar" (también solo, al recuperar la conexión) y vuelta a la página 1
+ * al cambiar los filtros o el tamaño.
  * Base de todos los listados (con búsqueda: `useSearchList`; sin ella: validadores, validaciones,
  * bitácoras) para que se comporten igual y se dibujen con el mismo `Paginator`.
  */
@@ -34,6 +36,7 @@ export function usePagedList<T>(fetchPage: (query: PageQuery, signal: AbortSigna
   const [reload, setReload] = useState(0);
   const retry = useCallback(() => setReload((n) => n + 1), []);
   useErrorPopup(error, { title: errorTitle, retry });
+  useRetryOnReconnect(error, retry);
 
   const fetchRef = useRef(fetchPage);
   useLayoutEffect(() => {

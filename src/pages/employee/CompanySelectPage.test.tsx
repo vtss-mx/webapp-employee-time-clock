@@ -8,7 +8,7 @@ import { homeForUser, needsCompanySelection, paths } from '../../routes/paths';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders, sampleUser, tokenResponse } from '../../test/render';
 import { withScreens } from '../../test/screens';
-import type { User, UserMembership } from '../../types';
+import type { FaceStatus, User, UserMembership } from '../../types';
 import { CompanySelectPage } from './CompanySelectPage';
 
 const membership = (id: number, name: string, extra: Partial<UserMembership> = {}): UserMembership => ({
@@ -31,8 +31,8 @@ function SignIn() {
   return null;
 }
 
-function renderSelect(selectResponse: (call: MockCall) => Response) {
-  const { calls } = mockFetch((call) => (call.url.endsWith('/auth/company') ? selectResponse(call) : apiOk(tokenResponse(multiUser))));
+function renderSelect(selectResponse: (call: MockCall) => Response, user: User = multiUser) {
+  const { calls } = mockFetch((call) => (call.url.endsWith('/auth/company') ? selectResponse(call) : apiOk(tokenResponse(user))));
   renderWithProviders(
     <>
       <SignIn />
@@ -78,5 +78,31 @@ describe('Selección de empresa (persona en varias empresas)', () => {
     expect(popup).toHaveTextContent('La empresa está desactivada');
     await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /Panificadora del Norte/ })).toBeEnabled());
+  });
+
+  it('acceso desactivado en una empresa y un estado facial que el catálogo aún no tiene (se muestra su código)', async () => {
+    const user = withScreens({
+      ...multiUser,
+      memberships: [
+        membership(1, 'Panificadora del Norte', { active: false }),
+        membership(2, 'Logística Sonora', { face_status: 'ON_HOLD' as FaceStatus }),
+      ],
+    });
+    renderSelect(() => apiFail(500, 'NO_DEBE_LLAMARSE'), user);
+    const blocked = await screen.findByRole('button', { name: /Panificadora del Norte/ });
+    expect(blocked).toBeDisabled();
+    expect(blocked).toHaveTextContent('Tu acceso está desactivado');
+    expect(screen.getByRole('button', { name: /Logística Sonora/ })).toHaveTextContent('ON_HOLD');
+  });
+
+  it('sin empresas en la sesión no se rompe; "Cerrar sesión" pide confirmación', async () => {
+    renderSelect(() => apiFail(500, 'NO_DEBE_LLAMARSE'), withScreens({ ...sampleUser, employee: null, company: null }));
+    expect(await screen.findByText(/Trabajas en 0 empresas/)).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+    const ask = await screen.findByRole('alertdialog', { name: '¿Estás seguro de que deseas cerrar sesión?' });
+    await userEvent.click(within(ask).getByRole('button', { name: 'Seguir aquí' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(screen.getByRole('heading', { name: 'Elige tu empresa' })).toBeInTheDocument();
   });
 });

@@ -30,10 +30,6 @@ export function setBusinessTimeZone(timeZone: string | null | undefined): void {
   }
 }
 
-export function businessTimeZone(): string {
-  return zone.timeZone;
-}
-
 /** Hoy (YYYY-MM-DD) en la zona del negocio. */
 export function businessToday(now: Date = new Date()): string {
   return zone.day.format(now);

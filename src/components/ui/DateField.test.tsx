@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
+import { businessDate } from '../../utils/format';
 import { DateField, displayToValue, isoToDisplay, maskDate, parseIso, toIso } from './DateField';
 
 function Harness({ initial = '', min = '1920-01-01', max = '2010-06-15' }: { initial?: string; min?: string; max?: string }) {
@@ -118,6 +119,63 @@ describe('DateField', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('La fecha es obligatoria');
     expect(screen.queryByText('Edad mínima')).toBeNull();
     expect(screen.getByLabelText('Fecha')).toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+describe('DateField: casos límite', () => {
+  const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const openCalendar = () => userEvent.click(screen.getByRole('button', { name: 'Abrir calendario' }));
+
+  it('sin fecha, máximo ni mes inicial abre en el mes de hoy (zona del negocio) con hoy marcado', async () => {
+    render(<DateField label="Fecha" value="" onChange={() => undefined} />);
+    await openCalendar();
+    const today = businessDate();
+    expect(screen.getByRole('button', { name: `Elegir año, actual: ${today.getFullYear()}` })).toBeInTheDocument();
+    const cell = screen.getByRole('gridcell', { name: `${today.getDate()} de ${MONTHS[today.getMonth()]} de ${today.getFullYear()}` });
+    expect(cell).toHaveClass('is-today');
+    expect(cell).toHaveFocus();
+  });
+
+  it('teclas que no son flechas no mueven el foco; en meses cambia de año; en años las flechas recorren', async () => {
+    render(<Harness initial="2005-05-10" />);
+    await openCalendar();
+    expect(fireEvent.keyDown(screen.getByRole('grid'), { key: 'a' })).toBe(true);
+    expect(document.activeElement).toHaveAccessibleName('10 de Mayo de 2005');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Elegir mes, actual: Mayo' }));
+    expect(fireEvent.keyDown(screen.getByRole('group', { name: 'Meses de 2005' }), { key: 'x' })).toBe(true);
+    expect(document.activeElement).toHaveAccessibleName('Mayo de 2005');
+    await userEvent.click(screen.getByRole('button', { name: 'Año anterior' }));
+    expect(screen.getByRole('group', { name: 'Meses de 2004' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Año siguiente' }));
+    expect(screen.getByRole('group', { name: 'Meses de 2005' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Elegir año, actual: 2005' }));
+    expect(document.activeElement).toHaveTextContent('2005');
+    fireEvent.keyDown(screen.getByRole('group', { name: 'Años' }), { key: 'ArrowRight' });
+    expect(document.activeElement).toHaveTextContent('2006');
+  });
+
+  it('valores externos: vacío limpia el campo; una fecha completa que no existe se muestra tal cual', async () => {
+    function External() {
+      const [value, setValue] = useState('2000-01-15');
+      return (
+        <>
+          <DateField label="Fecha" value={value} onChange={setValue} />
+          <button type="button" onClick={() => setValue('')}>
+            vaciar
+          </button>
+          <button type="button" onClick={() => setValue('31/02/2001')}>
+            inexistente
+          </button>
+        </>
+      );
+    }
+    render(<External />);
+    await userEvent.click(screen.getByRole('button', { name: 'vaciar' }));
+    expect(screen.getByLabelText('Fecha')).toHaveValue('');
+    await userEvent.click(screen.getByRole('button', { name: 'inexistente' }));
+    expect(screen.getByLabelText('Fecha')).toHaveValue('31/02/2001');
   });
 });
 

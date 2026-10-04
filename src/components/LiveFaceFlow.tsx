@@ -10,7 +10,8 @@ import { faceService } from '../services/verificationService';
 import type { FaceChallenge, TurnAction, VerificationRules } from '../types';
 import { isVirtualCamera } from '../utils/cameraDevices';
 import { config } from '../utils/config';
-import { detectedAccessories, isRetryableFaceError } from '../utils/faceErrors';
+import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs } from '../utils/faceErrors';
+import { sleep, whenOnline } from '../utils/waits';
 import { CameraCapture } from './CameraCapture';
 import { currentStage, ScanCard, scanStages, STAGE_INFO, stageFill, type Phase, type ScanStage } from './FaceScan';
 import { AccessoryAlert, FaceGuide, guidanceTone, type Tone } from './FaceGuide';
@@ -45,7 +46,8 @@ interface LiveFaceFlowProps {
   /** Envía las capturas. Si lanza un error corregible (accesorios, calidad, prueba de vida)
    *  se muestra el motivo y se reinicia el flujo automáticamente. */
   onSubmit: (captured: CapturedFace) => Promise<void>;
-  /** Errores no corregibles (red, permisos, servicio caído); se recibe el error original. */
+  /** Errores no corregibles (permisos, servicio caído) o la red que sigue fallando tras reintentar
+   *  solo (MAX_TRANSIENT_FACE_FAILURES); se recibe el error original. */
   onFatal: (error: unknown) => void;
   onCancel: () => void;
 }
@@ -71,7 +73,6 @@ interface Blocked {
 const REVIEW_AFTER_ATTEMPTS = 2;
 /** Retos de giro que se piden de nuevo (conservando el escaneo) antes de reiniciar todo el flujo. */
 const CHALLENGE_RETRIES = 2;
-const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const vibrate = (ms: number) => {
   try {
     navigator.vibrate?.(ms); // Android; iOS lo ignora
@@ -278,12 +279,16 @@ export function LiveFaceFlow({
   const turnsRef = useRef<Blob[]>([]);
   /** Retos de giro pedidos de nuevo con el mismo escaneo (se reinicia con cada escaneo). */
   const challengeRetries = useRef(0);
+  /** Fallas de red o servidor seguidas: cada reintento vuelve a subir las capturas. */
+  const transientStreak = useRef(0);
   const mounted = useMountedRef();
 
   const block = useCallback(
     async (error: unknown) => {
       if (!mounted.current) return;
-      if (!isRetryableFaceError(error, catalogs)) {
+      const outcome = faceErrorOutcome(error, catalogs, transientStreak.current);
+      transientStreak.current = outcome.streak;
+      if (outcome.fatal) {
         onFatal(error);
         return;
       }
@@ -296,7 +301,8 @@ export function LiveFaceFlow({
       setCapture(null);
       setPhase('blocked');
       vibrate(80);
-      await sleep(config.faceResumeAfterBlockMs);
+      // Se reanuda tras la pausa (o la que pidió el servidor) y, sin red, hasta recuperar la conexión.
+      await Promise.all([sleep(faceResumeDelayMs(error)), whenOnline()]);
       if (mounted.current) {
         setBlocked(null);
         setPhase('frontal');
@@ -310,6 +316,7 @@ export function LiveFaceFlow({
       setPhase('submitting');
       try {
         await onSubmit({ ...captured, camera: camera.trackLabel || undefined, accessoryReview: reviewRequested });
+        transientStreak.current = 0;
       } catch (error) {
         await block(error);
       }

@@ -37,6 +37,11 @@ export const authService = {
   },
 
   /** Renueva el access token (rota el refresh token de la cookie). */
+  /** ¿Hay una sesión vigente en este navegador? (lo sabe el backend por la cookie HttpOnly; no la renueva). */
+  sessionStatus(): Promise<{ signed_in: boolean }> {
+    return apiRequest<{ signed_in: boolean }>('/auth/session', { auth: false, validate: hasKeys<{ signed_in: boolean }>('signed_in') });
+  },
+
   refresh(): Promise<AuthTokenResponse> {
     return apiRequest<AuthTokenResponse>('/auth/refresh', { method: 'POST', auth: false, validate: isTokenResponse });
   },

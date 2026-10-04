@@ -2,7 +2,7 @@ import type { DynamicQr, QrStatus, UserPreferences } from '../types';
 import { hasKeys } from '../utils/guards';
 import { apiRequest } from './apiClient';
 
-const isQr = hasKeys<DynamicQr>('id', 'image_base64', 'expires_at', 'lifetime_seconds');
+const isQr = hasKeys<DynamicQr>('id', 'content', 'expires_at', 'lifetime_seconds');
 const isQrStatus = hasKeys<QrStatus>('id', 'status');
 const isPreferences = hasKeys<UserPreferences>('sidebar_collapsed');
 

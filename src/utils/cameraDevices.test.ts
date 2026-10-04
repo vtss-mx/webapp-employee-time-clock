@@ -50,13 +50,12 @@ describe('cameraDevices: elección de cámara', () => {
   });
 
   it('la cámara recordada solo se reabre si sirve para el propósito (el bug: quedaba la trasera en el rostro)', () => {
-    const back = parseRemembered(JSON.stringify({ deviceId: 'b', kind: 'back' }));
+    const back = parseRemembered({ deviceId: 'b', kind: 'back' });
     expect(rememberedFor(back, 'user')).toBeUndefined(); // escáner facial: vuelve a la frontal
     expect(rememberedFor(back, 'environment')).toBe('b'); // lector de QR: la trasera sí sirve
-    const webcam = parseRemembered(JSON.stringify({ deviceId: 'w2', kind: 'unknown' }));
+    const webcam = parseRemembered({ deviceId: 'w2', kind: 'unknown' });
     expect(rememberedFor(webcam, 'user')).toBe('w2'); // webcam elegida en la computadora
-    expect(parseRemembered('b')).toBeNull(); // formato anterior (solo id, sin lado): se ignora
-    expect(parseRemembered('{roto')).toBeNull();
+    expect(parseRemembered('b')).toBeNull(); // formato anterior (texto): se ignora
     expect(parseRemembered(null)).toBeNull();
     expect(rememberedFor(null, 'user')).toBeUndefined();
   });

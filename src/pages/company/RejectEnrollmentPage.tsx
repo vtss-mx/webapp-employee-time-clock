@@ -1,5 +1,4 @@
 import { UserX } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ReasonFormPanel } from '../../components/ReasonFormPanel';
 import { RetryState } from '../../components/ui/RetryState';
@@ -12,32 +11,15 @@ import { enrollmentService } from '../../services/enrollmentService';
 
 const MIN_REASON = 3;
 
+/** El empleado verá el motivo: es obligatorio. */
+const validateReason = (reason: string) => (reason.trim().length < MIN_REASON ? 'Escribe o elige el motivo del rechazo' : undefined);
+
 /** Rechazar un registro facial: el empleado verá el motivo y deberá registrarse de nuevo. */
 export function RejectEnrollmentPage() {
   const enrollmentId = Number(useParams().id);
   const navigate = useNavigate();
   const feedback = useFeedback();
-  const { data: item, error, retry } = useResource(() => enrollmentService.get(enrollmentId), enrollmentId, 'No se pudo cargar la solicitud');
-  const [reason, setReason] = useState('');
-  const [touched, setTouched] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const invalid = reason.trim().length < MIN_REASON;
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setTouched(true);
-    if (invalid) return;
-    setSaving(true);
-    try {
-      const res = await enrollmentService.reject(enrollmentId, reason.trim());
-      notifyEnrollmentsChanged();
-      void feedback.info('Usuario rechazado', `${res.full_name} deberá registrar su rostro nuevamente.`);
-      void navigate(paths.company.validations);
-    } catch (err) {
-      setSaving(false);
-      void feedback.fromError(err, { title: 'No se pudo rechazar' });
-    }
-  };
+  const { data: item, error, retry } = useResource((signal) => enrollmentService.get(enrollmentId, signal), enrollmentId, 'No se pudo cargar la solicitud');
 
   if (!item) return error ? <RetryState onRetry={retry} /> : <SkeletonCard lines={4} />;
   return (
@@ -53,13 +35,16 @@ export function RejectEnrollmentPage() {
         label: 'Motivo (visible para el empleado)',
         placeholder: 'Describe por qué se rechaza el registro',
         required: true,
-        error: touched && invalid ? 'Escribe o elige el motivo del rechazo' : undefined,
       }}
-      reason={reason}
-      onReason={setReason}
+      validate={validateReason}
       submit={{ label: 'Rechazar', icon: <UserX size={18} />, variant: 'danger', disabled: item.status !== 'PENDING', disabledTitle: 'Este registro ya fue revisado' }}
-      saving={saving}
-      onSubmit={(e) => void submit(e)}
+      errorTitle="No se pudo rechazar"
+      onSend={async (reason) => {
+        const res = await enrollmentService.reject(enrollmentId, reason);
+        notifyEnrollmentsChanged();
+        void feedback.info('Usuario rechazado', `${res.full_name} deberá registrar su rostro nuevamente.`);
+        void navigate(paths.company.validations);
+      }}
       onCancel={() => void navigate(paths.company.validation(enrollmentId))}
     />
   );

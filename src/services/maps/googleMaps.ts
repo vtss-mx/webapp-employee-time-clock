@@ -154,8 +154,12 @@ export const mapsService = {
   /** Sesión de búsqueda (agrupa las sugerencias y el lugar elegido para la facturación de Google). */
   async newSearchSession(): Promise<google.maps.places.AutocompleteSessionToken> {
     requireApi('places');
-    const { AutocompleteSessionToken } = await library<google.maps.PlacesLibrary>('places');
-    return new AutocompleteSessionToken();
+    try {
+      const { AutocompleteSessionToken } = await library<google.maps.PlacesLibrary>('places');
+      return new AutocompleteSessionToken();
+    } catch (error) {
+      throw asMapsError('places', error); // como todo el servicio: solo lanza MapsApiError
+    }
   },
 
   /** Sugerencias de lugares y direcciones mientras se escribe. */

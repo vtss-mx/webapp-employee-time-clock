@@ -1,11 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { liveFeedback } from '../components/FormField';
-import { ApiError } from '../services/apiClient';
+import { fieldErrorsFrom } from '../services/apiClient';
 import { validatorService } from '../services/validatorService';
 import type { Address, Validator, ValidatorMode, ValidatorSettings } from '../types';
 import { ADDRESS_FIELDS, addressForPoint, pickAddress, validateAddress, type AddressValues, type GeoPoint } from '../utils/address';
 import { validateEmail, validatePassword, validatePasswordConfirm, type FieldErrors } from '../utils/validation';
-import { useAvailability } from './useAvailability';
+import { liveFeedback, useAvailability } from './useAvailability';
 import { useCatalogs } from './useCatalogs';
 import { useFormState } from './useFormState';
 
@@ -40,18 +39,16 @@ export function validateRadius(value: string): string | undefined {
   return undefined;
 }
 
-/** Errores del backend en los campos del formulario (`address.street` → `street`). */
-export function validatorServerErrors(err: unknown): FieldErrors<ValidatorFormValues> {
-  if (!(err instanceof ApiError)) return {};
-  const result: FieldErrors<ValidatorFormValues> = {};
-  for (const [field, message] of Object.entries(err.fieldErrors)) {
-    const name = field === 'location_radius_m' ? 'radius' : field.replace(/^address\./, '');
-    if (name in initialValues(null)) result[name as keyof ValidatorFormValues] = message;
-  }
-  if (err.code === 'EMAIL_TAKEN') result.email = err.message;
-  if (err.code === 'LOCATION_RADIUS_REQUIRED') result.radius = err.message;
-  return result;
-}
+/** Nombre en el formulario de los campos del backend (`address.street` → `street`) y de sus errores de negocio. */
+const ERROR_FIELDS: Partial<Record<string, keyof ValidatorFormValues>> = {
+  ...Object.fromEntries(ADDRESS_FIELDS.map((field) => [`address.${field}`, field])),
+  location_radius_m: 'radius',
+  EMAIL_TAKEN: 'email',
+  LOCATION_RADIUS_REQUIRED: 'radius',
+};
+
+/** Errores del backend en los campos del formulario. */
+export const validatorServerErrors = (err: unknown): FieldErrors<ValidatorFormValues> => fieldErrorsFrom(err, ERROR_FIELDS);
 
 function initialValues(original: Validator | null): ValidatorFormValues {
   return { ...pickAddress(original?.address), name: original?.name ?? '', email: '', password: '', confirm: '', radius: String(original?.location_radius_m ?? DEFAULT_RADIUS_M) };

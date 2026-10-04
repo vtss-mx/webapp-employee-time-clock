@@ -42,6 +42,7 @@ export const config = {
 
   // --- Actualización periódica (con jitter, pausada si la pestaña está oculta) ---
   pendingEnrollmentsPollMs: seconds('VITE_POLL_PENDING_ENROLLMENTS_SECONDS', 45, 10, 3600),
+  pendingErrorsPollMs: seconds('VITE_POLL_PENDING_ERRORS_SECONDS', 60, 10, 3600),
   validationStatusPollMs: seconds('VITE_POLL_VALIDATION_STATUS_SECONDS', 30, 10, 3600),
 
   // --- Reconocimiento facial ---
@@ -74,7 +75,7 @@ export const config = {
   qrPrefix: envString(env, 'VITE_QR_PREFIX', 'TCQR'),
   qrScanIntervalMs: envNumber(env, 'VITE_QR_SCAN_INTERVAL_MS', 150, 50, 1000),
   /** Cada cuántos segundos "Mi código QR" consulta si un validador ya lo usó (para mostrar otro). */
-  qrStatusPollSeconds: envNumber(env, 'VITE_QR_STATUS_POLL_SECONDS', 2, 1, 10),
+  qrStatusPollSeconds: envNumber(env, 'VITE_QR_STATUS_POLL_SECONDS', 3, 1, 10),
 
   // --- Punto de control (validador en tableta o teléfono) ---
   /** Segundos que el resultado queda en pantalla antes de volver a esperar a la siguiente persona. */

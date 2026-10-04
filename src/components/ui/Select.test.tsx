@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { filterOptions, listKeyAction, Select, type SelectOption } from './Select';
 
 type Fruit = 'apple' | 'banana' | 'cherry' | 'date';
@@ -127,3 +127,88 @@ describe('Select con búsqueda (listas largas)', () => {
     expect(listKeyAction('ArrowDown', COUNTRIES, 0, { typeahead: false })).toEqual({ kind: 'move', index: 1 });
   });
 });
+
+describe('Select: casos límite', () => {
+  const activeOption = () => screen.getByRole('listbox').getAttribute('aria-activedescendant');
+
+  it('flecha arriba sube; una letra sin opción no mueve; Tab cierra sin devolver el foco al control', async () => {
+    render(
+      <>
+        <Harness initial="date" />
+        <button type="button">siguiente</button>
+      </>,
+    );
+    trigger().focus();
+    await userEvent.keyboard('{ArrowUp}'); // abre en la elegida ("Dátil")
+    expect(activeOption()).toMatch(/opt-3$/);
+    await userEvent.keyboard('{ArrowUp}');
+    expect(activeOption()).toMatch(/opt-2$/);
+    await userEvent.keyboard('z');
+    expect(activeOption()).toMatch(/opt-2$/);
+    const tabbed = fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Tab' });
+    expect(tabbed).toBe(true); // el navegador mueve el foco al siguiente control
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(trigger()).not.toHaveFocus();
+    expect(output()).toBe('date');
+  });
+
+  it('otras teclas en el control no abren la lista; un clic con la lista abierta la cierra', async () => {
+    render(<Harness />);
+    trigger().focus();
+    await userEvent.keyboard('a');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    await userEvent.click(trigger());
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await userEvent.click(trigger());
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('elegir la opción que ya estaba elegida no avisa un cambio', async () => {
+    const onChange = vi.fn();
+    render(<Select<Fruit> value="apple" options={OPTIONS} onChange={onChange} aria-label="Fruta" />);
+    await userEvent.click(trigger());
+    await userEvent.click(screen.getByRole('option', { name: /Manzana/ }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('valor fuera de las opciones o deshabilitado: texto de ayuda y al abrir se activa la primera disponible', async () => {
+    const { rerender } = render(<Select<Fruit> value={'kiwi' as Fruit} options={OPTIONS} onChange={() => undefined} aria-label="Fruta" placeholder="Elige una fruta" />);
+    expect(trigger()).toHaveAccessibleName('Fruta Elige una fruta');
+    expect(document.querySelector('.select__value')).toHaveClass('select__value--placeholder');
+    rerender(<Select<Fruit> value={'kiwi' as Fruit} options={OPTIONS} onChange={() => undefined} aria-label="Fruta" />);
+    expect(trigger()).toHaveAccessibleName('Fruta Selecciona una opción');
+    rerender(<Select<Fruit> value="banana" options={OPTIONS} onChange={() => undefined} aria-label="Fruta" />);
+    await userEvent.click(trigger());
+    expect(activeOption()).toMatch(/opt-0$/); // "Plátano" está deshabilitada
+  });
+
+  it('sin aria-label ni etiqueta visible no apunta a una etiqueta inexistente', () => {
+    render(<Select<Fruit> value="apple" options={OPTIONS} onChange={() => undefined} />);
+    expect(screen.getByRole('button')).not.toHaveAttribute('aria-labelledby');
+  });
+
+  it('deshabilitado: tampoco se abre con el teclado', () => {
+    render(<Select<Fruit> value="apple" options={OPTIONS} onChange={() => undefined} aria-label="Fruta" disabled />);
+    fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('contenido propio por opción y buscador con sus textos por omisión', async () => {
+    render(
+      <Select<Fruit>
+        value="cherry"
+        options={OPTIONS}
+        onChange={() => undefined}
+        aria-label="Fruta"
+        searchable
+        renderOption={(option, state) => <b>{`${option.label}${state.selected ? ' (elegida)' : ''}`}</b>}
+      />,
+    );
+    await userEvent.click(trigger());
+    expect(screen.getByRole('option', { name: 'Cereza (elegida)' })).toBeInTheDocument();
+    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar...' }), 'kiwi');
+    expect(screen.getByRole('status')).toHaveTextContent('Sin resultados');
+  });
+});
+

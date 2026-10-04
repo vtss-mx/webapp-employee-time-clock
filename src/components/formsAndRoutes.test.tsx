@@ -8,11 +8,11 @@ import { CatalogProvider } from '../context/CatalogContext';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { AppRouter } from '../routes/AppRouter';
 import { catalogsFixture } from '../test/catalogs';
-import { apiFail, apiOk, mockFetch } from '../test/http';
+import { apiFail, apiOk, mockFetch, testSession } from '../test/http';
 import { tokenResponse, WithCatalogs } from '../test/render';
-import { preferenceStore } from '../utils/storage';
 import type { EmployeeFormValues } from '../types';
-import { emptyEmployeeForm, EmployeeFormFields } from './EmployeeForm';
+import { EmployeeFormFields } from './EmployeeForm';
+import { emptyEmployeeForm } from '../utils/formRules';
 
 describe('EmployeeFormFields: normaliza mientras se escribe', () => {
   function Harness() {
@@ -82,7 +82,7 @@ describe('rutas con carga diferida y guardas', () => {
   });
 
   it('con sesión, /login (solo invitados) lleva al inicio del rol', async () => {
-    preferenceStore.set('tc.signed-in', '1');
+    testSession.signedIn = true;
     const { calls } = mockFetch((call) => {
       if (call.url.endsWith('/auth/refresh')) return apiOk(tokenResponse());
       return call.url.endsWith('/catalogs') ? apiOk(catalogsFixture) : apiOk({ items: [], total: 0, page: 1, size: 20 });

@@ -1,6 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ApiError, configureApiClient, TOUCH_DEVICE_REQUIRED } from '../services/apiClient';
-import type { ApiErrorItem } from '../services/apiClient';
+import { ApiError, configureApiClient, retryDelay } from '../services/apiClient';
 import { authService, type LoginProofs } from '../services/authService';
 import { meService } from '../services/meService';
 import type { AuthTokenResponse, Session, User, UserPreferences } from '../types';
@@ -8,7 +7,7 @@ import { deviceProof } from '../utils/deviceKey';
 import { setBusinessTimeZone } from '../utils/format';
 import { currentLocation } from '../utils/geolocation';
 import { describeDevice } from '../utils/userAgent';
-import { preferenceStore } from '../utils/storage';
+import { sleep, whenOnline } from '../utils/waits';
 
 /**
  * Inicio de sesión con las pruebas que el backend pida a un validador, en el orden en que las pide:
@@ -37,24 +36,26 @@ async function loginWithProofs(email: string, password: string, remember: boolea
 }
 
 /** Indicador NO sensible: solo dice que vale la pena intentar restaurar la sesión al recargar. */
-const SIGNED_IN_KEY = 'tc.signed-in';
 const EXPIRED_MESSAGE = 'Tu sesión ha expirado. Inicia sesión nuevamente.';
 /** Separación mínima entre verificaciones de la sesión al volver a la pestaña. */
 const SESSION_CHECK_GAP_MS = 15_000;
+/** Reintentos al restaurar la sesión si el servidor no responde (espera creciente: ~12 s en total). */
+const RESTORE_RETRIES = 5;
+
+/** Falla pasajera (sin red, tiempo agotado, servidor caído o reiniciando): la sesión puede seguir viva. */
+function isTransientFailure(error: unknown): error is ApiError {
+  return error instanceof ApiError && (error.isTransient || error.status >= 500);
+}
 
 export type AuthStatus = 'restoring' | 'authenticated' | 'anonymous';
 
-/** Empleado que intenta usar la app desde una computadora o tableta (política de la empresa). */
+/** Validador que intenta operar desde una computadora (su empresa exige tableta o teléfono). */
 export interface DeviceBlock {
-  device: 'desktop' | 'tablet';
-  /** Desde dónde debe continuar: teléfono (empleado) o tableta/teléfono (validador). */
-  requires: 'phone' | 'touch';
   message: string;
 }
 
-export function deviceBlockFrom(error: Pick<ApiError, 'message' | 'code'> & { errors: ApiErrorItem[] }): DeviceBlock {
-  const device = error.errors[0]?.details?.device === 'tablet' ? 'tablet' : 'desktop';
-  return { device, requires: error.code === TOUCH_DEVICE_REQUIRED ? 'touch' : 'phone', message: error.message };
+export function deviceBlockFrom(error: Pick<ApiError, 'message'>): DeviceBlock {
+  return { message: error.message };
 }
 
 export interface AuthContextValue {
@@ -63,7 +64,7 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   /** Mensaje mostrado en el login tras un cierre de sesión forzado (p. ej. expiración). */
   logoutReason: string | null;
-  /** Dispositivo no permitido: la app muestra la pantalla "continúa desde tu teléfono". */
+  /** Validador en una computadora: la app muestra "continúa desde una tableta o un teléfono". */
   deviceBlock: DeviceBlock | null;
   /** Sale de esa pantalla: cierra la sesión (si la hay) y vuelve al inicio de sesión. */
   dismissDeviceBlock: () => Promise<void>;
@@ -91,13 +92,14 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [status, setStatus] = useState<AuthStatus>(() =>
-    preferenceStore.get(SIGNED_IN_KEY) ? 'restoring' : 'anonymous',
-  );
+  // Siempre se empieza preguntando al backend si hay sesión (la cookie HttpOnly es la única fuente: el
+  // navegador no guarda nada propio para saberlo).
+  const [status, setStatus] = useState<AuthStatus>('restoring');
   const [logoutReason, setLogoutReason] = useState<string | null>(null);
   const [deviceBlock, setDeviceBlock] = useState<DeviceBlock | null>(null);
   const sessionRef = useRef<Session | null>(null);
-  const refreshing = useRef<Promise<boolean> | null>(null);
+  /** Renovación en curso (compartida); se resuelve con el error, o null si se renovó. */
+  const refreshing = useRef<Promise<unknown> | null>(null);
 
   const apply = useCallback((response: AuthTokenResponse) => {
     const next: Session = {
@@ -111,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(next);
     setStatus('authenticated');
     setLogoutReason(null);
-    preferenceStore.set(SIGNED_IN_KEY, '1');
   }, []);
 
   const clear = useCallback((reason?: string) => {
@@ -119,26 +120,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setStatus('anonymous');
     setLogoutReason(reason ?? null);
-    preferenceStore.remove(SIGNED_IN_KEY);
   }, []);
 
-  const refreshSession = useCallback((): Promise<boolean> => {
+  /** Renueva el access token con la cookie (un único refresh en curso). Se resuelve con el error, o null si se renovó. */
+  const renew = useCallback((): Promise<unknown> => {
     refreshing.current ??= authService
       .refresh()
       .then((response) => {
         apply(response);
-        return true;
+        return null;
       })
       .catch((error: unknown) => {
         // 401 = sesión revocada/expirada; errores de red no cierran la sesión.
         if (error instanceof ApiError && error.status === 401) clear(sessionRef.current ? EXPIRED_MESSAGE : undefined);
-        return false;
+        return error ?? new Error('No se pudo renovar la sesión');
       })
       .finally(() => {
         refreshing.current = null;
       });
     return refreshing.current;
   }, [apply, clear]);
+
+  const refreshSession = useCallback(async () => (await renew()) === null, [renew]);
 
   // Se configura durante el primer render (no en un efecto): los efectos de los hijos corren
   // antes que los del provider y sus primeras peticiones saldrían sin estos hooks.
@@ -153,12 +156,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     apiConfigured.current = true;
   }
 
-  // Restaurar la sesión al cargar la app (cookie HttpOnly).
+  // Restaurar la sesión al cargar la app (cookie HttpOnly). Solo un rechazo del servidor (401: vencida
+  // o revocada) o un error que no se arregla reintentando lleva al login; una falla pasajera (sin red,
+  // servidor reiniciando) se reintenta con espera creciente —sin red, al recuperar la conexión— para
+  // no pedir de nuevo la contraseña con la sesión aún vigente.
   useEffect(() => {
-    if (status !== 'restoring') return;
-    void refreshSession().then((ok) => {
-      if (!ok) setStatus((current) => (current === 'restoring' ? 'anonymous' : current));
-    });
+    // Solo al montar, y la app siempre empieza en 'restoring' (pregunta al backend si hay sesión).
+    let active = true;
+    const restore = async () => {
+      // Sin sesión no hay nada que renovar (ni un 401 que registrar); si no se pudo preguntar, se intenta.
+      const signedIn = await authService.sessionStatus().then(
+        (probe) => probe.signed_in,
+        () => true,
+      );
+      for (let attempt = 0; signedIn; attempt++) {
+        const error = await renew();
+        if (error === null || !active) return;
+        if (!isTransientFailure(error) || attempt >= RESTORE_RETRIES) break;
+        await sleep(retryDelay(attempt, error.retryAfterMs));
+        await whenOnline();
+        if (!active) return;
+      }
+      setStatus((current) => (current === 'restoring' ? 'anonymous' : current));
+    };
+    void restore();
+    return () => {
+      active = false;
+    };
     // Solo al montar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,5 +1,5 @@
 import { UserPlus } from 'lucide-react';
-import type { FormEvent } from 'react';
+import type { SubmitEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmployeeFormFields, HeadwearExemptField } from '../../components/EmployeeForm';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
@@ -16,7 +16,7 @@ export function EmployeeCreatePage() {
   const { values, setValues, touch, headwearExempt, setHeadwearExempt, errors, saving, canSubmit, validate, save, live, linking } =
     useEmployeeForm();
 
-  const onSubmit = async (e: FormEvent) => {
+  const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     if (!validate()) return;
     await save(async () => {

@@ -1,6 +1,6 @@
 import { Ban, QrCode, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { useFeedback } from '../hooks/useFeedback';
+import { useAction } from '../hooks/useAction';
 import { useResource } from '../hooks/useResource';
 import { useVerificationPolicy } from '../hooks/useVerificationPolicy';
 import { employeeService } from '../services/employeeService';
@@ -16,24 +16,19 @@ import { RetryState } from './ui/RetryState';
  * imprime. Aquí ve su actividad y puede invalidar el vigente (su teléfono muestra otro).
  */
 export function QrCodePanel({ employeeId }: { employeeId: number }) {
-  const feedback = useFeedback();
   const { policy } = useVerificationPolicy();
-  const { data: summary, setData, error, retry } = useResource(() => employeeService.qrSummary(employeeId), employeeId, 'No se pudo cargar la actividad del QR');
+  const { data: summary, setData, error, retry } = useResource((signal) => employeeService.qrSummary(employeeId, signal), employeeId, 'No se pudo cargar la actividad del QR');
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const action = useAction();
+  const busy = action.busy !== null;
 
-  const revoke = async () => {
-    setBusy(true);
-    try {
-      setData(await employeeService.revokeQr(employeeId));
-      void feedback.success('Código invalidado', 'El código que tenía en pantalla ya no sirve; en su teléfono podrá mostrar uno nuevo.');
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo invalidar el código' });
-    } finally {
-      setBusy(false);
-      setConfirmOpen(false);
-    }
-  };
+  const revoke = () =>
+    action.run(() => employeeService.revokeQr(employeeId), {
+      errorTitle: 'No se pudo invalidar el código',
+      success: ['Código invalidado', 'El código que tenía en pantalla ya no sirve; en su teléfono podrá mostrar uno nuevo.'],
+      onSuccess: setData,
+      onSettled: () => setConfirmOpen(false),
+    });
 
   const live = summary?.live ?? false;
   return (

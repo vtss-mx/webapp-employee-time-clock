@@ -3,17 +3,45 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaceRequirements } from '../../components/FaceRequirements';
 import { scanStages, ScanStagesPreview } from '../../components/FaceScan';
-import { LiveFaceFlow } from '../../components/LiveFaceFlow';
+import { LiveFaceFlow, type CapturedFace } from '../../components/LiveFaceFlow';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { useAuth } from '../../hooks/useAuth';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { paths } from '../../routes/paths';
+import { ApiError } from '../../services/apiClient';
 import { enrollmentService } from '../../services/enrollmentService';
 import { config } from '../../utils/config';
+import { sleep } from '../../utils/waits';
+
+/**
+ * Envía el registro. ENROLLMENT_PENDING (409) significa que un envío anterior ya llegó (p. ej. se
+ * perdió su respuesta y se repitió): el registro está en validación, así que cuenta como enviado.
+ */
+async function submitEnrollment(captured: CapturedFace): Promise<void> {
+  try {
+    await enrollmentService.submit(captured, captured.accessoryReview);
+  } catch (error) {
+    if (!(error instanceof ApiError && error.code === 'ENROLLMENT_PENDING')) throw error;
+  }
+}
 
 /** Primer inicio de sesión (o registro rechazado): el empleado registra su rostro. */
+/** Relee el usuario hasta 3 veces (1 s, 2 s, 4 s): una red que parpadea justo al enviar no deja al
+ * empleado en una pantalla vieja. Devuelve si lo logró. */
+export async function refreshWithRetry(refresh: () => Promise<void>, attempts = 3): Promise<boolean> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await refresh();
+      return true;
+    } catch {
+      await sleep(1000 * 2 ** attempt);
+    }
+  }
+  return false;
+}
+
 export function EnrollmentPage() {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -55,10 +83,18 @@ export function EnrollmentPage() {
         policy={policy}
         allowAccessoryReview
         onSubmit={async (captured) => {
-          await enrollmentService.submit(captured, captured.accessoryReview);
-          await refreshUser();
-          void feedback.success('Registro enviado', 'Tu empresa validará tu identidad en breve.');
-          void navigate(paths.employee.pending, { replace: true });
+          await submitEnrollment(captured);
+          // El registro ya quedó guardado. Releer el usuario (con reintentos) trae su nueva pantalla
+          // (en validación); si aun así falla, NO se navega a una pantalla que el usuario viejo no
+          // tiene (rebotaría al registro): la sesión se actualiza sola al volver la red y lo lleva.
+          // El error nunca sube al flujo facial: lo tomaría por un envío fallido y volvería a enviar.
+          const updated = await refreshWithRetry(refreshUser);
+          void feedback.success(
+            'Registro enviado',
+            updated ? 'Tu empresa validará tu identidad en breve.' : 'Tu empresa validará tu identidad en breve. Tu pantalla se actualizará en cuanto vuelva la conexión.',
+          );
+          if (updated) void navigate(paths.employee.pending, { replace: true });
+          else setStarted(false);
         }}
         onFatal={(error) => {
           setStarted(false);

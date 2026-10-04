@@ -6,7 +6,8 @@ import { LoginPage } from '../pages/LoginPage';
 import { AuthProvider } from '../context/AuthContext';
 import { WithCatalogs } from '../test/render';
 import { ChangePasswordSection } from './ChangePasswordSection';
-import { emptyEmployeeForm, EmployeeFormFields } from './EmployeeForm';
+import { EmployeeFormFields } from './EmployeeForm';
+import { emptyEmployeeForm } from '../utils/formRules';
 
 /**
  * Chrome adivina el tipo de cada campo por su etiqueta. Con estas reglas (tomadas de Chromium,

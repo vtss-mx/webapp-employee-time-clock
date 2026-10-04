@@ -1,4 +1,4 @@
-import { Building2, Gauge, KeyRound, Pencil, Power, PowerOff, Trash2, UserCog, UserPlus } from 'lucide-react';
+import { Blocks, Building2, Gauge, KeyRound, Pencil, Power, PowerOff, Trash2, UserCog, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ConfirmDialog } from '../../components/Modal';
@@ -8,7 +8,8 @@ import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../components/ui
 import { PagedItems } from '../../components/ui/PagedItems';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
-import { useFeedback } from '../../hooks/useFeedback';
+import { Switch } from '../../components/ui/Switch';
+import { useAction } from '../../hooks/useAction';
 import { usePagedList, type PagedList } from '../../hooks/usePagedList';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
@@ -17,7 +18,7 @@ import type { CompanyAdmin, CompanyDetail } from '../../types';
 import { formatDate, formatDateTime } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
 
-type Pending = { kind: 'company' } | { kind: 'delete' } | { kind: 'admin'; admin: CompanyAdmin } | null;
+type Pending = { kind: 'company' } | { kind: 'delete' } | { kind: 'api' } | { kind: 'admin'; admin: CompanyAdmin } | null;
 const orMissing = (value: string | null | undefined) => value || <span className="muted">Sin capturar</span>;
 
 interface CompanyActionsProps {
@@ -97,31 +98,54 @@ function CompanyAdmins({ list, companyId, busy, onToggle }: CompanyAdminsProps) 
   );
 }
 
-/** Detalle de una empresa: datos, uso del plan, administradores y estado. */
+interface ApiAccessProps {
+  enabled: boolean;
+  busy: boolean;
+  saving: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
+/**
+ * Módulos de la empresa que decide el ADMIN de la plataforma. Integraciones (API): sin acceso, su
+ * pantalla desaparece del menú y el backend rechaza sus llaves (se conservan: al devolverle el
+ * acceso vuelven a funcionar).
+ */
+function ApiAccess({ enabled, busy, saving, onChange }: ApiAccessProps) {
+  return (
+    <Switch
+      checked={enabled}
+      onChange={onChange}
+      icon={<KeyRound size={20} />}
+      label="Integraciones (API)"
+      description={
+        enabled
+          ? 'La empresa puede crear llaves y conectar sus sistemas (nómina, ERP) con su información.'
+          : 'Sin acceso: la pantalla no aparece en su menú y sus llaves no funcionan.'
+      }
+      disabled={busy}
+      busy={saving}
+    />
+  );
+}
+
+/** Detalle de una empresa: datos, uso del plan, módulos, administradores y estado. */
 export function CompanyDetailPage() {
   const companyId = Number(useParams().id);
   const navigate = useNavigate();
-  const feedback = useFeedback();
-  const { data: company, setData: setCompany, error, retry: load } = useResource(() => adminService.get(companyId), companyId, 'No se pudo cargar la empresa');
+  const { data: company, setData: setCompany, error, retry: load } = useResource((signal) => adminService.get(companyId, signal), companyId, 'No se pudo cargar la empresa');
   const admins = usePagedList((page, signal) => adminService.admins(companyId, page, signal), {
     errorTitle: 'No se pudieron cargar los administradores',
     filterKey: String(companyId),
   });
   const [confirm, setConfirm] = useState<Pending>(null);
-  const [busy, setBusy] = useState(false);
+  // Qué se procesa: el acceso a la API muestra su propio interruptor ocupado; lo demás, `true`.
+  const action = useAction<'api' | true>();
+  const busy = action.busy !== null;
+  const close = () => setConfirm(null);
 
-  const run = async (action: () => Promise<CompanyDetail>, success: string, detail?: string) => {
-    setBusy(true);
-    try {
-      setCompany(await action());
-      void feedback.success(success, detail);
-    } catch (e) {
-      void feedback.fromError(e, { title: 'No se pudo completar la acción' });
-    } finally {
-      setBusy(false);
-      setConfirm(null);
-    }
-  };
+  /** Cambio que devuelve la empresa actualizada (estado o módulos de la empresa, o de un administrador). */
+  const run = (task: () => Promise<CompanyDetail>, success: string, detail?: string, what: 'api' | true = true) =>
+    action.run(task, { errorTitle: 'No se pudo completar la acción', success: [success, detail], onSuccess: setCompany, onSettled: close, busy: what });
   /** Cambia el estado de un administrador y vuelve a pedir la página (el backend decide el resultado). */
   const setAdminActive = (admin: CompanyAdmin, active: boolean) =>
     run(() => adminService.setAdminStatus(companyId, admin.id, active), active ? 'Administrador activado' : 'Administrador desactivado').then(admins.retry);
@@ -146,18 +170,18 @@ export function CompanyDetailPage() {
     company.active
       ? setConfirm({ kind: 'company' })
       : void run(() => adminService.setStatus(company.id, true), 'Empresa activada', 'Su personal ya puede iniciar sesión.');
-  const remove = async () => {
-    setBusy(true);
-    try {
-      await adminService.remove(company.id);
-      void navigate(paths.admin.companies, { replace: true });
-      void feedback.success('Empresa eliminada', `${company.name} y sus cuentas de acceso se eliminaron.`);
-    } catch (e) {
-      setBusy(false);
-      setConfirm(null);
-      void feedback.fromError(e, { title: 'No se pudo eliminar la empresa' });
-    }
-  };
+  const setApiAccess = (enabled: boolean) =>
+    enabled
+      ? void run(() => adminService.setApiAccess(company.id, true), 'Integraciones activadas', 'La empresa ya ve la pantalla Integraciones (API) y sus llaves funcionan.', 'api')
+      : setConfirm({ kind: 'api' });
+  const remove = () =>
+    action.run(() => adminService.remove(company.id), {
+      errorTitle: 'No se pudo eliminar la empresa',
+      success: ['Empresa eliminada', `${company.name} y sus cuentas de acceso se eliminaron.`],
+      onSuccess: () => void navigate(paths.admin.companies, { replace: true }),
+      onError: close,
+      keepBusy: true,
+    });
   const usage = company.max_employees ? Math.min(100, Math.round((company.employee_count / company.max_employees) * 100)) : null;
 
   return (
@@ -176,7 +200,7 @@ export function CompanyDetailPage() {
             <CompanyActions
               company={company}
               busy={busy}
-              toggling={busy && confirm === null}
+              toggling={action.busy === true && confirm === null}
               onToggle={toggleCompany}
               onDelete={() => setConfirm({ kind: 'delete' })}
             />
@@ -205,7 +229,15 @@ export function CompanyDetailPage() {
             </dl>
           </PanelSection>
 
-          <PanelSection title="Uso del plan" icon={<Gauge size={20} />}>
+          <PanelSection
+            title="Uso del plan"
+            icon={<Gauge size={20} />}
+            aside={
+              <ButtonLink to={paths.admin.companyEmployees(company.id)} size="sm" variant="ghost" icon={<Users size={16} />}>
+                Ver empleados
+              </ButtonLink>
+            }
+          >
             <div className="usage">
               <div className="usage__numbers">
                 <strong>{company.employee_count}</strong>
@@ -230,6 +262,10 @@ export function CompanyDetailPage() {
           </PanelSection>
         </PanelGrid>
 
+        <PanelSection title="Módulos" icon={<Blocks size={20} />}>
+          <ApiAccess enabled={company.api_enabled} busy={busy} saving={action.busy === 'api'} onChange={setApiAccess} />
+        </PanelSection>
+
         <PanelSection
           title="Administradores"
           icon={<UserCog size={20} />}
@@ -250,8 +286,18 @@ export function CompanyDetailPage() {
         confirmLabel="Desactivar empresa"
         tone="danger"
         loading={busy}
-        onCancel={() => setConfirm(null)}
+        onCancel={close}
         onConfirm={() => void run(() => adminService.setStatus(company.id, false), 'Empresa desactivada', 'Su personal ya no puede iniciar sesión.')}
+      />
+      <ConfirmDialog
+        open={confirm?.kind === 'api'}
+        title={`Quitar Integraciones a ${company.name}`}
+        message="Sus sistemas conectados dejarán de recibir información de inmediato: el backend rechazará sus llaves y la pantalla Integraciones (API) desaparecerá de su menú. Las llaves se conservan y vuelven a funcionar si le devuelves el acceso."
+        confirmLabel="Quitar acceso"
+        tone="danger"
+        loading={busy}
+        onCancel={close}
+        onConfirm={() => void run(() => adminService.setApiAccess(company.id, false), 'Integraciones desactivadas', 'Sus llaves ya no funcionan hasta que le devuelvas el acceso.', 'api')}
       />
       <ConfirmDialog
         open={confirm?.kind === 'delete'}
@@ -261,7 +307,7 @@ export function CompanyDetailPage() {
         confirmText={company.name}
         tone="danger"
         loading={busy}
-        onCancel={() => setConfirm(null)}
+        onCancel={close}
         onConfirm={() => void remove()}
       />
       <ConfirmDialog
@@ -271,7 +317,7 @@ export function CompanyDetailPage() {
         confirmLabel="Desactivar"
         tone="danger"
         loading={busy}
-        onCancel={() => setConfirm(null)}
+        onCancel={close}
         onConfirm={() => confirm?.kind === 'admin' && void setAdminActive(confirm.admin, false)}
       />
     </div>

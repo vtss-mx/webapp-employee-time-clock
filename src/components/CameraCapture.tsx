@@ -114,6 +114,7 @@ function useCameraMessages({ status, problem, start }: CameraController) {
       if (choice === 'retry') void start();
       if (choice === 'secure' && problem.secureUrl) window.location.assign(problem.secureUrl);
     });
-    return () => feedback.dismiss(message.key ?? '');
+    // cameraProblemMessage siempre trae su clave (`camera-problem-<tipo>`): con ella se retira el popup.
+    return () => feedback.dismiss(message.key as string);
   }, [status, problem, feedback, start]);
 }

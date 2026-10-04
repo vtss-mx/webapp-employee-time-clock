@@ -1,4 +1,4 @@
-import type { FormEvent, ReactNode } from 'react';
+import type { SubmitEvent, ReactNode } from 'react';
 import { PageHeader } from '../PageHeader';
 
 /**
@@ -16,7 +16,7 @@ interface PanelProps {
   children: ReactNode;
   className?: string;
   /** Si se indica, el contenedor es un <form> (envío con Enter, validación propia). */
-  onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit?: (event: SubmitEvent<HTMLFormElement>) => void;
 }
 
 export function Panel({ children, className = '', onSubmit }: PanelProps) {

@@ -15,6 +15,7 @@ export type AvailabilityField =
   | 'email'
   | 'phone'
   | 'validator_email'
+  | 'department_name'
   | 'company_rfc'
   | 'company_admin_email'
   | 'company_phone';
@@ -37,6 +38,13 @@ export interface Availability {
 
 const isAvailability = hasKeys<Omit<Availability, 'via'>>('field', 'available', 'valid', 'code', 'message');
 
+/**
+ * Respaldo HTTP: un solo intento y corto. Mientras se verifica, el formulario no deja guardar; si no
+ * responde a tiempo se deja de esperar (el campo queda "sin verificar" y el servidor valida al guardar)
+ * en lugar de bloquear el guardado con el tiempo límite y los reintentos de las lecturas normales.
+ */
+const HTTP_FALLBACK_TIMEOUT_MS = 5_000;
+
 function fromEnvelope(envelope: ApiEnvelope): Omit<Availability, 'via'> {
   if (isAvailability(envelope.data)) return envelope.data;
   throw new Error(envelope.message);
@@ -58,6 +66,8 @@ export async function checkAvailability(field: AvailabilityField, value: string,
   }
   const data = await apiRequest('/validation', {
     query: { field, value, exclude_id: excludeId, related },
+    timeoutMs: HTTP_FALLBACK_TIMEOUT_MS,
+    retries: 0,
     validate: isAvailability,
   });
   return { ...data, via: 'http' };

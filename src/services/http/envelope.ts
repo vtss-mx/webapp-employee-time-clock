@@ -69,6 +69,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Errores de una petición llevados a los campos de un formulario (única implementación): los de
+ * validación por campo (`ApiError.fieldErrors`) y el de negocio cuyo código corresponde a un campo
+ * (correo ya registrado, RFC que no coincide...), que tiene prioridad. `rename` traduce al nombre
+ * del formulario tanto campos del backend (`location_radius_m` → `radius`) como códigos de error
+ * (`EMAIL_TAKEN` → `email`); un campo sin traducción conserva su nombre.
+ */
+export function fieldErrorsFrom<T>(err: unknown, rename: Partial<Record<string, keyof T>> = {}): Partial<Record<keyof T, string>> {
+  if (!(err instanceof ApiError)) return {};
+  const result: Partial<Record<keyof T, string>> = {};
+  for (const [field, message] of Object.entries(err.fieldErrors)) result[rename[field] ?? (field as keyof T)] = message;
+  const byCode = rename[err.code];
+  if (byCode) result[byCode] = err.message;
+  return result;
+}
+
 /* ---------------------------- Valores por defecto ---------------------------- */
 
 const DEFAULT_MESSAGES: Record<number, string> = {

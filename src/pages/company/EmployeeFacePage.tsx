@@ -24,7 +24,7 @@ export function EmployeeFacePage() {
   const navigate = useNavigate();
   const feedback = useFeedback();
   const { policy } = useVerificationPolicy();
-  const { data: employee, error, retry: load } = useResource(() => employeeService.get(employeeId), employeeId, 'No se pudo cargar el empleado');
+  const { data: employee, error, retry: load } = useResource((signal) => employeeService.get(employeeId, signal), employeeId, 'No se pudo cargar el empleado');
 
   const back = () => void navigate(paths.company.employee(employeeId));
   if (!employee) return error ? <RetryState onRetry={load} /> : <SkeletonCard lines={6} />;

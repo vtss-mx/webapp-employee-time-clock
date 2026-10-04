@@ -6,6 +6,8 @@ import type {
   EmployeeListParams,
   EmployeeQrSummary,
   EmployeeUpdatePayload,
+  FaceLearningSummary,
+  IdentityReverifySummary,
   PageQuery,
   VerificationLogList,
   VerificationResult,
@@ -33,8 +35,8 @@ export const employeeService = {
     return apiRequest<EmployeeList>('/employees', { query: { ...params }, signal, validate: isPage(isEmployee) });
   },
 
-  get(id: number): Promise<Employee> {
-    return apiRequest<Employee>(`/employees/${id}`, { validate: isEmployee });
+  get(id: number, signal?: AbortSignal): Promise<Employee> {
+    return apiRequest<Employee>(`/employees/${id}`, { signal, validate: isEmployee });
   },
 
   /** Alta de empleado + usuario EMPLOYEE + QR automático (el rostro lo registra el empleado). */
@@ -56,7 +58,6 @@ export const employeeService = {
     await apiRequest<null | undefined>(`/employees/${id}`, { method: 'DELETE', validate: isNothing });
   },
 
-  /** Elimina los datos faciales: el empleado deberá registrarse de nuevo. */
   /** Solicita al empleado verificar de nuevo su identidad (motivo opcional, visible para él). */
   resetFace(id: number, reason?: string): Promise<Employee> {
     return apiRequest<Employee>(`/employees/${id}/face/reset`, {
@@ -66,9 +67,31 @@ export const employeeService = {
     });
   },
 
+  /** Solicita a TODOS los empleados con registro facial verificar de nuevo su identidad. */
+  resetAllFaces(reason?: string): Promise<IdentityReverifySummary> {
+    return apiRequest<IdentityReverifySummary>('/employees/face/reset', {
+      method: 'POST',
+      body: reason ? { reason } : undefined,
+      validate: hasKeys<IdentityReverifySummary>('employees'),
+    });
+  },
+
+  /** Cómo evoluciona el reconocimiento facial de la empresa (tablero). */
+  faceLearning(signal?: AbortSignal): Promise<FaceLearningSummary> {
+    return apiRequest<FaceLearningSummary>('/employees/face/learning', {
+      signal,
+      validate: hasKeys<FaceLearningSummary>('enabled', 'employees_learning', 'learned_samples'),
+    });
+  },
+
+  /** Olvida lo que el reconocimiento aprendió del uso: vuelve a su registro aprobado. */
+  forgetLearnedFace(id: number): Promise<Employee> {
+    return apiRequest<Employee>(`/employees/${id}/face/learned`, { method: 'DELETE', validate: isEmployee });
+  },
+
   /** Actividad del QR dinámico (si tiene uno vigente, cuándo lo generó y lo usó). */
-  qrSummary(id: number): Promise<EmployeeQrSummary> {
-    return apiRequest<EmployeeQrSummary>(`/employees/${id}/qr`, { validate: isQrSummary });
+  qrSummary(id: number, signal?: AbortSignal): Promise<EmployeeQrSummary> {
+    return apiRequest<EmployeeQrSummary>(`/employees/${id}/qr`, { signal, validate: isQrSummary });
   },
 
   /** Invalida el QR vigente: el teléfono del empleado muestra otro. */

@@ -46,6 +46,9 @@ export class ValidationSocket {
         this.pending.delete(id);
         this.fail();
         reject(new Error('Tiempo de espera agotado'));
+        // Sin respuesta, la conexión puede estar medio abierta (el servidor ya no la atiende): se
+        // cierra para que la siguiente consulta abra otra en lugar de volver a esperar en vano.
+        this.close();
       }, config.realtimeTimeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       this.socket?.send(JSON.stringify({ ...message, id }));
@@ -55,17 +58,27 @@ export class ValidationSocket {
 
   close(): void {
     window.clearTimeout(this.idleTimer);
-    this.socket?.close(1000);
+    const socket = this.socket;
+    // Primero se suelta: su aviso de cierre (que llega después) ya no toca el canal ni una conexión nueva.
     this.reset(new Error('Canal cerrado'));
+    socket?.close(1000);
   }
 
   private connect(): Promise<void> {
     if (this.ready) return this.ready;
     const token = currentAccessToken();
     if (!token) return Promise.reject(new Error('Sin sesión'));
+    let socket: WebSocket;
+    try {
+      socket = this.factory(realtimeUrl());
+    } catch (error) {
+      // Un proxy o una URL que el navegador rechaza: esta consulta va por HTTP y la siguiente vuelve a
+      // intentar el canal (sin dejar una conexión «rota» guardada para siempre).
+      this.fail();
+      return Promise.reject(new Error('No se pudo abrir el canal', { cause: error }));
+    }
+    this.socket = socket;
     this.ready = new Promise<void>((resolve, reject) => {
-      const socket = this.factory(realtimeUrl());
-      this.socket = socket;
       const timer = window.setTimeout(() => {
         reject(new Error('No se pudo abrir el canal'));
         socket.close();
@@ -76,15 +89,19 @@ export class ValidationSocket {
         if (!envelope) return;
         if (envelope.code === 'WS_AUTHENTICATED') {
           window.clearTimeout(timer);
-          this.failures = 0;
           this.triedRefresh = false;
           resolve();
           return;
         }
-        const waiting = envelope.traceId ? this.pending.get(envelope.traceId) : undefined;
+        // Cada consulta lleva un id no vacío: un mensaje sin traceId no corresponde a ninguna.
+        const id = envelope.traceId ?? '';
+        const waiting = this.pending.get(id);
         if (waiting) {
+          // El canal está sano cuando responde consultas (no basta con aceptar la conexión: tras
+          // cerrar una conexión sin respuesta, la nueva se autentica aunque el servidor no conteste).
+          this.failures = 0;
           window.clearTimeout(waiting.timer);
-          this.pending.delete(envelope.traceId ?? '');
+          this.pending.delete(id);
           waiting.resolve(envelope);
         } else if (!envelope.success && envelope.statusCode === 401) {
           window.clearTimeout(timer);
@@ -95,6 +112,7 @@ export class ValidationSocket {
       socket.onclose = (event: CloseEvent) => {
         window.clearTimeout(timer);
         reject(new Error(`Canal cerrado (${event.code})`));
+        if (this.socket !== socket) return; // conexión ya descartada (cierre propio)
         // Token vencido o revocado: se intenta renovar una vez; la siguiente consulta reconecta.
         if (AUTH_CLOSE_CODES.has(event.code) && !this.triedRefresh) {
           this.triedRefresh = true;

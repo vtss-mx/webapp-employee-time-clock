@@ -5,8 +5,9 @@ import type { CapturedFace, FlowAlternative } from '../../components/LiveFaceFlo
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
 import { identifiedResult, sampleCheckpoint, samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
+import { catalogsWith } from '../../test/catalogs';
 import { renderWithProviders } from '../../test/render';
-import type { CheckpointProfile } from '../../types';
+import type { CheckpointProfile, ValidatorModeItem } from '../../types';
 import { CheckpointPage } from './CheckpointPage';
 
 // La cámara (getUserMedia, MediaPipe, jsQR) se prueba en navegador real (E2E); aquí, los flujos.
@@ -19,11 +20,18 @@ vi.mock('../../components/QrScanPanel', () => ({
     </div>
   ),
 }));
+interface FlowProps {
+  title: string;
+  onSubmit: (c: CapturedFace) => Promise<void>;
+  onFatal: (error: unknown) => void;
+  alternative?: FlowAlternative;
+}
 vi.mock('../../components/LiveFaceFlow', () => ({
-  LiveFaceFlow: ({ title, onSubmit, alternative }: { title: string; onSubmit: (c: CapturedFace) => Promise<void>; alternative?: FlowAlternative }) => (
+  LiveFaceFlow: ({ title, onSubmit, onFatal, alternative }: FlowProps) => (
     <div>
       <h1>{title}</h1>
       <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false })}>capturar rostro</button>
+      <button onClick={() => onFatal(new Error('La cámara se desconectó'))}>falla de cámara</button>
       {alternative && <button onClick={alternative.onSelect}>{alternative.label}</button>}
     </div>
   ),
@@ -34,7 +42,7 @@ const events = [
   { id: 1, created_at: new Date().toISOString(), method: 'FACE', success: false, reason: 'NO_MATCH', confidence: null, employee_name: null, employee_number: null },
 ];
 
-function server(profile: CheckpointProfile, overrides: Record<string, () => Response> = {}) {
+function server(profile: CheckpointProfile, overrides: Record<string, () => Response | Promise<Response>> = {}) {
   return mockFetch((call: MockCall) => {
     const path = call.url.split('?')[0];
     if (overrides[path]) return overrides[path]();
@@ -123,5 +131,52 @@ describe('CheckpointPage (VALIDATOR)', () => {
     server(sampleCheckpoint, { '/api/checkpoint/me': () => apiFail(500, 'INTERNAL_ERROR', 'Error') });
     renderWithProviders(<CheckpointPage />);
     expect(await screen.findByRole('button', { name: /Reintentar/ })).toBeInTheDocument();
+  });
+
+  it('solo rostro: sin alternativa de QR; una falla de la cámara se muestra como resultado', async () => {
+    server({ ...sampleCheckpoint, mode: 'FACE' });
+    renderWithProviders(<CheckpointPage />);
+    await userEvent.click(await screen.findByRole('button', { name: FACE_CARD }));
+    expect(screen.queryByRole('button', { name: 'Usar su código QR' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'falla de cámara' }));
+    expect(await screen.findByText('No fue posible identificar')).toBeInTheDocument();
+    expect(screen.getByText('La cámara se desconectó')).toBeInTheDocument();
+  });
+
+  it('QR y rostro: un QR que no es de un empleado activo termina con su motivo (sin pedir el rostro)', async () => {
+    const { calls } = server(
+      { ...sampleCheckpoint, mode: 'QR_AND_FACE' },
+      { '/api/checkpoint/qr/inspect': () => apiFail(404, 'QR_INVALID', 'El código QR no es válido o ya se usó') },
+    );
+    renderWithProviders(<CheckpointPage />);
+    await userEvent.click(await screen.findByRole('button', { name: QR_FACE_CARD }));
+    await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
+    expect(await screen.findByText('No fue posible identificar')).toBeInTheDocument();
+    expect(screen.getAllByText('El código QR no es válido o ya se usó').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: /Paso 2 de 2/ })).toBeNull();
+    expect(calls.some((c) => c.url === '/api/checkpoint/identify/face')).toBe(false);
+  });
+
+  it('mientras se vuelve a pedir la bitácora, la lista se atenúa', async () => {
+    let release: (response: Response) => void = () => undefined;
+    let requests = 0;
+    server(sampleCheckpoint, {
+      '/api/checkpoint/recent': () => (requests++ === 0 ? apiOk({ items: events, total: 15, page: 1, size: 10 }) : new Promise<Response>((resolve) => (release = resolve))),
+    });
+    renderWithProviders(<CheckpointPage />);
+    const list = (await screen.findByText('Ana Ruiz')).closest('ul');
+    await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await waitFor(() => expect(list).toHaveClass('is-loading'));
+    release(apiOk({ items: events, total: 15, page: 2, size: 10 }));
+    await waitFor(() => expect(list).not.toHaveClass('is-loading'));
+  });
+
+  it('un método nuevo del catálogo: ícono genérico y su código mientras el catálogo no lo describe', async () => {
+    const modes = catalogsWith({}).validator_modes.map((mode): ValidatorModeItem => (mode.code === 'FACE' ? { ...mode, methods: ['FACE', 'NFC' as ValidatorModeItem['methods'][number]] } : mode));
+    server({ ...sampleCheckpoint, mode: 'FACE' });
+    renderWithProviders(<CheckpointPage />, { catalogs: catalogsWith({ validator_modes: modes }) });
+    const card = await screen.findByRole('button', { name: /^NFC/ });
+    expect(card.querySelector('.lucide-shield-check')).not.toBeNull(); // ícono genérico
+    expect(screen.getByRole('button', { name: FACE_CARD })).toBeInTheDocument();
   });
 });

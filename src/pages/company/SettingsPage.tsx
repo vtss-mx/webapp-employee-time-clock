@@ -1,5 +1,5 @@
-import { Film, Fingerprint, Gauge, History, ImageOff, Images, Lock, LockKeyhole, MonitorSmartphone, QrCode, ScanFace, ScanLine, ShieldCheck, SlidersHorizontal, Smartphone, Timer, Users, VideoOff } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { BrainCircuit, Film, Fingerprint, Gauge, History, ImageOff, Images, Lock, LockKeyhole, MonitorSmartphone, QrCode, ScanFace, ScanLine, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Timer, Users, VideoOff } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ruledAccessories, type AccessoryRule } from '../../components/accessories';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
 import { PolicyTuning, type TuningKey } from '../../components/settings/PolicyTuning';
@@ -9,8 +9,9 @@ import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { Switch } from '../../components/ui/Switch';
+import { useAction, type SuccessNotice } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
-import { useErrorPopup, useFeedback } from '../../hooks/useFeedback';
+import { useResource } from '../../hooks/useResource';
 import { publishPolicy } from '../../hooks/useVerificationPolicy';
 import { settingsService } from '../../services/settingsService';
 import type { AccessoryItem, VerificationPolicy, VerificationPolicyUpdate } from '../../types';
@@ -22,7 +23,6 @@ type PolicyKey =
   | 'liveness_challenge'
   | 'anti_spoofing'
   | 'qr_enabled'
-  | 'employee_mobile_only'
   | 'validator_mobile_only'
   | 'block_virtual_cameras'
   | 'reject_foreign_images'
@@ -32,7 +32,8 @@ type PolicyKey =
   | 'enforce_human_timing'
   | 'detect_duplicate_faces'
   | 'lockout_enabled'
-  | 'validator_device_approval';
+  | 'validator_device_approval'
+  | 'adaptive_learning';
 
 interface Option {
   key: PolicyKey;
@@ -107,26 +108,30 @@ const POLICY_SECTIONS: Section[] = [
     ],
   },
   {
+    title: 'Aprendizaje continuo',
+    icon: <BrainCircuit size={20} />,
+    hint: 'El reconocimiento facial mejora con el uso: cada identificación segura le enseña cómo luce hoy cada empleado. Las muestras que validaste nunca se reemplazan.',
+    options: [
+      {
+        key: 'adaptive_learning',
+        icon: <Sparkles size={20} />,
+        label: 'Aprender de cada identificación segura',
+        on: 'Solo aprende de identificaciones con prueba de vida y confianza holgada: otra luz, otra cámara, peinado, barba o el paso del tiempo. Lo aprendido que deja de servir se reemplaza solo.',
+        off: 'Cada empleado se compara solo con las muestras de su registro aprobado.',
+      },
+    ],
+  },
+  {
     title: 'Métodos de identificación',
     icon: <QrCode size={20} />,
     hint: 'Formas en que los empleados pueden identificarse.',
     options: [{ key: 'qr_enabled', icon: <QrCode size={20} />, label: 'Verificación con código QR', on: 'Los empleados muestran en su teléfono un QR dinámico: cambia solo y cada código sirve una sola vez.', off: 'Solo reconocimiento facial.' }],
   },
   {
-    title: 'Dispositivos permitidos',
+    title: 'Dispositivos de los validadores',
     icon: <Smartphone size={20} />,
-    hint: 'Desde dónde pueden usar la aplicación los empleados y los validadores. No aplica a administradores.',
+    hint: 'Solo los validadores de identidad tienen restricciones de dispositivo. Empleados y administradores usan la aplicación desde cualquier dispositivo.',
     options: [
-      {
-        key: 'employee_mobile_only',
-        icon: <Smartphone size={20} />,
-        label: 'Solo desde teléfono celular',
-        on: 'En computadoras y tabletas se indica al empleado que continúe desde su teléfono.',
-        off: 'Los empleados pueden usar la aplicación desde cualquier dispositivo.',
-        security: true,
-        confirmMessage:
-          'Los empleados podrán registrar su asistencia desde computadoras y tabletas compartidas, donde es más fácil suplantar a otra persona. ¿Deseas continuar?',
-      },
       {
         key: 'validator_device_approval',
         icon: <MonitorSmartphone size={20} />,
@@ -153,146 +158,102 @@ const POLICY_SECTIONS: Section[] = [
 
 /** COMPANY: política de verificación (se aplica en segundos a toda la empresa). */
 export function SettingsPage() {
-  const feedback = useFeedback();
-  const { accessories } = useCatalogs();
-  const sections = useMemo(() => [faceSection(accessories), ...POLICY_SECTIONS], [accessories]);
-  const [policy, setPolicy] = useState<VerificationPolicy | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [reload, setReload] = useState(0);
-  const retry = () => setReload((n) => n + 1);
-  useErrorPopup(error, { title: 'No se pudo cargar la configuración', retry });
-  const [saving, setSaving] = useState<PolicyKey | TuningKey | 'min_confidence' | null>(null);
-  const [confirm, setConfirm] = useState<Option | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setError(null);
-    settingsService
-      .getVerificationPolicy(controller.signal)
-      .then(setPolicy)
-      .catch((e: unknown) => !controller.signal.aborted && setError(e));
-    return () => controller.abort();
-  }, [reload]);
-
-  const save = async (option: Option, value: boolean) => {
-    if (!policy) return;
-    const previous = policy;
-    setPolicy({ ...policy, [option.key]: value }); // optimista
-    setSaving(option.key);
-    try {
-      const updated = await settingsService.updateVerificationPolicy({ [option.key]: value });
-      setPolicy(updated);
-      publishPolicy(updated);
-      void feedback.success(value ? `${option.label}: activado` : `${option.label}: desactivado`, value ? option.on : option.off);
-    } catch (e) {
-      setPolicy(previous);
-      void feedback.fromError(e, { title: 'No se pudo guardar' });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const saveConfidence = async (value: number) => {
-    if (!policy) return;
-    const previous = policy;
-    setPolicy({ ...policy, min_confidence: value }); // optimista
-    setSaving('min_confidence');
-    try {
-      const updated = await settingsService.updateVerificationPolicy({ min_confidence: value });
-      setPolicy(updated);
-      publishPolicy(updated);
-      void feedback.success('Nivel de confianza actualizado', `Se exigirá ${formatConfidence(value)} en cada verificación facial.`);
-    } catch (e) {
-      setPolicy(previous);
-      void feedback.fromError(e, { title: 'No se pudo guardar' });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const saveTuning = async (key: TuningKey, changes: VerificationPolicyUpdate, title: string, detail: string) => {
-    if (!policy) return;
-    const previous = policy;
-    setPolicy({ ...policy, ...changes }); // optimista
-    setSaving(key);
-    try {
-      const updated = await settingsService.updateVerificationPolicy(changes);
-      setPolicy(updated);
-      publishPolicy(updated);
-      void feedback.success(title, detail);
-    } catch (e) {
-      setPolicy(previous);
-      void feedback.fromError(e, { title: 'No se pudo guardar' });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const onToggle = (option: Option, value: boolean) => {
-    if (option.security && !value) setConfirm(option);
-    else void save(option, value);
-  };
+  const { data: policy, setData: setPolicy, error, retry } = useResource((signal) => settingsService.getVerificationPolicy(signal), 'policy', 'No se pudo cargar la configuración');
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader title="Configuración" subtitle="Política de verificación de identidad de tu empresa" />
-        {Boolean(error) && !policy && (
-          <PanelSection>
-            <RetryState onRetry={retry} />
-          </PanelSection>
-        )}
-        {!policy && !error && (
-          <PanelSection>
-            <SkeletonRows rows={6} />
-          </PanelSection>
-        )}
-        {policy && (
-          <PanelSection title="Nivel de confianza" icon={<Gauge size={20} />}>
-            <p className="muted small">
-              Probabilidad mínima de que la persona frente a la cámara sea el empleado registrado. Cada verificación
-              informa su confianza y queda en el historial del empleado.
-            </p>
-            <ConfidenceSlider value={policy.min_confidence} busy={saving === 'min_confidence'} onSave={(v) => void saveConfidence(v)} />
-          </PanelSection>
-        )}
-        {policy &&
-          sections.map((section) => (
-            <PanelSection key={section.title} title={section.title} icon={section.icon}>
-              <p className="muted small">{section.hint}</p>
-              {section.options.map((option) => (
-                <Switch
-                  key={option.key}
-                  icon={option.icon}
-                  label={option.label}
-                  badge={option.security ? <span className="badge badge--info">Recomendado</span> : null}
-                  description={policy[option.key] ? option.on : option.off}
-                  checked={policy[option.key]}
-                  busy={saving === option.key}
-                  onChange={(value) => onToggle(option, value)}
-                />
-              ))}
-            </PanelSection>
-          ))}
-        {policy && (
-          <PanelSection title="Ajustes de los candados" icon={<SlidersHorizontal size={20} />}>
-            <p className="muted small">Qué tan estricto es cada candado. Valores más estrictos protegen más, pero pueden pedir repetir la captura con más frecuencia.</p>
-            <PolicyTuning policy={policy} saving={saving} onSave={(key, changes, title, detail) => void saveTuning(key, changes, title, detail)} />
-          </PanelSection>
+        {policy ? (
+          <PolicyEditor policy={policy} onChange={setPolicy} />
+        ) : (
+          <PanelSection>{error ? <RetryState onRetry={retry} /> : <SkeletonRows rows={6} />}</PanelSection>
         )}
       </Panel>
-      <ConfirmDialog
-        open={confirm !== null}
-        title={`Desactivar ${confirm?.label.toLowerCase() ?? ''}`}
-        message={confirm?.confirmMessage ?? SPOOFING_WARNING}
-        confirmLabel="Desactivar"
-        tone="danger"
-        onConfirm={() => {
-          if (confirm) void save(confirm, false);
-          setConfirm(null);
-        }}
-        onCancel={() => setConfirm(null)}
-      />
     </div>
+  );
+}
+
+/**
+ * Controles de la política ya cargada: solo existen con ella, así que cada cambio parte siempre de
+ * la política vigente (sin casos "aún no hay política" que nunca ocurren).
+ */
+function PolicyEditor({ policy, onChange: setPolicy }: { policy: VerificationPolicy; onChange: (policy: VerificationPolicy) => void }) {
+  const { accessories } = useCatalogs();
+  const sections = useMemo(() => [faceSection(accessories), ...POLICY_SECTIONS], [accessories]);
+  const { busy: saving, run } = useAction<PolicyKey | TuningKey | 'min_confidence'>();
+  const [confirm, setConfirm] = useState<Option | null>(null);
+
+  /** Guarda un cambio: se ve de inmediato (optimista), se publica a toda la app y se revierte si el servidor no lo acepta. */
+  const apply = (key: PolicyKey | TuningKey | 'min_confidence', changes: VerificationPolicyUpdate, notice: SuccessNotice) => {
+    const previous = policy;
+    setPolicy({ ...policy, ...changes }); // optimista
+    void run(() => settingsService.updateVerificationPolicy(changes), {
+      busy: key,
+      errorTitle: 'No se pudo guardar',
+      success: notice,
+      onSuccess: (updated) => {
+        setPolicy(updated);
+        publishPolicy(updated);
+      },
+      onError: () => setPolicy(previous),
+    });
+  };
+
+  const save = (option: Option, value: boolean) =>
+    apply(option.key, { [option.key]: value }, [value ? `${option.label}: activado` : `${option.label}: desactivado`, value ? option.on : option.off]);
+  const saveConfidence = (value: number) =>
+    apply('min_confidence', { min_confidence: value }, ['Nivel de confianza actualizado', `Se exigirá ${formatConfidence(value)} en cada verificación facial.`]);
+
+  const onToggle = (option: Option, value: boolean) => {
+    if (option.security && !value) setConfirm(option);
+    else save(option, value);
+  };
+
+  return (
+    <>
+      <PanelSection title="Nivel de confianza" icon={<Gauge size={20} />}>
+        <p className="muted small">
+          Probabilidad mínima de que la persona frente a la cámara sea el empleado registrado. Cada verificación
+          informa su confianza y queda en el historial del empleado.
+        </p>
+        <ConfidenceSlider value={policy.min_confidence} busy={saving === 'min_confidence'} onSave={saveConfidence} />
+      </PanelSection>
+      {sections.map((section) => (
+        <PanelSection key={section.title} title={section.title} icon={section.icon}>
+          <p className="muted small">{section.hint}</p>
+          {section.options.map((option) => (
+            <Switch
+              key={option.key}
+              icon={option.icon}
+              label={option.label}
+              badge={option.security ? <span className="badge badge--info">Recomendado</span> : null}
+              description={policy[option.key] ? option.on : option.off}
+              checked={policy[option.key]}
+              busy={saving === option.key}
+              onChange={(value) => onToggle(option, value)}
+            />
+          ))}
+        </PanelSection>
+      ))}
+      <PanelSection title="Ajustes de los candados" icon={<SlidersHorizontal size={20} />}>
+        <p className="muted small">Qué tan estricto es cada candado. Valores más estrictos protegen más, pero pueden pedir repetir la captura con más frecuencia.</p>
+        <PolicyTuning policy={policy} saving={saving} onSave={(key, changes, title, detail) => apply(key, changes, [title, detail])} />
+      </PanelSection>
+      {confirm && (
+        <ConfirmDialog
+          open
+          title={`Desactivar ${confirm.label.toLowerCase()}`}
+          message={confirm.confirmMessage ?? SPOOFING_WARNING}
+          confirmLabel="Desactivar"
+          tone="danger"
+          onConfirm={() => {
+            save(confirm, false);
+            setConfirm(null);
+          }}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+    </>
   );
 }

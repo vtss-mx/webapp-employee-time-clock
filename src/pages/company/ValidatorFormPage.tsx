@@ -1,5 +1,5 @@
 import { Map as MapIcon, MapPinHouse, Save, ScanLine, ShieldCheck } from 'lucide-react';
-import type { FormEvent } from 'react';
+import type { SubmitEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AddressFields } from '../../components/location/AddressFields';
 import { LocationPicker } from '../../components/location/LocationPicker';
@@ -25,7 +25,7 @@ export function ValidatorFormPage() {
   const validatorId = id ? Number(id) : null;
   // Alta: no hay nada que cargar (el validador se crea en esta pantalla).
   const { data: original, error, retry: load } = useResource(
-    () => (validatorId === null ? Promise.resolve(null) : validatorService.get(validatorId)),
+    (signal) => (validatorId === null ? Promise.resolve(null) : validatorService.get(validatorId, signal)),
     validatorId ?? 'new',
     'No se pudo cargar el validador',
   );
@@ -72,7 +72,7 @@ function ValidatorForm({ original }: { original: Validator | null }) {
   const addressValues = pickAddress(form.values);
   const radius = form.locationRequired && !validateRadius(form.values.radius) ? Number(form.values.radius) : null;
 
-  const onSubmit = (event: FormEvent) => {
+  const onSubmit = (event: SubmitEvent) => {
     event.preventDefault();
     void form.save((saved) => {
       const message = savedMessage(saved, original);
