@@ -2,8 +2,23 @@ import { ChevronDown, Clock } from 'lucide-react';
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
+import { useT, type Translate } from '../../i18n';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
-import { clockDisplay, clockText, clockValue, completeClock, LAST_MINUTE_OF_DAY, maskClock, overlapsRange, parseClock, type ClockRange } from './clock';
+import {
+  clockDisplay,
+  clockStyle,
+  clockText,
+  clockValue,
+  completeClock,
+  isComplete,
+  LAST_MINUTE_OF_DAY,
+  maskClock,
+  overlapsRange,
+  parseClock,
+  parseTyped,
+  type ClockRange,
+  type ClockStyle,
+} from './clock';
 import { Floating } from './Floating';
 import { TimePanel, type TimePanelLabels, type TimePreset } from './TimePanel';
 
@@ -14,20 +29,21 @@ export interface TimeFieldLabels extends TimePanelLabels {
   placeholder: string;
   /** Hora completa que no existe (p. ej. 25:00). */
   invalid: string;
-  /** Hora fuera de `min`/`max` (recibe los límites ya escritos como "HH:MM"). */
+  /** Hora fuera de `min`/`max` (recibe los límites ya escritos como se ven en el campo: "07:00" o "07:00 AM"). */
   outOfRange: (min: string, max: string) => string;
 }
 
-const DEFAULT_LABELS: TimeFieldLabels = {
-  open: 'Elegir hora',
-  title: 'Elegir hora',
-  hours: 'Hora',
-  minutes: 'Min',
-  presets: 'Horas sugeridas',
-  placeholder: 'hh:mm',
-  invalid: 'Escribe una hora entre 00:00 y 23:59',
-  outOfRange: (min, max) => `Elige una hora entre ${min} y ${max}`,
-};
+/** Textos por omisión en el idioma activo (los límites del día, en su formato de hora). */
+const defaultLabels = (t: Translate, style: ClockStyle): TimeFieldLabels => ({
+  open: t('ui.timeField.open'),
+  title: t('ui.timeField.title'),
+  hours: t('ui.timeField.hours'),
+  minutes: t('ui.timeField.minutes'),
+  presets: t('ui.timeField.presets'),
+  placeholder: t('ui.timeField.placeholder'),
+  invalid: t('ui.timeField.invalid', { min: clockText(0, style), max: clockText(LAST_MINUTE_OF_DAY, style) }),
+  outOfRange: (min, max) => t('ui.timeField.outOfRange', { min, max }),
+});
 
 export interface TimeFieldProps {
   label: string;
@@ -60,11 +76,11 @@ export interface TimeFieldProps {
 }
 
 /** Por qué lo escrito no sirve (solo con la hora completa: mientras se escribe no se regaña). */
-function clockProblem(text: string, range: ClockRange, labels: TimeFieldLabels): string | undefined {
-  if (text.length < 5) return undefined;
-  const minutes = parseClock(text);
+function clockProblem(text: string, range: ClockRange, labels: TimeFieldLabels, style: ClockStyle): string | undefined {
+  if (!isComplete(text)) return undefined;
+  const minutes = parseTyped(text, style);
   if (minutes === null) return labels.invalid;
-  return overlapsRange(minutes, minutes, range) ? undefined : labels.outOfRange(clockText(range.min ?? 0), clockText(range.max ?? LAST_MINUTE_OF_DAY));
+  return overlapsRange(minutes, minutes, range) ? undefined : labels.outOfRange(clockText(range.min ?? 0, style), clockText(range.max ?? LAST_MINUTE_OF_DAY, style));
 }
 
 /**
@@ -73,28 +89,37 @@ function clockProblem(text: string, range: ClockRange, labels: TimeFieldLabels):
  * selector flotante con columnas de horas y minutos, horas sugeridas, límites y teclado completo.
  * Mismo alto, borde, foco, error y ayuda que los demás campos; el selector usa `Floating` (ningún
  * panel lo recorta) y se cierra al tocar fuera o con Escape, regresando el foco a su botón.
+ *
+ * El valor siempre es "HH:MM" (24 h). En inglés (en-US) se escribe y se ve en 12 h: "07:30 PM" (la
+ * "a" o la "p" ponen AM o PM; sin ellas se lee como 24 h, así "1930" también es "07:30 PM"). Al
+ * cambiar el idioma, la hora elegida se vuelve a escribir en el formato nuevo.
  */
 export function TimeField(props: TimeFieldProps) {
   const { label, value, onChange, error, hint, disabled = false, required, name, minuteStep = 5, presets = [], icon = <Clock size={18} />, size = 'md' } = props;
-  const labels = { ...DEFAULT_LABELS, ...props.labels };
+  const t = useT();
+  const style = clockStyle();
+  const labels = { ...defaultLabels(t, style), ...props.labels };
   const id = useId();
-  const [text, setText] = useState(() => clockDisplay(value));
+  const [text, setText] = useState(() => clockDisplay(value, style));
   const [open, setOpen] = useState(false);
   const controlRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const range: ClockRange = { min: parseClock(props.min), max: parseClock(props.max) };
-  const message = clockProblem(text, range, labels) ?? error;
+  const message = clockProblem(text, range, labels, style) ?? error;
 
   // Cambios externos (p. ej. al cargar el turno a editar).
   useSyncOnChange(value, (next) => {
-    if (clockValue(text) !== next) setText(clockDisplay(next));
+    if (clockValue(text, style) !== next) setText(clockDisplay(next, style));
   });
+  // Cambio de idioma en caliente: la hora elegida se escribe en el formato nuevo (el valor no cambia);
+  // lo que se está escribiendo a medias se conserva tal cual.
+  useSyncOnChange(style, (next) => setText((current) => (parseClock(value) === null ? current : clockDisplay(value, next))));
   useDismissOnOutsidePointer([controlRef, panelRef], open, () => setOpen(false));
 
   const update = (next: string) => {
     setText(next);
-    onChange(clockValue(next));
+    onChange(clockValue(next, style));
   };
   const close = () => {
     setOpen(false);
@@ -121,16 +146,16 @@ export function TimeField(props: TimeFieldProps) {
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          maxLength={5}
+          maxLength={style === 'h23' ? 5 : undefined}
           placeholder={labels.placeholder}
           value={text}
           disabled={disabled}
           required={required}
           aria-invalid={Boolean(message)}
           aria-describedby={describedBy(id, message, hint)}
-          onChange={(e) => update(maskClock(e.target.value))}
+          onChange={(e) => update(maskClock(e.target.value, style))}
           onBlur={() => {
-            const completed = completeClock(text);
+            const completed = completeClock(text, style);
             if (completed !== text) update(completed);
             props.onBlur?.();
           }}
@@ -157,8 +182,9 @@ export function TimeField(props: TimeFieldProps) {
               range={range}
               presets={presets}
               labels={labels}
+              style={style}
               onPick={(minutes, done) => {
-                update(clockText(minutes));
+                update(clockText(minutes, style));
                 if (done) close();
               }}
               onClose={close}

@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>58/58</span>
+                <span class='fraction'>66/66</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>48/48</span>
+                <span class='fraction'>52/52</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>18/18</span>
+                <span class='fraction'>24/24</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>42/42</span>
+                <span class='fraction'>45/45</span>
             </div>
         
             
@@ -188,7 +188,17 @@
 <a name='L123'></a><a href='#L123'>123</a>
 <a name='L124'></a><a href='#L124'>124</a>
 <a name='L125'></a><a href='#L125'>125</a>
-<a name='L126'></a><a href='#L126'>126</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -225,7 +235,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">120x</span>
-<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">50x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -261,9 +271,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -316,6 +330,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { Detection } from '@mediapipe/tasks-vision';
 import type { LivenessAction } from '../types';
 import { config } from './config';
+import type { FaceBox } from './faceBurst';
 &nbsp;
 /**
  * Pose de la cabeza con los puntos de MediaPipe (BlazeFace: ojo derecho, ojo izquierdo, punta de la
@@ -339,6 +354,8 @@ export interface FaceBaseline {
   pitch: number | null;
   /** Ancho del rostro en píxeles del video. */
   width: number;
+  /** Caja del rostro en reposo (px del video): la zona que recorta la ráfaga del antifraude 2a. */
+  box?: FaceBox;
 }
 &nbsp;
 /** Un movimiento del reto: qué se pide, el mínimo del servidor y el rostro en reposo. */
@@ -380,15 +397,19 @@ export function pitchRatio(detection: Detection, video: HTMLVideoElement): numbe
 }
 &nbsp;
 /** Lo que se guarda de un cuadro de frente (con la caja del rostro) para medir después. */
-export function faceSample(detection: Detection, box: { width: number }, video: HTMLVideoElement): FaceBaseline {
-  return { pitch: pitchRatio(detection, video), width: box.width };
+export function faceSample(detection: Detection, box: { originX: number; originY: number; width: number; height: number }, video: HTMLVideoElement): FaceBaseline {
+  return { pitch: pitchRatio(detection, video), width: box.width, box: { x: box.originX, y: box.originY, width: box.width, height: box.height } };
 }
 &nbsp;
 /** Promedio de los cuadros estables de frente (undefined si no hubo ninguno). */
 export function averageSample(samples: FaceBaseline[]): FaceBaseline | undefined {
   if (samples.length === 0) return undefined;
   const pitches = samples.map((s) =&gt; s.pitch).filter((p): p is number =&gt; p !== null);
-  return { pitch: pitches.length ? mean(pitches) : null, width: mean(samples.map((s) =&gt; s.width)) };
+  const boxes = samples.map((s) =&gt; s.box).filter((b): b is FaceBox =&gt; b !== undefined);
+  const box = boxes.length
+    ? { x: mean(boxes.map((b) =&gt; b.x)), y: mean(boxes.map((b) =&gt; b.y)), width: mean(boxes.map((b) =&gt; b.width)), height: mean(boxes.map((b) =&gt; b.height)) }
+    : undefined;
+  return { pitch: pitches.length ? mean(pitches) : null, width: mean(samples.map((s) =&gt; s.width)), ...(box ? { box } : {}) };
 }
 &nbsp;
 /** Cambio del pitch respecto al de frente en el sentido pedido (arriba = baja el valor). */
@@ -445,7 +466,7 @@ export function moveProgress(detections: Detection[], video: HTMLVideoElement, m
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

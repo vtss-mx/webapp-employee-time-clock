@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe('validatorService y checkpointService', () => {
   it.each([
-    ['list', () => validatorService.list({ page: 2, size: 20 }), { items: [sampleValidator], total: 21, page: 2, size: 20 }, 'GET', '/api/validators?page=2&size=20'],
+    ['list', () => validatorService.list({ page: 2, size: 20 }), { items: [sampleValidator], total: 21, page: 2, size: 20, active: 3, limit: 5 }, 'GET', '/api/validators?page=2&size=20'],
     ['update', () => validatorService.update(3, { mode: 'QR' }), sampleValidator, 'PUT', '/api/validators/3'],
     ['setStatus', () => validatorService.setStatus(3, false), sampleValidator, 'PATCH', '/api/validators/3/status'],
     ['resetPassword', () => validatorService.resetPassword(3, 'Nueva1234'), sampleValidator, 'PUT', '/api/validators/3/password'],
@@ -41,6 +41,11 @@ describe('validatorService y checkpointService', () => {
     await call();
     expect(calls[0].init.method ?? 'GET').toBe(method);
     expect(calls[0].url).toBe(url);
+  });
+
+  it('la lista trae el uso del límite que fija el ADMIN: sin él, la respuesta no sirve', async () => {
+    mockFetch(apiOk({ items: [sampleValidator], total: 1, page: 1, size: 10 }));
+    await expect(validatorService.list({ page: 1, size: 10 })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 
   it('alta con datos limpios y rostro con el QR del modo "QR y rostro"', async () => {

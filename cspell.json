@@ -1,0 +1,85 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "description": "Ortografía de los textos de la interfaz (regla 16): es-MX solo contra el diccionario de español y en-US solo contra el de inglés de Estados Unidos, más las listas de palabras propias revisadas (cspell-words*.txt: comunes a los dos idiomas, solo español y solo inglés). Distingue mayúsculas y acentos ('informacion' sin acento es un error). Revisa las cadenas (comillas simples, dobles e invertidas), no los comentarios.",
+  "import": [
+    "@cspell/dict-es-es/cspell-ext.json"
+  ],
+  "caseSensitive": true,
+  "minWordLength": 3,
+  "dictionaryDefinitions": [
+    {
+      "name": "project-words",
+      "path": "./cspell-words.txt",
+      "addWords": true
+    },
+    {
+      "name": "project-words-es",
+      "path": "./cspell-words.es-MX.txt",
+      "addWords": true
+    },
+    {
+      "name": "project-words-en",
+      "path": "./cspell-words.en-US.txt",
+      "addWords": true
+    }
+  ],
+  "dictionaries": [
+    "project-words"
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "coverage"
+  ],
+  "files": [
+    "src/i18n/locales/**/*.ts",
+    "src/i18n/endonyms.ts",
+    "index.html",
+    "public/site.webmanifest"
+  ],
+  "overrides": [
+    {
+      "filename": [
+        "src/i18n/**/*.ts"
+      ],
+      "includeRegExpList": [
+        "/\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`/g"
+      ],
+      "ignoreRegExpList": [
+        "/\\/\\*[\\s\\S]*?\\*\\//g",
+        "/^\\s*\\/\\/.*$/gm",
+        "/\\{\\w+\\}/g",
+        "/\\$\\{[^}]*\\}/g",
+        "/from\\s+'[^']*'/g",
+        "/'[a-z]{2}-[A-Z]{2}'/g"
+      ]
+    },
+    {
+      "filename": "src/i18n/locales/es-MX/**",
+      "language": "es",
+      "dictionaries": [
+        "project-words-es"
+      ]
+    },
+    {
+      "filename": "src/i18n/locales/en-US/**",
+      "language": "en-US",
+      "dictionaries": [
+        "project-words-en"
+      ]
+    },
+    {
+      "filename": [
+        "src/i18n/endonyms.ts",
+        "index.html",
+        "public/site.webmanifest"
+      ],
+      "language": "es,en-US",
+      "dictionaries": [
+        "project-words-es",
+        "project-words-en"
+      ]
+    }
+  ]
+}

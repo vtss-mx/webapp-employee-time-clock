@@ -1,11 +1,12 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
+import { setLocale } from '../i18n/core';
 import { ApiError } from '../services/apiClient';
 import { apiOk, mockFetch } from '../test/http';
 import { GlobalErrorHandler } from './GlobalErrorHandler';
 
-const GENERIC_TEXT = 'Intenta nuevamente. Si persiste, recarga la página.';
+const GENERIC_TEXT = 'Intenta de nuevo. Si continúa, recarga la página.';
 
 function rejectUnhandled(reason: unknown) {
   const event = new Event('unhandledrejection') as PromiseRejectionEvent;
@@ -60,3 +61,12 @@ describe('GlobalErrorHandler', () => {
   });
 });
 
+
+describe('GlobalErrorHandler en inglés (en-US)', () => {
+  it('el aviso abierto de un error inesperado sigue al idioma (título y texto amable)', async () => {
+    scriptError({ message: 'x is not a function', error: new TypeError('x is not a function') });
+    await screen.findByRole('alertdialog', { name: 'Ocurrió un problema' });
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('alertdialog', { name: 'Something went wrong' })).toHaveTextContent('Try again. If it continues, reload the page.');
+  });
+});

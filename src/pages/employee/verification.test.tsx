@@ -5,6 +5,7 @@ import { Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CapturedFace, FlowAlternative } from '../../components/LiveFaceFlow';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
+import { setLocale } from '../../i18n/core';
 import { paths } from '../../routes/paths';
 import { ApiError } from '../../services/apiClient';
 import { identifiedResult, samplePolicy } from '../../test/fixtures';
@@ -71,8 +72,8 @@ describe('FaceVerificationPage (el empleado se identifica con su rostro)', () =>
     renderVerification();
     expect(screen.getByRole('heading', { name: 'Verificación facial' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
-    expect(await screen.findByText('Identificación exitosa')).toBeInTheDocument();
-    expect(screen.getByText('¡Hola, Ana! Tu identidad fue confirmada.')).toBeInTheDocument();
+    expect(await screen.findByText('Identidad confirmada')).toBeInTheDocument();
+    expect(screen.getByText('Hola, Ana.')).toBeInTheDocument();
     expect(calls.find((c) => c.init.method === 'POST')?.url).toBe('/api/verification/face');
     await userEvent.click(screen.getByRole('button', { name: 'Finalizar' }));
     expect(await screen.findByText('Menú del empleado')).toBeInTheDocument();
@@ -82,7 +83,7 @@ describe('FaceVerificationPage (el empleado se identifica con su rostro)', () =>
     server({}, () => apiOk({ ...identifiedResult, verified: false, message: 'Rostro no reconocido', employee_id: null }));
     renderVerification();
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
-    expect(await screen.findByText('No fue posible verificar tu identidad')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudo verificar tu identidad')).toBeInTheDocument();
     expect(screen.getByText('Rostro no reconocido')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Intentar de nuevo' }));
     expect(screen.getByRole('heading', { name: 'Verificación facial' })).toBeInTheDocument();
@@ -92,7 +93,7 @@ describe('FaceVerificationPage (el empleado se identifica con su rostro)', () =>
     server();
     renderVerification();
     await userEvent.click(screen.getByRole('button', { name: 'falla de cámara' }));
-    expect(await screen.findByText('No fue posible verificar tu identidad')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudo verificar tu identidad')).toBeInTheDocument();
     expect(screen.getByText('No se pudo abrir la cámara')).toBeInTheDocument();
   });
 
@@ -103,7 +104,7 @@ describe('FaceVerificationPage (el empleado se identifica con su rostro)', () =>
     await waitFor(() => expect(session.flowErrors).toHaveLength(1));
     expect(session.flowErrors[0]).toMatchObject({ code: 'FACE_LOCKED' });
     expect(screen.getByRole('heading', { name: 'Verificación facial' })).toBeInTheDocument();
-    expect(screen.queryByText('Identificación exitosa')).toBeNull();
+    expect(screen.queryByText('Identidad confirmada')).toBeNull();
   });
 
   it('con el QR habilitado ofrece mostrar el código en su lugar', async () => {
@@ -152,8 +153,8 @@ describe('VerificationMenuPage (cómo identificarse)', () => {
 describe('PendingValidationPage (registro en validación)', () => {
   it('explica en qué paso va; "Actualizar estado" relee el usuario sin avisos si sale bien', async () => {
     renderWithProviders(<PendingValidationPage />);
-    expect(screen.getByRole('heading', { name: 'Estamos validando tu identidad' })).toBeInTheDocument();
-    expect(screen.getByText(/Ana, tu registro facial se envió correctamente/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tu identidad está en validación' })).toBeInTheDocument();
+    expect(screen.getByText(/Ana, tu registro facial se envió\./)).toBeInTheDocument();
     expect(screen.getByText('Registro facial enviado').closest('li')).toHaveClass('is-done');
     expect(screen.getByText('Validación por tu empresa').closest('li')).toHaveClass('is-current');
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
@@ -178,5 +179,60 @@ describe('PendingValidationPage (registro en validación)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('pantallas del empleado en inglés (en-US) y cambio de idioma en caliente', () => {
+  it('el resultado en pantalla cambia de idioma sin perderse', async () => {
+    server();
+    renderVerification();
+    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
+    expect(await screen.findByText('Identidad confirmada')).toBeInTheDocument();
+    await act(() => setLocale('en-US'));
+    expect(screen.getByText('Identity confirmed')).toBeInTheDocument();
+    expect(screen.getByText('Hi, Ana.')).toBeInTheDocument();
+    expect(screen.getByText('Date and time')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    expect(await screen.findByText('Menú del empleado')).toBeInTheDocument();
+  });
+
+  it('verificación facial: título, alternativa y falla en inglés', async () => {
+    await setLocale('en-US');
+    server();
+    renderVerification();
+    expect(screen.getByRole('heading', { name: 'Face verification' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Show my QR code' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'falla de cámara' }));
+    expect(await screen.findByText("Couldn't verify your identity")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Change method/ })).toBeInTheDocument();
+  });
+
+  it('menú de identificación en inglés', async () => {
+    await setLocale('en-US');
+    server({ qr_lifetime_seconds: 45 });
+    renderAt(paths.employee.dashboard, <VerificationMenuPage />);
+    expect(screen.getByRole('heading', { name: 'Hi, Ana' })).toBeInTheDocument();
+    expect(screen.getByText('How would you like to identify yourself?')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /VERIFY WITH FACE/ })).toHaveTextContent('Face recognition with a liveness check');
+    expect(await screen.findByRole('link', { name: /SHOW MY QR.*changes every 45 s/ })).toBeInTheDocument();
+  });
+
+  it('registro en validación: la pantalla y su popup de error abierto cambian de idioma', async () => {
+    session.refreshUser.mockRejectedValue(new ApiError({ statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: 'Servidor ocupado' }));
+    renderWithProviders(<PendingValidationPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo actualizar el estado' })).toBeInTheDocument();
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('alertdialog', { name: "Couldn't update the status" })).toHaveTextContent('Servidor ocupado');
+    expect(screen.getByRole('heading', { name: "Your identity is being validated" })).toBeInTheDocument();
+    expect(screen.getByText(/Ana, your face enrollment was sent\./)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh status' })).toBeInTheDocument();
+  });
+
+  it('registro en validación sin datos de empleado: el texto no lleva nombre', () => {
+    session.user = { ...sampleUser, employee: null };
+    renderWithProviders(<PendingValidationPage />);
+    expect(screen.getByText(/^, tu registro facial se envió\./)).toBeInTheDocument();
   });
 });

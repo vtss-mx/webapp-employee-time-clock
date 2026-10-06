@@ -34,7 +34,7 @@ describe('calendario, operaciones masivas y jornadas de la empresa', () => {
     ['requestAbsence', () => calendarService.requestAbsence({ type: 'VACATION', starts_on: '2026-12-01', ends_on: '2026-12-05' }), absence, 'POST', '/api/me/absences'],
     ['cancelMyAbsence', () => calendarService.cancelMyAbsence(2), absence, 'POST', '/api/me/absences/2/cancel'],
     ['myHolidays', () => calendarService.myHolidays({ page: 1, size: 10 }), page(holiday), 'GET', '/api/me/holidays?page=1&size=10'],
-    ['shifts.assignMany', () => shiftService.assignMany({ shift_id: 5, employee_ids: [7, 8], valid_from: '2026-10-06', remote_weekdays: [], site_ids: [3] }), bulk, 'POST', '/api/shift-assignments/bulk'],
+    ['shifts.assignMany', () => shiftService.assignMany({ shift_id: 5, employee_ids: [7, 8], valid_from: '2026-10-06' }), bulk, 'POST', '/api/shift-assignments/bulk'],
     ['employees.ids', () => employeeService.ids({ search: 'ana', department_id: 2 }), { ids: [7], total: 1, limit: 500 }, 'GET', '/api/employees/ids?search=ana&department_id=2'],
     ['attendance.createSession', () => attendanceService.createSession({ ...times, employee_id: 7, work_date: '2026-10-05' }), detail, 'POST', '/api/attendance/sessions'],
     ['attendance.correctSession', () => attendanceService.correctSession(6, times), detail, 'PUT', '/api/attendance/sessions/6'],
@@ -68,6 +68,6 @@ describe('calendario, operaciones masivas y jornadas de la empresa', () => {
   it('rechaza respuestas con forma inesperada', async () => {
     mockFetch(apiOk({ id: 1 }));
     await expect(calendarService.createHoliday({ holiday_date: '2026-12-25', name: 'Navidad' })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
-    await expect(shiftService.assignMany({ shift_id: 5, employee_ids: [7], valid_from: '2026-10-06', remote_weekdays: [], site_ids: [] })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+    await expect(shiftService.assignMany({ shift_id: 5, employee_ids: [7], valid_from: '2026-10-06' })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 });

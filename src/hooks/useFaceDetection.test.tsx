@@ -17,11 +17,13 @@ vi.mock('@mediapipe/tasks-vision', () => ({
 const FILESET = { wasm: 'fileset' };
 const DETECTOR = { detectForVideo: vi.fn() } as unknown as FaceDetector;
 
-/** Módulo nuevo (sin el detector compartido de otra prueba) con su configuración. */
+/** Módulo nuevo (sin el detector compartido de otra prueba) con su configuración y sus textos (es-MX). */
 async function freshModule() {
   vi.resetModules();
   const module = await import('./useFaceDetection');
   const { config: freshConfig } = await import('../utils/config');
+  const { activate } = await import('../i18n/core');
+  activate('es-MX', (await import('../i18n/locales/es-MX')).default);
   return { ...module, config: freshConfig };
 }
 
@@ -76,15 +78,15 @@ describe('useFaceDetector', () => {
   it('pasa de "cargando" al detector listo', async () => {
     const { useFaceDetector } = await freshModule();
     const { result } = renderHook(() => useFaceDetector());
-    expect(result.current).toEqual({ detector: null, error: null, loading: true });
-    await waitFor(() => expect(result.current).toEqual({ detector: DETECTOR, error: null, loading: false }));
+    expect(result.current).toEqual({ detector: null, failed: false, loading: true });
+    await waitFor(() => expect(result.current).toEqual({ detector: DETECTOR, failed: false, loading: false }));
   });
 
   it('si no carga, lo informa para ofrecer la captura manual', async () => {
     const { useFaceDetector } = await freshModule();
     vision.forVisionTasks.mockRejectedValue(new Error('sin red'));
     const { result } = renderHook(() => useFaceDetector());
-    await waitFor(() => expect(result.current.error).toBe('No se pudo cargar la detección facial automática'));
+    await waitFor(() => expect(result.current.failed).toBe(true));
     expect(result.current.loading).toBe(false);
   });
 
@@ -95,12 +97,12 @@ describe('useFaceDetector', () => {
     const failing = renderHook(() => useFaceDetector());
     failing.unmount();
     await act(() => Promise.resolve().then(() => fail(new Error('sin red'))));
-    expect(failing.result.current).toEqual({ detector: null, error: null, loading: true });
+    expect(failing.result.current).toEqual({ detector: null, failed: false, loading: true });
 
     const loaded = renderHook(() => useFaceDetector());
     loaded.unmount();
     await act(() => loadFaceDetector());
-    expect(loaded.result.current).toEqual({ detector: null, error: null, loading: true });
+    expect(loaded.result.current).toEqual({ detector: null, failed: false, loading: true });
   });
 });
 
@@ -248,7 +250,8 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
     detections = [face({ size: 210, pitch: 0.52 })];
     frame();
     expect(result.current.guidance).toBe('ready');
-    expect(onStable).toHaveBeenCalledExactlyOnceWith({ pitch: expect.closeTo(0.5) as number, width: 200 });
+    // Con la caja del rostro en reposo: la zona que recorta la ráfaga del antifraude 2a.
+    expect(onStable).toHaveBeenCalledExactlyOnceWith({ pitch: expect.closeTo(0.5) as number, width: 200, box: { x: 220, y: 140, width: 200, height: 200 } });
   });
 
   it('rostro estable: el avance llega a 1 y la captura se dispara una sola vez', () => {

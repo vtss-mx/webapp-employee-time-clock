@@ -9,19 +9,19 @@ interface Options {
 }
 
 /**
- * Un número que se consulta periódicamente y al avisar que cambió: la base de los contadores del
- * menú (validaciones pendientes, errores pendientes). `load` debe ser estable (función de módulo).
- * null: aún no se sabe o el contador no está activo.
+ * Un valor que se consulta periódicamente y al avisar que cambió: la base de los contadores del menú
+ * (validaciones pendientes, errores pendientes) y del resumen de alertas lentas (contador y aviso en vivo con
+ * UNA sola consulta). `load` debe ser estable (función de módulo). null: aún no se sabe o no está activo.
  */
-export function usePolledCount(load: (signal?: AbortSignal) => Promise<number>, { enabled, intervalMs, changedEvent }: Options): number | null {
-  const [count, setCount] = useState<number | null>(null);
+export function usePolledValue<T>(load: (signal?: AbortSignal) => Promise<T>, { enabled, intervalMs, changedEvent }: Options): T | null {
+  const [value, setValue] = useState<T | null>(null);
   // La consulta periódica y la de un aviso pueden ir a la vez: solo cuenta la más reciente (una
-  // respuesta vieja que llega tarde no regresa el número a un valor anterior).
+  // respuesta vieja que llega tarde no regresa el valor a uno anterior).
   const latest = useRef(0);
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const turn = ++latest.current;
-    const value = await load(signal);
-    if (turn === latest.current) setCount(value);
+    const next = await load(signal);
+    if (turn === latest.current) setValue(next);
   }, [load]);
 
   usePolling(refresh, { intervalMs, enabled });
@@ -33,5 +33,10 @@ export function usePolledCount(load: (signal?: AbortSignal) => Promise<number>, 
     return () => window.removeEventListener(changedEvent, onChange);
   }, [enabled, refresh, changedEvent]);
 
-  return count;
+  return value;
+}
+
+/** Un número que se consulta periódicamente y al avisar que cambió (contadores del menú). */
+export function usePolledCount(load: (signal?: AbortSignal) => Promise<number>, options: Options): number | null {
+  return usePolledValue(load, options);
 }

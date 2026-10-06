@@ -1,5 +1,6 @@
 import { Minus, Plus } from 'lucide-react';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useT } from '../../i18n';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
 
 /** Textos de los botones (nombre accesible; personalizables). */
@@ -7,8 +8,6 @@ export interface NumberFieldLabels {
   decrement: string;
   increment: string;
 }
-
-const DEFAULT_LABELS: NumberFieldLabels = { decrement: 'Disminuir', increment: 'Aumentar' };
 
 export interface NumberFieldProps {
   label: string;
@@ -38,12 +37,19 @@ export interface NumberFieldProps {
   labels?: Partial<NumberFieldLabels>;
   /** md: alto de los controles; sm: compacto (con el dedo nunca baja de 44 px). */
   size?: 'md' | 'sm';
+  /**
+   * Decimales que acepta (por omisión 0: solo enteros). Con decimales (dinero, porcentajes) se escribe
+   * un punto y el teléfono abre su teclado decimal.
+   */
+  decimals?: number;
 }
 
 interface Limits {
   min: number;
   max?: number;
   step: number;
+  /** Decimales del valor (los pasos se redondean a ellos: 0.1 + 0.2 = 0.3). */
+  decimals?: number;
 }
 
 /** Más dígitos de los que caben en un número exacto no tienen sentido en un campo. */
@@ -52,9 +58,23 @@ const HOLD_DELAY_MS = 450;
 const REPEAT_MS = 75;
 const KEY_STEPS: Record<string, number> = { ArrowUp: 1, ArrowDown: -1, PageUp: 10, PageDown: -10 };
 
-/** Lo escrito: solo dígitos y no más de los que admite el máximo (pegar "1,500 m" deja "1500"). */
-export function digitsOf(text: string, max?: number): string {
-  return text.replace(/\D/g, '').slice(0, max === undefined ? MAX_DIGITS : String(Math.trunc(max)).length);
+/**
+ * Lo escrito: solo dígitos y no más enteros de los que admite el máximo (pegar "1,500 m" deja "1500").
+ * Con `decimals`, además un punto con hasta esos decimales ("$1,250.505" → "1250.50"); la coma es el
+ * separador de miles y se descarta.
+ */
+export function digitsOf(text: string, max?: number, decimals = 0): string {
+  const limit = max === undefined ? MAX_DIGITS : String(Math.trunc(max)).length;
+  if (!decimals) return text.replace(/\D/g, '').slice(0, limit);
+  const [whole, ...fraction] = text.replace(/[^\d.]/g, '').split('.');
+  const integer = whole.slice(0, limit);
+  return fraction.length ? `${integer}.${fraction.join('').slice(0, decimals)}` : integer;
+}
+
+/** El número escrito; null si está vacío o a medias (solo "."). */
+export function parseNumber(text: string): number | null {
+  const value = Number(text);
+  return text === '' || Number.isNaN(value) ? null : value;
 }
 
 /** Lleva un número a los límites. */
@@ -62,7 +82,9 @@ export const clampNumber = (n: number, { min, max = Infinity }: Limits) => Math.
 
 /** El valor tras `steps` pasos (negativos restan); desde vacío empieza en el mínimo. */
 export function steppedValue(text: string, steps: number, limits: Limits): string {
-  return String(clampNumber(text === '' ? limits.min : Number(text) + steps * limits.step, limits));
+  const current = parseNumber(text);
+  const next = clampNumber(current === null ? limits.min : current + steps * limits.step, limits);
+  return String(Number(next.toFixed(limits.decimals ?? 0)));
 }
 
 /**
@@ -106,11 +128,12 @@ function useHoldRepeat(action: (steps: number) => boolean, enabled: boolean) {
  * Vacío se queda vacío: "obligatorio" lo decide la validación del formulario.
  */
 export function NumberField(props: NumberFieldProps) {
-  const { label, value, onChange, min = 0, max, step = 1, unit, icon, error, hint, disabled = false, required, size = 'md' } = props;
-  const labels = { ...DEFAULT_LABELS, ...props.labels };
-  const limits: Limits = { min, max, step };
+  const { label, value, onChange, min = 0, max, step = 1, unit, icon, error, hint, disabled = false, required, size = 'md', decimals = 0 } = props;
+  const t = useT();
+  const labels: NumberFieldLabels = { decrement: t('ui.numberField.decrement'), increment: t('ui.numberField.increment'), ...props.labels };
+  const limits: Limits = { min, max, step, decimals };
   const id = useId();
-  const number = value === '' ? null : Number(value);
+  const number = parseNumber(value);
   // Último valor entregado: al repetir, cada paso parte del anterior aunque aún no se redibuje.
   const latest = useRef(value);
   useLayoutEffect(() => {
@@ -166,7 +189,7 @@ export function NumberField(props: NumberFieldProps) {
           name={props.name}
           type="text"
           role="spinbutton"
-          inputMode="numeric"
+          inputMode={decimals ? 'decimal' : 'numeric'}
           autoComplete="off"
           placeholder={props.placeholder}
           value={value}
@@ -178,7 +201,7 @@ export function NumberField(props: NumberFieldProps) {
           aria-valuetext={unit && number !== null ? `${value} ${unit}` : undefined}
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy(id, error, hint)}
-          onChange={(e) => onChange(digitsOf(e.target.value, max))}
+          onChange={(e) => onChange(digitsOf(e.target.value, max, decimals))}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
         />

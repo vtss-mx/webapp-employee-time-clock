@@ -1,0 +1,19 @@
+# Palabras propias revisadas SOLO del inglés de Estados Unidos (ortografía de los diccionarios en-US,
+# regla 16). Antes de agregar una se confirma que está bien escrita.
+
+# Palabras válidas que el diccionario no trae (headwear: gorras y sombreros; look-alikes: parecidos)
+headwear
+alikes
+
+# Backend: término técnico (geofence: el perímetro virtual de un sitio de trabajo)
+geofence
+# Backend: países y territorios con su nombre en inglés (catálogo countries)
+Åland
+Barthélemy
+Cunha
+Eswatini
+Kitts
+Réunion
+SAR
+São
+Türkiye

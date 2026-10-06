@@ -2,6 +2,7 @@
  * Elección de cámara (reglas puras, sin MediaStream): qué cámara abrir, a cuál cambiar, cuál
  * recordar y cómo nombrarla. La usa el hook useCamera.
  */
+import { t } from '../i18n/core';
 
 export type CameraFacing = 'user' | 'environment';
 export type CameraKind = 'front' | 'back' | 'unknown';
@@ -42,14 +43,12 @@ export function activeKind(facingMode: string | undefined, label: string): Camer
   return detectKind(label);
 }
 
-/** Nombre de la cámara abierta para el visor. */
+/** Nombre de la cámara abierta para el visor, en el idioma activo. */
 export function kindLabel(kind: CameraKind): string {
-  if (kind === 'front') return 'Cámara frontal';
-  if (kind === 'back') return 'Cámara trasera';
-  return 'Cámara';
+  return t(`face.camera.kinds.${kind}`);
 }
 
-/** Etiquetas legibles: "Cámara frontal", "Cámara trasera 2", "Cámara 1"... */
+/** Etiquetas legibles en el idioma activo: "Cámara frontal", "Cámara trasera 2", "Cámara 1"... (se piden al dibujarse). */
 export function toCameraDevices(inputs: Array<Pick<MediaDeviceInfo, 'deviceId' | 'label'>>): CameraDevice[] {
   const counters = { front: 0, back: 0, unknown: 0 };
   const totals = { front: 0, back: 0, unknown: 0 };
@@ -58,7 +57,7 @@ export function toCameraDevices(inputs: Array<Pick<MediaDeviceInfo, 'deviceId' |
     const kind = detectKind(d.label);
     const n = ++counters[kind];
     const base = kindLabel(kind);
-    const label = kind === 'unknown' ? `${base} ${n}` : totals[kind] > 1 ? `${base} ${n}` : base;
+    const label = kind === 'unknown' || totals[kind] > 1 ? t('face.camera.numbered', { name: base, number: n }) : base;
     return { deviceId: d.deviceId, label, rawLabel: d.label, kind };
   });
 }

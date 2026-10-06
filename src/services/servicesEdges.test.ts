@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiOk, mockFetch } from '../test/http';
 import { adminService } from './adminService';
 import { checkpointService } from './checkpointService';
+import { signingNonce } from './http/requestSigning';
 import { reloadApp } from './versionService';
 
 const company = { id: 5, name: 'Abarrotes', active: true, employee_count: 0 };
@@ -17,6 +18,7 @@ describe('servicios: cuerpos que se envían', () => {
 
   it('identificar por rostro: con QR envía su contenido; sin QR busca entre todos (1:N)', async () => {
     const { calls } = mockFetch(apiOk(result));
+    signingNonce.remember(null); // el perfil ya dijo que la empresa no pide firma: nada que pedir antes
     const captures = { frontal: [new Blob(['f'])] };
     await checkpointService.identifyFace(captures, 'TCQR2:abc');
     await checkpointService.identifyFace(captures);

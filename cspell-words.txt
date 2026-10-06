@@ -1,0 +1,83 @@
+# Palabras propias revisadas, COMUNES a los dos idiomas (ortografía, regla 16): nombres de productos,
+# marcas, lugares y siglas que los diccionarios no traen. Una por renglón, tal como se escriben.
+# Antes de agregar una palabra se confirma que está bien escrita: estas listas no son para silenciar
+# errores. Lo que solo es correcto en un idioma va en cspell-words.es-MX.txt o cspell-words.en-US.txt.
+
+# Producto, marcas y programas
+ETC
+Excel
+Firebase
+Kaspersky
+MediaPipe
+OBS
+Cam
+# Antifraude (fase 1b): cámara virtual y herramientas de automatización del navegador que nombran las señales
+ManyCam
+Playwright
+Selenium
+mini
+WebCrypto
+# Lugares de México
+Hermosillo
+Juárez
+Morelos
+# Siglas de México (identificación fiscal y de población, impuestos, seguridad social, instituciones)
+CURP
+IMSS
+IVA
+NSS
+RFC
+SAT
+# Siglas técnicas
+ERP
+# Siglas de identificadores fiscales de otros países, iguales en los dos idiomas (catálogo tax_id_types, migración
+# 0074): EIN (Estados Unidos), NIF y CIF (España), NIT (Colombia), CUIT (Argentina), RUT (Chile), RUC (Perú), CNPJ
+# (Brasil), VAT y CRN (Reino Unido), SIREN y SIRET (Francia)
+CIF
+CNPJ
+CRN
+CUIT
+EIN
+NIF
+NIT
+RUC
+RUT
+SIREN
+SIRET
+VAT
+# Métricas de Google de la experiencia en el navegador (Web Vitals), iguales en todo idioma: pantalla Rendimiento
+CLS
+FCP
+INP
+LCP
+TTFB
+# Backend (los mismos diccionarios revisan sus textos: backend-employee-time-clock/cspell.json)
+# Monedas (códigos ISO 4217) y formato de imagen
+EUR
+MXN
+USD
+WEBP
+# Nombre del producto (Employee Time Clock), también el del rol en el catálogo de roles
+Clock
+Employee
+# Abreviaturas iguales en los dos idiomas (min: minutos; pong: respuesta del canal en vivo a un ping)
+min
+pong
+# Países y territorios con el mismo nombre en los dos idiomas (catálogo countries)
+Burkina
+Caicos
+Côte
+d’Ivoire
+Faso
+Futuna
+Kosovo
+Leste
+Maarten
+Macao
+Marino
+Mayen
+Príncipe
+Rica
+Sint
+Tokelau
+Tomé

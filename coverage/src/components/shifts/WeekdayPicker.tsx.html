@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>15/15</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>10/10</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
@@ -131,7 +131,9 @@
 <a name='L66'></a><a href='#L66'>66</a>
 <a name='L67'></a><a href='#L67'>67</a>
 <a name='L68'></a><a href='#L68'>68</a>
-<a name='L69'></a><a href='#L69'>69</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -155,32 +157,25 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">438x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">839x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">158x</span>
+<span class="cline-any cline-yes">346x</span>
+<span class="cline-any cline-yes">346x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">220x</span>
-<span class="cline-any cline-yes">158x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1106x</span>
-<span class="cline-any cline-yes">1106x</span>
-<span class="cline-any cline-yes">1106x</span>
+<span class="cline-any cline-yes">430x</span>
+<span class="cline-any cline-yes">346x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">2422x</span>
+<span class="cline-any cline-yes">2422x</span>
+<span class="cline-any cline-yes">2422x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -189,18 +184,28 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">403x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { Weekday } from '../../types';
-import { WEEKDAYS } from '../../utils/shifts';
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">857x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useT } from '../../i18n';
+import type { Weekday } from '../../types';
+import { weekdayOptions } from '../../utils/shifts';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { QuickChoices } from './formFields';
 import { sortedDays } from './shiftRules';
@@ -230,13 +235,14 @@ const sameDays = (a: readonly Weekday[], b: readonly Weekday[]) =&gt; a.length =
  * Cada ficha mide al menos 44 px (dedo); en un contenedor angosto pasan a dos renglones.
  */
 export function WeekdayPicker({ label, value, onChange, allowed, presets = [], error, hint, disabled = false }: WeekdayPickerProps) {
+  const t = useT();
   const toggle = (day: Weekday) =&gt; onChange(value.includes(day) ? value.filter((d) =&gt; d !== day) : sortedDays([...value, day]));
   // La selección rápida que coincide con los días elegidos se ve marcada (por su posición).
   const picked = String(presets.findIndex((preset) =&gt; sameDays(preset.days, value)));
   return (
     &lt;ChoiceGroup label={label} className="weekday-picker" error={error} hint={hint}&gt;
       &lt;div className="weekday-picker__days"&gt;
-        {WEEKDAYS.map(({ value: day, short, name }) =&gt; {
+        {weekdayOptions().map(({ value: day, short, name }) =&gt; {
           const on = value.includes(day);
           const blocked = allowed !== undefined &amp;&amp; !allowed.includes(day);
           return (
@@ -246,7 +252,7 @@ export function WeekdayPicker({ label, value, onChange, allowed, presets = [], e
               className={on ? 'chip weekday-picker__day is-active' : 'chip weekday-picker__day'}
               aria-pressed={on}
               aria-label={name}
-              title={blocked ? 'El turno no trabaja ese día' : undefined}
+              title={blocked ? t('shifts.weekdayPicker.blocked') : undefined}
               disabled={disabled || blocked}
               onClick={() =&gt; toggle(day)}
             &gt;
@@ -257,7 +263,7 @@ export function WeekdayPicker({ label, value, onChange, allowed, presets = [], e
       &lt;/div&gt;
       {presets.length &gt; 0 &amp;&amp; (
         &lt;QuickChoices
-          label={`Selección rápida: ${label.toLowerCase()}`}
+          label={t('shifts.weekdayPicker.quick', { label: label.toLowerCase() })}
           value={picked}
           choices={presets.map((preset, index) =&gt; ({ value: String(index), text: preset.label }))}
           disabled={disabled}
@@ -274,7 +280,7 @@ export function WeekdayPicker({ label, value, onChange, allowed, presets = [], e
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

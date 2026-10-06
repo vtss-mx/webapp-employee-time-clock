@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -117,25 +117,23 @@
 <a name='L52'></a><a href='#L52'>52</a>
 <a name='L53'></a><a href='#L53'>53</a>
 <a name='L54'></a><a href='#L54'>54</a>
-<a name='L55'></a><a href='#L55'>55</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">441x</span>
-<span class="cline-any cline-yes">441x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2646x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">507x</span>
+<span class="cline-any cline-yes">507x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -145,10 +143,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3042x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">441x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">507x</span>
+<span class="cline-any cline-yes">507x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -172,7 +186,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { ReactNode } from 'react';
+import { useT } from '../../i18n';
 import { config } from '../../utils/config';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 import { BrandLogo } from '../ui/BrandLogo';
 &nbsp;
 /** Trazos de marca muy sutiles detrás de la tarjeta (decorativos). */
@@ -200,8 +216,12 @@ function Backdrop() {
   );
 }
 &nbsp;
-/** Marco corporativo del inicio de sesión: barra con la marca, fondo azul, tarjeta central y pie. */
+/**
+ * Marco corporativo del inicio de sesión: barra con la marca y el selector de idioma (cambia en
+ * caliente, sin perder lo escrito), fondo azul, tarjeta central y pie.
+ */
 export function AuthLayout({ children }: { children: ReactNode }) {
+  const t = useT();
   return (
     &lt;div className="auth"&gt;
       &lt;header className="auth__header"&gt;
@@ -209,9 +229,10 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           &lt;BrandLogo size={46} /&gt;
           &lt;span className="auth__brand-name"&gt;
             &lt;strong&gt;{config.appName}&lt;/strong&gt;
-            &lt;small&gt;{config.appTagline}&lt;/small&gt;
+            &lt;small&gt;{t('app.tagline')}&lt;/small&gt;
           &lt;/span&gt;
         &lt;/span&gt;
+        &lt;LanguageSwitcher variant="compact" tone="dark" /&gt;
       &lt;/header&gt;
 &nbsp;
       &lt;main className="auth__panel"&gt;
@@ -220,7 +241,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       &lt;/main&gt;
 &nbsp;
       &lt;footer className="auth__footer"&gt;
-        © {new Date().getFullYear()} {config.appName}. Todos los derechos reservados.
+        {t('auth.layout.copyright', { year: new Date().getFullYear(), app: config.appName })}
       &lt;/footer&gt;
     &lt;/div&gt;
   );
@@ -232,7 +253,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

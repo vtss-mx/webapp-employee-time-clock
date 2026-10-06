@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { LazyText } from '../i18n/lazy';
 import type { Page, PageQuery } from '../types';
 import { config } from '../utils/config';
 import { useErrorPopup } from './useFeedback';
 import { useRetryOnReconnect } from './useRetryOnReconnect';
 
 interface PagedListOptions {
-  errorTitle: string;
+  /** Título del popup si falla la carga; como función (`() => t('…')`) sigue al idioma activo. */
+  errorTitle: LazyText;
   /**
    * Resumen de los filtros con que se pide la lista (estado, búsqueda, pestaña...). Al cambiar, se
    * vuelve a pedir desde la página 1. Debe incluir todo lo que `fetchPage` usa además de la página.

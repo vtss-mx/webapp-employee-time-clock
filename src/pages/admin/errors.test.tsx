@@ -47,6 +47,7 @@ const server: ServerStatus = {
       { api: 'GET employees', tier: 'NORMAL', recent_requests: 40, latency_ms: null, shed: 7 },
     ],
   },
+  storage: { configured: false, backend: 'disabled', bucket: null, prefix: 'local', reason: 'sin llave', count_cap: 10000, images: [], tasks: [] },
 };
 /** Bandeja: resumen, estado del servidor y la lista. */
 function inbox(items: ErrorReportDetail[]) {
@@ -63,7 +64,7 @@ describe('Errores del sistema: bandeja', () => {
     renderWithProviders(<ErrorsPage />, { route: '/admin/errors' });
     expect(await screen.findByText('INTERNAL_ERROR')).toBeInTheDocument();
     expect(screen.getByText('GET /api/catalogs · 500')).toBeInTheDocument();
-    expect(screen.getByText(/1 pendientes/)).toBeInTheDocument();
+    expect(screen.getByText(/^1 pendiente · /)).toBeInTheDocument(); // el plural sigue al número
     await userEvent.click(screen.getByRole('button', { name: /Filtrar por seguimiento/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'Solucionado (4)' }));
     await waitFor(() => expect(calls.at(-1)?.url).toContain('status=RESOLVED'));
@@ -72,9 +73,9 @@ describe('Errores del sistema: bandeja', () => {
   it('sin errores: buena noticia; con filtros: nada coincide', async () => {
     mockFetch(inbox([]));
     renderWithProviders(<ErrorsPage />, { route: '/admin/errors' });
-    expect(await screen.findByText('Sin errores registrados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin errores')).toBeInTheDocument();
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar errores' }), 'x');
-    expect(await screen.findByText('Ningún error coincide con los filtros')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 
   it('muestra el estado del servidor: dependencias con su error y la capacidad adaptativa', async () => {
@@ -129,11 +130,11 @@ describe('Errores del sistema: bandeja', () => {
     await waitFor(() => expect(calls.at(-1)?.url).toContain('search=catalogs'));
     await userEvent.click(await screen.findByRole('button', { name: 'Marcar como solucionados (1)' }));
     let dialog = await screen.findByRole('dialog', { name: '¿Marcar como solucionado el error?' });
-    expect(within(dialog).getByText(/Se marcará como solucionado el error con gravedad «Crítico», búsqueda «catalogs»/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Incluye el error con gravedad «Crítico», búsqueda «catalogs»/)).toBeInTheDocument();
     // Solo con la gravedad en el filtro, cada error está en su propio seguimiento.
     expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('SeguimientoAntes: Sin solucionarDespués: Solucionado');
     expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Errores1Vistos hasta');
-    expect(dialog).toHaveTextContent('Uno que vuelva a ocurrir se reabre solo como pendiente.');
+    expect(dialog).toHaveTextContent('Si alguno vuelve a ocurrir, se reabre como pendiente.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.url.endsWith('/resolve'))).toBe(false);
 
@@ -141,7 +142,7 @@ describe('Errores del sistema: bandeja', () => {
     dialog = await screen.findByRole('dialog', { name: '¿Marcar como solucionado el error?' });
     const listed = calls.filter((c) => !c.url.endsWith('/resolve') && c.url.startsWith('/api/admin/errors?')).length;
     await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar como solucionados' }));
-    expect(await screen.findByText('1 error quedó marcado como solucionado.')).toBeInTheDocument();
+    expect(await screen.findByText('1 error marcado como solucionado.')).toBeInTheDocument();
     const sent = calls.find((c) => c.url.endsWith('/resolve'));
     expect(sent?.init.method).toBe('POST');
     expect(JSON.parse(sent?.init.body as string)).toEqual({ severity: 'CRITICAL', search: 'catalogs', seen_until: AS_OF });
@@ -167,14 +168,14 @@ describe('Errores del sistema: bandeja', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Pendiente (1)' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Marcar como solucionados (2)' }));
     const dialog = await screen.findByRole('dialog', { name: '¿Marcar como solucionados los 2 errores?' });
-    expect(within(dialog).getByText(/Se marcarán como solucionados los 2 errores con seguimiento «Pendiente»/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Incluye los 2 errores con seguimiento «Pendiente»/)).toBeInTheDocument();
     expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('SeguimientoAntes: PendienteDespués: Solucionado');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar como solucionados' }));
     const failed = await screen.findByRole('alertdialog', { name: 'No se pudieron marcar los errores' });
     await userEvent.click(within(failed).getByRole('button', { name: 'Entendido' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Marcar como solucionados (2)' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Marcar como solucionados los 2 errores?' })).getByRole('button', { name: 'Marcar como solucionados' }));
-    expect(await screen.findByText('2 errores quedaron marcados como solucionados.')).toBeInTheDocument();
+    expect(await screen.findByText('2 errores marcados como solucionados.')).toBeInTheDocument();
   });
 
   it('dónde ocurrió, también si vino del log del backend', () => {
@@ -229,7 +230,7 @@ describe('Errores del sistema: detalle y seguimiento', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Marcar como solucionado' }));
     dialog = await screen.findByRole('dialog', { name: '¿Marcar INTERNAL_ERROR como solucionado?' });
     expect(dialog).toHaveClass('msg--success');
-    expect(dialog).toHaveTextContent('Si vuelve a ocurrir, se reabre solo como pendiente.');
+    expect(dialog).toHaveTextContent('Si vuelve a ocurrir, se reabre como pendiente.');
     expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('Antes: En procesoDespués: Solucionado');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar como solucionado' }));
     await waitFor(() => expect(patches()).toEqual([{ status: 'IN_PROGRESS' }, { status: 'RESOLVED' }]));

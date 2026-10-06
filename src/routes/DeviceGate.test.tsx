@@ -6,6 +6,7 @@ import { phoneAccessUrl } from '../components/PhoneAccessGuide';
 import { AuthProvider, deviceBlockFrom } from '../context/AuthContext';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { useAuth } from '../hooks/useAuth';
+import { setLocale } from '../i18n/core';
 import { apiRequest, TOUCH_DEVICE_REQUIRED } from '../services/apiClient';
 import { apiOk, envelope, jsonResponse, mockFetch } from '../test/http';
 import { tokenResponse } from '../test/render';
@@ -89,5 +90,22 @@ describe('DeviceGate', () => {
     await userEvent.click(within(popup).getByRole('button', { name: 'Cerrar sesión' }));
     await waitFor(() => expect(result.current.isAuthenticated).toBe(false));
     expect(calls.some((c) => c.url.endsWith('/auth/logout'))).toBe(true);
+  });
+});
+
+describe('DeviceGate en inglés (en-US)', () => {
+  it('el aviso abierto sigue al idioma; el mensaje del servidor se muestra tal cual', async () => {
+    setLocation('http://localhost:8080/login');
+    mockFetch(deviceRejected());
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(() => result.current.login('recepcion@empresa.com', 'Valida1234').catch(() => undefined));
+    await screen.findByRole('dialog', { name: 'Continúa desde una tableta o un teléfono' });
+    await act(() => setLocale('en-US'));
+    const popup = screen.getByRole('dialog', { name: 'Continue on a tablet or phone' });
+    expect(within(popup).getByText('You are using a computer')).toBeInTheDocument();
+    expect(within(popup).getByText("Need help? Contact your company's administrator.")).toBeInTheDocument();
+    expect(popup).toHaveAccessibleDescription(MESSAGE);
+    await userEvent.click(within(popup).getByRole('button', { name: 'Got it' }));
+    await waitFor(() => expect(result.current.deviceBlock).toBeNull());
   });
 });

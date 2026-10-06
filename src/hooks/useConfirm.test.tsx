@@ -61,7 +61,7 @@ describe('useConfirm', () => {
   it('una edición sin cambios no pregunta: avisa "Sin cambios" y no se confirma', async () => {
     const { result } = renderHook(() => useConfirm(), { wrapper });
     await expect(ask(result.current, { kind: 'edit', title: '¿Guardar?', changes: [] })).resolves.toBe(false);
-    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No modificaste ningún dato');
+    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No hay nada que guardar');
     expect(screen.queryByRole('dialog', { name: '¿Guardar?' })).toBeNull();
   });
 
@@ -160,11 +160,11 @@ describe('ConfirmDialog: personalización', () => {
 
   it('eliminar: alerta roja, consecuencia resaltada y texto para habilitarla', async () => {
     const onConfirm = vi.fn();
-    render(<ConfirmDialog open kind="delete" title="¿Eliminar Acme?" note="Esta acción no se puede deshacer." confirmText="Acme" details={['Sus validadores']} onConfirm={onConfirm} onCancel={noop} />);
+    render(<ConfirmDialog open kind="delete" title="¿Eliminar Acme?" note="No se puede deshacer." confirmText="Acme" details={['Sus validadores']} onConfirm={onConfirm} onCancel={noop} />);
     const dialog = screen.getByRole('alertdialog', { name: '¿Eliminar Acme?' });
     expect(dialog).toHaveClass('msg--error');
     expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Sus validadores');
-    expect(within(dialog).getByText('Esta acción no se puede deshacer.').closest('.confirm-note')).not.toBeNull();
+    expect(within(dialog).getByText('No se puede deshacer.').closest('.confirm-note')).not.toBeNull();
     const button = within(dialog).getByRole('button', { name: 'Eliminar' });
     expect(button).toBeDisabled();
     await userEvent.type(within(dialog).getByLabelText('Escribe «Acme» para confirmar'), 'Acme');

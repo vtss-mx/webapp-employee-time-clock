@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useResource } from '../../hooks/useResource';
+import type { LazyText } from '../../i18n';
 import { Panel, PanelHeader, PanelSection } from '../ui/Panel';
 import { RetryState } from '../ui/RetryState';
 import { SkeletonCard } from '../ui/Skeleton';
@@ -32,17 +33,21 @@ interface RecordLoaderProps<T> {
   /** Id del registro a editar; null en un alta (no hay nada que cargar). */
   id: number | null;
   load: (id: number, signal: AbortSignal) => Promise<T>;
-  errorTitle: string;
+  /** Título del popup si no carga; con una función (`() => t('…')`) sigue al idioma activo. */
+  errorTitle: LazyText;
   /** Encabezado si no se pudo cargar. */
   failed: Omit<LoadFailedProps, 'onRetry'>;
-  /** El formulario: con el registro (edición) o con null (alta). */
-  children: (record: T | null) => ReactNode;
+  /**
+   * El formulario: con el registro (edición) o con null (alta). `replace` cambia el registro mostrado sin
+   * volver a pedirlo (p. ej. el que devolvió el servidor al restaurarlo de «Eliminados»).
+   */
+  children: (record: T | null, replace: (record: T) => void) => ReactNode;
 }
 
 /** Alta o edición en la misma ruta: en la edición primero se carga el registro (esqueleto o "Volver a cargar"). */
 export function RecordLoader<T>({ id, load, errorTitle, failed, children }: RecordLoaderProps<T>) {
-  const { data, error, retry } = useResource((signal) => (id === null ? Promise.resolve(null) : load(id, signal)), id ?? 'new', errorTitle);
-  if (id === null) return children(null);
-  if (data) return children(data);
+  const { data, setData, error, retry } = useResource((signal) => (id === null ? Promise.resolve(null) : load(id, signal)), id ?? 'new', errorTitle);
+  if (id === null) return children(null, setData);
+  if (data) return children(data, setData);
   return error ? <LoadFailed {...failed} onRetry={retry} /> : <SkeletonCard lines={8} />;
 }

@@ -1,11 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { currentLocale, setLocale } from '../i18n/core';
 import { ApiError } from '../services/apiClient';
 import { apiOk, mockFetch, type MockCall } from '../test/http';
 import { renderWithProviders, sampleUser } from '../test/render';
 import { withScreens } from '../test/screens';
-import type { User } from '../types';
+import type { User, UserPreferences } from '../types';
+import { deviceStore } from '../utils/deviceStore';
 import { ProfilePage } from './ProfilePage';
 
 const session = vi.hoisted(() => ({
@@ -13,6 +15,8 @@ const session = vi.hoisted(() => ({
   refreshUser: vi.fn<() => Promise<void>>(),
   logout: vi.fn<() => Promise<void>>(),
   logoutEverywhere: vi.fn<() => Promise<void>>(),
+  isAuthenticated: true,
+  updatePreferences: vi.fn<(changes: Partial<UserPreferences>) => Promise<void>>(),
 }));
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => session }));
 
@@ -26,8 +30,18 @@ const employeeUser: User = {
 const companyUser: User = withScreens({ ...sampleUser, email: 'rh@empresa.com', role: 'COMPANY', employee: null });
 
 const deviceSessions = { items: [{ id: 's1', created_at: '2026-10-01T10:00:00Z', last_used_at: null, expires_at: '2026-10-09T10:00:00Z', ip_address: '10.0.0.1', user_agent: null, current: true }], total: 1, page: 1, size: 10 };
+/** Mis dispositivos (antifraude 1b): desde dónde checa el empleado (solo lectura). */
+const myDevices = {
+  items: [{ id: 3, name: 'iPhone · Safari', status: 'APPROVED', first_seen_at: '2026-10-01T15:00:00Z', last_seen_at: '2026-10-02T15:00:00Z', uses: 4, stepped_up_at: null, reviewed_at: null, reviewed_by: null }],
+  total: 1,
+  page: 1,
+  size: 10,
+};
 function server() {
-  return mockFetch((call: MockCall) => (call.url.includes('/auth/change-password') ? apiOk({ revoked_sessions: 2 }) : apiOk(deviceSessions)));
+  return mockFetch((call: MockCall) => {
+    if (call.url.includes('/auth/change-password')) return apiOk({ revoked_sessions: 2 });
+    return apiOk(call.url.includes('/users/me/devices') ? myDevices : deviceSessions);
+  });
 }
 const sessionLoads = (calls: MockCall[]) => calls.filter((c) => c.url.startsWith('/api/auth/sessions')).length;
 
@@ -35,6 +49,8 @@ beforeEach(() => {
   session.user = employeeUser;
   session.refreshUser.mockResolvedValue(undefined);
   session.logout.mockResolvedValue(undefined);
+  session.updatePreferences.mockResolvedValue(undefined);
+  vi.spyOn(deviceStore, 'set').mockResolvedValue();
 });
 
 describe('ProfilePage (Mi perfil)', () => {
@@ -42,8 +58,8 @@ describe('ProfilePage (Mi perfil)', () => {
     server();
     renderWithProviders(<ProfilePage />);
     expect(screen.getByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
-    expect(screen.getByText('AR')).toBeInTheDocument();
-    expect(screen.getByText('Employee')).toBeInTheDocument(); // nombre del rol (catálogo)
+    expect(screen.getAllByText('AR')).toHaveLength(2); // la cuenta y su foto de perfil (sin foto: iniciales)
+    expect(screen.getByText('Empleado')).toBeInTheDocument(); // nombre del rol (catálogo)
     expect(screen.getByText('Activo')).toBeInTheDocument();
     expect(screen.getByText('Validado')).toBeInTheDocument();
     for (const [label, value] of [
@@ -58,6 +74,9 @@ describe('ProfilePage (Mi perfil)', () => {
     }
     expect(session.refreshUser).toHaveBeenCalledOnce();
     expect(await screen.findByText('Este dispositivo')).toBeInTheDocument(); // sesiones activas
+    expect(screen.getByRole('heading', { name: 'Mis dispositivos' })).toBeInTheDocument();
+    expect(await screen.findByText('iPhone · Safari')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Revocar/ })).toBeNull(); // los decide su empresa
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
@@ -66,10 +85,11 @@ describe('ProfilePage (Mi perfil)', () => {
     server();
     renderWithProviders(<ProfilePage />);
     expect(screen.getByRole('heading', { name: 'rh@empresa.com' })).toBeInTheDocument();
-    expect(screen.getByText('Company')).toBeInTheDocument();
+    expect(screen.getByText('Empresa')).toBeInTheDocument();
     for (const label of ['Número de empleado', 'CURP', 'RFC', 'NSS', 'Teléfono celular']) expect(screen.queryByText(label)).toBeNull();
     expect(screen.queryByText('Validado')).toBeNull();
     await screen.findByText('Este dispositivo');
+    expect(screen.queryByRole('heading', { name: 'Mis dispositivos' })).toBeNull(); // sin empleo, sin dispositivos
   });
 
   it('si no se pudo actualizar la información, lo avisa en popup y muestra la de la sesión', async () => {
@@ -98,7 +118,7 @@ describe('ProfilePage (Mi perfil)', () => {
     await userEvent.type(screen.getByLabelText('Confirmar nueva contraseña'), 'Nueva12345');
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Cambiar tu contraseña?' })).getByRole('button', { name: 'Cambiar contraseña' }));
-    expect(await screen.findByRole('dialog', { name: 'Contraseña actualizada' })).toHaveTextContent('Se cerró la sesión en 2 dispositivo(s) más.');
+    expect(await screen.findByRole('dialog', { name: 'Contraseña actualizada' })).toHaveTextContent('Se cerró la sesión en 2 dispositivos más.');
     await waitFor(() => expect(sessionLoads(calls)).toBe(2));
   });
 
@@ -107,7 +127,7 @@ describe('ProfilePage (Mi perfil)', () => {
     renderWithProviders(<ProfilePage />);
     const footerLogout = screen.getByRole('button', { name: 'Cerrar sesión' });
     await userEvent.click(footerLogout);
-    const ask = await screen.findByRole('alertdialog', { name: '¿Estás seguro de que deseas cerrar sesión?' });
+    const ask = await screen.findByRole('alertdialog', { name: '¿Cerrar sesión?' });
     await userEvent.click(within(ask).getByRole('button', { name: 'Seguir aquí' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(session.logout).not.toHaveBeenCalled();
@@ -115,5 +135,31 @@ describe('ProfilePage (Mi perfil)', () => {
     await userEvent.click(footerLogout);
     await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cerrar sesión' }));
     await waitFor(() => expect(session.logout).toHaveBeenCalledOnce());
+  });
+});
+
+describe('ProfilePage: idioma', () => {
+  it('sección "Idioma" con el selector: cambia en caliente, se guarda en la cuenta y la pantalla queda en inglés', async () => {
+    server();
+    renderWithProviders(<ProfilePage />);
+    const section = screen.getByRole('heading', { name: 'Idioma' }).closest('section') as HTMLElement;
+    expect(within(section).getByText(/Se aplica en todos tus dispositivos/)).toBeInTheDocument();
+    await userEvent.click(within(section).getByRole('button', { name: /Idioma/ }));
+    await userEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: /English/ }));
+    await waitFor(() => expect(currentLocale()).toBe('en-US'));
+    expect(session.updatePreferences).toHaveBeenCalledWith({ locale: 'en-US' });
+    expect(screen.getByRole('heading', { name: 'Language' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'My profile' })).toBeInTheDocument();
+  });
+
+  it('en inglés (en-US): encabezado, datos de la cuenta, secciones y cerrar sesión', async () => {
+    server();
+    await setLocale('en-US');
+    renderWithProviders(<ProfilePage />);
+    expect(screen.getByText('Your account, password and active sessions')).toBeInTheDocument();
+    for (const heading of ['Account', 'Change password', 'Language', 'Active sessions']) expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+    for (const label of ['Email', 'Employee number', 'Mobile phone', 'Last sign-in', 'Account created']) expect(screen.getByText(label)).toBeInTheDocument();
+    expect(await screen.findByText('This device')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 });

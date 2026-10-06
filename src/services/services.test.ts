@@ -3,7 +3,7 @@ import { catalogsFixture, testCatalogs } from '../test/catalogs';
 import { apiOk, mockFetch } from '../test/http';
 import { CameraNotReadyError } from '../utils/cameraDiagnostics';
 import { config } from '../utils/config';
-import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, isRetryableFaceError, isTransientFaceError, MAX_TRANSIENT_FACE_FAILURES } from '../utils/faceErrors';
+import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, isRetryableFaceError, isTransientFaceError, MAX_TRANSIENT_FACE_FAILURES, stepUpChallenge } from '../utils/faceErrors';
 import { ApiError } from './apiClient';
 import { authService } from './authService';
 import { catalogService } from './catalogService';
@@ -29,11 +29,31 @@ const department = { id: 3, name: 'Producción', employee_count: 0, managers: []
 const errorReport = { id: 9, code: 'INTERNAL_ERROR', status: 'PENDING', severity: 'CRITICAL', occurrences: 2 };
 const result = { verified: true, method: 'FACE', message: 'ok' };
 const policy = { block_glasses: true, block_headwear: true, block_mask: false, liveness_challenge: true, anti_spoofing: true, qr_enabled: true };
+/** La del ADMIN: la de la empresa más el motor de riesgo (lo mínimo que la app revisa). */
+const adminPolicy = { ...policy, risk_engine: true, risk_signals: [], pending_changes: 0 };
 const site = { id: 2, name: 'Planta Norte', address: {}, radius_m: 100, active: true };
-const sitePayload = { name: 'Planta Norte', address: { street: 'Av', exterior_number: '1', interior_number: null, postal_code: '83000', country_code: 'MX', state: 'S', municipality: 'H', city: 'H', latitude: 29, longitude: -110 }, radius_m: 100 };
-const shift = { id: 5, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', weekdays: [0], active: true };
-const shiftPayload = { name: 'Matutino', start_time: '08:00', end_time: '16:00', weekdays: [0, 1] as const, breaks_count: 1, break_minutes: 30, early_check_in_minutes: 15, late_tolerance_minutes: 10, early_check_out_minutes: 0, late_check_out_minutes: 60 };
-const assignment = { id: 8, shift, valid_from: '2026-10-05', state: 'SCHEDULED', sites: [] };
+const sitePayload = {
+  name: 'Planta Norte',
+  address: { street: 'Av', exterior_number: '1', interior_number: null, postal_code: '83000', country_code: 'MX', state: 'S', municipality: 'H', city: 'H', neighborhood: 'Centro', reference_notes: null, latitude: 29, longitude: -110 },
+  radius_m: 100,
+  presence_code: false,
+};
+const shift = { id: 5, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', weekdays: [0], remote_weekdays: [], sites: [], active: true };
+const shiftPayload = {
+  name: 'Matutino',
+  start_time: '08:00',
+  end_time: '16:00',
+  weekdays: [0, 1] as const,
+  breaks_count: 1,
+  break_minutes: 30,
+  early_check_in_minutes: 15,
+  late_tolerance_minutes: 10,
+  early_check_out_minutes: 0,
+  late_check_out_minutes: 60,
+  site_ids: [2],
+  remote_weekdays: [],
+};
+const assignment = { id: 8, shift, valid_from: '2026-10-05', state: 'SCHEDULED' };
 const shiftRequest = { id: 4, employee: { id: 1 }, shift, valid_from: '2026-10-06', status: 'PENDING' };
 const session = { id: 6, work_date: '2026-10-05', status: 'OPEN', check_in_at: 'x', breaks: [] };
 const board = { items: [{ employee: { id: 1 }, state: 'WORKING', shift_name: 'Matutino' }], total: 1, page: 1, size: 10, work_date: '2026-10-05', working: 1 };
@@ -82,8 +102,8 @@ describe('servicios', () => {
     ['apiKeys.revoke', () => apiKeyService.revoke(3), apiKey, 'DELETE', '/api/api-keys/3'],
     ['me.qrStatus', () => meService.qrStatus(7), { id: 7, status: 'USED' }, 'GET', '/api/users/me/qr/7'],
     ['settings.get', () => settingsService.getVerificationPolicy(), policy, 'GET', '/api/settings/verification'],
-    ['admin.policy', () => adminService.policy(4), policy, 'GET', '/api/admin/companies/4/verification-policy'],
-    ['admin.updatePolicy', () => adminService.updatePolicy(4, { block_mask: false }), policy, 'PUT', '/api/admin/companies/4/verification-policy'],
+    ['admin.policy', () => adminService.policy(4), adminPolicy, 'GET', '/api/admin/companies/4/verification-policy'],
+    ['admin.updatePolicy', () => adminService.updatePolicy(4, { block_mask: false }), { policy: adminPolicy, change: null }, 'PUT', '/api/admin/companies/4/verification-policy'],
     ['admin.faceLearning', () => adminService.faceLearning(4), { enabled: true, employees_learning: 1, learned_samples: 2 }, 'GET', '/api/admin/companies/4/face-learning'],
     ['admin.forgetLearnedFace', () => adminService.forgetLearnedFace(4, 1), { ...employee, active: true, face_status: 'APPROVED' }, 'DELETE', '/api/admin/companies/4/employees/1/face/learned'],
     ['enrollments.submitReview', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }, true), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
@@ -108,7 +128,7 @@ describe('servicios', () => {
     ['shifts.setStatus', () => shiftService.setStatus(5, false), shift, 'PATCH', '/api/shifts/5/status'],
     ['shifts.remove', () => shiftService.remove(5), null, 'DELETE', '/api/shifts/5'],
     ['shifts.assignments', () => shiftService.assignments(1, { page: 1, size: 10 }), { items: [assignment], total: 1 }, 'GET', '/api/employees/1/shift-assignments?page=1&size=10'],
-    ['shifts.assign', () => shiftService.assign(1, { shift_id: 5, valid_from: '2026-10-05', remote_weekdays: [], site_ids: [2] }), assignment, 'POST', '/api/employees/1/shift-assignments'],
+    ['shifts.assign', () => shiftService.assign(1, { shift_id: 5, valid_from: '2026-10-05' }), assignment, 'POST', '/api/employees/1/shift-assignments'],
     ['shifts.cancelAssignment', () => shiftService.cancelAssignment(8), null, 'DELETE', '/api/shift-assignments/8'],
     ['shifts.requests', () => shiftService.requests({ page: 1, size: 10, status: 'PENDING' }), { items: [shiftRequest], total: 1 }, 'GET', '/api/shift-requests?page=1&size=10&status=PENDING'],
     ['shifts.pendingRequests', () => shiftService.pendingRequests(), { pending: 2 }, 'GET', '/api/shift-requests/summary'],
@@ -136,8 +156,19 @@ describe('servicios', () => {
     await attendanceService.record('CHECK_IN', { frontal: [new Blob(['a'])] }, { latitude: 29.1, longitude: -110.9, accuracy: 250_000 });
     const form = calls[0].init.body as FormData;
     expect([form.get('latitude'), form.get('longitude'), form.get('accuracy')]).toEqual(['29.1', '-110.9', '100000']);
+    expect(form.get('location_samples')).toBeNull(); // sin la toma de varias lecturas
     expect(calls[0].url).toBe('/api/me/attendance/check-in');
     await expect(attendanceService.board({ page: 1, size: 10 })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
+
+  it('asistencia: todas las lecturas de la toma viajan para que el servidor detecte una ubicación simulada', async () => {
+    const { calls } = mockFetch(apiOk({ verified: true, message: 'm', action: 'CHECK_IN', verification: result }));
+    const samples = [
+      { latitude: 29.1, longitude: -110.9, accuracy: 12 },
+      { latitude: 29.10001, longitude: -110.9, accuracy: 250_000 },
+    ];
+    await attendanceService.record('CHECK_IN', { frontal: [new Blob(['a'])] }, { ...samples[0], samples });
+    expect(JSON.parse((calls[0].init.body as FormData).get('location_samples') as string)).toEqual([samples[0], { ...samples[1], accuracy: 100_000 }]);
   });
 
   it('las solicitudes y el motivo del rechazo viajan sin espacios sobrantes', async () => {
@@ -224,7 +255,7 @@ describe('rostro en persona (la empresa con el empleado presente)', () => {
     const { calls } = mockFetch((call) =>
       call.url.endsWith('/enroll')
         ? apiOk({ enrollment_id: 9, face_status: 'APPROVED', message: 'ok' })
-        : apiOk({ verified: true, method: 'FACE', message: 'Identificación exitosa' }),
+        : apiOk({ verified: true, method: 'FACE', message: 'Identidad confirmada' }),
     );
     const frame = new Blob(['f'], { type: 'image/jpeg' });
     const challenge = { id: 'ch-1', images: [new Blob(['t'], { type: 'image/jpeg' })] };
@@ -234,5 +265,40 @@ describe('rostro en persona (la empresa con el empleado presente)', () => {
     const form = calls[0].init.body as FormData;
     expect(form.getAll('images')).toHaveLength(2);
     expect(form.get('challenge_id')).toBe('ch-1');
+  });
+});
+
+describe('stepUpChallenge: el reto de "un paso más" del motor de riesgo', () => {
+  const stepUp = (details: Record<string, unknown> | null) =>
+    new ApiError({ statusCode: 422, code: 'STEP_UP_REQUIRED', message: 'Un paso más', errors: [{ code: 'STEP_UP_REQUIRED', message: 'Un paso más', field: null, details }] });
+
+  it('solo con el código y un reto válido', () => {
+    const challenge = { challenge_id: 'ch-up', actions: ['TURN_LEFT'], step_up: true };
+    expect(stepUpChallenge(stepUp({ challenge }))).toEqual(challenge);
+    expect(stepUpChallenge(stepUp({ challenge: { actions: [] } }))).toBeNull();
+    expect(stepUpChallenge(stepUp({ challenge: { challenge_id: 'x' } }))).toBeNull();
+    expect(stepUpChallenge(stepUp({ challenge: 'x' }))).toBeNull();
+    expect(stepUpChallenge(stepUp(null))).toBeNull();
+    expect(stepUpChallenge(new ApiError({ statusCode: 422, code: 'TOO_DARK', message: 'Poca luz' }))).toBeNull();
+    expect(stepUpChallenge(new Error('x'))).toBeNull();
+  });
+});
+
+describe('servicios del antifraude', () => {
+  it('nivel predefinido con motivo, contador de revisiones y la decisión de una jornada (sin nota)', async () => {
+    const adminPolicy = { ...policy, risk_engine: true, risk_signals: [], pending_changes: 0 };
+    const { calls } = mockFetch((call) => {
+      if (call.url.endsWith('/preset')) return apiOk({ policy: adminPolicy, change: null });
+      if (call.url.endsWith('/reviews/count')) return apiOk({ pending: 3 });
+      return apiOk({ id: 5, employee: { id: 1 }, events: [], status: 'CLOSED' });
+    });
+    await adminService.applyPolicyPreset(4, 'HIGH', '  Fraude en planta ');
+    expect(await attendanceService.reviewCount()).toBe(3);
+    await attendanceService.review(5, 'CONFIRMED', '   ');
+    expect(calls.map((c): [string, unknown] => [c.url, c.init.body ? (JSON.parse(c.init.body as string) as unknown) : undefined])).toEqual([
+      ['/api/admin/companies/4/verification-policy/preset', { preset: 'HIGH', reason: 'Fraude en planta' }],
+      ['/api/attendance/reviews/count', undefined],
+      ['/api/attendance/sessions/5/review', { decision: 'CONFIRMED', note: null }],
+    ]);
   });
 });

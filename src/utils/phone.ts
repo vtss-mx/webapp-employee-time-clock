@@ -1,4 +1,6 @@
 import { AsYouType, isSupportedCountry, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import { t } from '../i18n/core';
+import { localizedError } from '../i18n/lazy';
 import type { CountryItem } from '../types';
 
 /**
@@ -53,7 +55,7 @@ function toOption({ code, name, dial_code: dialCode, featured }: CountryItem & {
 export function countryDirectory(countries: CountryItem[]): CountryDirectory {
   const options = countries.filter(isUsable).map(toOption);
   const defaultCountry = options.find((country) => country.featured) ?? options.at(0);
-  if (!defaultCountry) throw new Error('El catálogo de países no tiene países activos');
+  if (!defaultCountry) throw localizedError(() => t('forms.phone.noCountries'));
   const byCode = new Map(options.map((country) => [country.code, country]));
 
   /** País de una lada: el preferido si la comparte (como +1); si no, el primero del catálogo. */
@@ -86,10 +88,10 @@ export function joinPhone(country: CountryOption, national: string): string {
 export const formatNational = (country: CountryOption, national: string) => new AsYouType(country.code).input(national);
 
 export function validatePhone(value: string): string | undefined {
-  if (!value) return 'El teléfono es obligatorio';
+  if (!value) return t('forms.phone.required');
   const parsed = parsePhoneNumberFromString(value);
   if (parsed?.isValid() && new Set(parsed.nationalNumber).size > 1) return undefined;
-  return `El teléfono no es válido para la lada +${parsed?.countryCallingCode ?? value.replace(/\D/g, '').slice(0, 3)}`;
+  return t('forms.phone.invalid', { code: parsed?.countryCallingCode ?? value.replace(/\D/g, '').slice(0, 3) });
 }
 
 /** E.164 → "+52 662 123 4567" para mostrar. */

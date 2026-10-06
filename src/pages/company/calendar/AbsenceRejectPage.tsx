@@ -1,7 +1,7 @@
 import { Inbox } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { absenceFacts, calendarPath, daysText, rangeText } from '../../../components/calendar/calendarRules';
-import { RejectRequestPanel } from '../../../components/RejectRequestPanel';
+import { RejectRequestPanel, type RejectQuestion } from '../../../components/RejectRequestPanel';
 import { LoadFailed } from '../../../components/shifts/PageStates';
 import { ButtonLink } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -11,12 +11,12 @@ import { useCatalogs } from '../../../hooks/useCatalogs';
 import { useFeedback } from '../../../hooks/useFeedback';
 import { notifyAbsenceRequestsChanged } from '../../../hooks/usePendingAbsenceRequests';
 import { useResource } from '../../../hooks/useResource';
+import { t, useT } from '../../../i18n';
 import { ApiError } from '../../../services/apiClient';
 import { calendarService, isAbsence } from '../../../services/calendarService';
 import type { Absence } from '../../../types';
 import { isRecord } from '../../../utils/guards';
 
-const TITLE = 'Rechazar solicitud';
 /** Pendientes por página al buscarla (la página más grande de la API) y tope de páginas: nunca sin límite. */
 const SEARCH_SIZE = 50;
 const SEARCH_PAGES = 20;
@@ -42,20 +42,35 @@ export async function pendingAbsence(id: number, passed: Absence | null, signal:
   return null;
 }
 
+/** La confirmación del rechazo: qué se rechaza y qué pasa (se arma al dibujarse: sigue al idioma activo). */
+function rejectQuestion(absence: Absence, typeName: string): RejectQuestion {
+  return {
+    title: t('calendar.reject.confirmTitle', { kind: typeName.toLowerCase(), name: absence.employee.full_name }),
+    eyebrow: t('calendar.reject.title'),
+    message: t('calendar.reject.confirmMessage'),
+    facts: absenceFacts(absence, typeName),
+  };
+}
+
+const loadError = () => t('calendar.reject.loadError');
+const rejectedTitle = () => t('calendar.reject.done');
+const rejectedText = (name: string) => () => t('calendar.reject.doneText', { name });
+
 /** Ya no está pendiente: se explica y se ofrece volver a las solicitudes. */
 function NotPending() {
+  const t = useT();
   return (
     <div className="page">
       <Panel>
-        <PanelHeader title={TITLE} backTo={calendarPath('requests')} backLabel="Solicitudes" />
+        <PanelHeader title={t('calendar.reject.title')} backTo={calendarPath('requests')} backLabel={t('calendar.page.tabs.requests')} />
         <PanelSection>
           <EmptyState
             icon={<Inbox />}
-            title="Esta solicitud ya no está pendiente"
-            description="Ya se aprobó, se rechazó o el empleado la canceló. Su estado aparece en la pestaña «Ausencias» del calendario."
+            title={t('calendar.reject.notPending.title')}
+            description={t('calendar.reject.notPending.description')}
             action={
               <ButtonLink to={calendarPath('requests')} variant="primary" icon={<Inbox size={18} />}>
-                Ver solicitudes
+                {t('calendar.reject.notPending.action')}
               </ButtonLink>
             }
           />
@@ -66,6 +81,7 @@ function NotPending() {
 }
 
 function RejectForm({ absence }: { absence: Absence }) {
+  const t = useT();
   const navigate = useNavigate();
   const feedback = useFeedback();
   const { nameOf } = useCatalogs();
@@ -73,17 +89,12 @@ function RejectForm({ absence }: { absence: Absence }) {
   const kind = nameOf('day_off_types', absence.type);
   return (
     <RejectRequestPanel
-      title={TITLE}
+      title={t('calendar.reject.title')}
       subtitle={`${absence.employee.full_name} · ${absence.employee.employee_number}`}
       backTo={calendarPath('requests')}
-      intro={`Pidió ${kind.toLowerCase()}: ${rangeText(absence.starts_on, absence.ends_on)} (${daysText(absence.days)}). Esos días seguirá teniendo que checar y verá esta nota en su solicitud.`}
-      placeholder="Explica por qué no se puede (p. ej. es temporada alta y falta personal)"
-      question={{
-        title: `¿Rechazar ${kind.toLowerCase()} de ${absence.employee.full_name}?`,
-        eyebrow: 'Rechazar solicitud',
-        message: 'Esos días seguirá teniendo que checar y verá tu nota en su solicitud.',
-        facts: absenceFacts(absence, kind),
-      }}
+      intro={t('calendar.reject.intro', { kind: kind.toLowerCase(), range: rangeText(absence.starts_on, absence.ends_on), days: daysText(absence.days) })}
+      placeholder={t('calendar.reject.placeholder')}
+      question={() => rejectQuestion(absence, kind)}
       onSend={async (note) => {
         await calendarService.rejectAbsence(absence.id, note).catch((error: unknown) => {
           // Otra persona ya la decidió o el empleado la canceló: el popup lo explica y se vuelve a la bandeja.
@@ -94,7 +105,7 @@ function RejectForm({ absence }: { absence: Absence }) {
           throw error;
         });
         notifyAbsenceRequestsChanged();
-        void feedback.info('Solicitud rechazada', `${absence.employee.full_name} conserva esos días como laborables y verá tu nota.`);
+        void feedback.info(rejectedTitle, rejectedText(absence.employee.full_name));
         back();
       }}
       onCancel={back}
@@ -104,11 +115,12 @@ function RejectForm({ absence }: { absence: Absence }) {
 
 /** Rechazar una solicitud de vacaciones o permiso (/company/calendar/absences/:id/reject), con una nota para el empleado. */
 export function AbsenceRejectPage() {
+  const t = useT();
   const id = Number(useParams().id);
   const state: unknown = useLocation().state;
   const passed = isRecord(state) && isAbsence(state.absence) ? state.absence : null;
-  const { data, error, retry } = useResource(async (signal) => ({ absence: await pendingAbsence(id, passed, signal) }), id, 'No se pudo cargar la solicitud');
+  const { data, error, retry } = useResource(async (signal) => ({ absence: await pendingAbsence(id, passed, signal) }), id, loadError);
 
-  if (!data) return error ? <LoadFailed title={TITLE} backTo={calendarPath('requests')} backLabel="Solicitudes" onRetry={retry} /> : <SkeletonCard lines={6} />;
+  if (!data) return error ? <LoadFailed title={t('calendar.reject.title')} backTo={calendarPath('requests')} backLabel={t('calendar.page.tabs.requests')} onRetry={retry} /> : <SkeletonCard lines={6} />;
   return data.absence ? <RejectForm absence={data.absence} /> : <NotPending />;
 }

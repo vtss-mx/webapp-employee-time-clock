@@ -24,6 +24,8 @@ export const LoginPage = page(() => import('../pages/LoginPage'), 'LoginPage');
 export const ProfilePage = page(() => import('../pages/ProfilePage'), 'ProfilePage');
 export const ForbiddenPage = page(() => import('../pages/ForbiddenPage'), 'ForbiddenPage');
 export const NotFoundPage = page(() => import('../pages/NotFoundPage'), 'NotFoundPage');
+/** Tableta de un sitio (pública, sin sesión): el código que el personal escanea o escribe al checar. */
+export const KioskPage = page(() => import('../pages/KioskPage'), 'KioskPage');
 
 // ADMIN (plataforma)
 export const AdminDashboardPage = page(() => import('../pages/admin/AdminDashboardPage'), 'AdminDashboardPage');
@@ -32,14 +34,33 @@ export const CompanyCreatePage = page(() => import('../pages/admin/CompanyCreate
 export const CompanyDetailPage = page(() => import('../pages/admin/CompanyDetailPage'), 'CompanyDetailPage');
 export const CompanyEditPage = page(() => import('../pages/admin/CompanyEditPage'), 'CompanyEditPage');
 export const CompanyPolicyPage = page(() => import('../pages/admin/CompanyPolicyPage'), 'CompanyPolicyPage');
+export const RejectPolicyChangePage = page(() => import('../pages/admin/RejectPolicyChangePage'), 'RejectPolicyChangePage');
 export const CompanyEmployeesPage = page(() => import('../pages/admin/CompanyEmployeesPage'), 'CompanyEmployeesPage');
+export const CompanyDocumentUploadPage = page(() => import('../pages/admin/CompanyDocumentUploadPage'), 'CompanyDocumentUploadPage');
 export const FaceSecurityPage = page(() => import('../pages/admin/FaceSecurityPage'), 'FaceSecurityPage');
+export const BillingPage = page(() => import('../pages/admin/billing/BillingPage'), 'BillingPage');
+export const CompanyBillingPage = page(() => import('../pages/admin/billing/CompanyBillingPage'), 'CompanyBillingPage');
+export const PaymentFormPage = page(() => import('../pages/admin/billing/PaymentFormPage'), 'PaymentFormPage');
+export const ChargeDetailPage = page(() => import('../pages/admin/billing/ChargeDetailPage'), 'ChargeDetailPage');
+export const VoidPaymentPage = page(() => import('../pages/admin/billing/BillingReasonPages'), 'VoidPaymentPage');
+export const VoidChargePage = page(() => import('../pages/admin/billing/BillingReasonPages'), 'VoidChargePage');
+export const SuspendCompanyPage = page(() => import('../pages/admin/billing/BillingReasonPages'), 'SuspendCompanyPage');
+export const UsagePage = page(() => import('../pages/admin/usage/UsagePage'), 'UsagePage');
+export const CompanyUsagePage = page(() => import('../pages/admin/usage/CompanyUsagePage'), 'CompanyUsagePage');
+export const PerformancePage = page(() => import('../pages/admin/performance/PerformancePage'), 'PerformancePage');
+export const MetricDetailPage = page(() => import('../pages/admin/performance/MetricDetailPage'), 'MetricDetailPage');
+export const SlowAlertDetailPage = page(() => import('../pages/admin/performance/SlowAlertDetailPage'), 'SlowAlertDetailPage');
+export const FraudCasesPage = page(() => import('../pages/admin/fraud/FraudCasesPage'), 'FraudCasesPage');
+export const FraudCaseDetailPage = page(() => import('../pages/admin/fraud/FraudCaseDetailPage'), 'FraudCaseDetailPage');
+export const FraudCaseDecisionPage = page(() => import('../pages/admin/fraud/FraudCaseFormPages'), 'FraudCaseDecisionPage');
+export const FraudCaseNotePage = page(() => import('../pages/admin/fraud/FraudCaseFormPages'), 'FraudCaseNotePage');
 
 // COMPANY
 export const DashboardPage = page(() => import('../pages/company/DashboardPage'), 'DashboardPage');
 export const AttendancePage = page(() => import('../pages/company/attendance/AttendancePage'), 'AttendancePage');
 export const AttendanceHistoryPage = page(() => import('../pages/company/attendance/AttendanceHistoryPage'), 'AttendanceHistoryPage');
 export const AttendanceSessionPage = page(() => import('../pages/company/attendance/AttendanceSessionPage'), 'AttendanceSessionPage');
+export const RejectAttendanceReviewPage = page(() => import('../pages/company/attendance/RejectAttendanceReviewPage'), 'RejectAttendanceReviewPage');
 export const ShiftsPage = page(() => import('../pages/company/shifts/ShiftsPage'), 'ShiftsPage');
 export const ShiftFormPage = page(() => import('../pages/company/shifts/ShiftFormPage'), 'ShiftFormPage');
 export const ShiftRequestsPage = page(() => import('../pages/company/shifts/ShiftRequestsPage'), 'ShiftRequestsPage');
@@ -56,6 +77,8 @@ export const AbsenceRejectPage = page(() => import('../pages/company/calendar/Ab
 export const WorkdayFormPage = page(() => import('../pages/company/calendar/WorkdayFormPage'), 'WorkdayFormPage');
 export const SitesPage = page(() => import('../pages/company/sites/SitesPage'), 'SitesPage');
 export const SiteFormPage = page(() => import('../pages/company/sites/SiteFormPage'), 'SiteFormPage');
+export const SiteKiosksPage = page(() => import('../pages/company/sites/SiteKiosksPage'), 'SiteKiosksPage');
+export const KioskFormPage = page(() => import('../pages/company/sites/KioskFormPage'), 'KioskFormPage');
 export const EmployeesListPage = page(() => import('../pages/company/EmployeesListPage'), 'EmployeesListPage');
 export const EmployeeCreatePage = page(() => import('../pages/company/EmployeeCreatePage'), 'EmployeeCreatePage');
 export const EmployeeDetailPage = page(() => import('../pages/company/EmployeeDetailPage'), 'EmployeeDetailPage');
@@ -65,6 +88,8 @@ export const ValidationsPage = page(() => import('../pages/company/ValidationsPa
 export const ValidationReviewPage = page(() => import('../pages/company/ValidationReviewPage'), 'ValidationReviewPage');
 export const ApiKeysPage = page(() => import('../pages/company/ApiKeysPage'), 'ApiKeysPage');
 export const ApiKeyFormPage = page(() => import('../pages/company/ApiKeyFormPage'), 'ApiKeyFormPage');
+export const DocumentsPage = page(() => import('../pages/company/DocumentsPages'), 'DocumentsPage');
+export const DocumentUploadPage = page(() => import('../pages/company/DocumentsPages'), 'DocumentUploadPage');
 export const ValidatorsPage = page(() => import('../pages/company/ValidatorsPage'), 'ValidatorsPage');
 export const ValidatorFormPage = page(() => import('../pages/company/ValidatorFormPage'), 'ValidatorFormPage');
 export const ValidatorDevicesPage = page(() => import('../pages/company/ValidatorDevicesPage'), 'ValidatorDevicesPage');

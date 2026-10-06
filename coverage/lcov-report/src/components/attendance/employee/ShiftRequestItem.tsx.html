@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
@@ -113,7 +113,18 @@
 <a name='L48'></a><a href='#L48'>48</a>
 <a name='L49'></a><a href='#L49'>49</a>
 <a name='L50'></a><a href='#L50'>50</a>
-<a name='L51'></a><a href='#L51'>51</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -132,8 +143,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -164,10 +186,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Repeat } from 'lucide-react';
+import { useT } from '../../../i18n';
 import type { ShiftRequest } from '../../../types';
 import { formatDate, formatDateTime, timeAgo } from '../../../utils/format';
 import { shiftSchedule, weekdaysLabel } from '../../../utils/shifts';
 import { CatalogStatusBadge } from '../../StatusBadge';
+import { DeletedMark } from '../../ui/DeletedMark';
 import { AttendanceItem, CancelRequestButton, ItemNote } from './AttendanceItem';
 &nbsp;
 interface ShiftRequestItemProps {
@@ -183,33 +207,42 @@ interface ShiftRequestItemProps {
  */
 export function ShiftRequestItem({ request, busy, onCancel }: ShiftRequestItemProps) {
   const { shift } = request;
+  const t = useT();
   return (
     &lt;AttendanceItem
       icon={&lt;Repeat size={20} /&gt;}
       title={shift.name}
       detail={`${shiftSchedule(shift)} · ${weekdaysLabel(shift.weekdays)}`}
-      badges={&lt;CatalogStatusBadge catalog="shift_request_statuses" code={request.status} /&gt;}
+      badges={
+        &lt;&gt;
+          &lt;DeletedMark deleted={shift.deleted} /&gt;
+          &lt;CatalogStatusBadge catalog="shift_request_statuses" code={request.status} /&gt;
+        &lt;/&gt;
+      }
       actions={request.status === 'PENDING' &amp;&amp; &lt;CancelRequestButton busy={busy} onCancel={onCancel} /&gt;}
     &gt;
       &lt;dl className="details attendance-item__facts"&gt;
         &lt;div&gt;
-          &lt;dt&gt;Desde&lt;/dt&gt;
+          &lt;dt&gt;{t('myAttendance.labels.from')}&lt;/dt&gt;
           &lt;dd&gt;{formatDate(request.valid_from)}&lt;/dd&gt;
         &lt;/div&gt;
         &lt;div&gt;
-          &lt;dt&gt;Turno anterior&lt;/dt&gt;
-          &lt;dd&gt;{request.current_shift?.name ?? 'Sin turno'}&lt;/dd&gt;
+          &lt;dt&gt;{t('myAttendance.items.previousShift')}&lt;/dt&gt;
+          &lt;dd&gt;
+            {request.current_shift?.name ?? t('myAttendance.items.noShift')}
+            &lt;DeletedMark deleted={request.current_shift?.deleted} /&gt;
+          &lt;/dd&gt;
         &lt;/div&gt;
         &lt;div&gt;
-          &lt;dt&gt;Pedida&lt;/dt&gt;
+          &lt;dt&gt;{t('myAttendance.items.requested')}&lt;/dt&gt;
           &lt;dd title={formatDateTime(request.created_at)}&gt;{timeAgo(request.created_at)}&lt;/dd&gt;
         &lt;/div&gt;
         &lt;div className="attendance-item__wide"&gt;
-          &lt;dt&gt;Motivo&lt;/dt&gt;
+          &lt;dt&gt;{t('common.fields.reason')}&lt;/dt&gt;
           &lt;dd&gt;{request.reason}&lt;/dd&gt;
         &lt;/div&gt;
       &lt;/dl&gt;
-      {request.review_note &amp;&amp; &lt;ItemNote label="Respuesta de tu empresa:"&gt;{request.review_note}&lt;/ItemNote&gt;}
+      {request.review_note &amp;&amp; &lt;ItemNote label={t('myAttendance.items.companyReply')}&gt;{request.review_note}&lt;/ItemNote&gt;}
     &lt;/AttendanceItem&gt;
   );
 }
@@ -220,7 +253,7 @@ export function ShiftRequestItem({ request, busy, onCancel }: ShiftRequestItemPr
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

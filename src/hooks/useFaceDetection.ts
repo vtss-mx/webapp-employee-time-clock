@@ -1,5 +1,7 @@
 import type { Detection, FaceDetector } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState } from 'react';
+import { t, type MessageKey } from '../i18n/core';
+import { localizedError } from '../i18n/lazy';
 import { config } from '../utils/config';
 import { actionMeasure, actionTarget, averageSample, confidentFaces, faceSample, moveProgress, yawRatio, type ActionMode, type FaceBaseline } from '../utils/facePose';
 
@@ -22,20 +24,25 @@ export type FaceGuidance =
   | 'hold_still'
   | 'ready';
 
-export const FACE_GUIDANCE_MESSAGES: Record<FaceGuidance, string> = {
-  loading: 'Preparando detección facial...',
-  no_face: 'Coloca tu rostro frente a la cámara',
-  multiple: 'Solo debe aparecer una persona frente a la cámara',
-  too_far: 'Acércate un poco más a la cámara',
-  too_close: 'Aléjate un poco de la cámara',
-  off_center: 'Centra tu rostro dentro de la guía',
-  look_straight: 'Mira directamente a la cámara',
-  too_dark: 'Hay poca luz. Busca un lugar más iluminado',
-  too_bright: 'Hay demasiada luz. Evita la luz directa',
-  move: 'Haz el movimiento que se indica',
-  hold_still: 'Rostro detectado. Mantente quieto...',
-  ready: 'Rostro detectado',
-};
+/** Texto de cada guía (el estado guarda el código; el texto se pide al dibujarse, en el idioma activo). */
+const GUIDANCE_KEYS = {
+  loading: 'face.guidance.loading',
+  no_face: 'face.guidance.noFace',
+  multiple: 'face.guidance.multiple',
+  too_far: 'face.guidance.tooFar',
+  too_close: 'face.guidance.tooClose',
+  off_center: 'face.guidance.offCenter',
+  look_straight: 'face.guidance.lookStraight',
+  too_dark: 'face.guidance.tooDark',
+  too_bright: 'face.guidance.tooBright',
+  move: 'face.guidance.move',
+  hold_still: 'face.guidance.holdStill',
+  ready: 'face.guidance.ready',
+} as const satisfies Record<FaceGuidance, MessageKey>;
+
+export function guidanceMessage(guidance: FaceGuidance): string {
+  return t(GUIDANCE_KEYS[guidance]);
+}
 
 /**
  * - frontal: rostro de frente (registro, primera fase de verificación y regreso al frente).
@@ -69,7 +76,7 @@ export function loadFaceDetector(): Promise<FaceDetector> {
   if (!detectorPromise) {
     // Si el modelo no carga a tiempo (red lenta), la UI pasa a captura manual en vez de colgarse.
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Tiempo de carga del detector agotado')), config.faceDetectorTimeoutMs),
+      setTimeout(() => reject(localizedError(() => t('face.detection.timeout'))), config.faceDetectorTimeoutMs),
     );
     detectorPromise = Promise.race([createDetector(), timeout]).catch((error) => {
       detectorPromise = null;
@@ -79,21 +86,25 @@ export function loadFaceDetector(): Promise<FaceDetector> {
   return detectorPromise;
 }
 
+/**
+ * El detector compartido para una pantalla. `failed`: no se pudo cargar (la pantalla ofrece la
+ * captura manual; el texto que lo explica lo escribe quien lo muestra, en el idioma activo).
+ */
 export function useFaceDetector() {
   const [detector, setDetector] = useState<FaceDetector | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     loadFaceDetector()
       .then((d) => !cancelled && setDetector(d))
-      .catch(() => !cancelled && setError('No se pudo cargar la detección facial automática'));
+      .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
     };
   }, []);
 
-  return { detector, error, loading: !detector && !error };
+  return { detector, failed, loading: !detector && !failed };
 }
 
 // Márgenes más estrictos que el backend para que la captura enviada pase su validación.

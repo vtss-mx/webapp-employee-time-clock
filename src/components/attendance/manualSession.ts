@@ -1,10 +1,12 @@
+import { t } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { fieldErrorsFrom } from '../../services/apiClient';
 import type { BreakTimes, ManualTimesPayload, WorkSession } from '../../types';
 import type { FieldLabels } from '../../utils/changes';
-import { formatTime } from '../../utils/format';
+import { businessTimeZone, localeDateFormat, timeStyle } from '../../utils/format';
+import { dateError } from '../calendar/calendarRules';
 import { clockMinutes } from '../shifts/shiftRules';
-import { parseIso } from '../ui/DateField';
+import { pad2 } from '../ui/clock';
 
 /**
  * Reglas puras de la jornada que registra o corrige la empresa (solo para guiar: el backend vuelve a
@@ -42,20 +44,35 @@ export const normalizeReason = (reason: string) => reason.trim().replace(/\s+/g,
 
 const isClock = (value: string) => clockMinutes(value) !== null;
 
+/**
+ * Hora "HH:MM" (24 h) de un instante en la zona del negocio: el valor que captura `TimeField`, igual
+ * en todo idioma (la que se MUESTRA es `formatTime` o `clockLabel`, con el formato del idioma).
+ */
+export function businessClock(instant: string): string {
+  const parts = localeDateFormat({ hour: 'numeric', minute: 'numeric', hourCycle: 'h23', timeZone: businessTimeZone() }).formatToParts(new Date(instant));
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${pad2(Number(value.hour))}:${pad2(Number(value.minute))}`;
+}
+
+/** Una hora capturada ("HH:MM") como se lee en el idioma activo: "07:55" (es-MX) o "7:55 AM" (en-US); incompleta, tal cual. */
+export function clockLabel(value: string): string {
+  const minutes = clockMinutes(value);
+  if (minutes === null) return value;
+  return localeDateFormat({ ...timeStyle(), timeZone: 'UTC' }).format(Date.UTC(1970, 0, 1, Math.floor(minutes / 60), minutes % 60));
+}
+
 function dateProblem(value: string, today: string): string | undefined {
-  if (!value) return 'Elige el día que trabajó';
-  if (!parseIso(value)) return 'Escribe una fecha válida (dd/mm/aaaa)';
-  return value > today ? 'No puede ser un día futuro' : undefined;
+  return dateError(value, t('attendance.manual.validation.dateMissing')) ?? (value > today ? t('attendance.manual.validation.dateFuture') : undefined);
 }
 
 /** Errores de lo capturado; `withDate`: al registrar se elige el día (al corregir ya es el de la jornada). */
 export function validateManual(values: ManualValues, { today, withDate }: { today: string; withDate: boolean }): ManualErrors {
   return {
     work_date: withDate ? dateProblem(values.work_date, today) : undefined,
-    check_in: isClock(values.check_in) ? undefined : 'Indica la hora de entrada',
-    check_out: values.stillWorking || isClock(values.check_out) ? undefined : 'Indica la hora de salida o marca «Aún no sale»',
-    breaks: values.breaks.every((item) => isClock(item.start) && isClock(item.end)) ? undefined : 'Indica el inicio y el fin de cada descanso (o quítalo)',
-    reason: normalizeReason(values.reason).length < REASON_MIN ? `Explica brevemente el motivo (al menos ${REASON_MIN} caracteres)` : undefined,
+    check_in: isClock(values.check_in) ? undefined : t('attendance.manual.validation.checkIn'),
+    check_out: values.stillWorking || isClock(values.check_out) ? undefined : t('attendance.manual.validation.checkOut'),
+    breaks: values.breaks.every((item) => isClock(item.start) && isClock(item.end)) ? undefined : t('attendance.manual.validation.breaks'),
+    reason: normalizeReason(values.reason).length < REASON_MIN ? t('attendance.manual.validation.reason', { min: REASON_MIN }) : undefined,
   };
 }
 
@@ -79,10 +96,10 @@ export const emptyValues = (workDate: string): ManualValues => ({ work_date: wor
 export function sessionValues(session: WorkSession): ManualValues {
   return {
     work_date: session.work_date,
-    check_in: formatTime(session.check_in_at),
-    check_out: session.check_out_at ? formatTime(session.check_out_at) : '',
+    check_in: businessClock(session.check_in_at),
+    check_out: session.check_out_at ? businessClock(session.check_out_at) : '',
     stillWorking: session.status === 'OPEN',
-    breaks: session.breaks.map((item) => ({ start: formatTime(item.started_at), end: item.ended_at ? formatTime(item.ended_at) : '' })),
+    breaks: session.breaks.map((item) => ({ start: businessClock(item.started_at), end: item.ended_at ? businessClock(item.ended_at) : '' })),
     reason: '',
   };
 }
@@ -94,14 +111,22 @@ export interface ManualFacts {
   breaks: string;
 }
 
-export const MANUAL_LABELS: FieldLabels<ManualFacts> = { check_in: 'Entrada', check_out: 'Salida', breaks: 'Descansos' };
+/** Etiquetas de lo que se confirma, en el idioma activo. */
+export const manualLabels = (): FieldLabels<ManualFacts> => ({
+  check_in: t('attendance.fields.checkIn'),
+  check_out: t('attendance.fields.checkOut'),
+  breaks: t('attendance.fields.breaks'),
+});
 
-/** Entrada, salida (o "Aún no sale") y descansos ("13:00 – 13:30, 16:00 – 16:15" o "Sin descansos"). */
+/**
+ * Entrada, salida (o "Aún no sale") y descansos ("13:00 – 13:30, 16:00 – 16:15" o "Sin descansos"),
+ * con las horas como se leen en el idioma activo.
+ */
 export function manualFacts(values: ManualValues): ManualFacts {
   return {
-    check_in: values.check_in,
-    check_out: values.stillWorking ? 'Aún no sale' : values.check_out,
-    breaks: values.breaks.length ? values.breaks.map((item) => `${item.start} – ${item.end}`).join(', ') : 'Sin descansos',
+    check_in: clockLabel(values.check_in),
+    check_out: values.stillWorking ? t('attendance.manual.stillWorking') : clockLabel(values.check_out),
+    breaks: values.breaks.length ? values.breaks.map((item) => `${clockLabel(item.start)} – ${clockLabel(item.end)}`).join(', ') : t('attendance.breaks.noBreaks'),
   };
 }
 

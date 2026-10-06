@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Users } from 'lucide-react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { businessToday } from '../../utils/format';
@@ -8,7 +9,7 @@ import { MonthCalendar, type CalendarMarker } from './MonthCalendar';
 const markers: Record<string, CalendarMarker[]> = {
   '2026-10-12': [
     { key: 'holiday', label: 'Festivo: Día de la Raza', tone: 'danger', content: 'Día de la Raza' },
-    { key: 'absences', label: '2 personas descansan', tone: 'info', content: 2 },
+    { key: 'absences', label: '2 personas descansan', tone: 'info', icon: Users, content: '2 descansan', count: 2 },
   ],
   '2026-10-20': [{ key: 'dot', label: 'Algo pasa' }],
 };
@@ -33,15 +34,25 @@ function Harness(props: Partial<Parameters<typeof MonthCalendar>[0]> & { start?:
 }
 
 const day = (name: RegExp) => screen.getByRole('button', { name });
+const cell = (date: string) => document.querySelector<HTMLButtonElement>(`[data-date="${date}"]`) as HTMLButtonElement;
 const focusedDate = () => (document.activeElement as HTMLElement).dataset.date;
 
 describe('MonthCalendar', () => {
-  it('dibuja el mes de lunes a domingo, hoy resaltado y las marcas con su nombre accesible', () => {
+  it('6 semanas de lunes a domingo con los días vecinos atenuados, fines de semana, hoy y las marcas', () => {
     render(<Harness />);
     const grid = screen.getByRole('grid', { name: 'Octubre de 2026' });
-    expect(within(grid).getAllByRole('columnheader')).toHaveLength(7);
-    // El 1 de octubre de 2026 es jueves: tres celdas vacías antes.
+    const headers = within(grid).getAllByRole('columnheader');
+    expect(headers).toHaveLength(7);
+    expect(headers[5]).toHaveClass('is-weekend');
+    expect(headers[4]).not.toHaveClass('is-weekend');
+    // Siempre 42 días: el 1 de octubre de 2026 es jueves (tres de septiembre antes) y termina el 8 de noviembre.
+    expect(grid.querySelectorAll('tbody tr')).toHaveLength(6);
+    expect(grid.querySelectorAll('tbody td')).toHaveLength(42);
     expect(grid.querySelectorAll('tbody tr:first-child td.is-outside')).toHaveLength(3);
+    expect(cell('2026-09-28').closest('td')).toHaveClass('is-outside');
+    expect(cell('2026-11-08').closest('td')).toHaveClass('is-outside', 'is-weekend');
+    expect(cell('2026-09-28')).toHaveAccessibleName('Lunes, 28 de septiembre de 2026');
+    expect(cell('2026-09-28')).toHaveAttribute('tabindex', '-1');
     const today = day(/^Domingo, 4 de octubre de 2026\. hoy$/);
     expect(today).toHaveAttribute('aria-current', 'date');
     expect(today).toHaveClass('is-today');
@@ -49,25 +60,41 @@ describe('MonthCalendar', () => {
     expect(today).toHaveAttribute('tabindex', '0');
     const holiday = day(/12 de octubre de 2026\. Festivo: Día de la Raza\. 2 personas descansan/);
     expect(holiday).toHaveClass('has-markers');
-    expect(holiday).toHaveTextContent('12Día de la Raza2');
+    expect(holiday).toHaveTextContent('12Día de la Raza2 descansan2');
     expect(holiday.querySelector('.month-cal__marker--danger')).toHaveAttribute('title', 'Festivo: Día de la Raza');
-    // Sin tono, la marca es primaria; sin contenido, un punto.
+    // El conteo lleva su ícono y su cifra (la cuadrícula mediana muestra solo la cifra).
+    const count = holiday.querySelector('.month-cal__marker--info') as HTMLElement;
+    expect(count).toHaveClass('has-count');
+    expect(count.querySelector('svg')).not.toBeNull();
+    expect(count.querySelector('.month-cal__marker-count')).toHaveTextContent('2');
+    expect(holiday.querySelector('.month-cal__marker--danger')).not.toHaveClass('has-count');
+    // Sin tono, la marca es primaria; sin contenido, solo su color.
     expect(day(/20 de octubre de 2026\. Algo pasa/).querySelector('.month-cal__marker--primary')).toBeEmptyDOMElement();
+    expect(cell('2026-10-05')).not.toHaveClass('has-markers');
   });
 
-  it('elegir un día lo marca y cambiar de mes con los botones no mueve el foco', async () => {
+  it('las marcas que no caben se resumen en "+N" con sus nombres', () => {
+    render(<Harness maxMarkers={1} />);
+    const holiday = cell('2026-10-12');
+    expect(holiday.querySelectorAll('.month-cal__marker')).toHaveLength(2);
+    expect(holiday.querySelector('.month-cal__marker--more')).toHaveTextContent('+1');
+    expect(holiday.querySelector('.month-cal__marker--more')).toHaveAttribute('title', '2 personas descansan');
+    expect(cell('2026-10-20').querySelector('.month-cal__marker--more')).toBeNull();
+  });
+
+  it('elegir un día lo marca; un día de otro mes lleva a su mes y lo elige', async () => {
     render(<Harness />);
     await userEvent.click(day(/^Martes, 6 de octubre/));
     expect(day(/^Martes, 6 de octubre/)).toHaveClass('is-selected');
     expect(day(/^Martes, 6 de octubre/).closest('td')).toHaveAttribute('aria-selected', 'true');
-    await userEvent.click(screen.getByRole('button', { name: 'Mes siguiente' }));
+    expect(cell('2026-10-07').closest('td')).toHaveAttribute('aria-selected', 'false');
+    await userEvent.click(cell('2026-11-02'));
     expect(screen.getByRole('grid', { name: 'Noviembre de 2026' })).toBeInTheDocument();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Mes siguiente' }));
-    // Ni el elegido ni hoy están en noviembre: el foco de tabulador va al primero del mes.
-    expect(day(/^Domingo, 1 de noviembre/)).toHaveAttribute('tabindex', '0');
-    await userEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
-    expect(screen.getByRole('grid', { name: 'Septiembre de 2026' })).toBeInTheDocument();
+    expect(cell('2026-11-02')).toHaveClass('is-selected');
+    expect(cell('2026-11-02')).toHaveAttribute('tabindex', '0');
+    await userEvent.click(cell('2026-10-26'));
+    expect(screen.getByRole('grid', { name: 'Octubre de 2026' })).toBeInTheDocument();
+    expect(cell('2026-10-26')).toHaveClass('is-selected');
   });
 
   it('teclado: flechas, Inicio/Fin y Re Pág/Av Pág; al salir del mes cambia de mes', async () => {
@@ -101,42 +128,55 @@ describe('MonthCalendar', () => {
     expect(day(/^Jueves, 13 de agosto/)).toHaveClass('is-selected');
   });
 
-  it('respeta los años permitidos (botones y teclado) y acepta textos y marcas propias', async () => {
+  it('respeta los años permitidos (teclado y días vecinos) y acepta textos, nombre y marcas propias', async () => {
     const onMonthChange = vi.fn();
+    const onSelect = vi.fn();
     render(
       <MonthCalendar
         year={2000}
         month={0}
         onMonthChange={onMonthChange}
+        onSelect={onSelect}
         years={{ from: 2000, to: 2000 }}
         today="2000-01-03"
-        labels={{ previous: 'Antes', next: 'Después', today: 'el día de hoy' }}
+        label="Mes de los festivos"
+        labels={{ today: 'el día de hoy' }}
         markers={{ '2000-01-05': [{ key: 'x', label: 'Marca', content: 'texto' }] }}
         renderMarker={(marker, date) => `${marker.key}@${date}`}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Antes' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Después' })).toBeEnabled();
+    expect(screen.getByRole('grid', { name: 'Mes de los festivos' })).toBeInTheDocument();
     expect(day(/, 3 de enero de 2000\. el día de hoy/)).toBeInTheDocument();
     expect(day(/, 5 de enero de 2000\. Marca/)).toHaveTextContent('x@2000-01-05');
-    // Sin `onSelect` las celdas no dicen si están elegidas.
-    expect(day(/, 5 de enero de 2000/).closest('td')).not.toHaveAttribute('aria-selected');
+    // El 27 de diciembre de 1999 se ve atenuado, pero está fuera de los años: no lleva a nada.
+    await userEvent.click(cell('1999-12-27'));
+    expect(onMonthChange).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
     day(/, 3 de enero de 2000/).focus();
     await userEvent.keyboard('{PageUp}');
     expect(onMonthChange).not.toHaveBeenCalled();
     expect(focusedDate()).toBe('2000-01-03');
-    await userEvent.click(screen.getByRole('button', { name: 'Después' }));
+    await userEvent.click(cell('2000-02-01'));
     expect(onMonthChange).toHaveBeenCalledWith(2000, 1);
+    expect(onSelect).toHaveBeenCalledWith('2000-02-01');
   });
 
-  it('en diciembre del último año no avanza; sin `today` usa el de la zona del negocio', () => {
-    const { unmount } = render(<MonthCalendar year={2100} month={11} onMonthChange={vi.fn()} years={{ from: 2000, to: 2100 }} today="2026-10-04" />);
-    expect(screen.getByRole('button', { name: 'Mes siguiente' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Mes anterior' })).toBeEnabled();
+  it('sin `onSelect` los días no dicen si están elegidos; sin `today` usa el de la zona del negocio', async () => {
+    const onMonthChange = vi.fn();
+    const { unmount } = render(<MonthCalendar year={2026} month={9} onMonthChange={onMonthChange} today="2026-10-04" />);
+    expect(cell('2026-10-05').closest('td')).not.toHaveAttribute('aria-selected');
+    await userEvent.click(cell('2026-10-05'));
+    expect(onMonthChange).not.toHaveBeenCalled();
+    await userEvent.click(cell('2026-11-01'));
+    expect(onMonthChange).toHaveBeenCalledWith(2026, 10);
     unmount();
+    // Ni hoy ni un día elegido en el mes: el foco de tabulador va a su primer día.
+    const november = render(<MonthCalendar year={2026} month={10} onMonthChange={vi.fn()} today="2026-10-04" />);
+    expect(cell('2026-11-01')).toHaveAttribute('tabindex', '0');
+    november.unmount();
     const [year, month] = businessToday().split('-').map(Number);
     render(<MonthCalendar year={year} month={month - 1} onMonthChange={vi.fn()} className="extra" />);
     expect(document.querySelector('.month-cal.extra')).not.toBeNull();
-    expect(document.querySelector(`[data-date="${businessToday()}"]`)).toHaveAttribute('aria-current', 'date');
+    expect(cell(businessToday())).toHaveAttribute('aria-current', 'date');
   });
 });

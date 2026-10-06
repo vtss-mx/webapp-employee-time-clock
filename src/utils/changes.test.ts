@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { describeChanges, describeValues, EMPTY_VALUE, namesSummary, SECRET_VALUE, type FieldLabels } from './changes';
+import { setLocale } from '../i18n/core';
+import { describeChanges, describeValues, emptyValue, namesSummary, SECRET_VALUE, type FieldLabels } from './changes';
 
 interface Values {
   name: string;
@@ -31,7 +32,7 @@ describe('describeChanges', () => {
   it('solo los campos que cambiaron, en el orden de las etiquetas y con su formato', () => {
     const after: Values = { ...before, phone: '6621234567', department: null, active: false, days: ['Lunes', 'Martes'], internal: 'y' };
     expect(describeChanges(before, after, labels)).toEqual([
-      { label: 'Teléfono', before: EMPTY_VALUE, after: '6621234567' },
+      { label: 'Teléfono', before: 'Sin capturar', after: '6621234567' },
       { label: 'Departamento', before: 'Depto. 3', after: 'Sin departamento' },
       { label: 'Activo', before: 'Sí', after: 'No' },
       { label: 'Días', before: 'Lunes', after: 'Lunes, Martes' },
@@ -41,7 +42,7 @@ describe('describeChanges', () => {
   it('un secreto nunca muestra su valor; un formato vacío se lee como "Sin capturar"', () => {
     expect(describeChanges(before, { ...before, password: 'Nueva123' }, labels)).toEqual([{ label: 'Contraseña', before: SECRET_VALUE, after: 'Nueva' }]);
     const blank: FieldLabels<Values> = { name: { label: 'Nombre', format: (value) => (value === 'Ana Ruiz' ? '' : value) } };
-    expect(describeChanges(before, { ...before, name: 'Ana' }, blank)).toEqual([{ label: 'Nombre', before: EMPTY_VALUE, after: 'Ana' }]);
+    expect(describeChanges(before, { ...before, name: 'Ana' }, blank)).toEqual([{ label: 'Nombre', before: emptyValue(), after: 'Ana' }]);
   });
 
   it('números y objetos se comparan por su valor', () => {
@@ -61,8 +62,38 @@ describe('describeValues', () => {
   });
 });
 
+describe('en inglés (en-US)', () => {
+  it('describeChanges: "Not provided", "Yes"/"No" y "New" para un secreto; las etiquetas las da quien llama', async () => {
+    await setLocale('en-US');
+    const english: FieldLabels<Values> = { phone: 'Phone', active: 'Active', password: { label: 'Password', secret: true } };
+    expect(describeChanges(before, { ...before, phone: '6621234567', active: false, password: 'Nueva123' }, english)).toEqual([
+      { label: 'Phone', before: 'Not provided', after: '6621234567' },
+      { label: 'Active', before: 'Yes', after: 'No' },
+      { label: 'Password', before: SECRET_VALUE, after: 'New' },
+    ]);
+    expect(emptyValue()).toBe('Not provided');
+  });
+
+  it('describeValues: los valores legibles en inglés y el secreto oculto', async () => {
+    await setLocale('en-US');
+    expect(describeValues({ ...before, active: false, password: 'x' }, { active: 'Active', password: { label: 'Password', secret: true } })).toEqual([
+      { label: 'Active', value: 'No' },
+      { label: 'Password', value: SECRET_VALUE },
+    ]);
+  });
+
+  it('namesSummary: nombres unidos como en inglés y "and N more"', async () => {
+    await setLocale('en-US');
+    const employees = (count: number) => (count === 1 ? '1 employee' : `${count} employees`);
+    expect(namesSummary(['Ana', 'Luis', 'Eva'], 3, employees)).toBe('Ana, Luis, and Eva');
+    expect(namesSummary(['Ana', 'Luis', 'Eva'], 1203, employees, 2)).toBe('Ana, Luis, and 1,201 more');
+    expect(namesSummary(['Ana'], 12, employees)).toBe('Ana and 11 more');
+    expect(namesSummary([], 12, employees)).toBe('12 employees');
+  });
+});
+
 describe('namesSummary', () => {
-  const noun = { one: 'empleado', other: 'empleados' };
+  const noun = (count: number) => (count === 1 ? '1 empleado' : `${count} empleados`);
   it('todos los nombres unidos en español; con más de los que se muestran, "y N más"', () => {
     expect(namesSummary(['Ana'], 1, noun)).toBe('Ana');
     expect(namesSummary(['Ana', 'Luis', 'Eva'], 3, noun)).toBe('Ana, Luis y Eva');

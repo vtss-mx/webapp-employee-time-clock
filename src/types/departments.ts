@@ -1,4 +1,5 @@
 // Departamentos de la empresa: responsables y empleados asignados (GET/POST /api/departments).
+import type { SoftDeleted } from './trash';
 
 /** Departamento (id y nombre) junto a un empleado. */
 export interface DepartmentRef {
@@ -14,7 +15,7 @@ export interface DepartmentPerson {
   active: boolean;
 }
 
-export interface Department {
+export interface Department extends SoftDeleted {
   id: number;
   name: string;
   description: string | null;

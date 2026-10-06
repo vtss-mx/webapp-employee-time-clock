@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { useT } from '../../i18n';
 import { config } from '../../utils/config';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 import { BrandLogo } from '../ui/BrandLogo';
 
 /** Trazos de marca muy sutiles detrás de la tarjeta (decorativos). */
@@ -27,8 +29,12 @@ function Backdrop() {
   );
 }
 
-/** Marco corporativo del inicio de sesión: barra con la marca, fondo azul, tarjeta central y pie. */
+/**
+ * Marco corporativo del inicio de sesión: barra con la marca y el selector de idioma (cambia en
+ * caliente, sin perder lo escrito), fondo azul, tarjeta central y pie.
+ */
 export function AuthLayout({ children }: { children: ReactNode }) {
+  const t = useT();
   return (
     <div className="auth">
       <header className="auth__header">
@@ -36,9 +42,10 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           <BrandLogo size={46} />
           <span className="auth__brand-name">
             <strong>{config.appName}</strong>
-            <small>{config.appTagline}</small>
+            <small>{t('app.tagline')}</small>
           </span>
         </span>
+        <LanguageSwitcher variant="compact" tone="dark" />
       </header>
 
       <main className="auth__panel">
@@ -47,7 +54,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="auth__footer">
-        © {new Date().getFullYear()} {config.appName}. Todos los derechos reservados.
+        {t('auth.layout.copyright', { year: new Date().getFullYear(), app: config.appName })}
       </footer>
     </div>
   );

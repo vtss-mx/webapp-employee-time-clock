@@ -1,4 +1,5 @@
 // Política de verificación de la empresa y evolución de su reconocimiento facial.
+import type { Page } from './index';
 
 /** Política de verificación de la empresa (la configura el ADMIN de la plataforma; la empresa solo la lee). */
 export interface VerificationPolicy {
@@ -50,11 +51,170 @@ export interface VerificationPolicy {
   max_travel_kmh: number;
   /** Nombres de cámaras virtuales que no se aceptan (la app avisa antes de capturar). */
   blocked_cameras: string[];
+  /** Un validador en modo QR registra asistencia con el QR solo (decisión del dueño: apagado en empresas nuevas). */
+  qr_only_attendance: boolean;
   updated_at: string | null;
   updated_by: string | null;
 }
 
+/** Una señal del motor de riesgo en esta empresa: la de la plataforma, la vigente y su línea base de casos. */
+export interface RiskSignalSetting {
+  code: string;
+  name: string;
+  description: string | null;
+  /** Tipo de fraude que sugiere (catálogo `fraud_kinds`): su familia suma con tope. */
+  kind: string;
+  /** Regla dura: obligatoria, niega sin importar el puntaje. */
+  hard: boolean;
+  /** La informa el dispositivo (menos confiable). */
+  client: boolean;
+  default_points: number;
+  default_mode: string;
+  points: number;
+  mode: string;
+  confirmed: number;
+  false_positive: number;
+  /** Solo se mide: no se puede exigir (el pulso por video, hasta calibrarlo). */
+  measure_only?: boolean;
+}
+
+/**
+ * La política completa que configura el ADMIN: además de lo que leen la empresa y su personal, el motor de
+ * riesgo y los controles antifraude (nunca viajan a la empresa).
+ */
+export interface AdminVerificationPolicy extends VerificationPolicy {
+  /** Nivel de SOSPECHA de duplicado al registrarse (solo marca para la revisión): un `value` de confidence_levels. */
+  duplicate_confidence: number;
+  /** Dispositivo del empleado (catálogo `employee_device_modes`; la vinculación llega en la fase 2). */
+  employee_device_mode: string;
+  /** Último nivel predefinido aplicado (catálogo `policy_presets`); null = a la medida. */
+  preset: string | null;
+  risk_engine: boolean;
+  risk_medium_score: number;
+  risk_high_score: number;
+  risk_critical_score: number;
+  /** Acción de cada nivel (catálogo `risk_actions`). */
+  risk_medium_action: string;
+  risk_high_action: string;
+  risk_critical_action: string;
+  /** Si el motor falla: permitir, permitir y avisar o un paso más. */
+  risk_fallback_action: string;
+  /** Guardar fotogramas de evidencia de los intentos sospechosos (cifrados en el bucket). */
+  fraud_evidence: boolean;
+  /** Antifraude 2a: destello dictado por el servidor y ráfaga de recortes del rostro (nacen midiendo). */
+  flash_paced: boolean;
+  capture_burst: boolean;
+  /**
+   * Antifraude 2b (códigos del catálogo `signal_modes`): firma de cada identificación con la llave del dispositivo
+   * del validador, su ubicación en cada identificación y el código de sitio al checar la entrada y la salida.
+   */
+  validator_signing: string;
+  validator_location: string;
+  site_codes: string;
+  risk_signals: RiskSignalSetting[];
+  /** Cambios que relajan la seguridad y esperan la aprobación de otro ADMIN. */
+  pending_changes: number;
+  /** La regla de dos personas está activa en la plataforma. */
+  two_person_rule: boolean;
+}
+
+/** El ajuste de una señal (lo omitido queda como estaba). */
+export interface RiskSignalUpdate {
+  mode?: string;
+  points?: number;
+}
+
 export type VerificationPolicyUpdate = Partial<Omit<VerificationPolicy, 'updated_at' | 'updated_by' | 'blocked_cameras'>>;
+
+/** Cambio de la política del ADMIN (cualquier control, también el motor de riesgo) y su motivo opcional. */
+export type AdminPolicyUpdate = VerificationPolicyUpdate &
+  Partial<
+    Pick<
+      AdminVerificationPolicy,
+      | 'duplicate_confidence'
+      | 'employee_device_mode'
+      | 'risk_engine'
+      | 'risk_medium_score'
+      | 'risk_high_score'
+      | 'risk_critical_score'
+      | 'risk_medium_action'
+      | 'risk_high_action'
+      | 'risk_critical_action'
+      | 'risk_fallback_action'
+      | 'fraud_evidence'
+      | 'flash_paced'
+      | 'capture_burst'
+      | 'validator_signing'
+      | 'validator_location'
+      | 'site_codes'
+    >
+  > & { risk_signals?: Record<string, RiskSignalUpdate>; reason?: string };
+
+/** Un campo que cambió: antes → después y si relaja la seguridad (`risk_signals.<código>.<mode|points>`). */
+export interface PolicyFieldChange {
+  field: string;
+  before: unknown;
+  after: unknown;
+  relaxes: boolean;
+}
+
+/** Cuántos intentos terminaron (o terminarían) en cada acción del motor. */
+export interface SimulationActions {
+  allow: number;
+  alert: number;
+  step_up: number;
+  review: number;
+  deny: number;
+}
+
+/** "¿Qué habría pasado en los últimos días con esta política?" (solo con lo que se midió en su momento). */
+export interface RiskSimulation {
+  days: number;
+  evaluated: number;
+  capped: boolean;
+  current: SimulationActions;
+  candidate: SimulationActions;
+  stricter: number;
+  looser: number;
+  frauds_stopped: number;
+  frauds: number;
+  genuine_affected: number;
+  top_reasons: { code: string; count: number }[];
+}
+
+/** Un cambio del historial de la política (catálogo `policy_change_statuses`). */
+export interface PolicyChange {
+  id: number;
+  status: string;
+  relaxes: boolean;
+  preset: string | null;
+  changes: PolicyFieldChange[];
+  reason: string | null;
+  simulation: RiskSimulation | null;
+  requested_by: string;
+  /** Lo pidió quien lo ve: puede cancelarlo, pero no aprobarlo ni rechazarlo. */
+  requested_by_me: boolean;
+  created_at: string;
+  /** Hasta cuándo se puede aprobar (solo los pendientes). */
+  expires_at: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+}
+
+/** La política tras pedir un cambio y el cambio que quedó (null si no cambiaba nada; PENDING si relaja). */
+export interface PolicyUpdateResult {
+  policy: AdminVerificationPolicy;
+  change: PolicyChange | null;
+}
+
+/** La configuración de riesgo que se quiere probar (lo omitido queda como la vigente). */
+export type RiskPolicyCandidate = Partial<
+  Pick<
+    AdminVerificationPolicy,
+    'risk_engine' | 'risk_medium_score' | 'risk_high_score' | 'risk_critical_score' | 'risk_medium_action' | 'risk_high_action' | 'risk_critical_action'
+  >
+> & { risk_signals?: Record<string, RiskSignalUpdate> };
 
 /**
  * Reglas que la app aplica en pantalla (el umbral de confianza solo lo evalúa el servidor; la vida del
@@ -70,6 +230,7 @@ export type VerificationRules = Omit<
   | 'max_travel_kmh'
   | 'liveness_timeout_seconds'
   | 'flash_liveness'
+  | 'qr_only_attendance'
   | 'updated_at'
   | 'updated_by'
 >;
@@ -88,3 +249,5 @@ export interface FaceLearningSummary {
   learned_identifications: number;
   last_learned_at: string | null;
 }
+
+export type PolicyChangeList = Page<PolicyChange>;

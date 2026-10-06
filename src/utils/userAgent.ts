@@ -3,9 +3,11 @@
  * Es solo descriptivo: un cliente puede falsear su User-Agent.
  */
 
-/** Descripción legible del navegador y sistema a partir del User-Agent. */
+import { t } from '../i18n/core';
+
+/** Descripción legible del navegador y sistema a partir del User-Agent, en el idioma activo (se pide al dibujar). */
 export function describeDevice(userAgent: string | null): { label: string; mobile: boolean } {
-  if (!userAgent) return { label: 'Dispositivo desconocido', mobile: false };
+  if (!userAgent) return { label: t('forms.device.unknown'), mobile: false };
   const browser = /Edg\//.test(userAgent)
     ? 'Edge'
     : /Chrome\//.test(userAgent)
@@ -14,7 +16,7 @@ export function describeDevice(userAgent: string | null): { label: string; mobil
         ? 'Firefox'
         : /Safari\//.test(userAgent)
           ? 'Safari'
-          : 'Navegador';
+          : t('forms.device.browser');
   const os = /Android/.test(userAgent)
     ? 'Android'
     : /iPhone|iPad/.test(userAgent)
@@ -25,6 +27,6 @@ export function describeDevice(userAgent: string | null): { label: string; mobil
           ? 'Windows'
           : /Linux/.test(userAgent)
             ? 'Linux'
-            : 'Sistema desconocido';
+            : t('forms.device.system');
   return { label: `${browser} · ${os}`, mobile: /Mobile|Android|iPhone|iPad/.test(userAgent) };
 }

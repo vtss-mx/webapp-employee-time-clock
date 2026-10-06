@@ -2,6 +2,7 @@ import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useFeedback } from '../hooks/useFeedback';
+import { t } from '../i18n';
 import { paths } from '../routes/paths';
 import { isOutdated, reloadApp } from '../services/versionService';
 import { config } from '../utils/config';
@@ -37,18 +38,19 @@ export function VersionWatcher() {
       return;
     }
     pending.current = false;
-    const choice = await feedback.show({
+    // Se arma al dibujarse: con el popup abierto, un cambio de idioma lo traduce.
+    const choice = await feedback.show(() => ({
       variant: 'info',
       icon: <RefreshCw size={30} />,
-      eyebrow: 'Actualización',
-      title: 'Hay una nueva versión de la aplicación',
-      text: 'Actualiza para usar las mejoras y correcciones más recientes. Solo toma un momento.',
+      eyebrow: t('system.newVersion.eyebrow'),
+      title: t('system.newVersion.title'),
+      text: t('system.newVersion.text'),
       actions: [
-        { id: 'later', label: 'Más tarde', variant: 'ghost' },
-        { id: 'reload', label: 'Actualizar ahora', icon: <RefreshCw size={18} /> },
+        { id: 'later', label: t('system.newVersion.later'), variant: 'ghost' },
+        { id: 'reload', label: t('system.newVersion.reload'), icon: <RefreshCw size={18} /> },
       ],
       key: 'new-version',
-    });
+    }));
     if (choice === 'reload') reloadApp();
     else snoozedUntil.current = Date.now() + SNOOZE_MS;
   }, [feedback, pathname]);

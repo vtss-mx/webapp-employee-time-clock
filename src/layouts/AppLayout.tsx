@@ -4,14 +4,19 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { PageLoader } from '../components/Spinner';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { Avatar } from '../components/ui/Avatar';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../hooks/useAuth';
 import { useCatalogs } from '../hooks/useCatalogs';
+import { t, useT } from '../i18n';
 import { PendingEnrollmentsContext, usePendingEnrollments } from '../hooks/usePendingEnrollments';
 import { usePendingErrors } from '../hooks/usePendingErrors';
 import { usePendingAbsenceRequests } from '../hooks/usePendingAbsenceRequests';
+import { usePendingAttendanceReviews } from '../hooks/usePendingAttendanceReviews';
+import { usePendingFraudCases } from '../hooks/usePendingFraudCases';
 import { usePendingShiftRequests } from '../hooks/usePendingShiftRequests';
+import { useSlowAlerts } from '../hooks/useSlowAlerts';
 import { homeForUser } from '../routes/paths';
 import type { User } from '../types';
 import { config } from '../utils/config';
@@ -30,7 +35,7 @@ function useSidebarCollapse() {
   const toggleCollapsed = useCallback(() => {
     // Si el servidor no responde, el contexto revierte el cambio y se avisa (una vez aunque se insista).
     updatePreferences({ sidebar_collapsed: !collapsed }).catch((error: unknown) => {
-      void feedback.fromError(error, { title: 'No se pudo guardar la preferencia del menú', key: 'sidebar-preference' });
+      void feedback.fromError(error, { title: () => t('layout.menu.preferenceFailed'), key: 'sidebar-preference' });
     });
   }, [collapsed, updatePreferences, feedback]);
   useEffect(() => {
@@ -52,10 +57,17 @@ function useSidebarCollapse() {
  */
 function workspaceName(user: User): string {
   if (user.company) return user.company.name;
-  return user.employee || user.memberships?.length ? 'Identidad verificada' : 'Consola de la plataforma';
+  return user.employee || user.memberships?.length ? t('layout.workspace.verifiedIdentity') : t('layout.workspace.platform');
 }
 
+/**
+ * Marco de las pantallas con sesión: menú lateral (escritorio) o cajón con hamburguesa (teléfonos) y
+ * el área de trabajo. Los nombres del menú los envía el backend en el idioma de la petición; los
+ * textos propios (botones, regiones) salen de los diccionarios.
+ */
 export function AppLayout() {
+  // Redibuja al cambiar el idioma; los textos salen de `t` (también el del popup, que se arma al dibujarse).
+  useT();
   const { user } = useAuth();
   const confirmLogout = useConfirmLogout();
   const { nameOf } = useCatalogs();
@@ -70,6 +82,11 @@ export function AppLayout() {
   const pendingErrors = usePendingErrors(usesBadge(user, 'PENDING_ERRORS'));
   const pendingShiftRequests = usePendingShiftRequests(usesBadge(user, 'PENDING_SHIFT_REQUESTS'));
   const pendingAbsences = usePendingAbsenceRequests(usesBadge(user, 'PENDING_ABSENCE_REQUESTS'));
+  // Antifraude: casos por revisar (ADMIN) y registros "en revisión" que la empresa confirma o rechaza.
+  const openFraudCases = usePendingFraudCases(usesBadge(user, 'OPEN_FRAUD_CASES'));
+  const pendingReviews = usePendingAttendanceReviews(usesBadge(user, 'PENDING_ATTENDANCE_REVIEWS'));
+  // Alertas de peticiones lentas (regla 18): una consulta para el contador y el aviso en vivo.
+  const openSlowAlerts = useSlowAlerts(usesBadge(user, 'OPEN_SLOW_ALERTS'));
 
   // En móvil, el menú lateral se cierra al navegar (configurable).
   useEffect(() => {
@@ -78,20 +95,18 @@ export function AppLayout() {
 
   if (!user) return null;
   const displayName = user.employee?.full_name ?? user.email;
-  const initials = displayName
-    .split(/[\s@.]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join('');
 
   const nav = navFor(user, {
     PENDING_ENROLLMENTS: pending,
     PENDING_ERRORS: pendingErrors,
     PENDING_SHIFT_REQUESTS: pendingShiftRequests,
     PENDING_ABSENCE_REQUESTS: pendingAbsences,
+    OPEN_SLOW_ALERTS: openSlowAlerts,
+    OPEN_FRAUD_CASES: openFraudCases,
+    PENDING_ATTENDANCE_REVIEWS: pendingReviews,
   });
   const role = nameOf('roles', user.role);
+  const toggleLabel = collapsed ? t('layout.menu.expand') : t('layout.menu.collapse');
 
   return (
     <div className={`shell ${collapsed ? 'is-collapsed' : ''}`}>
@@ -100,7 +115,7 @@ export function AppLayout() {
       <aside
         id="app-sidebar"
         className={`sidebar sidebar--${MOBILE_MENU.side} ${menuOpen ? 'is-open' : ''}`}
-        aria-label="Navegación principal"
+        aria-label={t('layout.sidebar')}
       >
         <Link to={homeForUser(user)} className="sidebar__brand">
           <BrandLogo />
@@ -110,7 +125,7 @@ export function AppLayout() {
           </span>
         </Link>
         {/* Teléfonos: el menú se cierra desde dentro (la barra queda detrás del fondo oscuro). */}
-        <Button iconOnly variant="ghost" className="sidebar__close" aria-label="Cerrar menú" onClick={closeMenu}>
+        <Button iconOnly variant="ghost" className="sidebar__close" aria-label={t('layout.menu.close')} onClick={closeMenu}>
           <X size={20} />
         </Button>
 
@@ -120,10 +135,10 @@ export function AppLayout() {
           <button
             type="button"
             className="sidebar__collapse"
-            aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+            aria-label={toggleLabel}
             aria-controls="app-sidebar"
             aria-expanded={!collapsed}
-            title={`${collapsed ? 'Expandir' : 'Contraer'} menú (Ctrl/⌘ + B)`}
+            title={t('layout.menu.withShortcut', { action: toggleLabel })}
             onClick={toggleCollapsed}
           >
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
@@ -133,12 +148,12 @@ export function AppLayout() {
 
         <div className="sidebar__footer">
           <div className="user-card">
-            <span className="avatar">{initials}</span>
+            <Avatar name={displayName} src={user.avatar} decorative />
             <span className="user-card__info">
               <strong className="truncate">{displayName}</strong>
               <small>{role}</small>
             </span>
-            <Button iconOnly variant="ghost" onClick={() => void confirmLogout()} aria-label="Cerrar sesión" title="Cerrar sesión">
+            <Button iconOnly variant="ghost" onClick={() => void confirmLogout()} aria-label={t('common.actions.logout')} title={t('common.actions.logout')}>
               <LogOut size={18} />
             </Button>
           </div>
@@ -152,7 +167,7 @@ export function AppLayout() {
             {/* Un error en una pantalla no tumba el menú ni la sesión; se reinicia al navegar. */}
             <ErrorBoundary inline>
               {/* Mientras llega el código de la pantalla (carga diferida), el menú sigue visible. */}
-              <Suspense fallback={<PageLoader text="Cargando..." />}>
+              <Suspense fallback={<PageLoader />}>
                 <PendingEnrollmentsContext.Provider value={pending}>
                   <Outlet />
                 </PendingEnrollmentsContext.Provider>

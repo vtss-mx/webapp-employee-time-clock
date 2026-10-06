@@ -8,14 +8,18 @@ import { usePendingEnrollmentsCount } from '../../hooks/usePendingEnrollments';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
+import { t, useT } from '../../i18n';
 import { businessHour } from '../../utils/format';
 
 function greeting() {
   const h = businessHour();
-  return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  return t(h < 12 ? 'companyHome.greeting.morning' : h < 19 ? 'companyHome.greeting.afternoon' : 'companyHome.greeting.evening');
 }
 
+const loadError = () => t('companyHome.loadError');
+
 export function DashboardPage() {
+  const t = useT();
   const { data: stats, error, retry } = useResource(
     (signal) =>
       Promise.all([employeeService.list({ size: 1 }, signal), employeeService.list({ size: 1, active: true }, signal)]).then(([all, active]) => ({
@@ -24,15 +28,15 @@ export function DashboardPage() {
         inactive: all.total - active.total,
       })),
     'summary',
-    'No se pudo cargar el resumen',
+    loadError,
   );
   // La cola de validaciones la consulta una sola vez el layout (el mismo valor que el contador del menú).
   const pending = usePendingEnrollmentsCount();
 
   const kpis: Kpi[] = [
-    { key: 'total', label: 'Empleados registrados', icon: Users, value: stats?.total, tile: '' },
-    { key: 'active', label: 'Activos', icon: UserCheck, value: stats?.active, tile: 'icon-tile--success' },
-    { key: 'inactive', label: 'Inactivos', icon: UserMinus, value: stats?.inactive, tile: 'icon-tile--warning' },
+    { key: 'total', label: t('companyHome.kpis.total'), icon: Users, value: stats?.total, tile: '' },
+    { key: 'active', label: t('companyHome.kpis.active'), icon: UserCheck, value: stats?.active, tile: 'icon-tile--success' },
+    { key: 'inactive', label: t('companyHome.kpis.inactive'), icon: UserMinus, value: stats?.inactive, tile: 'icon-tile--warning' },
   ];
 
   return (
@@ -40,10 +44,10 @@ export function DashboardPage() {
       <Panel>
         <PanelHeader
           title={greeting()}
-          subtitle="Este es el resumen de tu organización."
+          subtitle={t('companyHome.subtitle')}
           actions={
             <ButtonLink to={paths.company.newEmployee} variant="primary" icon={<UserPlus size={18} />}>
-              Registrar empleado
+              {t('companyHome.registerEmployee')}
             </ButtonLink>
           }
         />
@@ -56,13 +60,11 @@ export function DashboardPage() {
                 <ClipboardCheck size={22} />
               </span>
               <div className="callout__body">
-                <strong>
-                  {pending} {pending === 1 ? 'registro facial espera' : 'registros faciales esperan'} tu validación
-                </strong>
-                <p className="muted small">Confirma la identidad para que los empleados puedan identificarse.</p>
+                <strong>{t('companyHome.pending.title', { count: pending })}</strong>
+                <p className="muted small">{t('companyHome.pending.text')}</p>
               </div>
               <ButtonLink to={paths.company.validations} variant="primary" iconRight={<ArrowRight size={18} />}>
-                Revisar ahora
+                {t('companyHome.pending.review')}
               </ButtonLink>
             </div>
           ) : null}
@@ -73,7 +75,7 @@ export function DashboardPage() {
                 <ClipboardCheck size={22} />
               </span>
               <span>
-                <span className="kpi__label">Validaciones pendientes</span>
+                <span className="kpi__label">{t('companyHome.kpis.pending')}</span>
                 <KpiValue value={pending} />
               </span>
             </Link>
@@ -88,27 +90,27 @@ export function DashboardPage() {
                 <Users size={22} />
               </span>
               <span className="action-card__title">
-                Empleados <ArrowRight size={18} />
+                {t('companyHome.cards.employees.title')} <ArrowRight size={18} />
               </span>
-              <span className="muted">Consulta, edita, activa o desactiva empleados y administra sus códigos QR.</span>
+              <span className="muted">{t('companyHome.cards.employees.text')}</span>
             </Link>
             <Link to={paths.company.newEmployee} className="action-card">
               <span className="icon-tile">
                 <UserPlus size={22} />
               </span>
               <span className="action-card__title">
-                Registrar empleado <ArrowRight size={18} />
+                {t('companyHome.cards.newEmployee.title')} <ArrowRight size={18} />
               </span>
-              <span className="muted">Captura sus datos; el rostro se registra al iniciar sesión.</span>
+              <span className="muted">{t('companyHome.cards.newEmployee.text')}</span>
             </Link>
             <Link to={paths.company.validations} className="action-card">
               <span className="icon-tile">
                 <ClipboardCheck size={22} />
               </span>
               <span className="action-card__title">
-                Validaciones <ArrowRight size={18} />
+                {t('companyHome.cards.validations.title')} <ArrowRight size={18} />
               </span>
-              <span className="muted">Acepta o rechaza los registros faciales de tus empleados.</span>
+              <span className="muted">{t('companyHome.cards.validations.text')}</span>
             </Link>
           </div>
         </PanelSection>

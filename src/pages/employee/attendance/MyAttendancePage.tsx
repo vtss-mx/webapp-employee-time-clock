@@ -13,10 +13,14 @@ import { RetryState } from '../../../components/ui/RetryState';
 import { SkeletonCard } from '../../../components/ui/Skeleton';
 import { useAuth } from '../../../hooks/useAuth';
 import { useResource } from '../../../hooks/useResource';
+import { t, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { attendanceService } from '../../../services/attendanceService';
 import type { AttendanceToday } from '../../../types';
 import { businessToday, formatDate } from '../../../utils/format';
+
+/** Título del popup si "hoy" no carga (se arma al dibujarse: sigue al idioma activo). */
+const loadError = () => t('myAttendance.home.loadError');
 
 /** Margen tras la hora en que cambia lo permitido, para preguntar cuando el servidor ya la pasó. */
 const REFRESH_MARGIN_MS = 1500;
@@ -38,16 +42,17 @@ function useRefreshAt(at: string | null, offsetMs: number, refresh: () => void) 
  * festivo), su día libre; sin turno, cómo pedir uno.
  */
 function TodayCard({ today, offsetMs }: { today: AttendanceToday; offsetMs: number }) {
+  const t = useT();
   if (today.shift) return <TimeClockCard today={today} shift={today.shift} offsetMs={offsetMs} />;
   if (today.day_off) return <DayOffCard dayOff={today.day_off} today={businessToday(new Date(today.now))} message={today.message} />;
   return (
     <EmptyState
       icon={<CalendarX2 />}
-      title="Aún no tienes un turno asignado"
-      description="Cuando tu empresa te asigne uno, aquí registrarás tu entrada, tus descansos y tu salida con tu rostro y tu ubicación."
+      title={t('myAttendance.home.noShift.title')}
+      description={t('myAttendance.home.noShift.description')}
       action={
         <ButtonLink to={paths.employee.newShiftRequest} variant="primary" size="lg" icon={<CalendarPlus size={20} />}>
-          Solicitar un turno
+          {t('myAttendance.home.noShift.action')}
         </ButtonLink>
       }
     />
@@ -61,12 +66,13 @@ function TodayCard({ today, offsetMs }: { today: AttendanceToday; offsetMs: numb
  * libres (vacaciones, permisos y festivos).
  */
 export function MyAttendancePage() {
+  const t = useT();
   const { user } = useAuth();
   // La diferencia con la hora del servidor se calcula UNA vez, al recibir la respuesta.
   const { data, error, retry } = useResource(
     (signal) => attendanceService.today(signal).then((today) => ({ today, offsetMs: serverOffset(today.now) })),
     'today',
-    'No se pudo cargar tu asistencia',
+    loadError,
   );
   useRefreshAt(data && refreshAt(data.today), data?.offsetMs ?? 0, retry);
   const firstName = user?.employee?.first_name;
@@ -75,7 +81,7 @@ export function MyAttendancePage() {
     return error ? (
       <div className="page">
         <Panel>
-          <PanelHero eyebrow="Mi asistencia" title="Tu reloj checador" />
+          <PanelHero eyebrow={t('myAttendance.home.eyebrow')} title={t('myAttendance.home.clockTitle')} />
           <PanelSection>
             <RetryState onRetry={retry} />
           </PanelSection>
@@ -91,31 +97,31 @@ export function MyAttendancePage() {
   return (
     <div className="page page-transition my-attendance">
       <Panel>
-        <PanelHero eyebrow="Mi asistencia" title={firstName ? `Hola, ${firstName}` : 'Hola'}>
+        <PanelHero eyebrow={t('myAttendance.home.eyebrow')} title={firstName ? t('myAttendance.home.greeting', { name: firstName }) : t('myAttendance.home.greetingNoName')}>
           <p className="muted">{formatDate(today.now)}</p>
         </PanelHero>
         <PanelSection>
           <TodayCard today={today} offsetMs={offsetMs} />
         </PanelSection>
         {today.session && (
-          <PanelSection title="Tu jornada" icon={<CalendarRange size={20} />}>
+          <PanelSection title={t('myAttendance.home.workday')} icon={<CalendarRange size={20} />}>
             <SessionTimeline session={today.session} />
           </PanelSection>
         )}
         {shift && (
-          <PanelSection title={today.occurrence || today.session ? 'Dónde puedes checar hoy' : 'Dónde checarás tu próxima jornada'} icon={<MapPinned size={20} />}>
+          <PanelSection title={t(today.occurrence || today.session ? 'myAttendance.home.placesToday' : 'myAttendance.home.placesNext')} icon={<MapPinned size={20} />}>
             <CheckPlaces today={today} />
           </PanelSection>
         )}
         <PanelFooter align="between">
           <ButtonLink to={paths.employee.attendanceHistory} variant="secondary" size="lg" icon={<History size={20} />}>
-            Historial
+            {t('myAttendance.home.history')}
           </ButtonLink>
           <ButtonLink to={paths.employee.shiftRequests} variant="secondary" size="lg" icon={shift ? <Repeat size={20} /> : <ListChecks size={20} />}>
-            {shift ? 'Cambio de turno' : 'Mis solicitudes'}
+            {t(shift ? 'myAttendance.home.shiftChange' : 'myAttendance.home.myRequests')}
           </ButtonLink>
           <ButtonLink to={paths.employee.daysOff} variant="secondary" size="lg" icon={<TreePalm size={20} />}>
-            Mis días libres
+            {t('myAttendance.home.daysOff')}
           </ButtonLink>
         </PanelFooter>
       </Panel>

@@ -5,6 +5,7 @@
  * componente.
  */
 import type { ReactNode } from 'react';
+import type { Lazy } from '../i18n/lazy';
 
 /** Qué se confirma: define el ícono, el color, la etiqueta y el botón por omisión. */
 export type ConfirmKind = 'create' | 'edit' | 'delete' | 'action';
@@ -56,3 +57,10 @@ export interface ConfirmInput {
   /** La consecuencia, resaltada al final: "Esta acción no se puede deshacer". */
   note?: ReactNode;
 }
+
+/**
+ * Una confirmación, o la función que la arma al dibujarse (`() => ({ title: t('…'), … })`): con la
+ * función, una confirmación abierta sigue al idioma activo (textos, fechas y números se vuelven a
+ * calcular). Se evalúa una vez al pedirla (p. ej. para saber si `changes` está vacía) y en cada dibujo.
+ */
+export type ConfirmSource = Lazy<ConfirmInput>;

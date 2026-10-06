@@ -4,6 +4,8 @@
  *
  *   Tipado ............ tsc estricto + ESLint (any explícito/implícito, operaciones inseguras)
  *   Calidad ........... ESLint (APIs obsoletas, promesas sin manejar, hooks, complejidad)
+ *   Ortografía ........ cspell sobre los textos de la interfaz (es-MX con español, en-US con inglés de
+ *                       Estados Unidos y la lista revisada cspell-words.txt): una palabra desconocida falla
  *   Duplicidad ........ jscpd (umbral en .jscpd.json)
  *   Ciclos ............ importaciones circulares entre módulos de src/ (API del compilador de
  *                       TypeScript; no cuentan `import type` ni las cargas diferidas `import()`)
@@ -126,6 +128,11 @@ check('Lint (tipado/obsoletos)', 'npx', ['eslint', '.', '--max-warnings=0', '-f'
   if (code === 0) return 'sin problemas';
   const m = out.match(/(\d+) problems? \((\d+) errors?, (\d+) warnings?\)/);
   return m ? `${m[2]} errores, ${m[3]} advertencias` : 'falló';
+});
+
+check('Ortografía (cspell)', 'npx', ['cspell', '--no-progress', '--no-summary', '--show-suggestions'], (out, code) => {
+  if (code === 0) return 'sin palabras desconocidas (es-MX y en-US)';
+  return `${(out.match(/Unknown word/g) ?? []).length} palabras desconocidas`;
 });
 
 check('Duplicidad (jscpd)', 'npx', ['jscpd', '--config', '.jscpd.json', '--silent', 'src'], (out) => {

@@ -3,9 +3,12 @@ import { useId, useState } from 'react';
 import { useCatalogs } from '../hooks/useCatalogs';
 import { useConfirm } from '../hooks/useConfirm';
 import { useSyncOnChange } from '../hooks/useSyncOnChange';
+import { t, useT } from '../i18n';
+import { resolveLazy, type LazyText } from '../i18n/lazy';
 import type { ConfidenceLevelItem } from '../types';
 import type { ConfirmInput } from '../types/confirm';
 import { formatConfidence } from '../utils/format';
+import { formatRate, localeNumberFormat } from '../utils/numbers';
 import { Button } from './ui/Button';
 
 /** Nivel activo más cercano a un valor guardado o a una posición del control (en empate, el primero). */
@@ -15,14 +18,17 @@ function nearestLevel([first, ...rest]: ConfidenceLevelItem[], target: number, m
 const byValue = (level: ConfidenceLevelItem) => level.value;
 const byPosition = (level: ConfidenceLevelItem) => level.sort_order;
 
-/** Cómo se lee un nivel: "99 % (Estricto)". */
-const levelText = (level: ConfidenceLevelItem) => `${formatConfidence(level.value)} (${level.name})`;
+/** Cómo se lee un nivel: "99 % (Estricto)" (el nombre viene del catálogo). */
+const levelText = (level: ConfidenceLevelItem) => t('face.confidence.level', { value: formatConfidence(level.value), name: level.name });
 
-/** Cifras medidas del nivel: se muestran bajo el control y en su confirmación. */
+/** Porcentaje medido (0 a 100) con hasta tres decimales, en el formato del idioma activo. */
+const rate = (value: number) => formatRate(value, 3);
+
+/** Cifras medidas del nivel: se muestran bajo el control y en su confirmación (en el idioma activo). */
 const levelStats = (level: ConfidenceLevelItem) => [
-  { label: 'Similitud exigida', value: level.similarity.toFixed(3) },
-  { label: 'Impostores aceptados', value: level.false_accept_rate === 0 ? '0 de 3 000' : `≈ ${level.false_accept_rate} %` },
-  { label: 'Rechazos de una captura legítima', value: `≈ ${level.rejection_rate} %` },
+  { label: t('face.confidence.similarity'), value: localeNumberFormat({ minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(level.similarity) },
+  { label: t('face.confidence.impostors'), value: level.false_accept_rate === 0 ? t('face.confidence.noImpostors') : `≈ ${rate(level.false_accept_rate)}` },
+  { label: t('face.confidence.rejections'), value: `≈ ${rate(level.rejection_rate)}` },
 ];
 
 /**
@@ -37,24 +43,20 @@ function levelConfirm(label: string, saved: ConfidenceLevelItem, next: Confidenc
     kind: 'edit',
     tone: lower ? 'danger' : strict ? 'warning' : 'primary',
     icon: <Gauge size={30} />,
-    eyebrow: 'Nivel de confianza',
-    title: `¿Exigir ${formatConfidence(next.value)} de confianza?`,
-    message: lower
-      ? 'Un nivel más bajo acepta con más facilidad a una persona parecida: habrá menos reintentos, pero menos seguridad.'
-      : strict
-        ? 'Es el nivel más estricto: aumenta la seguridad, pero habrá más reintentos.'
-        : 'Un nivel más alto protege mejor contra personas parecidas.',
+    eyebrow: t('face.confidence.eyebrow'),
+    title: t('face.confidence.confirmTitle', { value: formatConfidence(next.value) }),
+    message: lower ? t('face.confidence.lower') : strict ? t('face.confidence.strict') : t('face.confidence.higher'),
     changes: [{ label, before: levelText(saved), after: levelText(next) }],
-    detailsTitle: strict ? 'Antes de exigirlo' : 'Con este nivel',
+    detailsTitle: strict ? t('face.confidence.beforeRequiring') : t('face.confidence.withLevel'),
     details: strict
       ? [
-          ...(next.sort_order >= 100 ? [`Ningún sistema biométrico puede garantizar el 100 %: se aplica el máximo calibrado, ${formatConfidence(next.value)}.`] : []),
-          `Aproximadamente ${next.rejection_rate} % de las capturas legítimas no alcanzan el nivel y se repiten.`,
-          'Pide a los empleados buena iluminación y mirar de frente a la cámara.',
+          ...(next.sort_order >= 100 ? [t('face.confidence.maxCalibrated', { value: formatConfidence(next.value) })] : []),
+          t('face.confidence.retries', { rate: rate(next.rejection_rate) }),
+          t('face.confidence.tips'),
         ]
       : levelStats(next),
-    note: 'Aplica en segundos a todas las verificaciones faciales de la empresa.',
-    confirmLabel: 'Guardar nivel',
+    note: t('face.confidence.note'),
+    confirmLabel: t('face.confidence.save'),
     confirmIcon: <Save size={18} />,
   };
 }
@@ -62,8 +64,11 @@ function levelConfirm(label: string, saved: ConfidenceLevelItem, next: Confidenc
 interface ConfidenceSliderProps {
   /** Nivel vigente (guardado). */
   value: number;
-  /** Nombre accesible del control (hay uno para verificar y otro para identificar entre todos). */
-  label?: string;
+  /**
+   * Nombre accesible del control (hay uno para verificar y otro para identificar entre todos). Con una
+   * función (`() => t('…')`) también la confirmación abierta sigue al idioma activo.
+   */
+  label?: LazyText;
   busy?: boolean;
   onSave: (value: number) => void;
 }
@@ -86,7 +91,12 @@ interface LevelSliderProps extends ConfidenceSliderProps {
   saved: ConfidenceLevelItem;
 }
 
-function LevelSlider({ levels, saved, busy = false, onSave, label = 'Nivel de confianza requerido' }: LevelSliderProps) {
+/** Nombre del control en el idioma activo (el propio o, por omisión, "Nivel de confianza requerido"). */
+const sliderLabel = (label: LazyText | undefined) => (label === undefined ? t('face.confidence.label') : resolveLazy(label));
+
+function LevelSlider({ levels, saved, busy = false, onSave, label: labelSource }: LevelSliderProps) {
+  const t = useT();
+  const label = sliderLabel(labelSource);
   const [position, setPosition] = useState<number>(saved.sort_order);
   useSyncOnChange(saved.sort_order, setPosition); // al guardarse o cargarse otro nivel
   const id = useId();
@@ -100,7 +110,7 @@ function LevelSlider({ levels, saved, busy = false, onSave, label = 'Nivel de co
 
   /** Cada nivel nuevo se confirma antes de guardarse; cancelar deja el control donde está, sin guardar. */
   const save = async () => {
-    if (await confirm(levelConfirm(label, saved, step))) onSave(step.value);
+    if (await confirm(() => levelConfirm(sliderLabel(labelSource), saved, step))) onSave(step.value);
   };
   const changed = current !== saved.sort_order;
   const fill = ((current - min) / Math.max(1, max - min)) * 100;
@@ -115,7 +125,7 @@ function LevelSlider({ levels, saved, busy = false, onSave, label = 'Nivel de co
           <strong className="confidence__value">{formatConfidence(step.value)}</strong>
           <span className="confidence__level">
             {step.name}
-            {!changed && <span className="badge badge--info">Vigente</span>}
+            {!changed && <span className="badge badge--info">{t('face.confidence.current')}</span>}
           </span>
         </div>
       </div>
@@ -130,7 +140,7 @@ function LevelSlider({ levels, saved, busy = false, onSave, label = 'Nivel de co
           value={current}
           disabled={busy}
           aria-label={label}
-          aria-valuetext={`${formatConfidence(step.value)} (${step.name})`}
+          aria-valuetext={levelText(step)}
           onChange={(e) => setPosition(Number(e.target.value))}
         />
         <div className="confidence__ticks" aria-hidden>
@@ -161,17 +171,17 @@ function LevelSlider({ levels, saved, busy = false, onSave, label = 'Nivel de co
 
       <div className="confidence__actions">
         <Button variant="ghost" icon={<RotateCcw size={18} />} disabled={!changed || busy} onClick={() => setPosition(saved.sort_order)}>
-          Restablecer
+          {t('face.confidence.reset')}
         </Button>
         <Button
           variant="primary"
           icon={<Save size={18} />}
           loading={busy}
           disabled={!changed}
-          title={changed ? undefined : 'Mueve el control para elegir otro nivel'}
+          title={changed ? undefined : t('face.confidence.moveHint')}
           onClick={() => void save()}
         >
-          Guardar nivel
+          {t('face.confidence.save')}
         </Button>
       </div>
     </div>

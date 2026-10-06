@@ -1,4 +1,5 @@
 import { CalendarDays, Coffee, LogIn, LogOut, Moon } from 'lucide-react';
+import { useT } from '../../i18n';
 import type { Weekday } from '../../types';
 import { formatMinutes } from '../../utils/format';
 import { weekdaysLabel } from '../../utils/shifts';
@@ -17,46 +18,43 @@ interface ShiftSummaryProps {
  * cuándo se checa la entrada, cuándo empieza el retardo y la ventana para checar la salida.
  */
 export function ShiftSummary({ timeline, weekdays, breaksCount, breakMinutes }: ShiftSummaryProps) {
+  const t = useT();
   if (!timeline) {
-    return <p className="shift-summary shift-summary--empty muted">Elige la hora de entrada y la de salida (distintas) para ver cómo queda la jornada.</p>;
+    return <p className="shift-summary shift-summary--empty muted">{t('shifts.form.summary.empty')}</p>;
   }
   return (
     <div className="shift-summary" aria-live="polite">
       <div className="shift-summary__head">
         <strong className="shift-summary__duration">{formatMinutes(timeline.duration)}</strong>
-        <span className="muted">de jornada</span>
+        <span className="muted">{t('shifts.form.summary.workday')}</span>
         {timeline.overnight && (
           <span className="badge badge--info">
-            <Moon size={14} aria-hidden /> Termina al día siguiente
+            <Moon size={14} aria-hidden /> {t('shifts.form.summary.overnight')}
           </span>
         )}
       </div>
       <dl className="shift-summary__rows">
         <div>
           <dt>
-            <LogIn size={16} aria-hidden /> Entrada
+            <LogIn size={16} aria-hidden /> {t('shifts.form.summary.checkIn')}
           </dt>
-          <dd>
-            Puede checar desde las {momentText(timeline.opens)}; después de las {momentText(timeline.lateAfter)} es retardo.
-          </dd>
+          <dd>{t('shifts.form.summary.checkInRule', { opens: momentText(timeline.opens), late: momentText(timeline.lateAfter) })}</dd>
         </div>
         <div>
           <dt>
-            <LogOut size={16} aria-hidden /> Salida
+            <LogOut size={16} aria-hidden /> {t('shifts.form.summary.checkOut')}
           </dt>
-          <dd>
-            Desde las {momentText(timeline.leavesFrom)} y a más tardar a las {momentText(timeline.deadline)}.
-          </dd>
+          <dd>{t('shifts.form.summary.checkOutRule', { from: momentText(timeline.leavesFrom), until: momentText(timeline.deadline) })}</dd>
         </div>
         <div>
           <dt>
-            <Coffee size={16} aria-hidden /> Descansos
+            <Coffee size={16} aria-hidden /> {t('shifts.form.summary.breaks')}
           </dt>
           <dd>{breaksText(breaksCount, breakMinutes)}</dd>
         </div>
         <div>
           <dt>
-            <CalendarDays size={16} aria-hidden /> Días
+            <CalendarDays size={16} aria-hidden /> {t('shifts.form.summary.days')}
           </dt>
           <dd>{weekdaysLabel(weekdays)}</dd>
         </div>

@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -139,30 +139,7 @@
 <a name='L74'></a><a href='#L74'>74</a>
 <a name='L75'></a><a href='#L75'>75</a>
 <a name='L76'></a><a href='#L76'>76</a>
-<a name='L77'></a><a href='#L77'>77</a>
-<a name='L78'></a><a href='#L78'>78</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
+<a name='L77'></a><a href='#L77'>77</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -175,6 +152,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -207,7 +196,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -225,10 +223,12 @@ import { StatusMark } from '../../components/ui/StatusMark';
 import { useAction } from '../../hooks/useAction';
 import { useAuth } from '../../hooks/useAuth';
 import { usePolling } from '../../hooks/usePolling';
+import { t, useLocale } from '../../i18n';
 import { config } from '../../utils/config';
 &nbsp;
 /** Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. */
 export function PendingValidationPage() {
+  useLocale(); // textos con `t` al dibujarse: un cambio de idioma los traduce
   const { user, refreshUser } = useAuth();
   const { busy, run } = useAction();
 &nbsp;
@@ -237,7 +237,7 @@ export function PendingValidationPage() {
   usePolling(poll, { intervalMs: config.validationStatusPollMs, immediate: false });
 &nbsp;
   // A mano: si falla (sin red, servidor ocupado) se avisa con su popup; la revisión automática sigue.
-  const check = () =&gt; run(refreshUser, { errorTitle: 'No se pudo actualizar el estado' });
+  const check = () =&gt; run(refreshUser, { errorTitle: () =&gt; t('employee.pending.errorTitle') });
 &nbsp;
   return (
     &lt;div className="page page--narrow page-transition"&gt;
@@ -247,11 +247,8 @@ export function PendingValidationPage() {
           &lt;span style={{ justifySelf: 'center' }}&gt;
             &lt;FaceStatusBadge status="PENDING_REVIEW" /&gt;
           &lt;/span&gt;
-          &lt;h1&gt;Estamos validando tu identidad&lt;/h1&gt;
-          &lt;p className="muted"&gt;
-            {user?.employee?.first_name}, tu registro facial se envió correctamente. Un administrador de tu empresa lo
-            revisará y te avisaremos aquí en cuanto quede aprobado.
-          &lt;/p&gt;
+          &lt;h1&gt;{t('employee.pending.title')}&lt;/h1&gt;
+          &lt;p className="muted"&gt;{t('employee.pending.text', { name: user?.employee?.first_name ?? '' })}&lt;/p&gt;
         &lt;/div&gt;
 &nbsp;
         &lt;ol className="timeline"&gt;
@@ -260,8 +257,8 @@ export function PendingValidationPage() {
               &lt;Check size={16} /&gt;
             &lt;/span&gt;
             &lt;div&gt;
-              &lt;strong&gt;Registro facial enviado&lt;/strong&gt;
-              &lt;span className="muted small"&gt;Rostro, prueba de vida y calidad verificados.&lt;/span&gt;
+              &lt;strong&gt;{t('employee.pending.sent.title')}&lt;/strong&gt;
+              &lt;span className="muted small"&gt;{t('employee.pending.sent.text')}&lt;/span&gt;
             &lt;/div&gt;
           &lt;/li&gt;
           &lt;li className="is-current"&gt;
@@ -269,8 +266,8 @@ export function PendingValidationPage() {
               &lt;Clock size={16} /&gt;
             &lt;/span&gt;
             &lt;div&gt;
-              &lt;strong&gt;Validación por tu empresa&lt;/strong&gt;
-              &lt;span className="muted small"&gt;Un administrador confirma que eres tú.&lt;/span&gt;
+              &lt;strong&gt;{t('employee.pending.review.title')}&lt;/strong&gt;
+              &lt;span className="muted small"&gt;{t('employee.pending.review.text')}&lt;/span&gt;
             &lt;/div&gt;
           &lt;/li&gt;
           &lt;li&gt;
@@ -278,17 +275,17 @@ export function PendingValidationPage() {
               &lt;UserCheck size={16} /&gt;
             &lt;/span&gt;
             &lt;div&gt;
-              &lt;strong&gt;Acceso habilitado&lt;/strong&gt;
-              &lt;span className="muted small"&gt;Podrás identificarte con tu rostro o tu código QR.&lt;/span&gt;
+              &lt;strong&gt;{t('employee.pending.access.title')}&lt;/strong&gt;
+              &lt;span className="muted small"&gt;{t('employee.pending.access.text')}&lt;/span&gt;
             &lt;/div&gt;
           &lt;/li&gt;
         &lt;/ol&gt;
 &nbsp;
         &lt;Button variant="secondary" size="lg" block loading={busy !== null} icon={&lt;RefreshCw size={18} /&gt;} onClick={() =&gt; void check()}&gt;
-          Actualizar estado
+          {t('employee.pending.refresh')}
         &lt;/Button&gt;
         &lt;p className="inline-note inline-note--center small muted"&gt;
-          &lt;ScanFace size={16} /&gt; Esta pantalla se actualiza automáticamente.
+          &lt;ScanFace size={16} /&gt; {t('employee.pending.auto')}
         &lt;/p&gt;
       &lt;/div&gt;
     &lt;/div&gt;
@@ -301,7 +298,7 @@ export function PendingValidationPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

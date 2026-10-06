@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>13/13</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>6/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
@@ -181,7 +181,10 @@
 <a name='L116'></a><a href='#L116'>116</a>
 <a name='L117'></a><a href='#L117'>117</a>
 <a name='L118'></a><a href='#L118'>118</a>
-<a name='L119'></a><a href='#L119'>119</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -198,7 +201,10 @@
 <span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">9x</span>
@@ -219,8 +225,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -309,14 +313,18 @@ import { usePendingEnrollmentsCount } from '../../hooks/usePendingEnrollments';
 import { useResource } from '../../hooks/useResource';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
+import { t, useT } from '../../i18n';
 import { businessHour } from '../../utils/format';
 &nbsp;
 function greeting() {
   const h = businessHour();
-  return h &lt; 12 ? 'Buenos días' : h &lt; 19 ? 'Buenas tardes' : 'Buenas noches';
+  return t(h &lt; 12 ? 'companyHome.greeting.morning' : h &lt; 19 ? 'companyHome.greeting.afternoon' : 'companyHome.greeting.evening');
 }
 &nbsp;
+const loadError = () =&gt; t('companyHome.loadError');
+&nbsp;
 export function DashboardPage() {
+  const t = useT();
   const { data: stats, error, retry } = useResource(
     (signal) =&gt;
       Promise.all([employeeService.list({ size: 1 }, signal), employeeService.list({ size: 1, active: true }, signal)]).then(([all, active]) =&gt; ({
@@ -325,15 +333,15 @@ export function DashboardPage() {
         inactive: all.total - active.total,
       })),
     'summary',
-    'No se pudo cargar el resumen',
+    loadError,
   );
   // La cola de validaciones la consulta una sola vez el layout (el mismo valor que el contador del menú).
   const pending = usePendingEnrollmentsCount();
 &nbsp;
   const kpis: Kpi[] = [
-    { key: 'total', label: 'Empleados registrados', icon: Users, value: stats?.total, tile: '' },
-    { key: 'active', label: 'Activos', icon: UserCheck, value: stats?.active, tile: 'icon-tile--success' },
-    { key: 'inactive', label: 'Inactivos', icon: UserMinus, value: stats?.inactive, tile: 'icon-tile--warning' },
+    { key: 'total', label: t('companyHome.kpis.total'), icon: Users, value: stats?.total, tile: '' },
+    { key: 'active', label: t('companyHome.kpis.active'), icon: UserCheck, value: stats?.active, tile: 'icon-tile--success' },
+    { key: 'inactive', label: t('companyHome.kpis.inactive'), icon: UserMinus, value: stats?.inactive, tile: 'icon-tile--warning' },
   ];
 &nbsp;
   return (
@@ -341,10 +349,10 @@ export function DashboardPage() {
       &lt;Panel&gt;
         &lt;PanelHeader
           title={greeting()}
-          subtitle="Este es el resumen de tu organización."
+          subtitle={t('companyHome.subtitle')}
           actions={
             &lt;ButtonLink to={paths.company.newEmployee} variant="primary" icon={&lt;UserPlus size={18} /&gt;}&gt;
-              Registrar empleado
+              {t('companyHome.registerEmployee')}
             &lt;/ButtonLink&gt;
           }
         /&gt;
@@ -357,13 +365,11 @@ export function DashboardPage() {
                 &lt;ClipboardCheck size={22} /&gt;
               &lt;/span&gt;
               &lt;div className="callout__body"&gt;
-                &lt;strong&gt;
-                  {pending} {pending === 1 ? 'registro facial espera' : 'registros faciales esperan'} tu validación
-                &lt;/strong&gt;
-                &lt;p className="muted small"&gt;Confirma la identidad para que los empleados puedan identificarse.&lt;/p&gt;
+                &lt;strong&gt;{t('companyHome.pending.title', { count: pending })}&lt;/strong&gt;
+                &lt;p className="muted small"&gt;{t('companyHome.pending.text')}&lt;/p&gt;
               &lt;/div&gt;
               &lt;ButtonLink to={paths.company.validations} variant="primary" iconRight={&lt;ArrowRight size={18} /&gt;}&gt;
-                Revisar ahora
+                {t('companyHome.pending.review')}
               &lt;/ButtonLink&gt;
             &lt;/div&gt;
           ) : null}
@@ -374,7 +380,7 @@ export function DashboardPage() {
                 &lt;ClipboardCheck size={22} /&gt;
               &lt;/span&gt;
               &lt;span&gt;
-                &lt;span className="kpi__label"&gt;Validaciones pendientes&lt;/span&gt;
+                &lt;span className="kpi__label"&gt;{t('companyHome.kpis.pending')}&lt;/span&gt;
                 &lt;KpiValue value={pending} /&gt;
               &lt;/span&gt;
             &lt;/Link&gt;
@@ -389,27 +395,27 @@ export function DashboardPage() {
                 &lt;Users size={22} /&gt;
               &lt;/span&gt;
               &lt;span className="action-card__title"&gt;
-                Empleados &lt;ArrowRight size={18} /&gt;
+                {t('companyHome.cards.employees.title')} &lt;ArrowRight size={18} /&gt;
               &lt;/span&gt;
-              &lt;span className="muted"&gt;Consulta, edita, activa o desactiva empleados y administra sus códigos QR.&lt;/span&gt;
+              &lt;span className="muted"&gt;{t('companyHome.cards.employees.text')}&lt;/span&gt;
             &lt;/Link&gt;
             &lt;Link to={paths.company.newEmployee} className="action-card"&gt;
               &lt;span className="icon-tile"&gt;
                 &lt;UserPlus size={22} /&gt;
               &lt;/span&gt;
               &lt;span className="action-card__title"&gt;
-                Registrar empleado &lt;ArrowRight size={18} /&gt;
+                {t('companyHome.cards.newEmployee.title')} &lt;ArrowRight size={18} /&gt;
               &lt;/span&gt;
-              &lt;span className="muted"&gt;Captura sus datos; el rostro se registra al iniciar sesión.&lt;/span&gt;
+              &lt;span className="muted"&gt;{t('companyHome.cards.newEmployee.text')}&lt;/span&gt;
             &lt;/Link&gt;
             &lt;Link to={paths.company.validations} className="action-card"&gt;
               &lt;span className="icon-tile"&gt;
                 &lt;ClipboardCheck size={22} /&gt;
               &lt;/span&gt;
               &lt;span className="action-card__title"&gt;
-                Validaciones &lt;ArrowRight size={18} /&gt;
+                {t('companyHome.cards.validations.title')} &lt;ArrowRight size={18} /&gt;
               &lt;/span&gt;
-              &lt;span className="muted"&gt;Acepta o rechaza los registros faciales de tus empleados.&lt;/span&gt;
+              &lt;span className="muted"&gt;{t('companyHome.cards.validations.text')}&lt;/span&gt;
             &lt;/Link&gt;
           &lt;/div&gt;
         &lt;/PanelSection&gt;
@@ -424,7 +430,7 @@ export function DashboardPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

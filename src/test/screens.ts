@@ -9,16 +9,21 @@ export const SEED_SCREENS: Screen[] = [
   { code: 'ADMIN_COMPANIES', name: 'Empresas', short_name: null, path: '/admin/companies', icon: 'Building2', badge: null, module: 'PLATFORM' },
   { code: 'ADMIN_ERRORS', name: 'Errores del sistema', short_name: 'Errores', path: '/admin/errors', icon: 'Bug', badge: 'PENDING_ERRORS', module: 'OPERATIONS' },
   { code: 'ADMIN_FACE_SECURITY', name: 'Seguridad facial', short_name: 'Seguridad', path: '/admin/face-security', icon: 'ShieldCheck', badge: null, module: 'OPERATIONS' },
-  { code: 'COMPANY_DASHBOARD', name: 'Dashboard', short_name: 'Inicio', path: '/company/dashboard', icon: 'LayoutDashboard', badge: null, module: 'OVERVIEW' },
+  { code: 'ADMIN_FRAUD_CASES', name: 'Casos de fraude', short_name: 'Fraude', path: '/admin/fraud-cases', icon: 'ShieldAlert', badge: 'OPEN_FRAUD_CASES', module: 'OPERATIONS' },
+  { code: 'ADMIN_BILLING', name: 'Cobranza', short_name: null, path: '/admin/billing', icon: 'Receipt', badge: null, module: 'BUSINESS' },
+  { code: 'ADMIN_USAGE', name: 'Consumo', short_name: null, path: '/admin/usage', icon: 'Gauge', badge: null, module: 'BUSINESS' },
+  { code: 'ADMIN_PERFORMANCE', name: 'Rendimiento', short_name: null, path: '/admin/performance', icon: 'Timer', badge: 'OPEN_SLOW_ALERTS', module: 'OPERATIONS' },
+  { code: 'COMPANY_DASHBOARD', name: 'Panel', short_name: 'Inicio', path: '/company/dashboard', icon: 'LayoutDashboard', badge: null, module: 'OVERVIEW' },
   { code: 'COMPANY_EMPLOYEES', name: 'Empleados', short_name: null, path: '/company/employees', icon: 'Users', badge: null, module: 'PEOPLE' },
   { code: 'COMPANY_DEPARTMENTS', name: 'Departamentos', short_name: 'Áreas', path: '/company/departments', icon: 'Network', badge: null, module: 'PEOPLE' },
   { code: 'COMPANY_VALIDATIONS', name: 'Validaciones', short_name: 'Validar', path: '/company/validations', icon: 'ClipboardCheck', badge: 'PENDING_ENROLLMENTS', module: 'PEOPLE' },
-  { code: 'COMPANY_ATTENDANCE', name: 'Tablero del día', short_name: 'Tablero', path: '/company/attendance', icon: 'Clock', badge: null, module: 'ATTENDANCE' },
+  { code: 'COMPANY_ATTENDANCE', name: 'Tablero del día', short_name: 'Tablero', path: '/company/attendance', icon: 'Clock', badge: 'PENDING_ATTENDANCE_REVIEWS', module: 'ATTENDANCE' },
   { code: 'COMPANY_SHIFTS', name: 'Turnos', short_name: null, path: '/company/shifts', icon: 'CalendarClock', badge: 'PENDING_SHIFT_REQUESTS', module: 'ATTENDANCE' },
   { code: 'COMPANY_CALENDAR', name: 'Calendario', short_name: null, path: '/company/calendar', icon: 'CalendarDays', badge: 'PENDING_ABSENCE_REQUESTS', module: 'ATTENDANCE' },
   { code: 'COMPANY_SITES', name: 'Sitios de trabajo', short_name: 'Sitios', path: '/company/sites', icon: 'MapPin', badge: null, module: 'ATTENDANCE' },
   { code: 'COMPANY_VALIDATORS', name: 'Validadores', short_name: null, path: '/company/validators', icon: 'ScanLine', badge: null, module: 'ACCESS' },
   { code: 'COMPANY_API', name: 'Integraciones (API)', short_name: 'API', path: '/company/integrations', icon: 'KeyRound', badge: null, module: 'DATA' },
+  { code: 'COMPANY_DOCUMENTS', name: 'Documentos', short_name: null, path: '/company/documents', icon: 'FileText', badge: null, module: 'ACCOUNT' },
   { code: 'VALIDATOR_CHECKPOINT', name: 'Identificar empleados', short_name: 'Identificar', path: '/validator/checkpoint', icon: 'ScanFace', badge: null, module: 'ACCESS' },
   { code: 'EMPLOYEE_ATTENDANCE', name: 'Mi asistencia', short_name: 'Asistencia', path: '/employee/attendance', icon: 'Clock', badge: null, module: 'MY_WORK' },
   { code: 'EMPLOYEE_ENROLL', name: 'Registro facial', short_name: 'Mi rostro', path: '/employee/enroll', icon: 'ScanFace', badge: null, module: 'IDENTITY' },
@@ -32,6 +37,7 @@ export const SEED_SCREENS: Screen[] = [
 /** Módulos del menú (catalog.menu_modules), en su orden. */
 export const SEED_MODULES: MenuModule[] = [
   { code: 'PLATFORM', name: 'Plataforma', icon: 'Building2' },
+  { code: 'BUSINESS', name: 'Negocio', icon: 'Wallet' },
   { code: 'OPERATIONS', name: 'Operación', icon: 'Activity' },
   { code: 'OVERVIEW', name: 'General', icon: 'LayoutDashboard' },
   { code: 'PEOPLE', name: 'Personal', icon: 'Users' },
@@ -44,7 +50,7 @@ export const SEED_MODULES: MenuModule[] = [
 ];
 
 export const SEED_GRANTS: Record<Role, string[]> = {
-  ADMIN: ['ADMIN_DASHBOARD', 'ADMIN_COMPANIES', 'ADMIN_ERRORS', 'ADMIN_FACE_SECURITY', 'PROFILE'],
+  ADMIN: ['ADMIN_DASHBOARD', 'ADMIN_COMPANIES', 'ADMIN_ERRORS', 'ADMIN_FACE_SECURITY', 'ADMIN_FRAUD_CASES', 'ADMIN_BILLING', 'ADMIN_USAGE', 'ADMIN_PERFORMANCE', 'PROFILE'],
   COMPANY: [
     'COMPANY_DASHBOARD',
     'COMPANY_EMPLOYEES',
@@ -56,6 +62,7 @@ export const SEED_GRANTS: Record<Role, string[]> = {
     'COMPANY_CALENDAR',
     'COMPANY_SITES',
     'COMPANY_API',
+    'COMPANY_DOCUMENTS',
     'PROFILE',
   ],
   VALIDATOR: ['VALIDATOR_CHECKPOINT', 'PROFILE'],

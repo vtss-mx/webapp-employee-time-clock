@@ -56,7 +56,7 @@ describe('rutas (armadas con las pantallas que envía el backend)', () => {
 
   it('la raíz lleva al inicio del usuario tras restaurar la sesión', async () => {
     renderApp('/');
-    expect(screen.getByText(/Restaurando/)).toBeInTheDocument();
+    expect(screen.getByText('Cargando…')).toBeInTheDocument(); // restaurando la sesión
     expect(await screen.findByText('MyAttendancePage')).toBeInTheDocument();
   });
 

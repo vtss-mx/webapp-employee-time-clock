@@ -1,8 +1,9 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CapturedFace, FlowAlternative } from '../../components/LiveFaceFlow';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
+import { setLocale } from '../../i18n/core';
 import { identifiedResult, sampleCheckpoint, samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { catalogsWith } from '../../test/catalogs';
@@ -79,7 +80,7 @@ describe('CheckpointPage (VALIDATOR)', () => {
   it('sin identificaciones: estado vacío y sin paginador', async () => {
     server(sampleCheckpoint, { '/api/checkpoint/recent': () => apiOk({ items: [], total: 0, page: 1, size: 10 }) });
     renderWithProviders(<CheckpointPage />);
-    expect(await screen.findByText('Aún no hay identificaciones')).toBeInTheDocument();
+    expect(await screen.findByText('Sin identificaciones')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });
 
@@ -102,7 +103,7 @@ describe('CheckpointPage (VALIDATOR)', () => {
     expect(screen.getByRole('heading', { name: 'Reconocer rostro' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Usar su código QR' }));
     await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
-    expect(await screen.findByText('No fue posible identificar')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudo identificar')).toBeInTheDocument();
     expect(screen.getAllByText('La verificación con QR está desactivada').length).toBeGreaterThan(0);
   });
 
@@ -139,7 +140,7 @@ describe('CheckpointPage (VALIDATOR)', () => {
     await userEvent.click(await screen.findByRole('button', { name: FACE_CARD }));
     expect(screen.queryByRole('button', { name: 'Usar su código QR' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'falla de cámara' }));
-    expect(await screen.findByText('No fue posible identificar')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudo identificar')).toBeInTheDocument();
     expect(screen.getByText('La cámara se desconectó')).toBeInTheDocument();
   });
 
@@ -151,7 +152,7 @@ describe('CheckpointPage (VALIDATOR)', () => {
     renderWithProviders(<CheckpointPage />);
     await userEvent.click(await screen.findByRole('button', { name: QR_FACE_CARD }));
     await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
-    expect(await screen.findByText('No fue posible identificar')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudo identificar')).toBeInTheDocument();
     expect(screen.getAllByText('El código QR no es válido o ya se usó').length).toBeGreaterThan(0);
     expect(screen.queryByRole('heading', { name: /Paso 2 de 2/ })).toBeNull();
     expect(calls.some((c) => c.url === '/api/checkpoint/identify/face')).toBe(false);
@@ -203,5 +204,55 @@ describe('CheckpointPage (VALIDATOR)', () => {
     const card = await screen.findByRole('button', { name: /^NFC/ });
     expect(card.querySelector('.lucide-shield-check')).not.toBeNull(); // ícono genérico
     expect(screen.getByRole('button', { name: FACE_CARD })).toBeInTheDocument();
+  });
+});
+
+describe('CheckpointPage en inglés (en-US) y cambio de idioma en caliente', () => {
+  it('inicio y QR + rostro en inglés (los nombres del catálogo llegan del servidor tal cual)', async () => {
+    await setLocale('en-US');
+    server({ ...sampleCheckpoint, mode: 'QR_AND_FACE' });
+    renderWithProviders(<CheckpointPage />);
+    expect(await screen.findByText('Choose how to identify the next person.')).toBeInTheDocument();
+    expect(screen.getByText('Latest identifications')).toBeInTheDocument();
+    expect(await screen.findByText('Not identified')).toBeInTheDocument();
+    expect(screen.getByText(/Only active employees of Mi empresa are identified/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: QR_FACE_CARD }));
+    expect(screen.getByRole('heading', { name: 'Step 1 of 2 · QR code' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
+    expect(await screen.findByRole('heading', { name: 'Step 2 of 2 · Ana Ruiz' })).toBeInTheDocument();
+  });
+
+  it('si las identificaciones recientes no cargan, el popup lo explica (en inglés)', async () => {
+    await setLocale('en-US');
+    server(sampleCheckpoint, { '/api/checkpoint/recent': () => apiFail(500, 'INTERNAL_ERROR', 'Error') });
+    renderWithProviders(<CheckpointPage />);
+    expect(await screen.findByRole('alertdialog', { name: "Couldn't load recent identifications" })).toBeInTheDocument();
+  });
+
+  it('modo solo QR desactivado, en inglés', async () => {
+    await setLocale('en-US');
+    server({ ...sampleCheckpoint, mode: 'QR', qr_enabled: false });
+    renderWithProviders(<CheckpointPage />);
+    expect(await screen.findByText('QR identification turned off')).toBeInTheDocument();
+    expect(screen.getByText(/uses the “Solo QR” mode/)).toBeInTheDocument();
+  });
+
+  it('el resultado en pantalla (identificado o con su motivo) cambia de idioma sin perderse', async () => {
+    server(sampleCheckpoint, { '/api/checkpoint/identify/qr': () => apiFail(403, 'QR_DISABLED', 'La verificación con QR está desactivada') });
+    renderWithProviders(<CheckpointPage />);
+    await userEvent.click(await screen.findByRole('button', { name: FACE_CARD }));
+    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
+    expect(await screen.findByText('Empleado identificado')).toBeInTheDocument();
+    await act(() => setLocale('en-US'));
+    expect(screen.getByText('Employee identified')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Next person/ }));
+
+    await userEvent.click(await screen.findByRole('button', { name: QR_CARD }));
+    expect(screen.getByRole('heading', { name: 'Scan QR' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
+    expect(await screen.findByText("Couldn't identify")).toBeInTheDocument();
+    await act(() => setLocale('es-MX'));
+    expect(screen.getByText('No se pudo identificar')).toBeInTheDocument();
+    expect(screen.getAllByText('La verificación con QR está desactivada').length).toBeGreaterThan(0); // texto del servidor
   });
 });

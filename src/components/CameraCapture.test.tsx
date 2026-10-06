@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import type { CameraController } from '../hooks/useCamera';
+import { setLocale } from '../i18n/core';
 import { describeCameraProblem, type CameraProblem } from '../utils/cameraDiagnostics';
 import { CameraCapture } from './CameraCapture';
 
@@ -26,6 +27,7 @@ function cameraIn(state: Partial<CameraController> = {}): CameraController {
     switchCamera: vi.fn(),
     selectCamera: vi.fn(),
     captureFrame: vi.fn(),
+    videoTrack: () => null,
     ...state,
   };
 }
@@ -65,12 +67,12 @@ describe('CameraCapture: visor de la cámara', () => {
   });
 
   it.each([
-    ['user', 'Usaremos la cámara frontal unos segundos para verificar tu identidad.'],
-    ['environment', 'Usaremos la cámara unos segundos para leer el código QR.'],
+    ['user', 'La cámara frontal se usará unos segundos para verificar tu identidad.'],
+    ['environment', 'La cámara se usará unos segundos para leer el código QR.'],
   ] as const)('mientras el navegador pide el permiso (%s) explica para qué se usa', (facing, text) => {
     renderCamera(cameraIn({ status: 'requesting', facing }));
     const status = screen.getByRole('status');
-    expect(status).toHaveTextContent('Activando la cámara');
+    expect(status).toHaveTextContent('Activando la cámara…');
     expect(status).toHaveTextContent(text);
     expect(screen.queryByText('Guía sobre la cámara')).toBeNull();
   });
@@ -130,7 +132,7 @@ describe('CameraCapture: fallas de la cámara en el popup', () => {
     const camera = cameraIn({ status: 'error', problem: problemOf('busy') });
     renderCamera(camera);
     const dialog = await popup();
-    expect(dialog).toHaveTextContent('La cámara no se pudo iniciar');
+    expect(dialog).toHaveTextContent('No se pudo iniciar la cámara');
     await userEvent.click(within(dialog).getByText('Cerrar'));
     expect(camera.start).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
@@ -165,5 +167,50 @@ describe('CameraCapture: fallas de la cámara en el popup', () => {
     rerenderCamera(cameraIn({ status: 'error', problem: null }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+  });
+});
+
+describe('CameraCapture en inglés (en-US) y cambio de idioma en caliente', () => {
+  it('el popup de un problema abierto cambia de idioma sin cerrarse ni reintentar', async () => {
+    const camera = cameraIn({ status: 'error', problem: problemOf('denied') });
+    renderCamera(camera);
+    expect(await popup()).toHaveTextContent('El permiso de cámara está bloqueado');
+
+    await act(() => setLocale('en-US'));
+    const dialog = screen.getByRole('alertdialog', { name: 'Camera permission is blocked' });
+    expect(dialog).toHaveTextContent("Chrome or the system won't let this page use the camera.");
+    expect(dialog).toHaveTextContent('Privacy & Security → Camera → turn on Chrome');
+    expect(dialog).toHaveTextContent('Press "Retry".');
+    expect(camera.start).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    expect(camera.start).toHaveBeenCalledOnce();
+  });
+
+  it('el visor en inglés: permiso, pausa y varias cámaras', async () => {
+    await setLocale('en-US');
+    const { rerenderCamera } = renderCamera(cameraIn({ status: 'requesting', facing: 'environment' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Turning on the camera…The camera will be used for a few seconds to read the QR code.');
+    rerenderCamera(cameraIn({ status: 'idle' }));
+    expect(screen.getByText('Camera paused')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Turn on camera' })).toBeInTheDocument();
+    rerenderCamera(
+      cameraIn({
+        devices: [
+          { deviceId: 'cam-1', label: 'Front camera', rawLabel: 'Front Camera', kind: 'front' },
+          { deviceId: 'cam-2', label: 'Back camera', rawLabel: 'Back Camera', kind: 'back' },
+        ],
+      }),
+    );
+    expect(screen.getByLabelText('Camera preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch camera' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Select camera/ })).toHaveTextContent('Front camera');
+  });
+
+  it('conexión no segura en inglés: abrir la versión segura', async () => {
+    await setLocale('en-US');
+    renderCamera(cameraIn({ status: 'error', problem: problemOf('insecure', { protocol: 'http:', hostname: '192.168.1.20', pathname: '/', search: '' }) }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'The camera needs a secure connection' });
+    expect(dialog).toHaveTextContent('Camera');
+    expect(within(dialog).getByRole('button', { name: 'Open secure version' })).toBeInTheDocument();
   });
 });

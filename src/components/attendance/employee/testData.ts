@@ -1,3 +1,4 @@
+import { siteAddress } from '../../../test/shifts';
 import type { Absence, AttendanceActionResult, AttendanceToday, BreakWindow, DayOff, Holiday, Occurrence, Shift, ShiftRef, ShiftRequest, SiteRef, WorkSession } from '../../../types';
 
 /**
@@ -7,9 +8,10 @@ import type { Absence, AttendanceActionResult, AttendanceToday, BreakWindow, Day
 
 export const NOW = '2026-10-05T13:30:00Z';
 
-export const sampleShift: ShiftRef = { id: 5, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', overnight: false, weekdays: [0, 1, 2, 3, 4] };
+export const sampleShift: ShiftRef = { id: 5, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', overnight: false, weekdays: [0, 1, 2, 3, 4], remote_weekdays: [] };
 
-export const sampleSite: SiteRef = { id: 2, name: 'Planta Norte', latitude: 29.1, longitude: -110.9, radius_m: 150 };
+/** Sitio de su turno (domicilio en Hermosillo, radio de 150 m). */
+export const sampleSite: SiteRef = { id: 2, name: 'Planta Norte', address: siteAddress, latitude: 29.1, longitude: -110.9, radius_m: 150, active: true };
 
 export const sampleOccurrence: Occurrence = {
   work_date: '2026-10-05',
@@ -57,6 +59,7 @@ export function attendanceToday(overrides: Partial<AttendanceToday> = {}): Atten
     actions: ['CHECK_IN'],
     remote_allowed: false,
     sites: [sampleSite],
+    site_code: false,
     message: 'Tu turno es de 08:00 a 16:00: registra tu entrada.',
     ...overrides,
   };
@@ -77,6 +80,7 @@ export function actionResult(overrides: Partial<AttendanceActionResult> = {}): A
 export function companyShift(overrides: Partial<Shift> = {}): Shift {
   return {
     ...sampleShift,
+    sites: [sampleSite],
     breaks_count: 2,
     break_minutes: 30,
     early_check_in_minutes: 15,
@@ -95,7 +99,7 @@ export function shiftRequest(overrides: Partial<ShiftRequest> = {}): ShiftReques
   return {
     id: 4,
     employee: { id: 7, full_name: 'Ana Ruiz', employee_number: 'EMP-7' },
-    shift: { id: 9, name: 'Vespertino', start_time: '14:00:00', end_time: '22:00:00', overnight: false, weekdays: [0, 1, 2, 3, 4] },
+    shift: { id: 9, name: 'Vespertino', start_time: '14:00:00', end_time: '22:00:00', overnight: false, weekdays: [0, 1, 2, 3, 4], remote_weekdays: [], sites: [sampleSite] },
     current_shift: sampleShift,
     valid_from: '2026-10-12',
     reason: 'Entro a la escuela por las mañanas',

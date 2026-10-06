@@ -2,15 +2,19 @@ import { MapPin, Search, SearchX, X } from 'lucide-react';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useMountedRef } from '../../hooks/useMountedRef';
-import { MapsApiError, mapsService, type FoundPlace, type PlaceSuggestion } from '../../services/maps/googleMaps';
+import { t, useLocale } from '../../i18n';
+import { MapsApiError, mapsService, type FoundPlace, type PlaceSuggestion, type SearchSession, type SearchSource } from '../../services/maps/googleMaps';
 import type { GeoPoint } from '../../utils/address';
 import { knownLocation } from '../../utils/geolocation';
-import { formatDistance } from '../attendance/sessionFacts';
+import { formatDistance } from '../../utils/numbers';
 import { Spinner } from '../Spinner';
 import { Floating } from '../ui/Floating';
 
-/** Pausa tras la última tecla: lo bastante corta para sentirse inmediata, sin una consulta por letra. */
-const DEBOUNCE_MS = 220;
+/**
+ * Pausa tras la última tecla: lo bastante corta para sentirse inmediata, sin una consulta por letra.
+ * Places está hecho para cada tecla; la geocodificación (respaldo) se cobra por consulta y espera un poco más.
+ */
+const DEBOUNCE_MS: Record<SearchSource, number> = { places: 220, geocoding: 300 };
 
 /** Toda falla se informa (nunca se calla): lo que no venga del servicio de mapas cuenta como falla de Places. */
 function asPlacesProblem(error: unknown): MapsApiError {
@@ -19,7 +23,7 @@ function asPlacesProblem(error: unknown): MapsApiError {
 const MIN_CHARS = 3;
 
 interface PlaceSearchProps {
-  /** País del domicilio: las sugerencias se limitan a él. */
+  /** País del domicilio: las sugerencias (de Places o de la geocodificación) se limitan a él. */
   country?: string;
   /**
    * Punto de referencia (el marcado o lo que se ve del mapa): las sugerencias más cercanas primero,
@@ -32,23 +36,24 @@ interface PlaceSearchProps {
   onError?: (error: MapsApiError) => void;
 }
 
-/** Lo que dice la lista cuando no hay sugerencias, según por qué. */
-function emptyCopy(term: string, problem: MapsApiError | null): { title: string; hint: string } {
-  if (problem?.problem === 'failed') {
-    return { title: 'No se pudo buscar en este momento', hint: 'Revisa tu conexión e inténtalo de nuevo, o marca el punto en el mapa.' };
-  }
-  if (problem) return { title: 'Sin resultados', hint: 'Escribe el domicilio en los campos y marca el punto directamente en el mapa.' };
-  return { title: `Sin resultados para «${term}»`, hint: 'Prueba con otra dirección o marca el punto directamente en el mapa.' };
+/** Lo que dice la lista cuando no hay sugerencias, según por qué (en el idioma activo, al dibujar). */
+function emptyCopy(problem: MapsApiError | null): { title: string; hint: string } {
+  if (problem?.problem === 'failed') return { title: t('location.search.failed.title'), hint: t('location.search.failed.hint') };
+  if (problem) return { title: t('location.search.unavailable.title'), hint: t('location.search.unavailable.hint') };
+  return { title: t('location.search.none.title'), hint: t('location.search.none.hint') };
 }
 
 /**
- * Buscador de lugares y direcciones (Places de Google) con su lista propia: las 5 sugerencias más
- * cercanas mientras se escribe (con pausa entre teclas; solo se dibuja la respuesta de lo último que
- * se escribió), con su distancia, flechas, Enter y Escape. Al elegir, entrega el punto y el
- * domicilio del lugar. Si no hay resultados, o Google no responde o no tiene la API habilitada, la
- * misma lista lo dice (nunca un popup) y el formulario sigue funcionando a mano.
+ * Buscador de lugares y direcciones de Google con su lista propia: las 5 sugerencias más cercanas
+ * mientras se escribe (con pausa entre teclas; solo se dibuja la respuesta de lo último que se
+ * escribió), con su distancia, flechas, Enter y Escape. Busca con Places (Autocomplete) y, si Places
+ * no está disponible, con la geocodificación de lo escrito: mismas filas, mismas distancias. Al
+ * elegir, entrega el punto y el domicilio del lugar. Si no hay resultados, o Google no responde o no
+ * tiene las APIs habilitadas, la misma lista lo dice (nunca un popup) y el formulario sigue a mano.
+ * Al cambiar el idioma, lo escrito se vuelve a buscar: las sugerencias llegan en el idioma nuevo.
  */
 export function PlaceSearch({ country, near = null, disabled = false, onSelect, onError }: PlaceSearchProps) {
+  const locale = useLocale();
   const id = useId();
   const mounted = useMountedRef();
   const [query, setQuery] = useState('');
@@ -62,7 +67,8 @@ export function PlaceSearch({ country, near = null, disabled = false, onSelect, 
   const [searched, setSearched] = useState(false);
   const controlRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const session = useRef<Promise<google.maps.places.AutocompleteSessionToken> | null>(null);
+  const session = useRef<SearchSession>({ token: null });
+  /** Ni Places ni Geocoding pueden buscar (no habilitados): no se vuelve a llamar a Google. */
   const failed = useRef(false);
   /** El texto del lugar elegido: no es una búsqueda nueva (no se abre otra sesión ni la lista). */
   const chosen = useRef<string | null>(null);
@@ -83,52 +89,50 @@ export function PlaceSearch({ country, near = null, disabled = false, onSelect, 
     setBusy(false); // una búsqueda anterior aún en curso ya no cuenta (su respuesta se ignora)
     if (term.length < MIN_CHARS || query === chosen.current) return;
     if (failed.current) {
-      // Sin la API habilitada no se vuelve a llamar a Google: la lista dice que no hay resultados.
+      // Sin ninguna API habilitada no se vuelve a llamar a Google: la lista dice que no hay resultados.
       setSearched(true);
       setOpen(true);
       return;
     }
-    let cancelled = false;
+    // Lo que se escriba después cancela esta búsqueda: su respuesta se ignora y el servicio no pide más.
+    const latest = new AbortController();
     const timer = window.setTimeout(() => {
       setBusy(true);
-      session.current ??= mapsService.newSearchSession();
-      session.current
-        // Si ya se escribió otra cosa mientras se abría la sesión, no se pide a Google algo que se ignoraría.
-        .then((token) => (cancelled ? [] : mapsService.suggestPlaces(term, token, { country, near: nearRef.current ?? device.current })))
+      mapsService
+        // Places primero; si no está (apagado, negado o falla), la geocodificación. El problema de Places se informa.
+        .searchPlaces(term, session.current, { country, near: nearRef.current ?? device.current, signal: latest.signal, onProblem: onError })
         .then((found) => {
-          if (cancelled) return;
+          if (latest.signal.aborted) return;
           setProblem(null);
           setSuggestions(found);
           setActive(0);
         })
         .catch((error: unknown) => {
-          // La siguiente búsqueda empieza otra sesión: una que falló (p. ej. sin red) no se reutiliza.
-          session.current = null;
-          if (cancelled) return;
+          if (latest.signal.aborted) return;
           const found = asPlacesProblem(error);
           failed.current = found.problem !== 'failed'; // sin la API habilitada no se vuelve a intentar
           setProblem(found);
           onError?.(found);
         })
         .finally(() => {
-          if (cancelled) return;
+          if (latest.signal.aborted) return;
           setBusy(false);
           setSearched(true);
           setOpen(true);
         });
-    }, DEBOUNCE_MS);
+    }, DEBOUNCE_MS[mapsService.searchSource() ?? 'places']);
     return () => {
-      cancelled = true;
+      latest.abort();
       window.clearTimeout(timer);
     };
-  }, [query, country, onError]);
+  }, [query, country, onError, locale]);
 
   const choose = async (suggestion: PlaceSuggestion) => {
     setOpen(false);
     setBusy(true);
     try {
       const place = await mapsService.resolvePlace(suggestion);
-      session.current = null; // la sesión de búsqueda termina al elegir
+      session.current = { token: null }; // la sesión de búsqueda termina al elegir
       if (!mounted.current) return;
       chosen.current = place.label;
       setQuery(place.label);
@@ -172,7 +176,7 @@ export function PlaceSearch({ country, near = null, disabled = false, onSelect, 
   const listId = `${id}-list`;
   const showList = open && suggestions.length > 0;
   const showEmpty = open && !busy && searched && suggestions.length === 0;
-  const empty = emptyCopy(query.trim(), problem);
+  const empty = emptyCopy(problem);
   const byDistance = suggestions.some((suggestion) => suggestion.distanceMeters !== null);
   return (
     <div className="place-search" ref={controlRef}>
@@ -185,8 +189,8 @@ export function PlaceSearch({ country, near = null, disabled = false, onSelect, 
         aria-controls={showList ? listId : undefined}
         aria-activedescendant={showList ? `${id}-opt-${active}` : undefined}
         aria-autocomplete="list"
-        aria-label="Buscar un lugar o una dirección"
-        placeholder="Buscar un lugar o una dirección"
+        aria-label={t('location.search.label')}
+        placeholder={t('location.search.label')}
         autoComplete="off"
         disabled={disabled}
         value={query}
@@ -200,13 +204,13 @@ export function PlaceSearch({ country, near = null, disabled = false, onSelect, 
         </span>
       )}
       {!busy && query && (
-        <button type="button" className="place-search__clear" aria-label="Borrar búsqueda" onClick={() => setQuery('')}>
+        <button type="button" className="place-search__clear" aria-label={t('location.search.clear')} onClick={() => setQuery('')}>
           <X size={16} />
         </button>
       )}
       {showList && (
         <Floating anchorRef={controlRef} floatingRef={menuRef} className="select__menu select__menu--light place-search__menu" matchWidth>
-          <ul id={listId} role="listbox" aria-label="Lugares encontrados">
+          <ul id={listId} role="listbox" aria-label={t('location.search.results')}>
             {suggestions.map((suggestion, index) => (
               <li
                 key={suggestion.id}
@@ -228,7 +232,7 @@ export function PlaceSearch({ country, near = null, disabled = false, onSelect, 
               </li>
             ))}
           </ul>
-          <p className="place-search__credit">{byDistance ? 'Los más cercanos primero · Resultados de Google' : 'Resultados de Google'}</p>
+          <p className="place-search__credit">{t(byDistance ? 'location.search.creditNearest' : 'location.search.credit')}</p>
         </Floating>
       )}
       {showEmpty && (

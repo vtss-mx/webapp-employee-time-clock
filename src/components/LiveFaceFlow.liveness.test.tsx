@@ -67,20 +67,20 @@ describe('LiveFaceFlow: destello de colores', () => {
     expect(detection.options?.mode).toEqual({ kind: 'action', action: 'LOOK_UP', minimum: 0.09, baseline });
     see({ guidance: 'move' });
     expect(message()).toHaveTextContent('Levanta un poco la barbilla y mira hacia arriba');
-    expect(document.querySelector('.tilt-cue--up')).not.toBeNull();
+    expect(document.querySelector('.ring-cue--up')).not.toBeNull();
     await stable();
     await stable(); // de vuelta al frente
 
     // Mirar abajo.
     expect(detection.options?.mode).toMatchObject({ action: 'LOOK_DOWN', minimum: 0.09 });
-    expect(document.querySelector('.tilt-cue--down')).not.toBeNull();
+    expect(document.querySelector('.ring-cue--down')).not.toBeNull();
     await stable();
     await stable();
 
-    // Acercarse: el óvalo punteado marca hasta dónde crecer.
+    // Acercarse: las ondas del anillo llegan hasta donde debe crecer el rostro.
     expect(heading()).toHaveTextContent('Prueba de vida · paso 3 de 3');
     expect(detection.options?.mode).toEqual({ kind: 'action', action: 'MOVE_CLOSER', minimum: 1.3, baseline });
-    expect(Number(document.querySelector<HTMLElement>('.closer-cue')?.style.getPropertyValue('--closer-scale'))).toBeCloseTo(1.3 + config.faceCloserMargin);
+    expect(Number(document.querySelector<HTMLElement>('.ring-cue--closer')?.style.getPropertyValue('--closer-scale'))).toBeCloseTo(1.3 + config.faceCloserMargin);
     await stable();
 
     const [frontal, red, green, blue, up, down, closer] = camera.frames;
@@ -89,6 +89,7 @@ describe('LiveFaceFlow: destello de colores', () => {
       challenge: { id: 'ch-f', images: [up, down, closer] },
       flash: [red, green, blue],
       camera: 'FaceTime HD Camera',
+      telemetry: expect.any(String),
       accessoryReview: false,
     });
     expect(server.checks()).toBe(1);
@@ -103,7 +104,7 @@ describe('LiveFaceFlow: destello de colores', () => {
     expect(overlay()).toBeNull();
     expect(detection.options?.mode).toMatchObject({ kind: 'action', action: 'TURN_LEFT' });
     await stable();
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: [camera.frames[0]], challenge: { id: 'ch-f', images: [camera.frames[1]] }, camera: 'FaceTime HD Camera', accessoryReview: false });
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: [camera.frames[0]], challenge: { id: 'ch-f', images: [camera.frames[1]] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String), accessoryReview: false });
   });
 
   it('obligatorio: si la pantalla deja de verse se explica y se pide otro reto (con colores nuevos) sin volver a escanear', async () => {
@@ -114,7 +115,7 @@ describe('LiveFaceFlow: destello de colores', () => {
     setVisibility('hidden');
     await advance(settle);
     expect(overlay()).toBeNull();
-    expect(heading()).toHaveTextContent('Intentemos de nuevo');
+    expect(heading()).toHaveTextContent('Intenta de nuevo');
     expect(message()).toHaveTextContent('No se pudo completar el destello de colores. Mantén la pantalla encendida y tu rostro frente a ella.');
     setVisibility('visible');
     await advance(config.faceResumeAfterBlockMs);
@@ -135,7 +136,7 @@ describe('LiveFaceFlow: destello de colores', () => {
     await advance(config.faceResumeAfterBlockMs + settle); // segundo
     await advance(config.faceResumeAfterBlockMs + settle); // tercero
     expect(server.challenges()).toBe(3);
-    expect(message()).toHaveTextContent('No se completó la prueba de vida. Intentemos de nuevo desde el inicio.');
+    expect(message()).toHaveTextContent('No se completó la prueba de vida. El escaneo empezará de nuevo.');
     await advance(config.faceResumeAfterBlockMs);
     expect(detection.options?.mode).toEqual({ kind: 'frontal' });
     expect(onFatal).not.toHaveBeenCalled();
@@ -162,9 +163,9 @@ describe('LiveFaceFlow: vencimiento del reto (expires_in)', () => {
     await advance(10_000);
     await stable(); // primer giro a los 10 s: al volver al frente quedan 5 s
     await advance(4_999);
-    expect(heading()).not.toHaveTextContent('Intentemos de nuevo');
+    expect(heading()).not.toHaveTextContent('Intenta de nuevo');
     await advance(1);
-    expect(heading()).toHaveTextContent('Intentemos de nuevo');
+    expect(heading()).toHaveTextContent('Intenta de nuevo');
     expect(message()).toHaveTextContent('No se completó el movimiento a tiempo');
   });
 
@@ -175,6 +176,6 @@ describe('LiveFaceFlow: vencimiento del reto (expires_in)', () => {
     await advance(config.faceChallengeTimeoutMs - 1);
     expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 2');
     await advance(1);
-    expect(heading()).toHaveTextContent('Intentemos de nuevo');
+    expect(heading()).toHaveTextContent('Intenta de nuevo');
   });
 });

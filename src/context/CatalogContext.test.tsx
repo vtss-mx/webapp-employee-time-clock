@@ -72,25 +72,25 @@ describe('CatalogProvider: catálogos en memoria, una carga por sesión', () => 
     const { calls } = server();
     renderApp(gated);
     expect(screen.getByTestId('catalogs')).toHaveTextContent('loading');
-    expect(screen.getByText('Preparando tu espacio de trabajo...')).toBeInTheDocument();
+    expect(screen.getByText('Cargando…')).toBeInTheDocument();
     expect(catalogCalls(calls)).toHaveLength(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'entrar' }));
-    expect(await screen.findByText('Validator')).toBeInTheDocument(); // nombre del catálogo de roles
+    expect(await screen.findByText('Validador')).toBeInTheDocument(); // nombre del catálogo de roles
     expect(screen.getByTestId('catalogs')).toHaveTextContent('ready');
     expect(catalogCalls(calls)).toHaveLength(1);
     // Solo en memoria: nada de los catálogos queda en el navegador.
     const stored = [window.localStorage, window.sessionStorage].flatMap((store) => Object.keys(store).map((key) => store.getItem(key)));
-    expect(stored.join(' ')).not.toMatch(/Validator|México/);
+    expect(stored.join(' ')).not.toMatch(/Validador|México/);
 
     await userEvent.click(screen.getByRole('button', { name: 'salir' }));
     await waitFor(() => expect(screen.getByTestId('catalogs')).toHaveTextContent('loading'));
     await userEvent.click(screen.getByRole('button', { name: 'entrar' }));
-    expect(await screen.findByText('Validator')).toBeInTheDocument();
+    expect(await screen.findByText('Validador')).toBeInTheDocument();
     expect(catalogCalls(calls)).toHaveLength(2); // nueva sesión, nueva carga
   });
 
-  it('si fallan avisa en el popup con "Reintentar"; la pantalla ofrece volver a cargar', async () => {
+  it('si fallan avisa en el popup con "Reintentar"; queda la pantalla de error de la app con "Reintentar"', async () => {
     const { calls } = server(2);
     renderApp(gated);
     await userEvent.click(screen.getByRole('button', { name: 'entrar' }));
@@ -102,9 +102,12 @@ describe('CatalogProvider: catálogos en memoria, una carga por sesión', () => 
     popup = await screen.findByRole('alertdialog', { name: 'No se pudieron cargar los catálogos' });
     await userEvent.click(within(popup).getAllByRole('button', { name: 'Cerrar' })[0]);
     expect(screen.getByTestId('catalogs')).toHaveTextContent('error');
-    await userEvent.click(screen.getByRole('button', { name: 'Volver a cargar' }));
+    const failed = screen.getByRole('alert');
+    expect(failed).toHaveTextContent('No se pudo cargar la información');
+    expect(failed).toHaveTextContent('Error al cargar');
+    await userEvent.click(within(failed).getByRole('button', { name: 'Reintentar' }));
 
-    expect(await screen.findByText('Validator')).toBeInTheDocument();
+    expect(await screen.findByText('Validador')).toBeInTheDocument();
     expect(catalogCalls(calls)).toHaveLength(3);
   });
 
@@ -119,7 +122,7 @@ describe('CatalogProvider: catálogos en memoria, una carga por sesión', () => 
     await screen.findByRole('alertdialog', { name: 'No se pudieron cargar los catálogos' });
     offline = false;
     act(() => void window.dispatchEvent(new Event('online')));
-    expect(await screen.findByText('Validator')).toBeInTheDocument();
+    expect(await screen.findByText('Validador')).toBeInTheDocument();
   });
 
   it('si la sesión se cierra mientras cargan, la respuesta tardía se descarta', async () => {
@@ -145,10 +148,10 @@ describe('CatalogProvider: catálogos en memoria, una carga por sesión', () => 
       await late;
     });
     expect(screen.getByTestId('catalogs')).toHaveTextContent('loading');
-    expect(screen.queryByText('Validator')).toBeNull();
+    expect(screen.queryByText('Validador')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'entrar' }));
-    expect(await screen.findByText('Validator')).toBeInTheDocument();
+    expect(await screen.findByText('Validador')).toBeInTheDocument();
   });
 
   it('useCatalogs exige el proveedor y los catálogos ya cargados', () => {

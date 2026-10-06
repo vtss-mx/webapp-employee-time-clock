@@ -1,8 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { describe, expect, it } from 'vitest';
 import { useAuth } from '../hooks/useAuth';
+import { setLocale } from '../i18n/core';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../test/http';
 import { renderWithProviders, tokenResponse } from '../test/render';
 import { SessionsPanel } from './SessionsPanel';
@@ -95,5 +96,51 @@ describe('SessionsPanel', () => {
     answer(page(session('a', true)));
     await waitFor(() => expect(document.querySelector('.session-list')).not.toHaveClass('is-loading'));
     expect(within(document.querySelector('.session-list') as HTMLElement).queryByRole('button', { name: 'Cerrar' })).toBeNull();
+  });
+});
+
+describe('SessionsPanel en inglés (en-US)', () => {
+  it('la confirmación abierta y el aviso de éxito siguen al idioma al cambiarlo en caliente', async () => {
+    renderPanel({ '/auth/sessions/c': () => apiOk(null), '/auth/sessions': () => page(session('a', true), session('c', false), phone) });
+    await screen.findByText('Este dispositivo');
+    const others = screen.getAllByRole('button', { name: 'Cerrar' });
+    await userEvent.click(others[0]);
+    await screen.findByRole('alertdialog', { name: /^¿Cerrar la sesión de .*\?$/ });
+    await act(() => setLocale('en-US'));
+    const confirm = screen.getByRole('alertdialog', { name: /^Sign out of .*\?$/ });
+    expect(confirm).toHaveTextContent('That device will need to sign in again to use your account.');
+    expect(confirm).toHaveTextContent('IP10.0.0.1');
+    expect(confirm).toHaveTextContent('Started');
+    // La lista también está en inglés.
+    expect(screen.getByRole('heading', { name: 'Active sessions' })).toBeInTheDocument();
+    expect(screen.getByText('This device')).toBeInTheDocument();
+    expect(screen.getByText(/Unknown IP · Active .* · Started/)).toBeInTheDocument();
+    expect(screen.getByText(/Don't recognize a device\?/)).toBeInTheDocument();
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('dialog', { name: 'Session ended' })).toHaveTextContent('That device will need to sign in again.');
+  });
+
+  it('si no se pudo cerrar otra sesión, el popup del error lo dice en el idioma activo', async () => {
+    renderPanel({ '/auth/sessions/c': () => apiFail(503, 'SERVICE_UNAVAILABLE', 'Servicio no disponible'), '/auth/sessions': () => page(session('a', true), session('c', false)) });
+    await screen.findByText('Este dispositivo');
+    await userEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: /^¿Cerrar la sesión de .*\?$/ })).getByRole('button', { name: 'Cerrar sesión' }));
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo cerrar la sesión' })).toHaveTextContent('Servicio no disponible');
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('alertdialog', { name: "Couldn't end the session" })).toBeInTheDocument();
+  });
+
+  it('si la lista no se pudo cargar, el popup lo dice (y sigue al idioma)', async () => {
+    renderPanel({ '/auth/sessions': () => apiFail(403, 'FORBIDDEN', 'Sin permiso') });
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudieron cargar tus sesiones' })).toHaveTextContent('Sin permiso');
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('alertdialog', { name: "Couldn't load your sessions" })).toBeInTheDocument();
+  });
+
+  it('sin sesiones: el vacío en inglés', async () => {
+    await setLocale('en-US');
+    renderPanel({ '/auth/sessions': () => page() });
+    expect(await screen.findByText('No open sessions')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out of all devices' })).toBeInTheDocument();
   });
 });

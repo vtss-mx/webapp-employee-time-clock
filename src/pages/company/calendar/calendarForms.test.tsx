@@ -48,9 +48,9 @@ const display = (iso: string) => iso.split('-').reverse().join('/');
 const posted = (calls: MockCall[]) => calls.find((call) => call.init.method === 'POST');
 const bodyOf = (call: MockCall | undefined) => JSON.parse(call?.init.body as string) as unknown;
 const fieldFail = (status: number, code: string, message: string, field: string) => jsonResponse(envelope(null, { status, code, message, errors: [{ code, message, field, details: null }] }), status);
-/** Con errores no se pregunta nada: solo el popup "Revisa la información" (se cierra). */
+/** Con errores no se pregunta nada: solo el popup "Revisa los datos" (se cierra). */
 const reviewed = async () => {
-  const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
+  const popup = await screen.findByRole('alertdialog', { name: 'Revisa los datos' });
   expect(screen.queryByRole('dialog')).toBeNull();
   await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
 };
@@ -109,7 +109,20 @@ describe('Agregar día festivo', () => {
 
     await submitAndConfirm('Agregar festivo', '¿Agregar Aniversario como día festivo?');
     expect(await screen.findByRole('dialog', { name: 'Día festivo agregado' })).toHaveTextContent(`Aniversario: ${longDate(last)}. Ese día nadie tiene que checar.`);
-    expect(screen.getByTestId('where')).toHaveTextContent(/^\/company\/calendar$/);
+    // El calendario regresa con el festivo nuevo elegido.
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(`/company/calendar?date=${last}`));
+  });
+
+  it('abierto desde un día del calendario, "Cancelar" y el regreso vuelven a ese día; una fecha inválida no se usa', async () => {
+    mockFetch();
+    const { unmount } = renderAt(`/company/calendar/holidays/new?date=${last}`);
+    expect(screen.getByRole('link', { name: 'Calendario' })).toHaveAttribute('href', `/company/calendar?date=${last}`);
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.getByTestId('where')).toHaveTextContent(`/company/calendar?date=${last}`);
+    unmount();
+    renderAt('/company/calendar/holidays/new?date=2026-02-31');
+    expect(screen.getByLabelText('Fecha')).toHaveValue('');
+    expect(screen.getByRole('link', { name: 'Calendario' })).toHaveAttribute('href', '/company/calendar');
   });
 
   it('sin fecha en la URL empieza vacío; Cancelar regresa al calendario', async () => {
@@ -184,7 +197,7 @@ describe('Registrar ausencia', () => {
     expect(bodyOf(posted(calls))).toEqual({ type: 'SICK_LEAVE', starts_on: '2026-10-05', ends_on: '2026-10-09', note: 'Folio 123', employee_ids: [7, 8] });
     expect(posted(calls)?.url).toBe('/api/calendar/absences');
     expect(changes).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('where')).toHaveTextContent('/company/calendar?tab=absences');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/company/calendar?tab=absences'));
   });
 
   it('para uno pregunta sin nota (cancelar no envía nada); marca un tipo que el servidor no acepta; Cancelar regresa a Ausencias', async () => {
@@ -221,6 +234,17 @@ describe('Registrar ausencia', () => {
     expect(changes).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/company/calendar?tab=absences');
+  });
+
+  it('abierta desde un día del calendario: empieza y termina ese día, y regresa a él', async () => {
+    pickerServer();
+    renderAt(`/company/calendar/absences/new?date=${last}`);
+    expect(screen.getByLabelText('Primer día')).toHaveValue(display(last));
+    expect(screen.getByLabelText('Último día')).toHaveValue(display(last));
+    expect(screen.getByText('1 día, ambos incluidos')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Calendario' })).toHaveAttribute('href', `/company/calendar?date=${last}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    expect(screen.getByTestId('where')).toHaveTextContent(`/company/calendar?date=${last}`);
   });
 });
 

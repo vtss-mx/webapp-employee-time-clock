@@ -1,15 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CENTRO, component, FakeSessionToken, failure, FOUND, geocoded, PALIZA, POINT, prediction, STREET, stubSdk, suggestionFor } from '../../test/googleMapsSdk';
 import { jsonResponse, mockFetch } from '../../test/http';
-import type { GeoPoint } from '../../utils/address';
-import { MapsApiError, mapsService, type PlaceSuggestion } from './googleMaps';
+import { MapsApiError, mapsService } from './googleMaps';
 
 // Configuración de Google Maps que cada prueba ajusta (clave y APIs habilitadas en la clave).
 const mapsConfig = vi.hoisted(() => ({ apiKey: 'clave de prueba', places: true, geocoding: true, geolocation: true }));
 vi.mock('../../utils/config', () => ({ config: { maps: mapsConfig } }));
 
 const DEFAULTS = { ...mapsConfig };
-const POINT: GeoPoint = { lat: 29.0729, lng: -110.9559 };
-const FOUND = { street: 'Calle Dr. Paliza', exterior_number: '71', postal_code: '83000', country_code: 'MX', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo' };
 const globals = window as unknown as Record<string, (() => void) | undefined>;
 
 /** Módulo recién cargado: sin SDK pedido antes ni rechazos de la clave registrados. */
@@ -20,76 +18,6 @@ async function freshModule() {
 
 /** Scripts del SDK que el cargador agregó a la página. */
 const sdkScripts = () => [...document.head.querySelectorAll<HTMLScriptElement>('script[src^="https://maps.googleapis.com/"]')];
-
-/** Error con el que terminó una promesa (o undefined si se cumplió). */
-const failure = (promise: Promise<unknown>) => promise.then(() => undefined, (error: unknown) => error);
-
-// --- SDK simulado (el real se valida en navegador) ---
-
-const component = (long_name: string, types: string[], short_name = long_name) => ({ long_name, short_name, types });
-const PALIZA = [
-  component('Calle Dr. Paliza', ['route']),
-  component('71', ['street_number']),
-  component('83000', ['postal_code']),
-  component('México', ['country', 'political'], 'mx'),
-  component('Sonora', ['administrative_area_level_1', 'political'], 'Son.'),
-  component('Hermosillo', ['administrative_area_level_2', 'political']),
-  component('Hermosillo', ['locality', 'political']),
-];
-const geocoded = (types: string[], formatted_address: string, address_components: unknown[], point = POINT) => ({
-  types,
-  formatted_address,
-  address_components,
-  geometry: { location: { toJSON: () => point } },
-});
-const CENTRO = geocoded(['neighborhood', 'political'], 'Centro, Hermosillo, Son., México', [component('Centro', ['neighborhood'])], { lat: 29.07, lng: -110.95 });
-const STREET = geocoded(['street_address'], 'Calle Dr. Paliza 71, Centro, 83000 Hermosillo, Son., México', PALIZA);
-
-class FakeSessionToken {}
-
-function stubSdk() {
-  const geocode = vi.fn<(request: google.maps.GeocoderRequest) => Promise<{ results: unknown[] }>>();
-  const fetchAutocompleteSuggestions = vi.fn<(request: google.maps.places.AutocompleteRequest) => Promise<{ suggestions: unknown[] }>>();
-  class Geocoder {
-    geocode = geocode;
-  }
-  const libraries: Record<string, unknown> = {
-    geocoding: { Geocoder },
-    places: { AutocompleteSessionToken: FakeSessionToken, AutocompleteSuggestion: { fetchAutocompleteSuggestions } },
-  };
-  const importLibrary = vi.fn((name: string) => Promise.resolve(libraries[name]));
-  vi.stubGlobal('google', { maps: { importLibrary } });
-  return { geocode, fetchAutocompleteSuggestions, importLibrary };
-}
-
-const textOf = (text: string | undefined) => (text === undefined ? null : { text });
-const prediction = (placeId: string, text: string, main?: string, secondary?: string) => ({ placeId, text: { text }, mainText: textOf(main), secondaryText: textOf(secondary) });
-
-interface FakePlaceFields {
-  location?: { toJSON: () => GeoPoint };
-  addressComponents?: Array<{ longText: string | null; shortText: string | null; types: string[] }>;
-  formattedAddress?: string | null;
-}
-
-/** Sugerencia cuyo lugar trae sus datos al pedirlos (`fetchFields`), como el SDK. */
-function suggestionFor(fields: FakePlaceFields | Error) {
-  const place: FakePlaceFields & { fetchFields: ReturnType<typeof vi.fn> } = {
-    fetchFields: vi.fn(() => {
-      if (fields instanceof Error) return Promise.reject(fields);
-      Object.assign(place, fields);
-      return Promise.resolve({ place });
-    }),
-  };
-  const toPlace = vi.fn(() => place);
-  const suggestion: PlaceSuggestion = {
-    id: 'p1',
-    primary: 'Plaza Zaragoza',
-    secondary: 'Centro, Hermosillo',
-    distanceMeters: null,
-    prediction: { toPlace } as unknown as google.maps.places.PlacePrediction,
-  };
-  return { suggestion, place, toPlace };
-}
 
 beforeEach(() => Object.assign(mapsConfig, DEFAULTS));
 afterEach(() => {
@@ -136,6 +64,16 @@ describe('loadGoogleMaps', () => {
     vi.advanceTimersByTime(60_000);
     await expect(loadGoogleMaps()).resolves.toBeUndefined();
     expect(sdkScripts()).toHaveLength(1);
+  });
+
+  it('el SDK se carga una vez con el idioma activo en ese momento: en inglés pide "en"', async () => {
+    const maps = await freshModule();
+    const { setLocale } = await import('../../i18n/core'); // el del módulo recién cargado
+    await setLocale('en-US');
+    const attempt = maps.loadGoogleMaps();
+    expect(new URL(sdkScripts()[0].src).searchParams.get('language')).toBe('en');
+    sdkScripts()[0].dispatchEvent(new Event('error'));
+    expect(await failure(attempt)).toMatchObject({ api: 'maps', problem: 'failed' });
   });
 
   it('sin red (el script no carga) falla como "failed" y se puede reintentar', async () => {
@@ -206,6 +144,8 @@ describe('mapsService: APIs apagadas en la configuración', () => {
     const calls: Array<[string, Promise<unknown>]> = [
       ['geocoding', mapsService.reverseGeocode(POINT)],
       ['geocoding', mapsService.geocodeAddress('Calle Dr. Paliza 71', 'MX')],
+      ['geocoding', mapsService.geocodePlaces('Calle Dr. Paliza 71')],
+      ['places', mapsService.searchPlaces('Plaza', { token: null })],
       ['places', mapsService.newSearchSession()],
       ['places', mapsService.suggestPlaces('Plaza', new FakeSessionToken())],
       ['places', mapsService.resolvePlace(suggestion)],
@@ -219,6 +159,7 @@ describe('mapsService: APIs apagadas en la configuración', () => {
     expect(sdk.importLibrary).not.toHaveBeenCalled();
     expect(toPlace).not.toHaveBeenCalled();
     expect(fn).not.toHaveBeenCalled();
+    expect(mapsService.searchSource()).toBeNull(); // sin ninguna de las dos no hay con qué buscar
   });
 });
 
@@ -252,8 +193,8 @@ describe('mapsService.reverseGeocode', () => {
   it('sin dirección exacta usa el primer resultado; sin resultados (o ZERO_RESULTS) no llena nada', async () => {
     const sdk = stubSdk();
     sdk.geocode.mockResolvedValueOnce({ results: [CENTRO] });
-    await expect(mapsService.reverseGeocode(POINT)).resolves.toEqual({});
-    sdk.geocode.mockResolvedValueOnce({ results: [geocoded(['locality'], 'Hermosillo, Son., México', PALIZA.slice(3))] });
+    await expect(mapsService.reverseGeocode(POINT)).resolves.toEqual({ neighborhood: 'Centro' }); // la colonia (barrio)
+    sdk.geocode.mockResolvedValueOnce({ results: [geocoded(['locality'], 'Hermosillo, Son., México', PALIZA.slice(3, 7))] });
     await expect(mapsService.reverseGeocode(POINT)).resolves.toEqual({ country_code: 'MX', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo' });
     sdk.geocode.mockResolvedValueOnce({ results: [] });
     await expect(mapsService.reverseGeocode(POINT)).resolves.toEqual({});
@@ -346,8 +287,8 @@ describe('mapsService: búsqueda de lugares', () => {
     sdk.fetchAutocompleteSuggestions.mockResolvedValue({ suggestions: [{ placePrediction: plaza }, { placePrediction: street }, { placePrediction: null }] });
     const token = new FakeSessionToken();
     await expect(mapsService.suggestPlaces('Plaza', token, { country: 'US' })).resolves.toEqual([
-      { id: 'p1', primary: 'Plaza Zaragoza', secondary: 'Centro, Hermosillo', distanceMeters: null, prediction: plaza },
-      { id: 'p2', primary: 'Calle 5 de Mayo 12', secondary: '', distanceMeters: null, prediction: street },
+      { source: 'places', id: 'p1', primary: 'Plaza Zaragoza', secondary: 'Centro, Hermosillo', distanceMeters: null, prediction: plaza },
+      { source: 'places', id: 'p2', primary: 'Calle 5 de Mayo 12', secondary: '', distanceMeters: null, prediction: street },
     ]);
     // Sin punto de referencia: ni distancia ni zona preferida (Google ordena por relevancia).
     expect(sdk.fetchAutocompleteSuggestions).toHaveBeenCalledWith({ input: 'Plaza', sessionToken: token, language: 'es', region: 'us', includedRegionCodes: ['us'] });
@@ -472,7 +413,7 @@ describe('mapsService: búsqueda de lugares', () => {
   it('un lugar sin ubicación o una falla al pedir sus datos se informan', async () => {
     const error = await failure(mapsService.resolvePlace(suggestionFor({ formattedAddress: 'Sin punto' }).suggestion));
     expect(error).toBeInstanceOf(MapsApiError);
-    expect(error).toMatchObject({ api: 'places', problem: 'failed', message: 'places: failed (sin ubicación)' });
+    expect(error).toMatchObject({ api: 'places', problem: 'failed', message: 'places: failed (no_location)' });
     expect(await failure(mapsService.resolvePlace(suggestionFor(new Error('PERMISSION_DENIED')).suggestion))).toMatchObject({ api: 'places', problem: 'denied' });
   });
 

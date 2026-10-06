@@ -37,8 +37,13 @@ describe('EmployeeFormFields: normaliza mientras se escribe', () => {
     expect(values).toMatchObject({ curp: 'HEGG560427MVZRRL04', rfc: 'PEGJ900515AB1', nss: '12345678903', phone: '+526621234567' });
     expect(screen.getByLabelText('Teléfono celular')).toHaveValue('662 123 4567');
     expect(screen.getByTestId('touched').textContent).toContain('curp'); // al salir del campo
-    // Obligatorios: asterisco rojo por CSS (no forma parte del texto de la etiqueta).
-    expect(screen.getByText('CURP').closest('label')).toHaveClass('is-required');
+    // Obligatorios: asterisco rojo por CSS (no forma parte del texto de la etiqueta). RFC, CURP y NSS son opcionales.
+    expect(screen.getByText('Nombres').closest('label')).toHaveClass('is-required');
+    for (const label of ['CURP', 'RFC', 'No. de Seguridad Social (NSS)']) {
+      expect(screen.getByText(label).closest('label')).not.toHaveClass('is-required');
+      expect(screen.getByLabelText(label)).not.toBeRequired();
+    }
+    expect(screen.getByText('Opcional · 13 caracteres. Debe coincidir con la fecha de nacimiento')).toBeInTheDocument();
   });
 });
 
@@ -90,7 +95,7 @@ describe('rutas con carga diferida y guardas', () => {
     app('/login');
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).toBeNull());
     expect(await screen.findByLabelText('Navegación principal', {}, { timeout: 4000 })).toBeInTheDocument(); // ya dentro de la app
-    expect(screen.getByText('Employee', { selector: '.sidebar__section' })).toBeInTheDocument(); // rol del catálogo
+    expect(screen.getByText('Empleado', { selector: '.sidebar__section' })).toBeInTheDocument(); // rol del catálogo
     expect(calls.filter((c) => c.url.endsWith('/catalogs'))).toHaveLength(1); // una sola carga por sesión
   });
 });

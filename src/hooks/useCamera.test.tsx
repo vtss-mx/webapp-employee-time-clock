@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { CameraNotReadyError } from '../utils/cameraDiagnostics';
+import { cameraProblemText, CameraNotReadyError } from '../utils/cameraDiagnostics';
 import { useCamera, type CameraController, type UseCameraOptions } from './useCamera';
 
 /** Almacén del dispositivo (IndexedDB en el navegador) simulado en memoria: la cámara elegida. */
@@ -129,6 +129,7 @@ describe('useCamera: abrir la cámara', () => {
     expect(viewer).toMatchObject({ activeDeviceId: 'cam-1', activeLabel: 'Cámara frontal', trackLabel: 'FaceTime HD Camera', isMirrored: true, error: null, problem: null });
     expect(viewer.devices).toEqual([{ deviceId: 'cam-1', label: 'Cámara frontal', rawLabel: 'FaceTime HD Camera', kind: 'front' }]);
     expect(savedCameras.get('tc.camera.user')).toEqual({ deviceId: 'cam-1', kind: 'front' });
+    expect(viewer.videoTrack()).toBe(tracks[0]); // su configuración viaja en la telemetría de la toma
   });
 
   it('si el navegador bloquea la reproducción automática, la cámara igual queda activa', async () => {
@@ -158,6 +159,7 @@ describe('useCamera: abrir la cámara', () => {
   it('sin inicio automático la cámara espera a que se pida (el navegador muestra su aviso entonces)', async () => {
     const { result } = renderHook(() => useCamera({ facing: 'user', autoStart: false }));
     expect(result.current.status).toBe('idle');
+    expect(result.current.videoTrack()).toBeNull(); // la telemetría de la toma: sin cámara abierta, sin pista
     expect(getUserMedia).not.toHaveBeenCalled();
     act(() => result.current.requestAccess());
     expect(result.current.status).toBe('requesting');
@@ -168,6 +170,7 @@ describe('useCamera: abrir la cámara', () => {
     getUserMedia.mockResolvedValue(streamOf(null));
     const { result } = await openCamera();
     expect(result.current).toMatchObject({ activeDeviceId: null, activeLabel: 'Cámara', trackLabel: '' });
+    expect(result.current.videoTrack()).toBeNull();
     expect(savedCameras.has('tc.camera.user')).toBe(false);
   });
 });
@@ -178,8 +181,8 @@ describe('useCamera: fallas al abrir', () => {
     const { result } = renderHook(() => useCamera({ facing: 'user' }));
     await waitFor(() => expect(result.current.status).toBe('error'));
     expect(result.current.problem?.kind).toBe('denied');
-    expect(result.current.problem?.steps.length).toBeGreaterThan(1);
-    expect(result.current.error).toBe(result.current.problem?.message);
+    expect(cameraProblemText(result.current.problem!).steps.length).toBeGreaterThan(1);
+    expect(result.current.error).toBe(cameraProblemText(result.current.problem!).message); // la causa, en el idioma activo
   });
 
   it.each([
@@ -466,12 +469,12 @@ describe('useCamera: captura', () => {
     const { video } = await openViewer();
     showImage(video);
     await expect(viewer.captureFrame()).resolves.toBe(blob);
-    expect([canvases[0].width, canvases[0].height]).toEqual([1280, 720]);
     expect(draw).toHaveBeenCalledWith(video, 0, 0, 1280, 720);
     expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenLastCalledWith(expect.any(Function), 'image/jpeg', 0.92);
+    expect([canvases[0].width, canvases[0].height]).toEqual([0, 0]); // el lienzo se suelta al codificar (iPhone)
 
     await viewer.captureFrame({ maxSide: 4000, quality: 0.5 }); // no se agranda
-    expect([canvases[1].width, canvases[1].height]).toEqual([1920, 1080]);
+    expect(draw).toHaveBeenLastCalledWith(video, 0, 0, 1920, 1080);
     expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenLastCalledWith(expect.any(Function), 'image/jpeg', 0.5);
   });
 

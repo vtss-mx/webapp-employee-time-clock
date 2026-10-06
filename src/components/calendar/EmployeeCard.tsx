@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { EmployeeRef } from '../../types';
-import { initials } from '../../utils/format';
 import { ShiftItem } from '../shifts/ShiftItem';
+import { Avatar } from '../ui/Avatar';
+import { DeletedMark } from '../ui/DeletedMark';
 
 interface EmployeeCardProps {
   employee: EmployeeRef;
@@ -11,14 +12,18 @@ interface EmployeeCardProps {
   children: ReactNode;
 }
 
-/** Un registro de un empleado en las listas del calendario (ausencia, día laborable): avatar, nombre y número. */
+/**
+ * Un registro de un empleado en las listas del calendario (ausencia, día laborable): avatar, nombre y número
+ * (con su marca si el empleado ya está en «Eliminados»: lo registrado no cambia).
+ */
 export function EmployeeCard({ employee, badges, actions, children }: EmployeeCardProps) {
   return (
     <ShiftItem
-      lead={<span className="avatar">{initials(employee.full_name)}</span>}
+      lead={<Avatar name={employee.full_name} decorative />}
       title={
         <>
           {employee.full_name} <span className="muted small">· {employee.employee_number}</span>
+          <DeletedMark deleted={employee.deleted} />
         </>
       }
       badges={badges}

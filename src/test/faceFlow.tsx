@@ -87,7 +87,7 @@ export function resetFaceFlow() {
     return Promise.resolve(blob);
   });
   detection.detector = {};
-  detection.error = null;
+  detection.failed = false;
   detection.options = null;
   detection.reset();
   flow.onSubmit.mockReset().mockImplementation(() => Promise.resolve());
@@ -116,5 +116,9 @@ export async function stable(sample?: FaceBaseline) {
   await advance(0);
 }
 export const see = (reading: Partial<Reading>) => act(() => detection.see(reading));
-export const message = () => screen.getAllByRole('status')[0];
+/** El mensaje bajo el círculo (el aviso en vivo): su indicación vigente, sin la que se desvanece en el fundido cruzado. */
+const status = () => screen.getAllByRole('status')[0];
+export const message = () => status().querySelector('.crossfade__layer--current') ?? status();
+/** La cuenta de las fotos bajo la indicación («Foto 2 de 3»), mientras se toman. */
+export const detail = () => status().querySelector('.camera__detail');
 export const heading = () => screen.getByRole('heading', { level: 2 });

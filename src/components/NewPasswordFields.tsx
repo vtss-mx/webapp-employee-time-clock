@@ -1,5 +1,6 @@
 import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
+import { useT } from '../i18n';
 import { validatePassword, validatePasswordConfirm } from '../utils/validation';
 import { ConfirmPasswordField, FormField } from './FormField';
 
@@ -26,11 +27,12 @@ export function useNewPassword() {
 export type NewPassword = ReturnType<typeof useNewPassword>;
 
 /** Los dos campos de la contraseña que se asigna (formularios de alta y de restablecer). */
-export function NewPasswordFields({ form, label = 'Contraseña nueva', disabled = false }: { form: NewPassword; label?: string; disabled?: boolean }) {
+export function NewPasswordFields({ form, label, disabled = false }: { form: NewPassword; label?: string; disabled?: boolean }) {
+  const t = useT();
   return (
     <>
       <FormField
-        label={label}
+        label={label ?? t('auth.password.new')}
         icon={<KeyRound size={18} />}
         type="password"
         autoComplete="new-password"
@@ -38,7 +40,7 @@ export function NewPasswordFields({ form, label = 'Contraseña nueva', disabled 
         disabled={disabled}
         value={form.password}
         error={form.shown.password}
-        hint="Mínimo 8 caracteres, con mayúscula, minúscula y número"
+        hint={t('auth.password.hint')}
         onBlur={() => form.touch('password')}
         onChange={(e) => form.setPassword(e.target.value)}
       />

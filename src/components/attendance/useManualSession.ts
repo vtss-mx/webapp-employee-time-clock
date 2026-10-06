@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useSubmit } from '../../hooks/useAction';
+import { useSubmit, type ErrorTitle } from '../../hooks/useAction';
 import { useFeedback } from '../../hooks/useFeedback';
+import { useLocale } from '../../i18n';
 import type { ConfirmInput } from '../../types/confirm';
 import { manualServerErrors, validateManual, type ManualErrors, type ManualField, type ManualValues } from './manualSession';
 
@@ -20,6 +21,9 @@ const errorFieldOf = (field: keyof ManualValues): ManualField => (field === 'sti
  * envío con `useSubmit` ("Guardando…" hasta salir de la pantalla; si falla, el popup lo explica).
  */
 export function useManualSession(initial: ManualValues, rules: ManualRules) {
+  // Los errores se calculan en cada dibujo con el idioma activo: al cambiarlo, quien usa el hook se
+  // vuelve a dibujar y los campos marcados cambian de idioma.
+  useLocale();
   const [values, setValues] = useState(initial);
   const [server, setServer] = useState<ManualErrors>({});
   const [attempted, setAttempted] = useState(false);
@@ -34,17 +38,18 @@ export function useManualSession(initial: ManualValues, rules: ManualRules) {
   const errorOf = (field: ManualField) => server[field] ?? (attempted ? client[field] : undefined);
 
   /**
-   * Envía si lo capturado está completo, tras confirmar (`confirm` arma la pregunta con lo capturado);
-   * si no, lo resume en un popup y marca los campos.
+   * Envía si lo capturado está completo, tras confirmar (`confirm` arma la pregunta con lo capturado
+   * y se vuelve a armar en cada dibujo: la confirmación abierta sigue al idioma activo); si no, lo
+   * resume en un popup (que también sigue al idioma) y marca los campos.
    */
-  const save = (task: () => Promise<void>, errorTitle: string, confirm: () => ConfirmInput) => {
+  const save = (task: () => Promise<void>, errorTitle: ErrorTitle, confirm: () => ConfirmInput) => {
     setAttempted(true);
     const problems = Object.values(client).filter(Boolean);
     if (problems.length) {
-      void feedback.invalidForm(client);
+      void feedback.invalidForm(() => validateManual(values, rules));
       return;
     }
-    void submit(task, errorTitle, { confirm: confirm(), onError: (error) => setServer(manualServerErrors(error)) });
+    void submit(task, errorTitle, { confirm, onError: (error) => setServer(manualServerErrors(error)) });
   };
 
   return {

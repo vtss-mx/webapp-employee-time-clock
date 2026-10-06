@@ -12,13 +12,19 @@ const company: CompanyDetail = {
   id: 4,
   name: 'Panificadora',
   legal_name: null,
-  rfc: null,
+  tax_country: null,
+  tax_id_type: null,
+  tax_id: null,
   phone: null,
   active: true,
   max_employees: null,
   api_enabled: false,
+  max_validators: 0,
+  active_validators: 0,
   employee_count: 2,
   admin_count: 1,
+  billing_status: 'ACTIVE',
+  suspension_reason: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };
@@ -104,7 +110,7 @@ describe('CompanyEmployeesPage (el ADMIN consulta el personal de una empresa)', 
     const facts = within(dialog).getByRole('region', { name: 'Se borrará' });
     expect(facts).toHaveTextContent('EmpleadoAna López · E-001');
     expect(facts).toHaveTextContent('Lo aprendido1 muestra · ');
-    expect(dialog).toHaveTextContent('Lo aprendido no se puede recuperar');
+    expect(dialog).toHaveTextContent('No se puede deshacer. Volverá a aprender');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false);
     expect(within(row).getByText('1 muestra')).toBeInTheDocument(); // cancelar deja la fila como estaba
@@ -132,13 +138,13 @@ describe('CompanyEmployeesPage (el ADMIN consulta el personal de una empresa)', 
     const calls = renderPage((url) => (url.includes('search=') ? page([]) : page([ana])));
     await screen.findByText('Ana López');
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar empleados' }), 'zzz');
-    expect(await screen.findByText('Ningún empleado coincide con la búsqueda')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
     expect(calls.some((c) => c.url.includes('search=zzz'))).toBe(true);
   });
 
   it('una empresa sin empleados lo explica', async () => {
     renderPage(() => page([]));
-    expect(await screen.findByText('La empresa aún no registra empleados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin empleados')).toBeInTheDocument();
   });
 
   it('si la empresa no carga: un solo aviso, "Volver a cargar" y la lista después', async () => {

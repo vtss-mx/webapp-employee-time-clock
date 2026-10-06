@@ -20,7 +20,8 @@ const overview: FaceSecurityOverview = {
   escalation_min_attacks: 5,
   escalation_window_minutes: 30,
   reinforced: [{ company_id: 4, name: 'Panificadora', attacks: 7 }],
-  flash: { measured: 120, conclusive: 100, inconclusive: 20, score_median: 0.62, score_p10: 0.3, magnitude_median: 0.012 },
+  flash: { measured: 120, conclusive: 100, inconclusive: 20, score_median: 0.62, score_p10: 0.3, magnitude_median: 0.012, ratio_median: 1.8, ratio_p10: 1.4 },
+  ip_database: { refresh_enabled: true, refresh_days: 30, country: { database_type: 'DBIP-Country-Lite', built_at: '2026-10-01T00:00:00Z' }, asn: null },
 };
 
 /** Con todo lo necesario para exigir el destello y sin empresas bajo ataque. */
@@ -28,7 +29,7 @@ const calm: FaceSecurityOverview = {
   ...overview,
   autocalibration: false,
   reinforced: [],
-  flash: { measured: 900, conclusive: 880, inconclusive: 20, score_median: 0.7, score_p10: 0.5, magnitude_median: 0.02 },
+  flash: { measured: 900, conclusive: 880, inconclusive: 20, score_median: 0.7, score_p10: 0.5, magnitude_median: 0.02, ratio_median: 1.9, ratio_p10: 1.5 },
 };
 
 function renderPage() {
@@ -44,6 +45,26 @@ function renderPage() {
 const card = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
 
 describe('FaceSecurityPage (seguridad facial de la plataforma)', () => {
+  it('la base local de IP: de cuándo es cada archivo, el que falta, si se actualiza sola y su atribución', async () => {
+    mockFetch(apiOk(overview));
+    const { unmount } = renderPage();
+    const section = (await screen.findByRole('heading', { name: 'Base local de IP' })).closest('section') as HTMLElement;
+    expect(section).toHaveTextContent(/PaísArchivo del .+Red \(sistema autónomo\)Sin archivo: las señales de red no se miden/);
+    expect(section).toHaveTextContent('Se actualiza sola cada 30 días.');
+    expect(within(section).getByRole('link', { name: 'IP Geolocation by DB-IP' })).toBeInTheDocument();
+    unmount();
+    mockFetch(apiOk({ ...overview, ip_database: { ...overview.ip_database, refresh_enabled: false, refresh_days: 1 } }));
+    renderPage();
+    expect(await screen.findByText(/La actualización automática está apagada/)).toBeInTheDocument();
+  });
+
+  it('un servidor anterior sin la base local no muestra esa sección', async () => {
+    mockFetch(apiOk({ ...overview, ip_database: undefined }));
+    renderPage();
+    await screen.findByText('Giro mínimo de la cabeza');
+    expect(screen.queryByRole('heading', { name: 'Base local de IP' })).toBeNull();
+  });
+
   it('muestra los umbrales frente a su mínimo y su tope, las empresas reforzadas y lo medido del destello', async () => {
     const { calls } = mockFetch(apiOk(overview));
     const { container } = renderPage();
@@ -136,5 +157,53 @@ describe('FaceSecurityPage (seguridad facial de la plataforma)', () => {
     await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Recalcular ahora los umbrales?' })).getByRole('button', { name: 'Recalcular ahora' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudieron recalcular los umbrales' })).toBeInTheDocument();
     expect(card('Giro mínimo de la cabeza')).toHaveTextContent('0.21'); // sin cambios
+  });
+});
+
+describe('FaceSecurityPage: protocolo de captura (antifraude 2a)', () => {
+  const protocol = {
+    flash_attempts: 400,
+    paced: 300,
+    late: 30,
+    pace_p50_ms: 640,
+    pace_p95_ms: 1900,
+    window_ms: 2000,
+    liveness_attempts: 400,
+    bursts: 396,
+    pulse_measured: 380,
+    pulse_seen: 250,
+    pulse_median_snr: null,
+  };
+  const moire = { key: 'MOIRE', name: 'Patrón de pantalla máximo', value: 18, floor: 14, cap: 20, samples: 400, computed_at: null, raised: true, upper: true };
+
+  it('muestra lo dictado, la ráfaga y el pulso, qué falta para exigirlo y el moiré como un máximo que baja', async () => {
+    mockFetch(apiOk({ ...overview, protocol, thresholds: [...overview.thresholds, moire, { ...moire, key: 'X', name: 'Otro máximo', value: 20, raised: false }] }));
+    renderPage();
+    const section = (await screen.findByRole('heading', { name: 'Protocolo de captura' })).closest('section') as HTMLElement;
+    expect(section).toHaveTextContent('Dictados por el servidor300');
+    expect(section).toHaveTextContent('Respuesta típica640 ms');
+    expect(section).toHaveTextContent('Nitidez del pulso (mediana)—');
+    expect(section).toHaveTextContent('El pulso solo se mide: nunca decide.');
+    expect(section).toHaveTextContent('Aún no conviene exigirlo');
+    expect(within(section).getByText('Midiendo')).toBeInTheDocument();
+    expect(section).toHaveTextContent('Que al menos el 95 % de los destellos sea dictado (hoy 75 %).');
+    const upper = card('Patrón de pantalla máximo');
+    expect(upper).toHaveTextContent('18 dB');
+    expect(upper).toHaveTextContent('Lo más estricto');
+    expect(card('Otro máximo')).toHaveTextContent('En su valor de partida');
+  });
+
+  it('listo para exigirlo cuando casi todo está dictado y con ráfaga; sin el protocolo (servidor anterior) no hay sección', async () => {
+    mockFetch(apiOk({ ...calm, min_samples: 300, protocol: { ...protocol, paced: 400, late: 2, pulse_median_snr: 0.4 } }));
+    const { unmount } = renderPage();
+    const section = (await screen.findByRole('heading', { name: 'Protocolo de captura' })).closest('section') as HTMLElement;
+    expect(section).toHaveTextContent('Ya se puede exigir el protocolo');
+    expect(section).toHaveTextContent('0.4 dB');
+    expect(within(section).getByText('Listo para exigirlo')).toBeInTheDocument();
+    unmount();
+    mockFetch(apiOk(overview));
+    renderPage();
+    await screen.findByText('Giro mínimo de la cabeza');
+    expect(screen.queryByRole('heading', { name: 'Protocolo de captura' })).toBeNull();
   });
 });

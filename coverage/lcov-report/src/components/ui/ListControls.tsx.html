@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>22/22</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -102,7 +102,10 @@
 <a name='L37'></a><a href='#L37'>37</a>
 <a name='L38'></a><a href='#L38'>38</a>
 <a name='L39'></a><a href='#L39'>39</a>
-<a name='L40'></a><a href='#L40'>40</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -120,21 +123,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">424x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">56x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1062x</span>
+<span class="cline-any cline-yes">1062x</span>
+<span class="cline-any cline-yes">1062x</span>
+<span class="cline-any cline-yes">704x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1062x</span>
+<span class="cline-any cline-yes">1062x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">76x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -143,40 +149,43 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Search } from 'lucide-react';
 import type { ActiveFilter } from '../../hooks/useSearchList';
-import { Select } from './Select';
+import { useT } from '../../i18n';
+import { Select, type SelectOption } from './Select';
 &nbsp;
-interface ListToolbarProps {
-  search: string;
-  onSearch: (value: string) =&gt; void;
-  placeholder: string;
-  label: string;
-  /** Filtro por estado (los listados sin estado, como departamentos, lo omiten). */
+/** Búsqueda del listado; los que no buscan en el backend (validadores, festivos, días laborables) la omiten. */
+type SearchProps =
+  | { search: string; onSearch: (value: string) =&gt; void; placeholder: string; label: string }
+  | { search?: undefined; onSearch?: undefined; placeholder?: undefined; label?: undefined };
+&nbsp;
+type ListToolbarProps = SearchProps &amp; {
+  /** Filtro por estado (los listados sin filtro lo omiten). */
   filter?: ActiveFilter;
   onFilter?: (value: ActiveFilter) =&gt; void;
-  /** Texto de las opciones del filtro (p. ej. "Activos" / "Activas"). */
-  labels?: { active: string; inactive: string };
-}
+  /** Texto de las opciones del filtro (p. ej. "Activos" / "Activas", "Eliminadas"). */
+  labels?: Partial&lt;Record&lt;Exclude&lt;ActiveFilter, 'all'&gt;, string&gt;&gt;;
+  /** Agrega «Eliminados»: la papelera del listado (lo eliminado se restaura durante 1 año). */
+  trash?: boolean;
+  /** false: el listado no tiene activos e inactivos (departamentos, festivos): el filtro es «Todos» / «Eliminados». */
+  statuses?: boolean;
+};
 &nbsp;
-/** Búsqueda + filtro por estado, comunes a los listados. */
-export function ListToolbar({ search, onSearch, placeholder, label, filter, onFilter, labels }: ListToolbarProps) {
+/** Búsqueda + filtro por estado (y, si se pide, «Eliminados»), comunes a los listados. */
+export function ListToolbar({ search, onSearch, placeholder, label, filter, onFilter, labels, trash = false, statuses = true }: ListToolbarProps) {
+  const t = useT();
+  const options: SelectOption&lt;ActiveFilter&gt;[] = [{ value: 'all', label: t(statuses ? 'ui.listToolbar.all' : 'ui.listToolbar.allRecords') }];
+  if (statuses) {
+    options.push({ value: 'active', label: labels?.active ?? t('ui.listToolbar.active') }, { value: 'inactive', label: labels?.inactive ?? t('ui.listToolbar.inactive') });
+  }
+  if (trash) options.push({ value: 'deleted', label: labels?.deleted ?? t('ui.listToolbar.deleted') });
   return (
-    &lt;div className="toolbar"&gt;
-      &lt;div className="search"&gt;
-        &lt;Search size={18} /&gt;
-        &lt;input type="search" className="input" placeholder={placeholder} value={search} onChange={(e) =&gt; onSearch(e.target.value)} aria-label={label} /&gt;
-      &lt;/div&gt;
-      {onFilter &amp;&amp; (
-      &lt;Select&lt;ActiveFilter&gt;
-        value={filter ?? 'all'}
-        onChange={onFilter}
-        aria-label="Filtrar por estado"
-        options={[
-          { value: 'all', label: 'Todos los estados' },
-          { value: 'active', label: labels?.active ?? 'Activos' },
-          { value: 'inactive', label: labels?.inactive ?? 'Inactivos' },
-        ]}
-      /&gt;
+    &lt;div className={`toolbar ${onSearch ? '' : 'toolbar--filter'}`.trim()}&gt;
+      {onSearch &amp;&amp; (
+        &lt;div className="search"&gt;
+          &lt;Search size={18} /&gt;
+          &lt;input type="search" className="input" placeholder={placeholder} value={search} onChange={(e) =&gt; onSearch(e.target.value)} aria-label={label} /&gt;
+        &lt;/div&gt;
       )}
+      {onFilter &amp;&amp; &lt;Select&lt;ActiveFilter&gt; value={filter ?? 'all'} onChange={onFilter} aria-label={t('ui.listToolbar.filter')} options={options} /&gt;}
     &lt;/div&gt;
   );
 }
@@ -187,7 +196,7 @@ export function ListToolbar({ search, onSearch, placeholder, label, filter, onFi
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

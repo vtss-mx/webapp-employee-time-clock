@@ -32,7 +32,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -106,7 +106,14 @@
 <a name='L41'></a><a href='#L41'>41</a>
 <a name='L42'></a><a href='#L42'>42</a>
 <a name='L43'></a><a href='#L43'>43</a>
-<a name='L44'></a><a href='#L44'>44</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -122,17 +129,17 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">832x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">816x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3022x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3006x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -141,15 +148,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">175x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">730x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">567x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2903x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { CountUp } from '../CountUp';
 import { Skeleton } from './Skeleton';
 &nbsp;
@@ -161,22 +176,28 @@ export interface Kpi {
   value: number | undefined;
   /** Variante del ícono (p. ej. `icon-tile--success`). */
   tile?: string;
+  /** Cómo se lee el valor (dinero, bytes, tiempo...); por omisión, el número tal cual. */
+  format?: (value: number) =&gt; string;
+  /** Línea breve bajo el valor (p. ej. "12 cargos · 30 sep 2026"). */
+  hint?: ReactNode;
 }
 &nbsp;
 /** Valor del indicador con conteo animado (o esqueleto mientras carga). */
-export function KpiValue({ value }: { value: number | null | undefined }) {
-  return &lt;div className="kpi__value"&gt;{value == null ? &lt;Skeleton width={48} height={30} /&gt; : &lt;CountUp value={value} /&gt;}&lt;/div&gt;;
+export function KpiValue({ value, format }: { value: number | null | undefined; format?: (value: number) =&gt; string }) {
+  // Con formato (dinero, bytes, tiempo) el texto es más largo: un poco más chico para caber en la tarjeta.
+  return &lt;div className={format ? 'kpi__value kpi__value--text' : 'kpi__value'}&gt;{value == null ? &lt;Skeleton width={48} height={30} /&gt; : &lt;CountUp value={value} format={format} /&gt;}&lt;/div&gt;;
 }
 &nbsp;
-export function KpiCard({ label, icon: Icon, value, tile = '' }: Omit&lt;Kpi, 'key'&gt;) {
+export function KpiCard({ label, icon: Icon, value, tile = '', format, hint }: Omit&lt;Kpi, 'key'&gt;) {
   return (
     &lt;div className="kpi"&gt;
       &lt;span className={`icon-tile ${tile}`}&gt;
         &lt;Icon size={22} /&gt;
       &lt;/span&gt;
-      &lt;span&gt;
+      &lt;span className="kpi__body"&gt;
         &lt;span className="kpi__label"&gt;{label}&lt;/span&gt;
-        &lt;KpiValue value={value} /&gt;
+        &lt;KpiValue value={value} format={format} /&gt;
+        {hint &amp;&amp; &lt;small className="kpi__hint"&gt;{hint}&lt;/small&gt;}
       &lt;/span&gt;
     &lt;/div&gt;
   );
@@ -199,7 +220,7 @@ export function KpiGrid({ kpis }: { kpis: Kpi[] }) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

@@ -37,7 +37,7 @@ describe('MyQrPage: fases del código', () => {
   it('reemplazado en otro dispositivo: no corre la cuenta y "Mostrar un código nuevo" pide otro', async () => {
     show('replaced');
     renderWithProviders(<MyQrPage />);
-    expect(screen.getByText('Este código se reemplazó')).toBeInTheDocument();
+    expect(screen.getByText('Código reemplazado')).toBeInTheDocument();
     expect(screen.queryByText(/Se renueva en/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Mostrar un código nuevo' }));
     expect(state.code.renew).toHaveBeenCalledOnce();
@@ -46,7 +46,7 @@ describe('MyQrPage: fases del código', () => {
   it('recién usado: "Generar otro" queda ocupado mientras llega el siguiente', () => {
     show('used');
     renderWithProviders(<MyQrPage />);
-    expect(screen.getByText('¡Listo!')).toBeInTheDocument();
+    expect(screen.getByText('Código usado')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Generar otro/ })).toBeDisabled();
   });
 

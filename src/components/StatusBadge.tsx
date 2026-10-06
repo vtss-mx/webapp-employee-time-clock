@@ -1,8 +1,10 @@
 import { useCatalogs } from '../hooks/useCatalogs';
+import { useT } from '../i18n';
 import type { ApiKeyStatus, DeviceStatus, EnrollmentStatus, FaceStatus, StatusTone } from '../types';
 
 export function StatusBadge({ active }: { active: boolean }) {
-  return <span className={`badge ${active ? 'badge--success' : 'badge--muted'}`}>{active ? 'Activo' : 'Inactivo'}</span>;
+  const t = useT();
+  return <span className={`badge ${active ? 'badge--success' : 'badge--muted'}`}>{active ? t('common.states.active') : t('common.states.inactive')}</span>;
 }
 
 /** Clase de cada tono del catálogo. "warning" es un estado en espera: su punto late. */
@@ -26,7 +28,15 @@ export type StatusCatalog =
   | 'work_session_statuses'
   | 'shift_request_statuses'
   | 'board_states'
-  | 'assignment_states';
+  | 'assignment_states'
+  | 'billing_statuses'
+  | 'charge_statuses'
+  | 'payment_statuses'
+  | 'slow_alert_statuses'
+  | 'risk_tiers'
+  | 'attendance_review_statuses'
+  | 'policy_change_statuses'
+  | 'fraud_case_statuses';
 
 export function CatalogStatusBadge({ catalog, code }: { catalog: StatusCatalog; code: string }) {
   const { byCode } = useCatalogs();

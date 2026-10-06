@@ -207,7 +207,7 @@ describe('Asistencia: tablero del día', () => {
     expect(await screen.findByText('Nadie tiene turno este día')).toBeInTheDocument();
     const search = screen.getByRole('searchbox', { name: 'Buscar empleados' });
     await userEvent.type(search, 'zzz');
-    expect(await screen.findByText('Nadie coincide con la búsqueda')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
     await userEvent.clear(search);
     await userEvent.type(search, 'ana');
     expect(await screen.findByText('Ana Ruiz')).toBeInTheDocument();
@@ -337,11 +337,11 @@ describe('Asistencia: historial', () => {
   it('sin jornadas lo explica; con filtros dice que nada coincide', async () => {
     mockFetch(history([]));
     renderHistory();
-    expect(await screen.findByText('Aún no hay jornadas registradas')).toBeInTheDocument();
+    expect(await screen.findByText('Sin jornadas')).toBeInTheDocument();
     expect(screen.getByText('0 jornadas')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Estado/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'En turno' }));
-    expect(await screen.findByText('Ninguna jornada coincide con los filtros')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 });
 

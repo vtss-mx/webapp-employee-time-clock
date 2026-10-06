@@ -1,12 +1,14 @@
 import type { CSSProperties } from 'react';
+import { useT } from '../../i18n';
 
 export function Skeleton({ width = '100%', height = 14, radius, style }: { width?: number | string; height?: number | string; radius?: number; style?: CSSProperties }) {
   return <span className="skeleton" style={{ display: 'block', width, height, borderRadius: radius, ...style }} aria-hidden />;
 }
 
 export function SkeletonCard({ lines = 3 }: { lines?: number }) {
+  const t = useT();
   return (
-    <div className="card" aria-busy="true" aria-label="Cargando">
+    <div className="card" aria-busy="true" aria-label={t('ui.loading')}>
       <div className="row" style={{ marginBottom: 18 }}>
         <Skeleton width={44} height={44} radius={12} />
         <div style={{ flex: 1, display: 'grid', gap: 8 }}>
@@ -24,8 +26,9 @@ export function SkeletonCard({ lines = 3 }: { lines?: number }) {
 }
 
 export function SkeletonRows({ rows = 5 }: { rows?: number }) {
+  const t = useT();
   return (
-    <div className="table-wrap" aria-busy="true" aria-label="Cargando">
+    <div className="table-wrap" aria-busy="true" aria-label={t('ui.loading')}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="row" style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
           <Skeleton width={40} height={40} radius={20} />

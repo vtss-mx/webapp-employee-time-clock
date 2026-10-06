@@ -5,10 +5,11 @@ import { Button, ButtonLink } from '../../components/ui/Button';
 import { CopyField } from '../../components/ui/CopyField';
 import { PagedItems } from '../../components/ui/PagedItems';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { useAction } from '../../hooks/useAction';
+import { useAction, type SuccessNotice } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useFeedback } from '../../hooks/useFeedback';
 import { usePagedList } from '../../hooks/usePagedList';
+import { t, Trans, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { apiKeyService } from '../../services/apiKeyService';
 import type { ApiKey } from '../../types';
@@ -19,6 +20,10 @@ type KeyAction = 'rotate' | 'revoke';
 /** Qué llave se está procesando y con qué botón (cada uno muestra su propio "ocupado"). */
 type Busy = `${KeyAction}:${number}`;
 
+/** Parámetros de paginación de la API (código: iguales en todos los idiomas). */
+const PAGE_PARAM = 'page';
+const SIZE_PARAM = 'size';
+
 /** Base de la API de integración (mismo dominio de la aplicación). */
 function integrationBaseUrl(origin = window.location.origin): string {
   return `${origin}/api/integrations/v1`;
@@ -27,9 +32,9 @@ function integrationBaseUrl(origin = window.location.origin): string {
 /** La llave en la confirmación: cómo reconocerla, qué permite y si se está usando. */
 function keyDetails(key: ApiKey, scopeName: (scope: string) => string): ConfirmDetail[] {
   return [
-    { label: 'Llave', value: `${key.prefix}…` },
-    { label: 'Permisos', value: key.scopes.map((scope) => scopeName(scope)).join(', ') },
-    { label: 'Último uso', value: key.last_used_at ? timeAgo(key.last_used_at) : 'Aún sin usar' },
+    { label: t('apiKeys.details.key'), value: `${key.prefix}…` },
+    { label: t('apiKeys.details.scopes'), value: key.scopes.map((scope) => scopeName(scope)).join(', ') },
+    { label: t('apiKeys.details.lastUsed'), value: key.last_used_at ? timeAgo(key.last_used_at) : t('apiKeys.row.neverUsed') },
   ];
 }
 
@@ -39,30 +44,45 @@ function keyConfirm(kind: KeyAction, key: ApiKey, details: ConfirmDetail[]): Con
     ? {
         tone: 'warning',
         icon: <RefreshCw size={30} />,
-        eyebrow: 'Rotar llave',
-        title: `¿Rotar «${key.name}»?`,
-        message: 'Se generará una llave nueva con los mismos permisos y vigencia. Tendrás que actualizarla en el sistema que se conecta.',
+        eyebrow: t('apiKeys.rotate.eyebrow'),
+        title: t('apiKeys.rotate.title', { name: key.name }),
+        message: t('apiKeys.rotate.message'),
         details,
-        note: 'La llave actual dejará de funcionar de inmediato.',
-        confirmLabel: 'Rotar llave',
+        note: t('apiKeys.rotate.note'),
+        confirmLabel: t('apiKeys.rotate.confirm'),
         confirmIcon: <RefreshCw size={18} />,
       }
     : {
         tone: 'danger',
         icon: <Ban size={30} />,
-        eyebrow: 'Revocar llave',
-        title: `¿Revocar «${key.name}»?`,
-        message: 'La llave dejará de funcionar de inmediato y el sistema que la usa ya no podrá conectarse.',
+        eyebrow: t('apiKeys.revoke.eyebrow'),
+        title: t('apiKeys.revoke.title', { name: key.name }),
+        message: t('apiKeys.revoke.message'),
         details,
-        note: 'Esta acción no se puede deshacer.',
-        confirmLabel: 'Revocar llave',
+        note: t('common.notes.irreversible'),
+        confirmLabel: t('apiKeys.revoke.confirm'),
         confirmIcon: <Ban size={18} />,
       };
 }
 
+/** Último uso de la llave (con la IP si se conoce) o "Aún sin usar". */
+function lastUse(key: ApiKey): string {
+  if (!key.last_used_at) return t('apiKeys.row.neverUsed');
+  const ago = timeAgo(key.last_used_at);
+  return key.last_used_ip ? t('apiKeys.row.lastUsedFrom', { ago, ip: key.last_used_ip }) : t('apiKeys.row.lastUsed', { ago });
+}
+
+/** Avisos de rotar y revocar: se arman al dibujarse (el popup abierto sigue al idioma activo). */
+const loadError = () => t('apiKeys.list.loadError');
+const actionError = (kind: KeyAction) => () => t(kind === 'rotate' ? 'apiKeys.rotate.error' : 'apiKeys.revoke.error');
+const revokedNotice = (key: ApiKey): SuccessNotice => [t('apiKeys.revoke.done'), t('apiKeys.revoke.doneText', { name: key.name })];
+
 /** Una llave: nombre, cómo reconocerla, quién la creó, su uso, vigencia, permisos y acciones. */
 function ApiKeyRow({ apiKey, busy, onAction }: { apiKey: ApiKey; busy: Busy | null; onAction: (kind: KeyAction, key: ApiKey) => void }) {
+  const t = useT();
   const { nameOf } = useCatalogs();
+  const created = formatDate(apiKey.created_at);
+  const revoked = formatDateTime(apiKey.revoked_at);
   const usable = apiKey.status !== 'REVOKED';
   return (
     <li>
@@ -73,16 +93,15 @@ function ApiKeyRow({ apiKey, busy, onAction }: { apiKey: ApiKey; busy: Busy | nu
         <strong className="truncate">{apiKey.name}</strong>
         <code className="api-key__prefix">{apiKey.prefix}…</code>
         <small className="muted truncate">
-          Creada {formatDate(apiKey.created_at)}
-          {apiKey.created_by && ` por ${apiKey.created_by}`} · {apiKey.expires_at ? `Vence ${formatDate(apiKey.expires_at)}` : 'Sin vencimiento'}
+          {apiKey.created_by ? t('apiKeys.row.createdBy', { date: created, name: apiKey.created_by }) : t('apiKeys.row.created', { date: created })} ·{' '}
+          {apiKey.expires_at ? t('apiKeys.row.expires', { date: formatDate(apiKey.expires_at) }) : t('apiKeys.row.noExpiry')}
         </small>
         <small className="muted truncate" title={apiKey.last_used_at ? formatDateTime(apiKey.last_used_at) : undefined}>
-          {apiKey.last_used_at ? `Último uso ${timeAgo(apiKey.last_used_at)}${apiKey.last_used_ip ? ` · IP ${apiKey.last_used_ip}` : ''}` : 'Aún sin usar'}
+          {lastUse(apiKey)}
         </small>
         {apiKey.revoked_at && (
           <small className="muted truncate">
-            Revocada {formatDateTime(apiKey.revoked_at)}
-            {apiKey.revoked_by && ` por ${apiKey.revoked_by}`}
+            {apiKey.revoked_by ? t('apiKeys.row.revokedBy', { date: revoked, name: apiKey.revoked_by }) : t('apiKeys.row.revoked', { date: revoked })}
           </small>
         )}
       </span>
@@ -97,10 +116,10 @@ function ApiKeyRow({ apiKey, busy, onAction }: { apiKey: ApiKey; busy: Busy | nu
       {usable && (
         <span className="validator-list__actions">
           <Button size="sm" variant="secondary" icon={<RefreshCw size={16} />} loading={busy === `rotate:${apiKey.id}`} disabled={busy !== null} onClick={() => onAction('rotate', apiKey)}>
-            Rotar
+            {t('apiKeys.row.rotate')}
           </Button>
           <Button size="sm" variant="danger-outline" icon={<Ban size={16} />} loading={busy === `revoke:${apiKey.id}`} disabled={busy !== null} onClick={() => onAction('revoke', apiKey)}>
-            Revocar
+            {t('apiKeys.row.revoke')}
           </Button>
         </span>
       )}
@@ -110,17 +129,19 @@ function ApiKeyRow({ apiKey, busy, onAction }: { apiKey: ApiKey; busy: Busy | nu
 
 /** Cómo se conecta un sistema: URL base, cabecera, ejemplo y qué permite cada permiso (catálogo). */
 function ConnectionGuide() {
+  const t = useT();
   const { active } = useCatalogs();
   const base = integrationBaseUrl();
   return (
     <div className="api-guide">
       <div className="field">
-        <span className="api-guide__label">URL base</span>
-        <CopyField value={base} label="Copiar URL base" />
+        <span className="api-guide__label">{t('apiKeys.guide.baseUrl')}</span>
+        <CopyField value={base} label={t('apiKeys.guide.copyBaseUrl')} />
       </div>
       <div className="field">
-        <span className="api-guide__label">Ejemplo (consulta tu empresa y tu llave)</span>
-        <CopyField value={`curl -H "X-API-Key: tck_…" ${base}/company`} label="Copiar ejemplo" multiline />
+        <span className="api-guide__label">{t('apiKeys.guide.example')}</span>
+        {/* eslint-disable-next-line i18n/no-hardcoded-text -- comando de ejemplo: es código, igual en todos los idiomas */}
+        <CopyField value={`curl -H "X-API-Key: tck_…" ${base}/company`} label={t('apiKeys.guide.copyExample')} multiline />
       </div>
       <dl className="api-guide__scopes">
         {active('api_scopes').map((scope) => (
@@ -132,10 +153,10 @@ function ConnectionGuide() {
       </dl>
       <ul className="api-guide__notes small muted">
         <li>
-          Respuestas en JSON con el mismo formato de la aplicación; listados paginados con <code>page</code> y <code>size</code> (máximo 50).
+          <Trans k="apiKeys.guide.format" values={{ page: <code>{PAGE_PARAM}</code>, size: <code>{SIZE_PARAM}</code> }} />
         </li>
-        <li>Fechas en UTC (ISO 8601); los días de tu empresa se cuentan en la hora del Centro.</li>
-        <li>Cada llave tiene un límite de peticiones por minuto (responde 429 si se excede).</li>
+        <li>{t('apiKeys.guide.dates')}</li>
+        <li>{t('apiKeys.guide.rateLimit')}</li>
       </ul>
     </div>
   );
@@ -147,8 +168,9 @@ function ConnectionGuide() {
  * de otra empresa; su secreto se muestra una sola vez.
  */
 export function ApiKeysPage() {
+  const t = useT();
   const feedback = useFeedback();
-  const list = usePagedList((page, signal) => apiKeyService.list(page, signal), { errorTitle: 'No se pudieron cargar las llaves' });
+  const list = usePagedList((page, signal) => apiKeyService.list(page, signal), { errorTitle: loadError });
   const { nameOf } = useCatalogs();
   const action = useAction<Busy>();
 
@@ -158,14 +180,18 @@ export function ApiKeysPage() {
     void action.run(
       async () => {
         // Rotar: el secreto nuevo se muestra una sola vez, en su propio popup (no un aviso de éxito).
-        if (rotating) void feedback.show(apiKeySecretMessage(await apiKeyService.rotate(key.id), true));
-        else await apiKeyService.revoke(key.id);
+        if (rotating) {
+          const rotated = await apiKeyService.rotate(key.id);
+          void feedback.show(() => apiKeySecretMessage(rotated, true));
+        } else {
+          await apiKeyService.revoke(key.id);
+        }
       },
       {
         busy: `${kind}:${key.id}`,
-        confirm: keyConfirm(kind, key, keyDetails(key, (scope) => nameOf('api_scopes', scope))),
-        errorTitle: rotating ? 'No se pudo rotar la llave' : 'No se pudo revocar la llave',
-        success: rotating ? undefined : ['Llave revocada', `«${key.name}» dejó de funcionar. El sistema que la usaba ya no puede conectarse.`],
+        confirm: () => keyConfirm(kind, key, keyDetails(key, (scope) => nameOf('api_scopes', scope))),
+        errorTitle: actionError(kind),
+        success: rotating ? undefined : () => revokedNotice(key),
         onSuccess: list.retry,
       },
     );
@@ -173,29 +199,25 @@ export function ApiKeysPage() {
 
   const createButton = (
     <ButtonLink to={paths.company.newApiKey} variant="primary" icon={<Plus size={18} />}>
-      Crear llave
+      {t('apiKeys.list.create')}
     </ButtonLink>
   );
 
   return (
     <div className="page">
       <Panel>
-        <PanelHeader
-          title="Integraciones (API)"
-          subtitle="Conecta los sistemas de tu empresa (nómina, ERP, control de acceso) con su información, de forma segura."
-          actions={createButton}
-        />
+        <PanelHeader title={t('apiKeys.list.title')} subtitle={t('apiKeys.list.subtitle')} actions={createButton} />
         <PanelSection>
           <PagedItems
             list={list}
             skeletonRows={3}
             empty={{
               icon: <KeyRound />,
-              title: 'No hay llaves de la API',
-              description: 'Crea una llave para cada sistema que se conectará: solo podrá leer la información de tu empresa con los permisos que elijas.',
+              title: t('apiKeys.list.empty.title'),
+              description: t('apiKeys.list.empty.description'),
               action: createButton,
             }}
-            pager={{ noun: { one: 'llave', other: 'llaves' } }}
+            pager={{ noun: { one: t('apiKeys.list.noun.one'), other: t('apiKeys.list.noun.other') } }}
           >
             {(keys) => (
               <ul className={`validator-list stagger ${list.loading ? 'is-loading' : ''}`}>
@@ -206,13 +228,12 @@ export function ApiKeysPage() {
             )}
           </PagedItems>
         </PanelSection>
-        <PanelSection title="Cómo conectarse" icon={<Code2 size={20} />}>
+        <PanelSection title={t('apiKeys.guide.title')} icon={<Code2 size={20} />}>
           <ConnectionGuide />
         </PanelSection>
         <PanelFooter align="center">
           <p className="inline-note small muted">
-            <ShieldCheck size={16} color="var(--success)" /> Cada llave solo accede a la información de tu empresa, en modo de solo lectura y
-            nunca a fotos ni datos biométricos.
+            <ShieldCheck size={16} color="var(--success)" /> {t('apiKeys.list.footer')}
           </p>
         </PanelFooter>
       </Panel>

@@ -1,0 +1,62 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/common';
+
+/** Palabras y frases generales que comparten muchas pantallas, en inglés (en-US). */
+export default {
+  actions: {
+    accept: 'OK',
+    activate: 'Activate',
+    approve: 'Approve',
+    back: 'Back',
+    cancel: 'Cancel',
+    changeStatus: 'Change status',
+    clear: 'Clear',
+    close: 'Close',
+    confirm: 'Confirm',
+    continue: 'Continue',
+    copy: 'Copy',
+    create: 'Create',
+    deactivate: 'Deactivate',
+    delete: 'Delete',
+    edit: 'Edit',
+    logout: 'Sign out',
+    next: 'Next',
+    previous: 'Previous',
+    refresh: 'Refresh',
+    reject: 'Reject',
+    retry: 'Retry',
+    save: 'Save',
+    saveChanges: 'Save changes',
+    saving: 'Saving…',
+    search: 'Search',
+    view: 'View',
+  },
+  states: {
+    active: 'Active',
+    inactive: 'Inactive',
+    loading: 'Loading…',
+  },
+  fields: {
+    company: 'Company',
+    date: 'Date',
+    department: 'Department',
+    email: 'Email',
+    employee: 'Employee',
+    employeeNumber: 'Employee number',
+    mobilePhone: 'Mobile phone',
+    name: 'Name',
+    note: 'Note',
+    phone: 'Phone',
+    reason: 'Reason',
+    status: 'Status',
+  },
+  values: {
+    yes: 'Yes',
+    no: 'No',
+    empty: 'Not provided',
+    optional: 'Optional',
+  },
+  notes: {
+    irreversible: "This can't be undone.",
+  },
+} satisfies Translation<typeof es>;

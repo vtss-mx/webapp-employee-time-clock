@@ -3,6 +3,8 @@
  * el contrato mismo, el formato antiguo `{detail}`, HTML de un proxy/ngrok, texto plano,
  * cuerpo vacío o JSON inválido.
  */
+import { t } from '../../i18n/core';
+import type { Messages } from '../../types/i18n';
 import { isRecord } from '../../utils/guards';
 
 export interface ApiErrorItem {
@@ -39,6 +41,10 @@ export class ApiError extends Error {
 
   constructor(envelope: EnvelopeInit, retryAfterMs: number | null = null) {
     super(envelope.message);
+    // Texto que armó la app (sin respuesta o sin mensaje del servidor): se traduce al leerse, así un
+    // popup abierto con este error cambia de idioma junto con la app. El del servidor ya llega traducido.
+    const local = LOCAL_TEXTS.get(envelope);
+    if (local) Object.defineProperty(this, 'message', { get: local, configurable: true, enumerable: false });
     this.name = 'ApiError';
     this.status = envelope.statusCode;
     this.code = envelope.code;
@@ -87,24 +93,27 @@ export function fieldErrorsFrom<T>(err: unknown, rename: Partial<Record<string, 
 
 /* ---------------------------- Valores por defecto ---------------------------- */
 
-const DEFAULT_MESSAGES: Record<number, string> = {
-  0: 'No fue posible conectar con el servidor. Verifica tu conexión.',
-  200: 'Operación exitosa',
-  400: 'Solicitud inválida',
-  401: 'Tu sesión no es válida. Inicia sesión nuevamente.',
-  403: 'No tienes permisos para realizar esta acción',
-  404: 'Recurso no encontrado',
-  405: 'Operación no permitida',
-  408: 'El servidor tardó demasiado en responder. Intenta nuevamente.',
-  409: 'Conflicto con datos existentes',
-  413: 'El archivo es demasiado grande',
-  415: 'Formato no soportado',
-  422: 'Los datos enviados no son válidos',
-  429: 'Demasiados intentos. Espera unos segundos.',
-  500: 'Ocurrió un error inesperado. Intenta nuevamente.',
-  502: 'El servicio no está disponible en este momento. Intenta en unos segundos.',
-  503: 'El servicio no está disponible en este momento. Intenta en unos segundos.',
-  504: 'El servidor tardó demasiado en responder. Intenta nuevamente.',
+type StatusText = keyof Messages['errors']['status'];
+
+/** Texto por estado cuando la respuesta no trae uno (o no hubo respuesta), en el idioma activo. */
+const STATUS_TEXTS: Record<number, StatusText> = {
+  0: 'network',
+  200: 'ok',
+  400: 'badRequest',
+  401: 'unauthorized',
+  403: 'forbidden',
+  404: 'notFound',
+  405: 'methodNotAllowed',
+  408: 'timeout',
+  409: 'conflict',
+  413: 'payloadTooLarge',
+  415: 'unsupportedMedia',
+  422: 'unprocessable',
+  429: 'rateLimited',
+  500: 'server',
+  502: 'unavailable',
+  503: 'unavailable',
+  504: 'timeout',
 };
 
 const DEFAULT_CODES: Record<number, string> = {
@@ -125,15 +134,31 @@ const DEFAULT_CODES: Record<number, string> = {
   504: 'GATEWAY_TIMEOUT',
 };
 
-const INVALID_RESPONSE_MESSAGE = 'El servidor devolvió una respuesta inesperada. Intenta nuevamente.';
-
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
-export function defaultMessage(status: number): string {
-  if (DEFAULT_MESSAGES[status]) return DEFAULT_MESSAGES[status];
-  if (isSuccessStatus(status)) return DEFAULT_MESSAGES[200];
-  return status >= 500 ? DEFAULT_MESSAGES[500] : DEFAULT_MESSAGES[400];
+function statusText(status: number): StatusText {
+  if (STATUS_TEXTS[status]) return STATUS_TEXTS[status];
+  if (isSuccessStatus(status)) return 'ok';
+  return status >= 500 ? 'server' : 'badRequest';
 }
+
+export function defaultMessage(status: number): string {
+  return t(`errors.status.${statusText(status)}`);
+}
+
+/**
+ * Envoltorios cuyo mensaje lo armó la app (no el servidor), con cómo traducirlo: `ApiError` lo lee al
+ * construirse para que su texto siga al idioma activo. Débil: no retiene envoltorios que ya no se usan.
+ */
+const LOCAL_TEXTS = new WeakMap<object, () => string>();
+
+/** El envoltorio lleva el texto de la app `text` (ya resuelto en `message`) y lo recuerda para traducirlo después. */
+function localText<E extends object>(envelope: E, text: () => string): E {
+  LOCAL_TEXTS.set(envelope, text);
+  return envelope;
+}
+
+const invalidResponse = () => t('errors.invalidResponse');
 
 export function defaultCode(status: number): string {
   if (DEFAULT_CODES[status]) return DEFAULT_CODES[status];
@@ -143,8 +168,8 @@ export function defaultCode(status: number): string {
 
 /** Error construido en el cliente (red, timeout, forma de datos inesperada). */
 export function clientError(statusCode: number, traceId: string | null, code = defaultCode(statusCode)): ApiError {
-  const message = code === 'INVALID_RESPONSE' ? INVALID_RESPONSE_MESSAGE : defaultMessage(statusCode);
-  return new ApiError({ statusCode, code, message, traceId, errors: [singleError(code, message)] });
+  const text = code === 'INVALID_RESPONSE' ? invalidResponse : () => defaultMessage(statusCode);
+  return new ApiError(localText({ statusCode, code, message: text(), traceId, errors: [singleError(code, text())] }, text));
 }
 
 /* ------------------------------ Normalización ------------------------------ */
@@ -181,10 +206,11 @@ function looksLikeEnvelope(body: Record<string, unknown>): boolean {
 /** 1) Contrato único. `success` se recalcula con el HTTP real; si el cuerpo lo contradice es error. */
 function fromEnvelope(status: number, body: Record<string, unknown>, traceId: string | null): ApiEnvelope {
   const code = asString(body.code) ?? defaultCode(status);
-  const message = asString(body.message) ?? defaultMessage(status);
+  const serverMessage = asString(body.message);
+  const message = serverMessage ?? defaultMessage(status);
   const success = isSuccessStatus(status) && body.success !== false;
   const errors = normalizeErrors(body.errors, code);
-  return {
+  const envelope: ApiEnvelope = {
     success,
     statusCode: status,
     code,
@@ -194,6 +220,7 @@ function fromEnvelope(status: number, body: Record<string, unknown>, traceId: st
     traceId: asString(body.traceId) ?? traceId,
     timestamp: asString(body.timestamp),
   };
+  return serverMessage ? envelope : localText(envelope, () => defaultMessage(status));
 }
 
 /** 2) Formato antiguo o de terceros: { detail, code, errors, details, request_id }. */
@@ -201,19 +228,22 @@ function fromLegacyError(status: number, body: Record<string, unknown>, traceId:
   const code = asString(body.code) ?? asString(body.error) ?? defaultCode(status);
   const detail = body.detail;
   const details = isRecord(body.details) ? body.details : null;
-  const message = asString(detail) ?? asString(body.message) ?? asString(body.error_description) ?? defaultMessage(status);
+  const serverMessage = asString(detail) ?? asString(body.message) ?? asString(body.error_description);
   const parsed = normalizeErrors(Array.isArray(detail) ? detail : body.errors, code);
-  const errors = parsed.length ? parsed.map((e, i) => (i === 0 && details ? { ...e, details } : e)) : [singleError(code, message, details)];
-  return {
+  const errors = parsed.length ? parsed.map((e, i) => (i === 0 && details ? { ...e, details } : e)) : [singleError(code, serverMessage ?? defaultMessage(status), details)];
+  // Varios errores de validación se resumen con el texto de la app; uno solo conserva el del servidor.
+  const summary = Array.isArray(detail) && errors.length > 1 ? () => defaultMessage(422) : serverMessage ? null : () => defaultMessage(status);
+  const envelope: ApiEnvelope = {
     success: false,
     statusCode: status,
     code,
-    message: Array.isArray(detail) && errors.length > 1 ? defaultMessage(422) : message,
+    message: summary ? summary() : (serverMessage as string),
     data: null,
     errors,
     traceId: asString(body.request_id) ?? asString(body.traceId) ?? traceId,
     timestamp: null,
   };
+  return summary ? localText(envelope, summary) : envelope;
 }
 
 /** 3) Éxito sin contrato (JSON simple, colección, valor o cuerpo vacío). */
@@ -234,8 +264,8 @@ function fromPlainSuccess(status: number, body: unknown, traceId: string | null)
 function fromUnexpected(status: number, traceId: string | null): ApiEnvelope {
   const statusCode = isSuccessStatus(status) ? 502 : status;
   const code = isSuccessStatus(status) ? 'INVALID_RESPONSE' : defaultCode(status);
-  const message = isSuccessStatus(status) ? INVALID_RESPONSE_MESSAGE : defaultMessage(status);
-  return { success: false, statusCode, code, message, data: null, errors: [singleError(code, message)], traceId, timestamp: null };
+  const text = isSuccessStatus(status) ? invalidResponse : () => defaultMessage(status);
+  return localText({ success: false, statusCode, code, message: text(), data: null, errors: [singleError(code, text())], traceId, timestamp: null }, text);
 }
 
 export function normalizeResponse(

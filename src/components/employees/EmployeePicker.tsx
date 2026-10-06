@@ -4,13 +4,16 @@ import { useAction } from '../../hooks/useAction';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { useSearchList } from '../../hooks/useSearchList';
+import { t, useT } from '../../i18n';
 import { departmentService } from '../../services/departmentService';
 import { employeeService } from '../../services/employeeService';
 import type { Employee } from '../../types';
 import type { ConfirmDetail } from '../../types/confirm';
 import { namesSummary } from '../../utils/changes';
+import { formatCount } from '../../utils/numbers';
 import { FieldMessage } from '../FormField';
 import { StatusBadge } from '../StatusBadge';
+import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
 import { Checkbox } from '../ui/Checkbox';
 import { ListToolbar } from '../ui/ListControls';
@@ -40,13 +43,25 @@ export interface EmployeePickerProps {
   label?: string;
 }
 
-const plural = (count: number) => (count === 1 ? '1 empleado' : `${count} empleados`);
-
-/** A quiénes afecta una acción con los elegidos, para su confirmación: hasta 8 nombres y "y N más". */
+/**
+ * A quiénes afecta una acción con los elegidos, para su confirmación: hasta 8 nombres y "y N más".
+ * Se llama al armar la confirmación (sigue al idioma activo).
+ */
 export const describeEmployees = (total: number, names: readonly string[]): ConfirmDetail => ({
-  label: total === 1 ? 'Empleado' : `Empleados (${total})`,
-  value: namesSummary(names, total, { one: 'empleado', other: 'empleados' }),
+  label: t('employees.picker.affected', { count: total }),
+  value: namesSummary(names, total, (count) => t('employees.count', { count })),
 });
+
+const departmentsError = () => t('departments.list.loadError');
+const employeesError = () => t('employees.list.loadError');
+const selectError = () => t('employees.picker.selectError');
+
+/** El filtro tiene más empleados de los que admite una operación: se eligieron los primeros. */
+const limitWarning = (total: number, limit: number, chosen: number) =>
+  [
+    () => t('employees.picker.limit.title'),
+    () => t('employees.picker.limit.text', { total: formatCount(total), limit: formatCount(limit), chosen: formatCount(chosen) }),
+  ] as const;
 
 /**
  * Elegir uno o varios empleados de la empresa: búsqueda, filtro por estado y por departamento, lista
@@ -54,14 +69,15 @@ export const describeEmployees = (total: number, names: readonly string[]): Conf
  * da los ids del filtro, hasta el tope de una operación masiva) y cuántos van elegidos. Lo usan
  * asignar un turno a varios y registrar una ausencia (vacaciones colectivas).
  */
-export function EmployeePicker({ value, onChange, single = false, disabled = false, error, hint, label = 'Empleados' }: EmployeePickerProps) {
+export function EmployeePicker({ value, onChange, single = false, disabled = false, error, hint, label }: EmployeePickerProps) {
+  const t = useT();
   const id = useId();
   const feedback = useFeedback();
   const [department, setDepartment] = useState(ALL_DEPARTMENTS);
   const departmentId = department === ALL_DEPARTMENTS ? undefined : Number(department);
-  const departments = useResource((signal) => departmentService.list({ page: 1, size: DEPARTMENT_OPTIONS_LIMIT }, signal), 'departments', 'No se pudieron cargar los departamentos');
+  const departments = useResource((signal) => departmentService.list({ page: 1, size: DEPARTMENT_OPTIONS_LIMIT }, signal), 'departments', departmentsError);
   const list = useSearchList((query, signal) => employeeService.list({ ...query, department_id: departmentId }, signal), {
-    errorTitle: 'No se pudieron cargar los empleados',
+    errorTitle: employeesError,
     filterKey: department,
   });
   const { busy, run } = useAction();
@@ -81,52 +97,50 @@ export function EmployeePicker({ value, onChange, single = false, disabled = fal
     run(
       () => employeeService.ids({ search: list.appliedSearch || undefined, active: list.filter === 'all' ? undefined : list.filter === 'active', department_id: departmentId }),
       {
-        errorTitle: 'No se pudieron seleccionar los empleados',
+        errorTitle: selectError,
         onSuccess: (result) => {
           emit([...new Set([...value, ...result.ids])]);
-          if (result.total > result.ids.length) {
-            void feedback.warning('Se eligieron los primeros', `El filtro tiene ${result.total} empleados y una operación llega hasta ${result.limit}: se eligieron los primeros ${result.ids.length} (en el orden de la lista).`);
-          }
+          if (result.total > result.ids.length) void feedback.warning(...limitWarning(result.total, result.limit, result.ids.length));
         },
       },
     );
 
   const departmentOptions = [
-    { value: ALL_DEPARTMENTS, label: 'Todos los departamentos' },
+    { value: ALL_DEPARTMENTS, label: t('employees.picker.allDepartments') },
     ...(departments.data?.items ?? []).map((item) => ({ value: String(item.id), label: item.name })),
   ];
   const total = list.data?.total ?? 0;
 
   return (
-    <div className={`employee-picker ${error ? 'employee-picker--error' : ''}`} role="group" aria-label={label}>
-      <ListToolbar search={list.search} onSearch={list.setSearch} placeholder="Buscar por nombre, número o correo" label="Buscar empleados" filter={list.filter} onFilter={list.setFilter} />
+    <div className={`employee-picker ${error ? 'employee-picker--error' : ''}`} role="group" aria-label={label ?? t('employees.picker.label')}>
+      <ListToolbar search={list.search} onSearch={list.setSearch} placeholder={t('employees.picker.searchPlaceholder')} label={t('employees.list.searchLabel')} filter={list.filter} onFilter={list.setFilter} />
       {departmentOptions.length > 1 && (
-        <Select value={department} onChange={setDepartment} options={departmentOptions} icon={<Network size={18} />} aria-label="Filtrar por departamento" searchable className="employee-picker__department" />
+        <Select value={department} onChange={setDepartment} options={departmentOptions} icon={<Network size={18} />} aria-label={t('employees.picker.departmentFilter')} searchable className="employee-picker__department" />
       )}
       <div className="employee-picker__bar">
         <span className={`badge ${value.length ? 'badge--info' : 'badge--muted'} badge--plain`} aria-live="polite">
-          <UserRoundCheck size={14} aria-hidden /> {value.length ? `${plural(value.length)} ${value.length === 1 ? 'elegido' : 'elegidos'}` : 'Nadie elegido'}
+          <UserRoundCheck size={14} aria-hidden /> {value.length ? t('employees.picker.chosen', { count: value.length }) : t('employees.picker.nobody')}
         </span>
         <span className="employee-picker__actions">
           {!single && total > 0 && (
             <Button size="sm" variant="secondary" icon={<CheckCheck size={16} />} loading={busy !== null} disabled={disabled} onClick={() => void selectFilter()}>
-              {filtered ? `Seleccionar los ${total} de este filtro` : `Seleccionar a los ${total}`}
+              {t(filtered ? 'employees.picker.selectFiltered' : 'employees.picker.selectAll', { count: total })}
             </Button>
           )}
           {value.length > 0 && (
             <Button size="sm" variant="ghost" icon={<X size={16} />} disabled={disabled} onClick={() => emit([])}>
-              Quitar selección
+              {t('employees.picker.clear')}
             </Button>
           )}
         </span>
       </div>
       <PagedItems
         list={list}
-        pager={{ noun: { one: 'empleado', other: 'empleados' } }}
+        pager={{ noun: { one: t('employees.noun.one'), other: t('employees.noun.other') } }}
         empty={
           filtered
-            ? { icon: <SearchX />, title: 'Ningún empleado coincide con la búsqueda', description: 'Prueba con otro nombre o número, o cambia el estado o el departamento.', compact: true }
-            : { icon: <Users />, title: 'No hay empleados registrados', description: 'Registra a tu personal en Empleados para poder elegirlo aquí.', compact: true }
+            ? { icon: <SearchX />, title: t('employees.list.noMatch.title'), description: t('employees.picker.noMatch'), compact: true }
+            : { icon: <Users />, title: t('employees.list.empty.title'), description: t('employees.picker.empty'), compact: true }
         }
       >
         {(items) => (
@@ -138,7 +152,8 @@ export function EmployeePicker({ value, onChange, single = false, disabled = fal
                 onChange={(checked) => toggle(employee, checked)}
                 disabled={disabled}
                 label={employee.full_name}
-                description={[`No. ${employee.employee_number}`, employee.department_name].filter(Boolean).join(' · ')}
+                icon={<Avatar name={employee.full_name} src={employee.avatar} size="sm" decorative />}
+                description={[t('employees.number', { number: employee.employee_number }), employee.department_name].filter(Boolean).join(' · ')}
                 aside={employee.active ? undefined : <StatusBadge active={false} />}
               />
             ))}

@@ -118,8 +118,10 @@ describe('useEmployeeForm', () => {
     const { result } = renderHook(() => useEmployeeForm(), { wrapper });
     expect(result.current.canSubmit).toBe(false);
     expect(result.current.errors).toEqual({}); // nada marcado antes de tocar los campos
+    act(() => result.current.touch('employee_number'));
+    expect(result.current.errors.employee_number).toBe('El número de empleado es obligatorio');
     act(() => result.current.touch('rfc'));
-    expect(result.current.errors.rfc).toBe('El RFC es obligatorio');
+    expect(result.current.errors.rfc).toBeUndefined(); // opcional
 
     act(() => result.current.setValues(valid));
     await waitFor(() => expect(result.current.canSubmit).toBe(true)); // tras verificar en vivo los datos únicos
@@ -129,6 +131,17 @@ describe('useEmployeeForm', () => {
     });
     expect(ok).toBe(true);
     expect(result.current.errors).toEqual({});
+  });
+
+  it('RFC, CURP y NSS son opcionales: sin ellos el botón se habilita y no se consultan en vivo', async () => {
+    const check = vi.spyOn(availability, 'checkAvailability').mockImplementation((field, value) =>
+      Promise.resolve({ field, value, normalized: value, valid: true, available: true, code: 'AVAILABLE', message: 'Disponible', via: 'http' }),
+    );
+    const { result } = renderHook(() => useEmployeeForm(), { wrapper });
+    act(() => result.current.setValues({ ...valid, rfc: '', curp: '', nss: '' }));
+    await waitFor(() => expect(result.current.canSubmit).toBe(true));
+    expect(check.mock.calls.map(([field]) => field).sort()).toEqual(['email', 'employee_number', 'phone']);
+    expect(result.current.live.rfc.status).toBe('idle');
   });
 
   it('persona de otra empresa (correo LINKABLE): se vincula sin contraseña', async () => {
@@ -176,9 +189,11 @@ describe('useEmployeeForm', () => {
   it('red de seguridad al enviar con datos incompletos: marca todo y resume en un popup', async () => {
     const { result } = renderHook(() => useEmployeeForm(), { wrapper });
     act(() => void result.current.validate());
-    expect(result.current.errors.curp).toBe('La CURP es obligatoria');
-    const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
-    expect(popup).toHaveTextContent('El NSS es obligatorio');
+    expect(result.current.errors.birth_date).toBe('La fecha de nacimiento es obligatoria');
+    expect(result.current.errors.curp).toBeUndefined(); // opcional: vacía no falta
+    const popup = await screen.findByRole('alertdialog', { name: 'Revisa los datos' });
+    expect(popup).toHaveTextContent('El teléfono es obligatorio');
+    expect(popup).not.toHaveTextContent('NSS');
   });
 
   it('muestra errores del servidor por campo', async () => {

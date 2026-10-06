@@ -1,10 +1,14 @@
-import { Camera, UserCheck } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useCamera, type CameraFacing } from '../hooks/useCamera';
+import { useCaptureTelemetry } from '../hooks/useCaptureTelemetry';
 import { useCatalogs } from '../hooks/useCatalogs';
 import { useFaceAutoCapture, useFaceDetector } from '../hooks/useFaceDetection';
+import { useFaceBurst } from '../hooks/useFaceBurst';
+import { useFrontalCapture, type FrontalPhoto } from '../hooks/useFrontalCapture';
 import { useMountedRef } from '../hooks/useMountedRef';
 import { useScreenFlash } from '../hooks/useScreenFlash';
+import { t, useLocale } from '../i18n';
+import { resolveLazy, type LazyText } from '../i18n/lazy';
 import { ApiError, errorMessage } from '../services/apiClient';
 import type { FaceCaptures } from '../services/http/faceUpload';
 import { faceService } from '../services/verificationService';
@@ -12,25 +16,21 @@ import type { FaceChallenge, VerificationRules } from '../types';
 import { isVirtualCamera } from '../utils/cameraDevices';
 import { config } from '../utils/config';
 import type { FaceBaseline } from '../utils/facePose';
-import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs } from '../utils/faceErrors';
+import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, stepUpChallenge } from '../utils/faceErrors';
 import { sleep, whenOnline } from '../utils/waits';
 import { CameraCapture } from './CameraCapture';
 import { FaceGuide } from './FaceGuide';
 import { ScanCard, scanStages, stageFill, type Phase } from './FaceScan';
 import { FlashOverlay } from './FlashOverlay';
-import { challengeActions, detectionMode, FLASH_HINT, livenessProgress, scannerView } from './liveFaceView';
+import { challengeActions, detectionMode, livenessProgress, scannerView, scanProgress, type ScannerViewInput } from './liveFaceView';
+import { FlowActions, FlowExtras, type FlowAlternative } from './LiveFaceParts';
 import { ScannerHints } from './LivenessCues';
-import { Button } from './ui/Button';
+
+export type { FlowAlternative } from './LiveFaceParts';
 
 export interface CapturedFace extends FaceCaptures {
   /** El empleado indicó que no usa el accesorio detectado: el registro va marcado a revisión. */
   accessoryReview: boolean;
-}
-
-export interface FlowAlternative {
-  label: string;
-  icon: ReactNode;
-  onSelect: () => void;
 }
 
 interface LiveFaceFlowProps {
@@ -39,8 +39,10 @@ interface LiveFaceFlowProps {
   facing?: CameraFacing;
   /** La persona capturada está exenta de retirar la prenda de cabeza (validación previa). */
   allowHeadwear?: boolean;
-  /** Capturas frontales a tomar (3 en verificación, 5 en registro). */
+  /** Fotos de frente a tomar (3 en una verificación; las 36 del registro con `enrollmentCapture()`). */
   frontalFrames: number;
+  /** Fotos completas del registro facial (`enrollmentCapture()`); sin él, las capturas frontales de siempre. */
+  frontalPhoto?: FrontalPhoto;
   submittingMessage: string;
   /** Política de la empresa: accesorios exigidos y prueba de vida. */
   policy: VerificationRules;
@@ -61,23 +63,39 @@ interface LiveFaceFlowProps {
  * Flujo facial guiado y automático, en cinco etapas visibles (FaceScan.tsx):
  *  1. Preparación    → rostro frente a la cámara, a buena distancia y con luz.
  *  2. Alineación     → centrado y de frente hasta quedar estable (se guarda el rostro "en reposo").
- *  3. Escaneo        → N capturas y validación previa en el backend (calidad, pose y accesorios
- *                      por consenso entre 3 capturas).
+ *  3. Escaneo        → las fotos de frente (3 en una verificación, 36 completas en el registro facial)
+ *                      y la validación previa en el backend (calidad, pose y accesorios de las 3
+ *                      primeras). El reto se pide al empezar el escaneo, junto con las fotos: así se
+ *                      sabe desde el principio cuántas fotos serán en total (anillo de 36 marcas).
  *  4. Prueba de vida → (si la empresa la exige) reto aleatorio del servidor:
  *                      a) destello: la pantalla se pinta de cada color del reto y se captura un
- *                         cuadro con cada uno (el rostro real refleja la luz; un video inyectado no);
+ *                         cuadro con cada uno (el rostro real refleja la luz; un video inyectado no).
+ *                         Dictado por el servidor (antifraude 2a), cada color llega por el canal en vivo
+ *                         al capturar el anterior; sin canal, los colores de siempre;
  *                      b) de uno a tres movimientos (girar, mirar arriba o abajo, acercarse); entre
  *                         uno y otro la persona vuelve al frente.
  *                      Si no se logra a tiempo (cada movimiento y el reto completo, `expires_in`)
  *                      se pide otro reto SIN repetir el escaneo.
  *  5. Confirmación   → el backend valida todo de nuevo (fuente de verdad).
+ *
+ * Antifraude 2a: desde que el rostro queda estable de frente se toma la ráfaga de recortes (`useFaceBurst`: tramo
+ * quieto hasta el destello y tramo de movimiento en el primer paso); viaja con las capturas si el reto la pide. Son las
+ * 36 fotos LIGERAS de una verificación: el servidor mide con ellas la continuidad y el consenso de la identidad.
+ *
+ * UN solo anillo (decisión del dueño, 2026-10-06): las fotos tomadas contra las del plan (`scanProgress`), por todo
+ * el proceso —fotos de frente, destello y movimientos— hasta completarse con la marca ✓. El anillo es continuo y fluye
+ * hacia su valor con CSS (una ráfaga de fotos no lo hace saltar) y la indicación cambia con un fundido cruzado.
  */
 
 /** Reto vigente (con prueba de vida): siempre trae su id. */
 type ActiveChallenge = FaceChallenge & { challenge_id: string };
 
 interface Blocked {
-  message: string;
+  /**
+   * Por qué se detuvo: se escribe al dibujarse (el estado no guarda el texto ya traducido), así un
+   * cambio de idioma con el aviso en pantalla lo traduce. El del servidor llega ya en su idioma.
+   */
+  reason: LazyText;
   /** Códigos del catálogo de accesorios detectados. */
   accessories: string[];
 }
@@ -85,8 +103,18 @@ interface Blocked {
 const REVIEW_AFTER_ATTEMPTS = 2;
 /** Retos pedidos de nuevo (conservando el escaneo) antes de reiniciar todo el flujo. */
 const CHALLENGE_RETRIES = 2;
-const TIMEOUT_MESSAGE = 'No se completó el movimiento a tiempo. Hazlo despacio, hasta que el anillo se llene.';
-const FLASH_FAILED_MESSAGE = 'No se pudo completar el destello de colores. Mantén la pantalla encendida y tu rostro frente a ella.';
+const timeoutReason = () => t('face.flow.timeout');
+const flashFailedReason = () => t('face.flow.flashFailed');
+
+/**
+ * Los retos se agotaron: se trata como si el servidor lo rechazara (mismo código), con el texto de
+ * la app en el idioma activo al leerse (popup o resultado abiertos lo traducen si cambia el idioma).
+ */
+function challengeExhausted(): ApiError {
+  const error = new ApiError({ statusCode: 422, code: 'CHALLENGE_INVALID', message: '' });
+  Object.defineProperty(error, 'message', { get: () => t('face.flow.challengeRestart'), configurable: true, enumerable: false });
+  return error;
+}
 const vibrate = (ms: number) => {
   try {
     navigator.vibrate?.(ms); // Android; iOS lo ignora
@@ -95,10 +123,13 @@ const vibrate = (ms: number) => {
   }
 };
 
-/** Hasta cuándo se puede responder el reto: su vida (`expires_in`) menos lo que tarda el envío. */
-function challengeDeadline(challenge: ActiveChallenge): number {
+/**
+ * Hasta cuándo se puede responder el reto: su vida (`expires_in`, contada desde que llegó: se pide al empezar el
+ * escaneo) menos lo que tarda el envío.
+ */
+function challengeDeadline(challenge: ActiveChallenge, arrivedAt: number): number {
   if (!challenge.expires_in) return Infinity;
-  return Date.now() + Math.max(0, challenge.expires_in * 1000 - config.faceChallengeMarginMs);
+  return arrivedAt + Math.max(0, challenge.expires_in * 1000 - config.faceChallengeMarginMs);
 }
 
 interface StableHandlers {
@@ -114,73 +145,15 @@ function stableHandler(phase: Phase, challenge: ActiveChallenge | null, handlers
   return handlers.frontal;
 }
 
-/** Propuesta de revisión humana cuando el detector insiste en un accesorio que el empleado no usa. */
-export function AccessoryReviewPrompt({ accessories, onConfirm }: { accessories: string[]; onConfirm: () => void }) {
-  const { byCode } = useCatalogs();
-  const names = accessories.map((code) => byCode('accessories', code)?.phrase ?? code).join(' ni ');
-  return (
-    <div className="review-prompt" role="note">
-      <strong>¿No estás usando {names}?</strong>
-      <span className="muted small">
-        Puede deberse a la iluminación o al encuadre. Si estás seguro, envía tu registro marcado: tu empresa lo revisará
-        con tu fotografía.
-      </span>
-      <Button variant="secondary" block icon={<UserCheck size={18} />} onClick={onConfirm}>
-        No uso {names} · enviar a revisión
-      </Button>
-    </div>
-  );
-}
-
 /** Fases en que la cámara busca el rostro (frontal, movimiento o regreso al frente). */
 const SCANNING_PHASES = new Set<Phase>(['frontal', 'challenge', 'recenter']);
-
-interface FlowExtrasProps {
-  /** Accesorios a proponer para revisión humana (null = no se ofrece). */
-  reviewAccessories: string[] | null;
-  reviewRequested: boolean;
-  onReview: () => void;
-}
-
-/** Bajo el visor, solo cuando aplica: enviar el registro a revisión si el sistema insiste en un accesorio. */
-function FlowExtras({ reviewAccessories, reviewRequested, onReview }: FlowExtrasProps) {
-  if (!reviewAccessories && !reviewRequested) return null;
-  return (
-    <>
-      {reviewAccessories && <AccessoryReviewPrompt accessories={reviewAccessories} onConfirm={onReview} />}
-      {reviewRequested && (
-        <p className="review-prompt review-prompt--sent small" role="status">
-          <UserCheck size={16} /> Tu registro se enviará marcado para revisión de tu empresa.
-        </p>
-      )}
-    </>
-  );
-}
-
-/** Captura manual (si la detección automática no está disponible) y otra forma de identificarse. */
-function FlowActions({ manualCapture, alternative }: { manualCapture: { disabled: boolean; onCapture: () => void } | null; alternative?: FlowAlternative }) {
-  if (!manualCapture && !alternative) return null;
-  return (
-    <>
-      {manualCapture && (
-        <Button variant="primary" size="lg" icon={<Camera size={20} />} disabled={manualCapture.disabled} onClick={manualCapture.onCapture}>
-          Capturar
-        </Button>
-      )}
-      {alternative && (
-        <Button variant="secondary" size="lg" icon={alternative.icon} onClick={alternative.onSelect}>
-          {alternative.label}
-        </Button>
-      )}
-    </>
-  );
-}
 
 export function LiveFaceFlow({
   title,
   facing = 'user',
   allowHeadwear = false,
   frontalFrames,
+  frontalPhoto,
   submittingMessage,
   policy,
   allowAccessoryReview = false,
@@ -189,14 +162,28 @@ export function LiveFaceFlow({
   onFatal,
   onCancel,
 }: LiveFaceFlowProps) {
+  // Los textos del visor se escriben en cada dibujo a partir de la fase, la guía y el paso: un cambio
+  // de idioma los traduce al instante sin tocar la cámara ni el avance del escaneo.
+  useLocale();
   const camera = useCamera({ facing });
+  // Antifraude: lo que el navegador dice de sí mismo y de su cámara viaja con las capturas (solo números).
+  const telemetry = useCaptureTelemetry(camera, policy.blocked_cameras);
   const catalogs = useCatalogs();
-  const { detector, error: detectorError } = useFaceDetector();
-  const { run: runFlash, ...flash } = useScreenFlash();
+  const { detector, failed: detectorFailed } = useFaceDetector();
+  const { play: playFlash, ...flash } = useScreenFlash();
+  const burst = useFaceBurst(camera.videoRef);
   const [phase, setPhase] = useState<Phase>('frontal');
   const [blocked, setBlocked] = useState<Blocked | null>(null);
   const [challenge, setChallenge] = useState<ActiveChallenge | null>(null);
-  const [capture, setCapture] = useState<{ current: number; total: number } | null>(null);
+  /** Las fotos de frente (cuántas se llevan: el anillo) y el reto que ya llegó (de él sale cuántas serán en total). */
+  const frontal = useFrontalCapture(camera, frontalFrames, frontalPhoto);
+  const { take: takePhotos, clear: clearPhotos } = frontal;
+  const [upcoming, setUpcoming] = useState<FaceChallenge | null>(null);
+  /**
+   * Las fotos ligeras del tramo quieto que lleva la ráfaga (cada recorte avisa). En el registro no se cuentan (van a la
+   * par de las 36 completas): su valor no cambia y la pantalla no se vuelve a dibujar por cada recorte.
+   */
+  const lightPhotos = useSyncExternalStore(burst.subscribe, () => (frontalPhoto ? 0 : burst.held()));
   const [accessoryStreak, setAccessoryStreak] = useState<{ count: number; accessories: string[] }>({ count: 0, accessories: [] });
   const [reviewRequested, setReviewRequested] = useState(false);
   const frontalRef = useRef<Blob[]>([]);
@@ -206,12 +193,24 @@ export function LiveFaceFlow({
   const [step, setStep] = useState(0);
   const stepsRef = useRef<Blob[]>([]);
   const flashRef = useRef<Blob[]>([]);
-  /** Hasta cuándo se puede responder el reto vigente (Date.now()). */
+  /** Comprobante del destello dictado por el servidor (va con las capturas). */
+  const receiptRef = useRef<string | undefined>(undefined);
+  /** Hasta cuándo se puede responder el reto vigente (Date.now()) y cuándo llegó el último reto. */
   const deadlineRef = useRef(Infinity);
+  const arrivedRef = useRef(0);
+  /** Escaneo en curso: el reto de uno que ya terminó (bloqueado) no cambia el anillo del siguiente. */
+  const scanRef = useRef(0);
   /** Retos pedidos de nuevo con el mismo escaneo (se reinicia con cada escaneo). */
   const challengeRetries = useRef(0);
   /** Fallas de red o servidor seguidas: cada reintento vuelve a subir las capturas. */
   const transientStreak = useRef(0);
+  /**
+   * Reto de "un paso más" que pidió el motor de riesgo (riesgo medio): el siguiente escaneo lo responde en lugar de
+   * pedir otro. Las capturas ya enviadas no se reutilizan (cada una sirve una sola vez): se toman nuevas.
+   */
+  const stepUpRef = useRef<FaceChallenge | null>(null);
+  /** Reto que firma la llave de este dispositivo (lo trae el reto del servidor solo para el propio empleado). */
+  const deviceNonceRef = useRef<string | null>(null);
   const mounted = useMountedRef();
 
   const clearChallenge = useCallback(() => {
@@ -219,6 +218,7 @@ export function LiveFaceFlow({
     setStep(0);
     stepsRef.current = [];
     flashRef.current = [];
+    receiptRef.current = undefined;
   }, []);
 
   const block = useCallback(
@@ -232,9 +232,12 @@ export function LiveFaceFlow({
       }
       const accessories = detectedAccessories(error);
       setAccessoryStreak((prev) => (accessories.length ? { count: prev.count + 1, accessories } : prev));
-      setBlocked({ message: errorMessage(error), accessories });
+      setBlocked({ reason: () => errorMessage(error), accessories });
       clearChallenge();
-      setCapture(null);
+      burst.reset();
+      clearPhotos();
+      setUpcoming(null);
+      scanRef.current += 1;
       setPhase('blocked');
       vibrate(80);
       // Se reanuda tras la pausa (o la que pidió el servidor) y, sin red, hasta recuperar la conexión.
@@ -244,32 +247,48 @@ export function LiveFaceFlow({
         setPhase('frontal');
       }
     },
-    [catalogs, clearChallenge, mounted, onFatal],
+    [burst, catalogs, clearChallenge, clearPhotos, mounted, onFatal],
   );
 
   const submit = useCallback(
     async (captured: Omit<CapturedFace, 'accessoryReview' | 'camera'>) => {
+      burst.pause();
       setPhase('submitting');
       try {
-        await onSubmit({ ...captured, camera: camera.trackLabel || undefined, accessoryReview: reviewRequested });
+        const device = deviceNonceRef.current ? { deviceNonce: deviceNonceRef.current } : {};
+        await onSubmit({ ...captured, ...device, camera: camera.trackLabel || undefined, telemetry: telemetry(), accessoryReview: reviewRequested });
         transientStreak.current = 0;
       } catch (error) {
+        stepUpRef.current = stepUpChallenge(error);
         await block(error);
       }
     },
-    [block, camera.trackLabel, onSubmit, reviewRequested],
+    [block, burst, camera.trackLabel, onSubmit, reviewRequested, telemetry],
   );
 
-  const captureFrames = useCallback(async (): Promise<Blob[]> => {
-    const frames: Blob[] = [];
-    for (let i = 0; i < frontalFrames; i++) {
-      setCapture({ current: i + 1, total: frontalFrames });
-      frames.push(await camera.captureFrame());
-      if (i < frontalFrames - 1) await sleep(config.faceFrameGapMs);
-    }
-    setCapture(null);
-    return frames;
-  }, [camera, frontalFrames]);
+  /** Un reto recibido: cuándo llegó (su vida corre desde ahí) y, para el anillo, cuántas fotos pide. */
+  const arrived = useCallback(
+    (next: FaceChallenge) => {
+      arrivedRef.current = Date.now();
+      if (mounted.current) setUpcoming(next);
+      return next;
+    },
+    [mounted],
+  );
+
+  /**
+   * El reto del escaneo, pedido al EMPEZAR (en paralelo a las fotos): el anillo sabe desde el principio cuántas fotos
+   * serán. Su falla se atiende al esperarlo, después de las fotos (nunca queda una promesa rechazada sin atender).
+   */
+  const requestChallenge = useCallback(() => {
+    const scan = ++scanRef.current;
+    const pending = (stepUpRef.current ? Promise.resolve(stepUpRef.current) : faceService.getChallenge()).then((next) =>
+      scan === scanRef.current ? arrived(next) : next,
+    );
+    stepUpRef.current = null;
+    pending.catch(() => undefined); // se atiende al esperarlo (onFrontalStable)
+    return pending;
+  }, [arrived]);
 
   // Validación previa: si el empleado pidió revisión, los accesorios no detienen el flujo.
   const precheck = useCallback(
@@ -290,23 +309,29 @@ export function LiveFaceFlow({
     async (next: ActiveChallenge): Promise<boolean> => {
       clearChallenge();
       setChallenge(next);
-      deadlineRef.current = challengeDeadline(next);
-      if (next.flash.length) {
+      deadlineRef.current = challengeDeadline(next, arrivedRef.current);
+      // El tramo quieto de la ráfaga se completa (con tope) y se detiene: los colores del destello cambian la piel.
+      await burst.settle(next.burst);
+      burst.pause();
+      if (next.flash.length || next.flash_pace) {
         setPhase('flash');
-        const frames = await runFlash(next.flash, () => camera.captureFrame()).catch(() => null);
+        const take = await playFlash(next, () => camera.captureFrame());
         if (!mounted.current) return false;
-        if (!frames && next.flash_required) return true;
-        flashRef.current = frames ?? [];
+        if (!take && next.flash_required) return true;
+        flashRef.current = take?.frames ?? [];
+        receiptRef.current = take?.receipt;
       }
       setPhase('challenge');
+      burst.move();
       return false;
     },
-    [camera, clearChallenge, mounted, runFlash],
+    [burst, camera, clearChallenge, mounted, playFlash],
   );
 
   // Sin prueba de vida se envían las frontales; con ella, empieza el reto. true = pedir otro reto.
   const proceed = useCallback(
     async (next: FaceChallenge): Promise<boolean> => {
+      deviceNonceRef.current = next.device_nonce ?? null;
       if (next.liveness_required && next.challenge_id) return beginChallenge({ ...next, challenge_id: next.challenge_id });
       await submit({ frontal: frontalRef.current });
       return false;
@@ -316,20 +341,20 @@ export function LiveFaceFlow({
 
   // Otro reto conservando el escaneo (hasta CHALLENGE_RETRIES); después se reinicia todo el flujo.
   const retryChallenge = useCallback(
-    async (message: string) => {
-      for (let reason = message; ; reason = FLASH_FAILED_MESSAGE) {
+    async (first: LazyText) => {
+      for (let reason = first; ; reason = flashFailedReason) {
         if (challengeRetries.current >= CHALLENGE_RETRIES) {
-          await block(new ApiError({ statusCode: 422, code: 'CHALLENGE_INVALID', message: 'No se completó la prueba de vida. Intentemos de nuevo desde el inicio.' }));
+          await block(challengeExhausted());
           return;
         }
         challengeRetries.current += 1;
-        setBlocked({ message: reason, accessories: [] });
+        setBlocked({ reason, accessories: [] });
         clearChallenge();
         setPhase('blocked');
         vibrate(80);
         await sleep(config.faceResumeAfterBlockMs);
         try {
-          const next = await faceService.getChallenge();
+          const next = arrived(await faceService.getChallenge());
           if (!mounted.current) return;
           setBlocked(null);
           if (!(await proceed(next))) return;
@@ -339,29 +364,33 @@ export function LiveFaceFlow({
         }
       }
     },
-    [block, clearChallenge, mounted, proceed],
+    [arrived, block, clearChallenge, mounted, proceed],
   );
 
-  // Fase 1: rostro frontal estable → capturas → validación previa → reto (si aplica).
+  // Fase 1: rostro frontal estable → reto (pedido ya) + fotos → validación previa → reto (si aplica).
   const onFrontalStable = useCallback(
     async (sample?: FaceBaseline) => {
       setPhase('checking');
       setBaseline(sample ?? null);
       challengeRetries.current = 0;
       clearChallenge();
+      clearPhotos();
+      setUpcoming(null);
+      burst.start(sample?.box);
       vibrate(25);
+      const pending = requestChallenge();
       try {
-        const frames = await captureFrames();
+        const frames = await takePhotos();
         frontalRef.current = frames;
         await precheck(frames);
-        const next = await faceService.getChallenge();
+        const next = await pending;
         if (!mounted.current) return;
-        if (await proceed(next)) await retryChallenge(FLASH_FAILED_MESSAGE);
+        if (await proceed(next)) await retryChallenge(flashFailedReason);
       } catch (error) {
         await block(error);
       }
     },
-    [block, captureFrames, clearChallenge, mounted, precheck, proceed, retryChallenge],
+    [block, burst, clearChallenge, clearPhotos, mounted, precheck, proceed, requestChallenge, retryChallenge, takePhotos],
   );
 
   // Fase 2: movimiento hecho → captura; con otro pendiente se vuelve al frente; tras el último, envío
@@ -372,18 +401,25 @@ export function LiveFaceFlow({
       vibrate(25);
       try {
         stepsRef.current = [...stepsRef.current.slice(0, step), await camera.captureFrame()];
+        burst.pause(); // el tramo de movimiento es el del primer paso
         if (step + 1 < active.actions.length) {
           setStep(step + 1);
           setPhase('recenter');
           return;
         }
-        const flashFrames = flashRef.current.length ? { flash: flashRef.current } : {};
-        await submit({ frontal: frontalRef.current, challenge: { id: active.challenge_id, images: stepsRef.current }, ...flashFrames });
+        const flashFrames = flashRef.current.length ? { flash: flashRef.current, flashReceipt: receiptRef.current } : {};
+        const sheet = await burst.take(active.burst);
+        await submit({
+          frontal: frontalRef.current,
+          challenge: { id: active.challenge_id, images: stepsRef.current },
+          ...flashFrames,
+          ...(sheet ? { burst: sheet } : {}),
+        });
       } catch (error) {
         await block(error);
       }
     },
-    [block, camera, step, submit],
+    [block, burst, camera, step, submit],
   );
 
   // Entre movimientos: de vuelta al frente, se pide el siguiente.
@@ -401,7 +437,7 @@ export function LiveFaceFlow({
   useEffect(() => {
     if (phase !== 'challenge' && phase !== 'recenter') return;
     const wait = Math.min(config.faceChallengeTimeoutMs, Math.max(0, deadlineRef.current - Date.now()));
-    const timer = window.setTimeout(() => void retryRef.current(TIMEOUT_MESSAGE), wait);
+    const timer = window.setTimeout(() => void retryRef.current(timeoutReason), wait);
     return () => window.clearTimeout(timer);
   }, [phase]);
 
@@ -421,23 +457,37 @@ export function LiveFaceFlow({
   });
   const livenessFill = livenessProgress(phase, flash, moveProgress);
   const { videoRef } = camera;
-  // El óvalo de la guía, junto al video: por ahí se sigue viendo la cámara durante el destello.
-  const locateOval = useCallback(() => videoRef.current?.parentElement?.querySelector('.face-scan')?.getBoundingClientRect(), [videoRef]);
+  // El círculo de la guía con su anillo, junto al video: por ahí se siguen viendo la cámara y el avance de las fotos
+  // durante el destello.
+  const locateCircle = useCallback(() => videoRef.current?.parentElement?.querySelector('.face-scan__ring')?.getBoundingClientRect(), [videoRef]);
+  const ring = scanProgress({
+    phase,
+    challenge: challenge ?? upcoming,
+    frontalFrames,
+    fullStill: Boolean(frontalPhoto),
+    photos: frontal.photos,
+    light: lightPhotos,
+    flash,
+    step,
+    moveProgress,
+  });
 
-  const { message, tone, stage, ringProgress, intro } = scannerView({
+  const viewInput: ScannerViewInput = {
     phase,
     guidance,
-    progress,
     challenge,
     step,
     virtualCamera,
-    blockedMessage: blocked?.message,
+    blockedMessage: blocked ? resolveLazy(blocked.reason) : undefined,
     submittingMessage,
     detectorReady: Boolean(detector),
-    detectorFailed: Boolean(detectorError),
-    capture,
+    detectorFailed,
+    capture: frontal.capture,
     moveProgress: livenessFill,
-  });
+  };
+  const { tone, detail, stage, intro } = scannerView(viewInput);
+  // La indicación se entrega como función (se escribe al dibujarse, también la que se desvanece en el fundido cruzado).
+  const message = () => scannerView(viewInput).message;
   const stages = scanStages(policy.liveness_challenge);
   const offerReview = allowAccessoryReview && !reviewRequested && accessoryStreak.count >= REVIEW_AFTER_ATTEMPTS;
 
@@ -446,13 +496,22 @@ export function LiveFaceFlow({
       title={title}
       stages={stages}
       stage={stage}
-      fill={stageFill(stage, { progress, moveProgress: livenessFill, capture })}
+      fill={stageFill(stage, { progress, moveProgress: livenessFill, capture: frontal.capture })}
       intro={intro}
       onCancel={onCancel}
       viewport={
         <CameraCapture camera={camera} className="camera--fill">
           <span className="faceid__label">{camera.activeLabel}</span>
-          <FaceGuide tone={tone} message={message} progress={ringProgress} stage={stage} />
+          <FaceGuide
+            tone={tone}
+            message={message}
+            detail={detail}
+            progress={ring}
+            stage={stage}
+            capturing={phase === 'checking'}
+            flash={phase === 'flash'}
+            complete={phase === 'submitting'}
+          />
           <ScannerHints
             phase={phase}
             guidance={guidance}
@@ -460,7 +519,7 @@ export function LiveFaceFlow({
             mirrored={camera.isMirrored}
             accessories={blocked?.accessories ?? []}
           />
-          <FlashOverlay color={flash.color} index={flash.index} total={flash.total} locate={locateOval} hint={FLASH_HINT} />
+          <FlashOverlay color={flash.color} index={flash.index} total={flash.total} locate={locateCircle} />
         </CameraCapture>
       }
       extras={
@@ -476,7 +535,7 @@ export function LiveFaceFlow({
       actions={
         <FlowActions
           manualCapture={
-            detectorError
+            detectorFailed
               ? { disabled: !cameraReady || !scanning || virtualCamera, onCapture: () => void onStable() }
               : null
           }

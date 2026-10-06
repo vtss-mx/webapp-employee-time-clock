@@ -1,6 +1,7 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../i18n/core';
 import { apiFail, apiOk, jsonResponse, mockFetch } from '../test/http';
 import { renderWithProviders } from '../test/render';
 import { ChangePasswordSection } from './ChangePasswordSection';
@@ -51,7 +52,7 @@ describe('ChangePasswordSection', () => {
     expect(screen.getByLabelText('Nueva contraseña')).toHaveValue('NuevaClave1');
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
     await answer('Cambiar contraseña');
-    expect(await screen.findByText('Se cerró la sesión en 2 dispositivo(s) más.')).toBeInTheDocument();
+    expect(await screen.findByText('Se cerró la sesión en 2 dispositivos más.')).toBeInTheDocument();
     expect(JSON.parse(calls[0].init.body as string)).toEqual({ current_password: 'Actual123', new_password: 'NuevaClave1' });
     expect(onChanged).toHaveBeenCalledOnce();
     expect(screen.getByLabelText('Contraseña actual')).toHaveValue('');
@@ -115,7 +116,7 @@ describe('ChangePasswordSection: casos límite', () => {
     const { fn } = mockFetch(apiOk({ revoked_sessions: 0 }));
     renderWithProviders(<ChangePasswordSection />);
     fireEvent.submit(screen.getByLabelText('Contraseña actual').closest('form') as HTMLFormElement);
-    const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
+    const popup = await screen.findByRole('alertdialog', { name: 'Revisa los datos' });
     expect(popup).toHaveTextContent('Escribe tu contraseña actual');
     expect(screen.getByLabelText('Contraseña actual')).toHaveAccessibleDescription('Escribe tu contraseña actual');
     expect(fn).not.toHaveBeenCalled();
@@ -127,6 +128,33 @@ describe('ChangePasswordSection: casos límite', () => {
     await fill('Actual123', 'NuevaClave1');
     await answer('Cambiar contraseña');
     expect(await screen.findByText('Tu sesión actual sigue activa.')).toBeInTheDocument();
+  });
+
+  it('una sola sesión cerrada: el aviso va en singular', async () => {
+    mockFetch(apiOk({ revoked_sessions: 1 }));
+    renderWithProviders(<ChangePasswordSection />);
+    await fill('Actual123', 'NuevaClave1');
+    await answer('Cambiar contraseña');
+    expect(await screen.findByText('Se cerró la sesión en 1 dispositivo más.')).toBeInTheDocument();
+  });
+});
+
+describe('ChangePasswordSection en inglés (en-US)', () => {
+  it('etiquetas, confirmación abierta al cambiar el idioma y aviso de éxito en inglés', async () => {
+    mockFetch(apiOk({ revoked_sessions: 1 }));
+    renderWithProviders(<ChangePasswordSection />);
+    await fill('Actual123', 'NuevaClave1');
+    // La confirmación ya abierta sigue al idioma (cambio en caliente), sin perder lo escrito.
+    await screen.findByRole('alertdialog', { name: '¿Cambiar tu contraseña?' });
+    await act(() => setLocale('en-US'));
+    const dialog = screen.getByRole('alertdialog', { name: 'Change your password?' });
+    expect(dialog).toHaveTextContent('You will be signed out of your other devices.');
+    expect(screen.getByLabelText('Current password')).toHaveValue('Actual123');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Change password' }));
+    const done = await screen.findByRole('dialog', { name: 'Password updated' });
+    expect(done).toHaveTextContent('You were signed out of 1 other device.');
+    expect(screen.getByRole('heading', { name: 'Change password' })).toBeInTheDocument();
+    expect(screen.getByLabelText('New password')).toHaveAccessibleDescription('At least 8 characters, with an uppercase letter, a lowercase letter, and a number');
   });
 });
 

@@ -2,7 +2,7 @@
   "name": "Employee Time Clock",
   "short_name": "ETC",
   "description": "Control de asistencia y jornada laboral.",
-  "lang": "es",
+  "lang": "es-MX",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

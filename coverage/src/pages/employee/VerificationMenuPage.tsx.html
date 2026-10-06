@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -128,13 +128,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -182,9 +182,11 @@ import { Link } from 'react-router-dom';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { useAuth } from '../../hooks/useAuth';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
+import { useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 &nbsp;
 export function VerificationMenuPage() {
+  const t = useT();
   const { user } = useAuth();
   const firstName = user?.employee?.first_name;
   const { policy } = useVerificationPolicy();
@@ -192,8 +194,8 @@ export function VerificationMenuPage() {
   return (
     &lt;div className="page page-transition"&gt;
       &lt;Panel&gt;
-        &lt;PanelHero eyebrow="Identificación" title={firstName ? `Hola, ${firstName}` : 'Hola'}&gt;
-          &lt;p className="muted"&gt;¿Cómo deseas identificarte?&lt;/p&gt;
+        &lt;PanelHero eyebrow={t('employee.menu.eyebrow')} title={firstName ? t('employee.menu.hello', { name: firstName }) : t('employee.menu.helloAnonymous')}&gt;
+          &lt;p className="muted"&gt;{t('employee.menu.question')}&lt;/p&gt;
         &lt;/PanelHero&gt;
 &nbsp;
         &lt;PanelSection&gt;
@@ -202,12 +204,10 @@ export function VerificationMenuPage() {
               &lt;span className="method-card__icon"&gt;
                 &lt;ScanFace size={42} /&gt;
               &lt;/span&gt;
-              &lt;span className="method-card__title"&gt;VERIFICAR CON ROSTRO&lt;/span&gt;
-              &lt;span className="method-card__desc"&gt;
-                {policy.liveness_challenge ? 'Reconocimiento facial con prueba de vida' : 'Reconocimiento facial'}
-              &lt;/span&gt;
+              &lt;span className="method-card__title"&gt;{t('employee.menu.face')}&lt;/span&gt;
+              &lt;span className="method-card__desc"&gt;{policy.liveness_challenge ? t('employee.menu.faceLiveness') : t('employee.menu.faceOnly')}&lt;/span&gt;
               &lt;span className="method-card__cta"&gt;
-                Comenzar &lt;ArrowRight size={18} /&gt;
+                {t('employee.menu.start')} &lt;ArrowRight size={18} /&gt;
               &lt;/span&gt;
             &lt;/Link&gt;
 &nbsp;
@@ -216,10 +216,10 @@ export function VerificationMenuPage() {
                 &lt;span className="method-card__icon"&gt;
                   &lt;QrCode size={42} /&gt;
                 &lt;/span&gt;
-                &lt;span className="method-card__title"&gt;MOSTRAR MI QR&lt;/span&gt;
-                &lt;span className="method-card__desc"&gt;Muéstralo al validador: cambia cada {policy.qr_lifetime_seconds} s y sirve una sola vez&lt;/span&gt;
+                &lt;span className="method-card__title"&gt;{t('employee.menu.qr')}&lt;/span&gt;
+                &lt;span className="method-card__desc"&gt;{t('employee.menu.qrText', { seconds: policy.qr_lifetime_seconds })}&lt;/span&gt;
                 &lt;span className="method-card__cta"&gt;
-                  Mostrar &lt;ArrowRight size={18} /&gt;
+                  {t('employee.menu.show')} &lt;ArrowRight size={18} /&gt;
                 &lt;/span&gt;
               &lt;/Link&gt;
             )}
@@ -227,7 +227,7 @@ export function VerificationMenuPage() {
         &lt;/PanelSection&gt;
         &lt;PanelFooter align="center"&gt;
           &lt;p className="inline-note small muted"&gt;
-            &lt;ShieldCheck size={16} color="var(--success)" /&gt; Identidad validada por tu empresa · Conexión protegida
+            &lt;ShieldCheck size={16} color="var(--success)" /&gt; {t('employee.menu.footer')}
           &lt;/p&gt;
         &lt;/PanelFooter&gt;
       &lt;/Panel&gt;
@@ -241,7 +241,7 @@ export function VerificationMenuPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

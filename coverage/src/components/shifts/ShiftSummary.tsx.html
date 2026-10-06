@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
@@ -127,9 +127,7 @@
 <a name='L62'></a><a href='#L62'>62</a>
 <a name='L63'></a><a href='#L63'>63</a>
 <a name='L64'></a><a href='#L64'>64</a>
-<a name='L65'></a><a href='#L65'>65</a>
-<a name='L66'></a><a href='#L66'>66</a>
-<a name='L67'></a><a href='#L67'>67</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L65'></a><a href='#L65'>65</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -148,14 +146,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">91x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">172x</span>
+<span class="cline-any cline-yes">172x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">84x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">165x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -196,6 +192,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { CalendarDays, Coffee, LogIn, LogOut, Moon } from 'lucide-react';
+import { useT } from '../../i18n';
 import type { Weekday } from '../../types';
 import { formatMinutes } from '../../utils/format';
 import { weekdaysLabel } from '../../utils/shifts';
@@ -214,46 +211,43 @@ interface ShiftSummaryProps {
  * cuándo se checa la entrada, cuándo empieza el retardo y la ventana para checar la salida.
  */
 export function ShiftSummary({ timeline, weekdays, breaksCount, breakMinutes }: ShiftSummaryProps) {
+  const t = useT();
   if (!timeline) {
-    return &lt;p className="shift-summary shift-summary--empty muted"&gt;Elige la hora de entrada y la de salida (distintas) para ver cómo queda la jornada.&lt;/p&gt;;
+    return &lt;p className="shift-summary shift-summary--empty muted"&gt;{t('shifts.form.summary.empty')}&lt;/p&gt;;
   }
   return (
     &lt;div className="shift-summary" aria-live="polite"&gt;
       &lt;div className="shift-summary__head"&gt;
         &lt;strong className="shift-summary__duration"&gt;{formatMinutes(timeline.duration)}&lt;/strong&gt;
-        &lt;span className="muted"&gt;de jornada&lt;/span&gt;
+        &lt;span className="muted"&gt;{t('shifts.form.summary.workday')}&lt;/span&gt;
         {timeline.overnight &amp;&amp; (
           &lt;span className="badge badge--info"&gt;
-            &lt;Moon size={14} aria-hidden /&gt; Termina al día siguiente
+            &lt;Moon size={14} aria-hidden /&gt; {t('shifts.form.summary.overnight')}
           &lt;/span&gt;
         )}
       &lt;/div&gt;
       &lt;dl className="shift-summary__rows"&gt;
         &lt;div&gt;
           &lt;dt&gt;
-            &lt;LogIn size={16} aria-hidden /&gt; Entrada
+            &lt;LogIn size={16} aria-hidden /&gt; {t('shifts.form.summary.checkIn')}
           &lt;/dt&gt;
-          &lt;dd&gt;
-            Puede checar desde las {momentText(timeline.opens)}; después de las {momentText(timeline.lateAfter)} es retardo.
-          &lt;/dd&gt;
+          &lt;dd&gt;{t('shifts.form.summary.checkInRule', { opens: momentText(timeline.opens), late: momentText(timeline.lateAfter) })}&lt;/dd&gt;
         &lt;/div&gt;
         &lt;div&gt;
           &lt;dt&gt;
-            &lt;LogOut size={16} aria-hidden /&gt; Salida
+            &lt;LogOut size={16} aria-hidden /&gt; {t('shifts.form.summary.checkOut')}
           &lt;/dt&gt;
-          &lt;dd&gt;
-            Desde las {momentText(timeline.leavesFrom)} y a más tardar a las {momentText(timeline.deadline)}.
-          &lt;/dd&gt;
+          &lt;dd&gt;{t('shifts.form.summary.checkOutRule', { from: momentText(timeline.leavesFrom), until: momentText(timeline.deadline) })}&lt;/dd&gt;
         &lt;/div&gt;
         &lt;div&gt;
           &lt;dt&gt;
-            &lt;Coffee size={16} aria-hidden /&gt; Descansos
+            &lt;Coffee size={16} aria-hidden /&gt; {t('shifts.form.summary.breaks')}
           &lt;/dt&gt;
           &lt;dd&gt;{breaksText(breaksCount, breakMinutes)}&lt;/dd&gt;
         &lt;/div&gt;
         &lt;div&gt;
           &lt;dt&gt;
-            &lt;CalendarDays size={16} aria-hidden /&gt; Días
+            &lt;CalendarDays size={16} aria-hidden /&gt; {t('shifts.form.summary.days')}
           &lt;/dt&gt;
           &lt;dd&gt;{weekdaysLabel(weekdays)}&lt;/dd&gt;
         &lt;/div&gt;
@@ -268,7 +262,7 @@ export function ShiftSummary({ timeline, weekdays, breaksCount, breakMinutes }: 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

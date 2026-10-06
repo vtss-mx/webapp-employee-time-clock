@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../i18n/core';
 import { renderWithProviders, sampleUser } from '../../test/render';
 import { withScreens } from '../../test/screens';
 import type { User } from '../../types';
@@ -24,7 +25,7 @@ async function open(user: User) {
   auth.user = user;
   renderWithProviders(<LogoutButton />);
   await userEvent.click(screen.getByRole('button', { name: 'salir' }));
-  return screen.getByRole('alertdialog', { name: '¿Estás seguro de que deseas cerrar sesión?' });
+  return screen.getByRole('alertdialog', { name: '¿Cerrar sesión?' });
 }
 
 beforeEach(() => {
@@ -39,10 +40,10 @@ describe('confirmación de cierre de sesión', () => {
     const dialog = await open(employee);
     expect(within(dialog).getByText('Ana Ruiz')).toBeInTheDocument();
     expect(within(dialog).getByText('ana@empresa.com')).toBeInTheDocument();
-    expect(within(dialog).getByText('Employee · Mi empresa')).toBeInTheDocument(); // nombre del rol: catálogo
+    expect(within(dialog).getByText('Empleado · Mi empresa')).toBeInTheDocument(); // nombre del rol: catálogo
     expect(within(dialog).getByText('Safari · iOS')).toBeInTheDocument();
     expect(within(dialog).getByText('hace 2 horas')).toBeInTheDocument();
-    expect(within(dialog).getByText(/mostrar tu código QR tendrás que volver a iniciar sesión/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Deberás iniciar sesión de nuevo para identificarte o mostrar tu código QR/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Seguir aquí' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(auth.logout).not.toHaveBeenCalled();
@@ -66,9 +67,22 @@ describe('confirmación de cierre de sesión', () => {
 
     auth.logoutEverywhere.mockImplementationOnce(() => Promise.reject(new Error('Sin conexión')));
     await userEvent.click(screen.getByRole('button', { name: 'salir' }));
-    dialog = screen.getByRole('alertdialog', { name: '¿Estás seguro de que deseas cerrar sesión?' });
+    dialog = screen.getByRole('alertdialog', { name: '¿Cerrar sesión?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salir de todos mis dispositivos' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo cerrar sesión en todos los dispositivos' })).toBeInTheDocument();
+  });
+
+  it('con el popup abierto, un cambio de idioma lo traduce (la consecuencia del rol, la tarjeta y los botones)', async () => {
+    const dialog = await open({ ...sampleUser, last_login_at: new Date(Date.now() - 2 * 3_600_000).toISOString() });
+    expect(dialog).toHaveTextContent('hace 2 horas');
+    await act(() => setLocale('en-US'));
+    const english = screen.getByRole('alertdialog', { name: 'Sign out?' });
+    expect(english).toHaveTextContent("You'll need to sign in again to identify yourself or show your QR code.");
+    expect(within(english).getByText('This device')).toBeInTheDocument();
+    expect(within(english).getByText('Last sign-in')).toBeInTheDocument();
+    expect(within(english).getByText('2 hours ago')).toBeInTheDocument();
+    await userEvent.click(within(english).getByRole('button', { name: 'Sign out of all my devices' }));
+    await waitFor(() => expect(auth.logoutEverywhere).toHaveBeenCalledTimes(1));
   });
 
   it('sin usuario (la sesión ya se cerró por otro lado) no pide confirmación ni cierra nada', async () => {

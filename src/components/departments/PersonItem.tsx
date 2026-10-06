@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { initials } from '../../utils/format';
+import { Avatar } from '../ui/Avatar';
+import { DeletedMark } from '../ui/DeletedMark';
 
 interface PersonItemProps {
   name: string;
@@ -7,21 +8,28 @@ interface PersonItemProps {
   detail?: ReactNode;
   badges?: ReactNode;
   actions?: ReactNode;
+  /** La persona ya está en «Eliminados» (una referencia del historial): su marca va antes de las insignias. */
+  deleted?: boolean;
 }
 
 /**
  * Una persona en una lista de departamentos (responsables, empleados asignados, candidatos): se
  * acomoda al ancho de su contenedor (una columna en teléfono, acciones a un lado en tableta).
  */
-export function PersonItem({ name, detail, badges, actions }: PersonItemProps) {
+export function PersonItem({ name, detail, badges, actions, deleted = false }: PersonItemProps) {
   return (
     <li className="people-list__item">
-      <span className="avatar">{initials(name)}</span>
+      <Avatar name={name} decorative />
       <span className="people-list__info">
         <strong className="truncate">{name}</strong>
         {detail && <small className="muted truncate">{detail}</small>}
       </span>
-      {badges && <span className="people-list__badges">{badges}</span>}
+      {(badges || deleted) && (
+        <span className="people-list__badges">
+          <DeletedMark deleted={deleted} />
+          {badges}
+        </span>
+      )}
       {actions && <span className="people-list__actions">{actions}</span>}
     </li>
   );

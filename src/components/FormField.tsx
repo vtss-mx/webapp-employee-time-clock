@@ -1,5 +1,6 @@
 import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2 } from 'lucide-react';
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type Ref, type TextareaHTMLAttributes } from 'react';
+import { useT } from '../i18n';
 import type { FieldStatus } from '../types';
 
 interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -17,11 +18,13 @@ interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
  * "Confirmar contraseña": toda contraseña que se asigna (alta, restablecer, cambiar) se escribe dos
  * veces. Misma apariencia en todos los formularios; la regla es `validatePasswordConfirm`.
  */
-export function ConfirmPasswordField({ label = 'Confirmar contraseña', ...props }: Omit<FormFieldProps, 'label' | 'type'> & { label?: string }) {
-  return <FormField label={label} icon={<KeyRound size={18} />} type="password" autoComplete="new-password" {...props} />;
+export function ConfirmPasswordField({ label, ...props }: Omit<FormFieldProps, 'label' | 'type'> & { label?: string }) {
+  const t = useT();
+  return <FormField label={label ?? t('ui.formField.confirmPassword')} icon={<KeyRound size={18} />} type="password" autoComplete="new-password" {...props} />;
 }
 
 export function FormField({ label, error, hint, icon, type, id, status, inputRef, ...inputProps }: FormFieldProps) {
+  const t = useT();
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const [showPassword, setShowPassword] = useState(false);
@@ -48,7 +51,7 @@ export function FormField({ label, error, hint, icon, type, id, status, inputRef
           {...inputProps}
         />
         {!error && status && (
-          <span className="field__status" aria-live="polite" aria-label={status.tone === 'checking' ? 'Verificando' : status.text}>
+          <span className="field__status" aria-live="polite" aria-label={status.tone === 'checking' ? t('ui.formField.checking') : status.text}>
             <StatusIcon tone={status.tone} />
           </span>
         )}
@@ -57,7 +60,7 @@ export function FormField({ label, error, hint, icon, type, id, status, inputRef
             type="button"
             className="field__toggle"
             onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            aria-label={showPassword ? t('ui.formField.hidePassword') : t('ui.formField.showPassword')}
           >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
@@ -113,14 +116,19 @@ interface TextAreaFieldProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaEle
   onChange: (value: string) => void;
   error?: string;
   hint?: string;
+  /** Contador "12/300" bajo el campo (requiere `maxLength`): cuánto se lleva sin adivinar el límite. */
+  counter?: boolean;
+  /** Clase extra del campo completo (etiqueta, control y mensaje), p. ej. para ocupar toda la fila. */
+  className?: string;
 }
 
-/** Texto largo (motivos, descripciones) con la misma etiqueta, error y ayuda que los demás campos. */
-export function TextAreaField({ label, value, onChange, error, hint, required, id: givenId, ...props }: TextAreaFieldProps) {
+/** Texto largo (motivos, descripciones, referencias) con la misma etiqueta, error y ayuda que los demás campos. */
+export function TextAreaField({ label, value, onChange, error, hint, required, id: givenId, counter = false, className = '', ...props }: TextAreaFieldProps) {
   const generated = useId();
   const id = givenId ?? generated;
+  const limit = counter ? props.maxLength : undefined;
   return (
-    <div className={`field ${error ? 'field--error' : ''}`}>
+    <div className={`field ${error ? 'field--error' : ''} ${className}`}>
       <FieldLabel htmlFor={id} label={label} required={required} />
       <textarea
         {...props}
@@ -132,7 +140,17 @@ export function TextAreaField({ label, value, onChange, error, hint, required, i
         aria-describedby={describedBy(id, error, hint)}
         onChange={(e) => onChange(e.target.value)}
       />
-      <FieldMessage id={id} error={error} hint={hint} />
+      {limit ? (
+        <div className="field__footer">
+          <FieldMessage id={id} error={error} hint={hint} />
+          {/* Solo visual: el lector de pantalla ya anuncia el límite del control (maxlength). */}
+          <small className={`field__counter ${value.length >= limit ? 'is-full' : ''}`} aria-hidden>
+            {value.length}/{limit}
+          </small>
+        </div>
+      ) : (
+        <FieldMessage id={id} error={error} hint={hint} />
+      )}
     </div>
   );
 }

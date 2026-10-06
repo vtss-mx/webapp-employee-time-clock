@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
-import type { ConfirmInput } from '../types/confirm';
-import { useAction } from './useAction';
+import { resolveLazy, type Lazy } from '../i18n/lazy';
+import type { ConfirmInput, ConfirmSource } from '../types/confirm';
+import { useAction, type ErrorTitle } from './useAction';
 import { useFeedback } from './useFeedback';
 import type { FieldErrors } from '../utils/validation';
 
@@ -71,21 +72,22 @@ export function useFormState<T extends StringValues<T>>(initial: T, { serverErro
    * cancelar no envía nada y el formulario sigue igual). Si falla, los errores del servidor quedan en
    * sus campos y el motivo se explica en un popup titulado `title`.
    */
-  const save = async (action: () => Promise<void>, title: string, confirm: ConfirmInput): Promise<void> => {
+  const save = async (action: () => Promise<void>, title: ErrorTitle, confirm: ConfirmSource): Promise<void> => {
     await run(action, { errorTitle: title, confirm, keepBusy: !staysOpen, onError: (err) => setServerErrors((prev) => ({ ...prev, ...fromServer(err) })) });
   };
 
   /**
    * Envía si lo capturado es válido (`errors`: las reglas del cliente); si no, marca todos los campos
-   * y resume en un popup qué corregir: nada se envía ni se pregunta.
+   * y resume en un popup qué corregir: nada se envía ni se pregunta. Con `errors` como función, el
+   * resumen abierto sigue al idioma activo; la confirmación (`confirm`) se arma al dibujarse.
    */
-  const saveIfValid = (errors: Record<string, string | undefined>, action: () => Promise<void>, title: string, confirm: () => ConfirmInput): void => {
+  const saveIfValid = (errors: Lazy<Record<string, string | undefined>>, action: () => Promise<void>, title: ErrorTitle, confirm: () => ConfirmInput): void => {
     touchAll();
-    if (Object.values(errors).some(Boolean)) {
+    if (Object.values(resolveLazy(errors)).some(Boolean)) {
       void feedback.invalidForm(errors);
       return;
     }
-    void save(action, title, confirm());
+    void save(action, title, confirm);
   };
 
   /** Vuelve al formulario inicial (vacío y sin errores), p. ej. tras guardar uno que sigue en pantalla. */

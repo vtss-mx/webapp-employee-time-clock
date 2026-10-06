@@ -4,31 +4,16 @@ import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiFail, apiOk, jsonResponse, envelope, mockFetch, type MockCall } from '../../../test/http';
 import { renderWithProviders } from '../../../test/render';
+import { morning, page, plant } from '../../../test/shifts';
 import type { Shift } from '../../../types';
 import { ShiftFormPage } from './ShiftFormPage';
 import { ShiftsPage } from './ShiftsPage';
 
-const morning: Shift = {
-  id: 5,
-  name: 'Matutino',
-  start_time: '08:00:00',
-  end_time: '16:00:00',
-  overnight: false,
-  weekdays: [0, 1, 2, 3, 4],
-  breaks_count: 1,
-  break_minutes: 30,
-  early_check_in_minutes: 15,
-  late_tolerance_minutes: 10,
-  early_check_out_minutes: 0,
-  late_check_out_minutes: 60,
-  duration_minutes: 480,
-  active: true,
-  employees: 8,
-  created_at: '2026-10-01T00:00:00Z',
-};
-const night: Shift = { ...morning, id: 6, name: 'Nocturno', start_time: '22:00:00', end_time: '06:00:00', overnight: true, weekdays: [0, 1, 2, 3, 4, 5, 6], breaks_count: 0, break_minutes: 0, late_tolerance_minutes: 0, active: false, employees: 0 };
+/** Nocturno inactivo: todos los días, remoto los domingos y en la Planta Norte los demás. */
+const night: Shift = { ...morning, id: 6, name: 'Nocturno', start_time: '22:00:00', end_time: '06:00:00', overnight: true, weekdays: [0, 1, 2, 3, 4, 5, 6], remote_weekdays: [6], breaks_count: 0, break_minutes: 0, late_tolerance_minutes: 0, active: false, employees: 0 };
 
-const page = (items: Shift[]) => ({ items, total: items.length, page: 1, size: 10 });
+/** El formulario pide los sitios activos de la empresa (la Planta Norte); lo demás lo responde `answer`. */
+const formServer = (answer: Response | ((call: MockCall) => Response)) => mockFetch((call) => (call.url.startsWith('/api/sites') ? apiOk(page([plant], 1, 50)) : typeof answer === 'function' ? answer(call) : answer.clone()));
 const bodyOf = (call: MockCall | undefined) => JSON.parse(call?.init.body as string) as unknown;
 const field = (label: RegExp | string) => screen.getByLabelText(label);
 const setTime = (label: string, value: string) => fireEvent.change(field(label), { target: { value } });
@@ -36,6 +21,10 @@ const setTime = (label: string, value: string) => fireEvent.change(field(label),
 const rows = (dialog: HTMLElement, region: string) => within(within(dialog).getByRole('region', { name: region })).getAllByRole('listitem').map((row) => row.textContent);
 /** Petición que crea, cambia o borra (POST, PUT, PATCH o DELETE). */
 const isWrite = (call: MockCall) => call.init.method !== 'GET';
+/** Un día del turno (en "Días en que empieza"; los días remotos tienen sus propios botones). */
+const shiftDay = (name: string) => within(screen.getByRole('group', { name: 'Días en que empieza' })).getByRole('button', { name });
+/** Elige un sitio del turno (la casilla de la Planta Norte). */
+const pickPlant = async () => userEvent.click(await screen.findByRole('checkbox', { name: /Planta Norte/ }));
 
 function renderForm(route: string) {
   return renderWithProviders(
@@ -56,7 +45,7 @@ async function closeAlert(title: string) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Turnos: listado', () => {
-  it('muestra horario, días, descansos, tolerancia, empleados y estado; busca, filtra y abre la edición', async () => {
+  it('muestra horario, días, dónde se checa, descansos, tolerancia, empleados y estado; busca, filtra y abre la edición', async () => {
     const { calls } = mockFetch(apiOk(page([morning, night])));
     renderWithProviders(
       <Routes>
@@ -68,6 +57,7 @@ describe('Turnos: listado', () => {
     const day = (await screen.findByText('Matutino')).closest('tr') as HTMLElement;
     expect(within(day).getByText('08:00 – 16:00 · 8 h')).toBeInTheDocument();
     expect(within(day).getByText('Lun a vie')).toBeInTheDocument();
+    expect(within(day).getByText('Solo en sitio: Planta Norte')).toBeInTheDocument();
     expect(within(day).getByText('1 × 30 min')).toBeInTheDocument();
     expect(within(day).getByText('10 min de retardo')).toBeInTheDocument();
     expect(within(day).getByText('8')).toBeInTheDocument();
@@ -75,6 +65,7 @@ describe('Turnos: listado', () => {
     const late = screen.getByText('Nocturno').closest('tr') as HTMLElement;
     expect(within(late).getByText('22:00 – 06:00 (día siguiente) · 8 h')).toBeInTheDocument();
     expect(within(late).getByText('Todos los días')).toBeInTheDocument();
+    expect(within(late).getByText('Remoto: Dom · En sitio: Planta Norte')).toBeInTheDocument();
     expect(within(late).getByText('Sin descansos')).toBeInTheDocument();
     expect(within(late).getByText('Sin retardo tolerado')).toBeInTheDocument();
     expect(within(late).getByText('Inactivo')).toBeInTheDocument();
@@ -93,10 +84,10 @@ describe('Turnos: listado', () => {
   it('sin turnos invita a crear el primero; con búsqueda dice que nada coincide; uno se cuenta en singular', async () => {
     mockFetch(apiOk(page([])));
     const { unmount } = renderWithProviders(<ShiftsPage />, { route: '/company/shifts' });
-    expect(await screen.findByText('Aún no hay turnos')).toBeInTheDocument();
+    expect(await screen.findByText('Sin turnos')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Nuevo turno' })).toHaveLength(2);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar turnos' }), 'zzz');
-    expect(await screen.findByText('Ningún turno coincide con la búsqueda')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
     unmount();
     mockFetch(apiOk(page([morning])));
     renderWithProviders(<ShiftsPage />, { route: '/company/shifts' });
@@ -105,8 +96,8 @@ describe('Turnos: listado', () => {
 });
 
 describe('Turnos: alta', () => {
-  it('horario nocturno, días, descansos y tolerancias con el resumen en vivo; crea y vuelve al listado', async () => {
-    const { calls } = mockFetch(apiOk(night, { status: 201 }));
+  it('horario nocturno, días, dónde se checa, descansos y tolerancias con el resumen en vivo; crea y vuelve al listado', async () => {
+    const { calls } = formServer(apiOk(night, { status: 201 }));
     renderForm('/company/shifts/new');
     // Valores iniciales: 08:00 a 16:00, de lunes a viernes, tolerancias por omisión.
     expect(field('Hora de entrada')).toHaveValue('08:00');
@@ -122,7 +113,7 @@ describe('Turnos: alta', () => {
     expect(screen.getByText('Desde las 06:00 del día siguiente y a más tardar a las 07:00 del día siguiente.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Todos' }));
     expect(screen.getByText('Todos los días')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'domingo' }));
+    await userEvent.click(shiftDay('domingo'));
     expect(screen.getByRole('button', { name: 'Lun a sáb' })).toHaveAttribute('aria-pressed', 'true');
 
     await userEvent.click(screen.getByRole('button', { name: /Descansos por jornada/ }));
@@ -136,6 +127,11 @@ describe('Turnos: alta', () => {
     await userEvent.clear(field(/Retardo tolerado/));
     await userEvent.type(field(/Retardo tolerado/), '5');
     expect(screen.getByText('Puede checar desde las 21:45; después de las 22:05 es retardo.')).toBeInTheDocument();
+    // Dónde se checa: la Planta Norte y, los sábados, remoto (el domingo ya no es día del turno).
+    await pickPlant();
+    const remote = screen.getByRole('group', { name: 'Días en que se checa remoto' });
+    expect(within(remote).getByRole('button', { name: 'domingo' })).toBeDisabled();
+    await userEvent.click(within(remote).getByRole('button', { name: 'sábado' }));
     await userEvent.click(screen.getByRole('button', { name: 'Crear turno' }));
 
     // Antes de enviar se confirma lo que se creará (con los minutos de cada descanso: sí tiene descansos).
@@ -151,8 +147,10 @@ describe('Turnos: alta', () => {
       'Retardo tolerado5 min',
       'Salida anticipada tolerada0 min',
       'Límite para checar la salida1 h',
+      'Sitios donde se checaPlanta Norte',
+      'Días en que se checa remotoSáb',
     ]);
-    expect(calls).toHaveLength(0);
+    expect(calls.filter(isWrite)).toHaveLength(0);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Crear turno' }));
 
     expect(await screen.findByText('Lista de turnos')).toBeInTheDocument();
@@ -168,13 +166,17 @@ describe('Turnos: alta', () => {
       late_tolerance_minutes: 5,
       early_check_out_minutes: 0,
       late_check_out_minutes: 60,
+      site_ids: [3],
+      remote_weekdays: [5],
     });
   });
 
   it('sin descansos la confirmación lo dice (sin sus minutos); cancelar no envía nada y deja el formulario', async () => {
-    const { calls } = mockFetch(apiOk(morning, { status: 201 }));
+    const { calls } = formServer(apiOk(morning, { status: 201 }));
     renderForm('/company/shifts/new');
     await userEvent.type(field(/Nombre del turno/), 'Matutino');
+    await userEvent.click(await screen.findByRole('button', { name: 'Todos sus días' })); // remoto todos sus días: sin sitios
+    expect(screen.getByText('Opcional: todos los días del turno son remotos.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Crear turno' }));
     const confirm = await screen.findByRole('dialog', { name: '¿Crear el turno Matutino?' });
     expect(confirm).toHaveTextContent('Se podrá asignar a tus empleados y elegir en las solicitudes de cambio.');
@@ -188,6 +190,7 @@ describe('Turnos: alta', () => {
       'Retardo tolerado10 min',
       'Salida anticipada tolerada0 min',
       'Límite para checar la salida1 h',
+      'Días en que se checa remotoLun a vie',
     ]);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
 
@@ -199,9 +202,9 @@ describe('Turnos: alta', () => {
   });
 
   it('lo que falta o no cabe no se envía: se explica en un popup y en cada campo', async () => {
-    const { calls } = mockFetch(apiOk(morning));
+    const { calls } = formServer(apiOk(morning));
     renderForm('/company/shifts/new');
-    for (const day of ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']) await userEvent.click(screen.getByRole('button', { name: day })); // sin días
+    for (const day of ['lunes', 'martes', 'miércoles', 'jueves', 'viernes']) await userEvent.click(shiftDay(day)); // sin días
     expect(screen.getByText('Elige al menos un día en que empieza el turno')).toBeInTheDocument();
     setTime('Hora de salida', '08:00');
     expect(screen.getByText(/Elige la hora de entrada y la de salida/)).toBeInTheDocument();
@@ -211,18 +214,18 @@ describe('Turnos: alta', () => {
     expect(screen.getByText('La salida debe ser distinta de la entrada')).toBeInTheDocument();
     await userEvent.clear(field(/Límite para checar la salida/));
     await userEvent.click(screen.getByRole('button', { name: 'Crear turno' }));
-    const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
+    const popup = await screen.findByRole('alertdialog', { name: 'Revisa los datos' });
     expect(popup).toHaveTextContent('Escribe un nombre');
     expect(popup).toHaveTextContent('La salida debe ser distinta de la entrada');
     expect(popup).toHaveTextContent('Elige al menos un día en que empieza el turno');
     expect(popup).toHaveTextContent('Indica los minutos');
     await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
     expect(screen.getByText('Indica los minutos')).toBeInTheDocument();
-    expect(calls).toHaveLength(0);
+    expect(calls.filter(isWrite)).toHaveLength(0);
   });
 
   it('horas y minutos con controles propios: horas sugeridas en el selector y botones − / + con su paso', async () => {
-    mockFetch(apiOk(morning));
+    formServer(apiOk(morning));
     renderForm('/company/shifts/new');
     expect(field('Hora de entrada')).toHaveAttribute('type', 'text'); // nunca el control de hora del sistema
     await userEvent.click(within(field('Hora de entrada').closest('.field') as HTMLElement).getByRole('button', { name: 'Elegir hora' }));
@@ -237,7 +240,7 @@ describe('Turnos: alta', () => {
   });
 
   it('cancelar regresa al listado', async () => {
-    mockFetch(apiOk(morning));
+    formServer(apiOk(morning));
     renderForm('/company/shifts/new');
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(await screen.findByText('Lista de turnos')).toBeInTheDocument();
@@ -247,7 +250,7 @@ describe('Turnos: alta', () => {
 describe('Turnos: edición', () => {
   it('aplica a las jornadas por empezar; sin cambios no envía; confirma "antes → después"; nombre ocupado en su campo, regla del backend en popup y guardado', async () => {
     let puts = 0;
-    const { calls } = mockFetch((call) => {
+    const { calls } = formServer((call) => {
       if (call.init.method !== 'PUT') return apiOk(morning);
       puts += 1;
       if (puts === 1) return apiFail(409, 'SHIFT_NAME_TAKEN', 'Ya existe un turno con ese nombre');
@@ -255,14 +258,15 @@ describe('Turnos: edición', () => {
       return apiOk({ ...morning, name: 'Matutino A' });
     });
     renderForm('/company/shifts/5/edit');
-    expect(await screen.findByText(/Los cambios aplican a las jornadas que aún no empiezan/)).toBeInTheDocument();
+    expect(await screen.findByText('Afecta a 8 empleados asignados. Los cambios aplican a las jornadas que aún no empiezan.')).toBeInTheDocument();
+    expect(await screen.findByRole('checkbox', { name: /Planta Norte/ })).toBeChecked();
     expect(field(/Nombre del turno/)).toHaveValue('Matutino');
     expect(field('Hora de salida')).toHaveValue('16:00');
     expect(field(/Minutos de cada descanso/)).toHaveValue('30');
 
     // Sin cambios: se avisa y no se envía nada.
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No modificaste ningún dato');
+    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No hay nada que guardar');
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     expect(calls.filter(isWrite)).toHaveLength(0);
 
@@ -272,9 +276,10 @@ describe('Turnos: edición', () => {
     setTime('Hora de salida', '17:00');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     const confirm = await screen.findByRole('dialog', { name: '¿Guardar los cambios del turno Matutino?' });
+    expect(confirm).toHaveTextContent('Afecta a 8 empleados asignados: desde ahora checan con este horario y en estos lugares.');
     expect(within(confirm).getByRole('region', { name: 'Cambios' })).toHaveTextContent('2 cambios');
     expect(rows(confirm, 'Cambios')).toEqual(['Nombre del turnoAntes: MatutinoDespués: Vespertino', 'Hora de salidaAntes: 16:00Después: 17:00']);
-    expect(confirm.querySelector('.confirm-note')).toHaveTextContent('Los cambios aplican a las jornadas que aún no empiezan: lo ya registrado conserva su horario.');
+    expect(confirm.querySelector('.confirm-note')).toHaveTextContent('Aplica a las jornadas que aún no empiezan. Lo ya registrado no cambia.');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
     expect(calls.filter(isWrite)).toHaveLength(0);
     expect(field(/Nombre del turno/)).toHaveValue('Vespertino');
@@ -295,13 +300,13 @@ describe('Turnos: edición', () => {
     await closeAlert('No se pudo guardar el turno');
     await save();
     expect(await screen.findByText('Lista de turnos')).toBeInTheDocument();
-    expect(await screen.findByRole('dialog', { name: 'Turno actualizado' })).toHaveTextContent('Matutino A quedó actualizado: aplica a las jornadas que aún no empiezan.');
+    expect(await screen.findByRole('dialog', { name: 'Turno actualizado' })).toHaveTextContent('Los cambios de Matutino A aplican a las jornadas que aún no empiezan.');
     expect(calls.filter((c) => c.init.method === 'PUT').map((c) => c.url)).toEqual(['/api/shifts/5', '/api/shifts/5', '/api/shifts/5']);
   });
 
   it('un turno sin descansos propone 30 min al agregarlos; activar y eliminar se confirman (o se cancelan); eliminar en uso y eliminar', async () => {
     let deletes = 0;
-    const { calls } = mockFetch((call) => {
+    const { calls } = formServer((call) => {
       if (call.init.method === 'PATCH') return apiOk({ ...night, active: true });
       if (call.init.method !== 'DELETE') return apiOk(night);
       deletes += 1;
@@ -315,7 +320,7 @@ describe('Turnos: edición', () => {
     expect(field(/Minutos de cada descanso/)).toHaveValue('30');
 
     const section = screen.getByRole('heading', { name: /Estado del turno/ }).closest('section') as HTMLElement;
-    expect(section).toHaveTextContent('quienes lo tienen no tienen jornadas programadas');
+    expect(section).toHaveTextContent('quienes lo tienen se quedan sin jornadas programadas');
 
     // Activar también se confirma (qué cambia y qué implica); cancelar no envía nada y deja el estado.
     await userEvent.click(within(section).getByRole('button', { name: 'Activar' }));
@@ -329,14 +334,14 @@ describe('Turnos: edición', () => {
 
     await userEvent.click(within(section).getByRole('button', { name: 'Activar' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Activar el turno Nocturno?' })).getByRole('button', { name: 'Activar' }));
-    await userEvent.click(within(await screen.findByRole('dialog', { name: 'El turno quedó activo' })).getByRole('button', { name: 'Entendido' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Turno activado' })).getByRole('button', { name: 'Entendido' }));
     expect(within(section).getByText('Activo')).toBeInTheDocument();
 
     // Eliminar: el foco empieza en "Cancelar" (un Enter de más no borra nada); cancelar no envía nada.
     await userEvent.click(within(section).getByRole('button', { name: 'Eliminar' }));
     const remove = await screen.findByRole('alertdialog', { name: '¿Eliminar el turno Nocturno?' });
-    expect(remove).toHaveTextContent('Solo se puede eliminar un turno que nadie tiene ni tuvo asignado');
-    expect(remove.querySelector('.confirm-note')).toHaveTextContent('Esta acción no se puede deshacer.');
+    expect(remove).toHaveTextContent('Si alguien lo tiene o lo tuvo, no se puede eliminar');
+    expect(remove.querySelector('.confirm-note')).toHaveTextContent('Pasará a «Eliminados»: podrás restaurarlo durante 1 año.');
     await waitFor(() => expect(within(remove).getByRole('button', { name: 'Cancelar' })).toHaveFocus());
     await userEvent.click(within(remove).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false);
@@ -355,7 +360,7 @@ describe('Turnos: edición', () => {
 
   it('si no carga ofrece volver a cargar', async () => {
     let attempts = 0;
-    mockFetch(() => {
+    formServer(() => {
       attempts += 1;
       return attempts === 1 ? apiFail(404, 'SHIFT_NOT_FOUND', 'Turno no encontrado') : apiOk(morning);
     });

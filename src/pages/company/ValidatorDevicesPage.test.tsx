@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { sampleValidator } from '../../test/fixtures';
-import { apiOk, mockFetch } from '../../test/http';
+import { apiFail, apiOk, mockFetch } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import type { ValidatorDevice } from '../../types';
 import { ValidatorDevicesPage } from './ValidatorDevicesPage';
@@ -89,7 +89,7 @@ describe('ValidatorDevicesPage (COMPANY)', () => {
   it('sin dispositivos lo explica', async () => {
     server([]);
     renderPage();
-    expect(await screen.findByText('No hay dispositivos registrados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin dispositivos')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });
 });
@@ -150,5 +150,27 @@ describe('ValidatorDevicesPage: tipos de dispositivo, cancelar y páginas', () =
     release(apiOk({ items: [device(11, 'PENDING')], total: 11, page: 2, size: 10 }));
     expect(await screen.findByText('Tableta 11')).toBeInTheDocument();
     expect(screen.getByText('Tableta 11').closest('ul')).not.toHaveClass('is-loading');
+  });
+});
+
+describe('ValidatorDevicesPage: cada falla se explica con su título', () => {
+  it.each([
+    ['el validador', (url: string) => !url.includes('/devices'), 'No se pudo cargar el validador'],
+    ['sus dispositivos', (url: string) => url.includes('/devices'), 'No se pudieron cargar los dispositivos'],
+  ])('%s que no cargan', async (_, failing, title) => {
+    mockFetch((call) => (failing(call.url) ? apiFail(403, 'FORBIDDEN', 'Sin acceso') : apiOk(call.url.includes('/devices') ? { items: [], total: 0, page: 1, size: 10 } : sampleValidator)));
+    renderPage();
+    expect(await screen.findByRole('alertdialog', { name: title })).toHaveTextContent('Sin acceso');
+  });
+
+  it('una decisión que el servidor rechaza', async () => {
+    mockFetch((call) => {
+      if (call.init.method === 'PATCH') return apiFail(409, 'DEVICE_STATUS_CONFLICT', 'El dispositivo ya cambió');
+      return apiOk(call.url.includes('/devices') ? { items: [device(1, 'PENDING')], total: 1, page: 1, size: 10 } : sampleValidator);
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rechazar Tableta 1' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Rechazar «Tableta 1»?' })).getByRole('button', { name: 'Rechazar' }));
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo actualizar el dispositivo' })).toHaveTextContent('El dispositivo ya cambió');
   });
 });

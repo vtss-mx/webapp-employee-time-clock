@@ -1,3 +1,4 @@
+import { currentLocale, t } from '../i18n/core';
 import { config } from '../utils/config';
 import { sleep } from '../utils/waits';
 import { ApiError, clientError, normalizeResponse, type ApiEnvelope } from './http/envelope';
@@ -16,12 +17,20 @@ export type { ApiEnvelope, ApiErrorItem } from './http/envelope';
 export const TOUCH_DEVICE_REQUIRED = 'TOUCH_DEVICE_REQUIRED';
 export const DEVICE_NOT_ALLOWED_CODES: ReadonlySet<string> = new Set([TOUCH_DEVICE_REQUIRED]);
 
+/**
+ * Empresa suspendida en la plataforma (cobranza): ninguna cuenta suya entra ni opera. Llega como 403
+ * (login, renovación, elegir empresa o cualquier petición) o 401 (la sesión se cerró al suspenderla).
+ */
+export const COMPANY_SUSPENDED = 'COMPANY_SUSPENDED';
+
 interface ApiClientHooks {
   getToken: () => string | null;
   /** Sesión rechazada (401 sin renovación posible). Sin quien la escuche, la petición solo se rechaza. */
   onUnauthorized?: (message: string) => void;
   /** Respuesta TOUCH_DEVICE_REQUIRED (en el login o en cualquier petición posterior). */
   onDeviceNotAllowed?: (error: ApiError) => void;
+  /** Respuesta COMPANY_SUSPENDED (401 o 403, en el login o en cualquier petición): pantalla completa. */
+  onCompanySuspended?: (error: ApiError) => void;
   /** Renueva el access token (refresh token en cookie). true si se obtuvo uno nuevo. */
   refreshSession: () => Promise<boolean>;
 }
@@ -44,6 +53,23 @@ export function currentAccessToken(): string | null {
 /** Pide renovar el token (refresh con cookie). true si se obtuvo uno nuevo. */
 export function renewAccessToken(): Promise<boolean> {
   return hooks.refreshSession();
+}
+
+/** Lo que tardó un intento: ruta como se pidió (sin query), estado HTTP; 0 = sin red, 408 = tiempo agotado del cliente. */
+export interface ApiTiming {
+  method: string;
+  path: string;
+  durationMs: number;
+  status: number;
+}
+
+// Quién mide cada intento (los observadores de rendimiento, `services/perf`); null = nadie. Es un registro y no
+// una importación para que el cliente no dependa de la telemetría (sin ciclos) y no mida nada si está apagada.
+let timingListener: ((timing: ApiTiming) => void) | null = null;
+
+/** Registra (o quita, con null) quién recibe la duración de cada intento. Una cancelación del llamador no se mide. */
+export function onApiTiming(listener: ((timing: ApiTiming) => void) | null): void {
+  timingListener = listener;
 }
 
 export interface RequestOptions<T> {
@@ -127,6 +153,8 @@ export function retryDelay(attemptIndex: number, retryAfterMs: number | null): n
 function buildRequest(options: RequestOptions<unknown>, traceId: string, token: string | null): { headers: Record<string, string>; payload?: BodyInit } {
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    // Idioma activo: el backend responde sus mensajes y catálogos ya traducidos (es-MX o en-US).
+    'Accept-Language': currentLocale(),
     'X-Request-ID': traceId,
     // Evita la página intermedia de advertencia de ngrok (plan gratuito) en llamadas a la API.
     'ngrok-skip-browser-warning': 'true',
@@ -153,6 +181,8 @@ async function attempt<T>(path: string, options: RequestOptions<T>, token: strin
   const timer = setTimeout(() => controller.abort('timeout'), timeoutMs);
   const onAbort = () => controller.abort('cancelled');
   signal?.addEventListener('abort', onAbort);
+  const started = performance.now();
+  const measure = (status: number) => timingListener?.({ method, path, durationMs: performance.now() - started, status });
 
   let response: Response;
   let parsed: { body: unknown; isJson: boolean };
@@ -162,11 +192,14 @@ async function attempt<T>(path: string, options: RequestOptions<T>, token: strin
     parsed = await readBody(response);
   } catch (error) {
     if (signal?.aborted) throw error;
-    throw clientError(controller.signal.aborted ? 408 : 0, traceId);
+    const status = controller.signal.aborted ? 408 : 0;
+    measure(status);
+    throw clientError(status, traceId);
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   }
+  measure(response.status);
 
   const envelope = normalizeResponse(response.status, parsed.body, {
     traceId: response.headers.get('X-Request-ID') ?? traceId,
@@ -202,6 +235,15 @@ async function recoverFromUnauthorized(error: ApiError, usedToken: string, alrea
 }
 
 /**
+ * Errores que la app presenta de forma global (antes del flujo del 401: la pantalla de la empresa
+ * suspendida queda puesta cuando la sesión se cierra): dispositivo no permitido y empresa suspendida.
+ */
+function notifyGlobalHandlers(error: ApiError): void {
+  if (DEVICE_NOT_ALLOWED_CODES.has(error.code)) hooks.onDeviceNotAllowed?.(error);
+  if (error.code === COMPANY_SUSPENDED) hooks.onCompanySuspended?.(error);
+}
+
+/**
  * Petición que devuelve el contrato completo (success, code, message, data, errors, traceId...).
  * Tiempo límite, renovación automática del token, reintentos con backoff para lecturas ante
  * errores transitorios (red, 502/503/504) y errores normalizados (ApiError).
@@ -216,7 +258,7 @@ export async function apiEnvelope<T>(path: string, options: RequestOptions<T> = 
       return await attempt<T>(path, options, token);
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
-      if (DEVICE_NOT_ALLOWED_CODES.has(error.code)) hooks.onDeviceNotAllowed?.(error);
+      notifyGlobalHandlers(error);
       if (token !== null && error.status === 401) {
         if (!(await recoverFromUnauthorized(error, token, retriedAuth, options.signal))) throw error;
         retriedAuth = true;
@@ -240,5 +282,5 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === 'string' && error) return error;
-  return 'Ocurrió un error inesperado';
+  return t('errors.unexpected');
 }

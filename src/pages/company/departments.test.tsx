@@ -2,32 +2,13 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { confirmation, page, person, press, production, renderAt } from '../../test/departments';
 import { apiFail, apiOk, liveCheck, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
-import type { Department, Employee } from '../../types';
 import { DepartmentAssignPage } from './DepartmentAssignPage';
 import { DepartmentDetailPage } from './DepartmentDetailPage';
 import { DepartmentFormPage, validateDepartmentName } from './DepartmentFormPage';
 import { DepartmentsPage } from './DepartmentsPage';
-
-const production: Department = {
-  id: 3,
-  name: 'Producción',
-  description: 'Línea de pan dulce',
-  employee_count: 2,
-  managers: [
-    { employee_id: 7, full_name: 'Ana Ruiz', employee_number: 'EMP-7', active: true },
-    { employee_id: 8, full_name: 'Luis Paz', employee_number: 'EMP-8', active: false },
-    { employee_id: 9, full_name: 'Eva Sol', employee_number: 'EMP-9', active: true },
-  ],
-  created_at: '2026-10-01T10:00:00Z',
-  updated_at: '2026-10-01T10:00:00Z',
-};
-
-const person = (id: number, name: string, extra: Partial<Employee> = {}) =>
-  ({ id, full_name: name, employee_number: `EMP-${id}`, first_name: name, last_name: '', active: true, department_id: null, department_name: null, ...extra }) as Employee;
-
-const page = <T,>(items: T[]) => ({ items, total: items.length, page: 1, size: 10 });
 
 /** Respuesta que llega cuando la prueba lo decide (para ver la lista mientras se vuelve a pedir). */
 function deferred() {
@@ -38,28 +19,11 @@ function deferred() {
   return { promise, resolve };
 }
 
-/** La confirmación con esa pregunta (azul: dialog; roja o de advertencia: alertdialog). */
-const confirmation = (title: string, role: 'dialog' | 'alertdialog' = 'dialog') => screen.findByRole(role, { name: title });
-
-/** Pulsa un botón dentro de la confirmación. */
-const press = (dialog: HTMLElement, button: string) => userEvent.click(within(dialog).getByRole('button', { name: button }));
-
 /** Cierra el popup de error de carga y pide de nuevo con "Volver a cargar". */
 async function reloadAfter(title: string) {
   await screen.findByRole('alertdialog', { name: title });
   await userEvent.keyboard('{Escape}');
   await userEvent.click(screen.getByRole('button', { name: 'Volver a cargar' }));
-}
-
-function renderAt(path: string, route: string, element: React.ReactElement) {
-  return renderWithProviders(
-    <Routes>
-      <Route path={path} element={element} />
-      <Route path="/company/departments" element={<p>Lista de departamentos</p>} />
-      <Route path="/company/departments/:id" element={<p>Detalle del departamento</p>} />
-    </Routes>,
-    { route },
-  );
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -79,7 +43,7 @@ describe('Departamentos: listado', () => {
   it('sin departamentos invita a crear el primero', async () => {
     mockFetch(apiOk(page([])));
     renderWithProviders(<DepartmentsPage />, { route: '/company/departments' });
-    expect(await screen.findByText('Aún no hay departamentos')).toBeInTheDocument();
+    expect(await screen.findByText('Sin departamentos')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Nuevo departamento' })[0]).toHaveAttribute('href', '/company/departments/new');
   });
 });
@@ -145,7 +109,7 @@ describe('Departamentos: formulario', () => {
     const description = await screen.findByLabelText(/Descripción/);
     await userEvent.type(description, '  '); // solo espacios: no cuenta como cambio
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No modificaste ningún dato');
+    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No hay nada que guardar');
     expect(screen.queryByRole('dialog', { name: '¿Guardar los cambios de Producción?' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
@@ -162,7 +126,7 @@ describe('Departamentos: formulario', () => {
     const { calls } = mockFetch(() => liveCheck());
     renderAt('/company/departments/new', '/company/departments/new', <DepartmentFormPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Crear departamento' }));
-    expect(await screen.findByText('Revisa la información')).toBeInTheDocument();
+    expect(await screen.findByText('Revisa los datos')).toBeInTheDocument();
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
   });
 });
@@ -227,7 +191,7 @@ describe('Departamentos: detalle', () => {
     const dialog = await confirmation('¿Eliminar el departamento Producción?', 'alertdialog');
     expect(dialog).toHaveTextContent('Producción tiene 2 empleados asignados: quítalos o asígnalos a otro departamento antes de eliminarlo.');
     expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('ResponsablesAna Ruiz, Luis Paz, Eva SolEmpleados asignados2');
-    expect(dialog).toHaveTextContent('Esta acción no se puede deshacer.');
+    expect(dialog).toHaveTextContent('Pasará a «Eliminados»: podrás restaurarlo durante 1 año.');
     await press(dialog, 'Eliminar departamento');
     expect(await screen.findByText('El departamento tiene empleados asignados')).toBeInTheDocument();
   });
@@ -350,7 +314,7 @@ describe('Departamentos: más casos del listado', () => {
     renderWithProviders(<DepartmentsPage />, { route: '/company/departments' });
     await screen.findByText('Producción');
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar departamentos' }), 'zzz');
-    expect(await screen.findByText('Ningún departamento coincide con la búsqueda')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 });
 
@@ -394,8 +358,8 @@ describe('Departamentos: más casos del formulario', () => {
     const dialog = await confirmation('¿Guardar los cambios de Producción?');
     expect(within(dialog).getByRole('region', { name: 'Cambios' })).toHaveTextContent('DescripciónAntes: Línea de pan dulceDespués: Pan y bolillo');
     await press(dialog, 'Guardar cambios');
-    expect(await screen.findByText('Producción quedó actualizado.')).toBeInTheDocument();
-    expect(screen.getByText('Detalle del departamento')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Departamento actualizado' })).toBeInTheDocument();
+    expect(await screen.findByText('Detalle del departamento')).toBeInTheDocument();
     expect(JSON.parse(calls.find((c) => c.init.method === 'PUT')?.init.body as string)).toEqual({ name: 'Producción', description: 'Pan y bolillo' });
   });
 
@@ -403,7 +367,7 @@ describe('Departamentos: más casos del formulario', () => {
     const { calls } = mockFetch((call) => (call.url.startsWith('/api/validation') ? liveCheck() : apiOk({ ...production, description: 'x'.repeat(501) })));
     renderAt('/company/departments/:id/edit', '/company/departments/3/edit', <DepartmentFormPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Guardar cambios' }));
-    expect(await screen.findByRole('alertdialog', { name: 'Revisa la información' })).toHaveTextContent('La descripción admite hasta 500 caracteres');
+    expect(await screen.findByRole('alertdialog', { name: 'Revisa los datos' })).toHaveTextContent('La descripción admite hasta 500 caracteres');
     expect(calls.some((c) => c.init.method === 'PUT')).toBe(false);
   });
 
@@ -477,12 +441,12 @@ describe('Departamentos: más casos de asignar', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar empleados' }), 'zzz');
     await waitFor(() => expect(candidates).toHaveClass('is-loading'));
     search.resolve(apiOk(page([])));
-    expect(await screen.findByText('Ningún empleado coincide con la búsqueda')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 
   it('sin empleados en la empresa invita a registrarlos', async () => {
     mockFetch((call) => apiOk(call.url.startsWith('/api/employees') ? page([]) : production));
     renderAt('/company/departments/:id/assign/:role', '/company/departments/3/assign/managers', <DepartmentAssignPage />);
-    expect(await screen.findByText('No hay empleados registrados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin empleados')).toBeInTheDocument();
   });
 });

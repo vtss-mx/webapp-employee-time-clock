@@ -3,7 +3,8 @@
 // calendario de la hora del negocio ("YYYY-MM-DD"); un rango incluye ambos extremos.
 
 import type { Page } from './index';
-import type { EmployeeRef, ShiftRequestStatus, Weekday } from './shifts';
+import type { EmployeeRef, ShiftRequestStatus } from './shifts';
+import type { SoftDeleted } from './trash';
 
 /** Tipo de ausencia (catalog.day_off_types); un festivo es HOLIDAY. */
 export type DayOffKind = 'HOLIDAY' | 'VACATION' | 'PERMISSION' | 'SICK_LEAVE' | 'OTHER' | (string & {});
@@ -45,18 +46,16 @@ export interface EmployeeIdList {
   limit: number;
 }
 
-/** El mismo turno, fecha, días remotos y sitios para varios empleados. */
+/** El mismo turno desde la misma fecha para varios empleados (dónde checan lo dice el turno). */
 export interface BulkAssignmentPayload {
   shift_id: number;
   employee_ids: number[];
   valid_from: string;
-  remote_weekdays: Weekday[];
-  site_ids: number[];
 }
 
 // ---------- Festivos ----------
 
-export interface Holiday {
+export interface Holiday extends SoftDeleted {
   id: number;
   holiday_date: string;
   name: string;
@@ -115,7 +114,7 @@ export interface AbsencePayload extends AbsenceRequestPayload {
 
 // ---------- Días laborables especiales ----------
 
-export interface Workday {
+export interface Workday extends SoftDeleted {
   id: number;
   employee: EmployeeRef;
   work_date: string;

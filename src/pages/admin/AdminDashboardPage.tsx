@@ -8,37 +8,42 @@ import { RetryState } from '../../components/ui/RetryState';
 import { KpiCard, type Kpi } from '../../components/ui/KpiCard';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { useResource } from '../../hooks/useResource';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { config } from '../../utils/config';
 import { adminService } from '../../services/adminService';
 import { formatDate } from '../../utils/format';
 
+/** Título del popup si el panel no carga (se traduce al dibujarse: sigue al idioma activo). */
+const loadError = () => t('admin.dashboard.loadError');
+
 /** Panel del administrador de la plataforma: indicadores y empresas recientes. */
 export function AdminDashboardPage() {
+  const t = useT();
   const { data, error, retry } = useResource(
     (signal) => Promise.all([adminService.stats(signal), adminService.list({ size: 5 }, signal)]),
     'platform',
-    'No se pudo cargar el panel',
+    loadError,
   );
   const stats = data?.[0];
   const recent = data?.[1].items;
 
   const kpis: Kpi[] = [
-    { key: 'companies', label: 'Empresas', icon: Building2, value: stats?.companies, tile: '' },
-    { key: 'active', label: 'Empresas activas', icon: CheckCircle2, value: stats?.active_companies, tile: 'icon-tile--success' },
-    { key: 'employees', label: 'Empleados', icon: Users, value: stats?.employees, tile: '' },
-    { key: 'admins', label: 'Administradores', icon: UserCog, value: stats?.company_admins, tile: 'icon-tile--warning' },
+    { key: 'companies', label: t('admin.shared.companies'), icon: Building2, value: stats?.companies, tile: '' },
+    { key: 'active', label: t('admin.dashboard.activeCompanies'), icon: CheckCircle2, value: stats?.active_companies, tile: 'icon-tile--success' },
+    { key: 'employees', label: t('admin.shared.employees'), icon: Users, value: stats?.employees, tile: '' },
+    { key: 'admins', label: t('admin.shared.admins'), icon: UserCog, value: stats?.company_admins, tile: 'icon-tile--warning' },
   ];
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Panel de la plataforma"
-          subtitle={`Empresas que usan ${config.appName} y su actividad.`}
+          title={t('admin.dashboard.title')}
+          subtitle={t('admin.dashboard.subtitle', { app: config.appName })}
           actions={
             <ButtonLink to={paths.admin.newCompany} variant="primary" icon={<Plus size={18} />}>
-              Registrar empresa
+              {t('admin.shared.registerCompany')}
             </ButtonLink>
           }
         />
@@ -52,11 +57,11 @@ export function AdminDashboardPage() {
         </PanelSection>
 
         <PanelSection
-          title="Empresas"
+          title={t('admin.shared.companies')}
           icon={<Building size={20} />}
           aside={
             <Link to={paths.admin.companies} className="btn btn--link btn--sm">
-              Ver todas <ArrowRight size={16} />
+              {t('admin.dashboard.viewAll')} <ArrowRight size={16} />
             </Link>
           }
         >
@@ -65,8 +70,8 @@ export function AdminDashboardPage() {
             <EmptyState
               compact
               icon={<Building2 />}
-              title="Aún no hay empresas registradas"
-              description="Registra la primera empresa con su administrador: aquí verás las más recientes y su actividad."
+              title={t('admin.dashboard.emptyTitle')}
+              description={t('admin.dashboard.emptyDescription')}
             />
           )}
           {recent && recent.length > 0 && (
@@ -77,9 +82,7 @@ export function AdminDashboardPage() {
                     <span className="company-row__logo">{c.name.slice(0, 2).toUpperCase()}</span>
                     <span className="company-row__info">
                       <strong className="truncate">{c.name}</strong>
-                      <small className="muted">
-                        {c.employee_count} empleado(s) · desde {formatDate(c.created_at)}
-                      </small>
+                      <small className="muted">{t('admin.dashboard.companyMeta', { count: c.employee_count, date: formatDate(c.created_at) })}</small>
                     </span>
                     <StatusBadge active={c.active} />
                   </Link>

@@ -1,0 +1,98 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/profile';
+
+/** Textos de Mi perfil: cuenta, idioma, contraseña y sesiones en inglés (en-US): las mismas llaves que es-MX. */
+export default {
+  title: 'My profile',
+  subtitle: 'Your account, password and active sessions',
+  refreshFailed: "Couldn't refresh your information",
+  account: {
+    title: 'Account',
+    lastLogin: 'Last sign-in',
+    createdAt: 'Account created',
+  },
+  language: {
+    title: 'Language',
+  },
+  photo: {
+    title: 'Profile photo',
+    description: 'It identifies you in the menu, on your profile and in your company lists. It is stored encrypted and without the location or camera data.',
+    saveAsk: {
+      eyebrow: 'Your profile photo',
+      titleNew: 'Save this profile photo?',
+      titleReplace: 'Change your profile photo?',
+      message: 'This is how it will look on your profile, in the menu and in your company lists.',
+      file: 'File',
+      note: 'The location and camera data are removed before it is saved.',
+      replaceNote: 'Your previous photo is deleted. The location and camera data are removed before the new one is saved.',
+      confirm: 'Save photo',
+    },
+    removeAsk: {
+      eyebrow: 'Your profile photo',
+      title: 'Remove your profile photo?',
+      message: 'Your initials will be shown instead.',
+      note: "The photo will be deleted and can't be recovered.",
+      confirm: 'Remove photo',
+    },
+    saveFailed: "Couldn't save your photo",
+    removeFailed: "Couldn't remove your photo",
+  },
+  password: {
+    title: 'Change password',
+    current: 'Current password',
+    new: 'New password',
+    confirm: 'Confirm new password',
+    submit: 'Update password',
+    submitDisabled: 'Fill in all required fields correctly',
+    currentRequired: 'Enter your current password',
+    mustDiffer: 'Must be different from the current one',
+    failed: "Couldn't change your password",
+    changed: 'Password updated',
+    revoked_zero: 'Your current session is still active.',
+    revoked_one: 'You were signed out of {count} other device.',
+    revoked_other: 'You were signed out of {count} other devices.',
+    ask: {
+      eyebrow: 'Account security',
+      title: 'Change your password?',
+      message: 'From now on, you will sign in with the new password.',
+      otherDevices: 'You will be signed out of your other devices.',
+      thisDevice: 'This device will stay signed in.',
+      confirm: 'Change password',
+    },
+  },
+  sessions: {
+    title: 'Active sessions',
+    loadFailed: "Couldn't load your sessions",
+    empty: {
+      title: 'No open sessions',
+      description: "Devices where you're signed in will appear here.",
+    },
+    noun: {
+      one: 'session',
+      other: 'sessions',
+    },
+    thisDevice: 'This device',
+    unknownIp: 'Unknown IP',
+    activity: '{ip} · Active {ago} · Started {started}',
+    hint: "Don't recognize a device? Sign it out and change your password.",
+    revokeAll: 'Sign out of all devices',
+    revoke: {
+      eyebrow: 'Active session',
+      title: 'Sign out of {device}?',
+      message: 'That device will need to sign in again to use your account.',
+      ip: 'IP',
+      unknown: 'Unknown',
+      started: 'Started',
+      failed: "Couldn't end the session",
+      done: 'Session ended',
+      doneText: 'That device will need to sign in again.',
+    },
+    revokeAllAsk: {
+      eyebrow: 'All your sessions',
+      title: 'Sign out of all your devices?',
+      message: "This includes this device, so you'll need to sign in again.",
+      confirm: 'Sign out of all',
+      failed: "Couldn't sign out of all devices",
+    },
+  },
+} satisfies Translation<typeof es>;

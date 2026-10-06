@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>21/21</span>
+                <span class='fraction'>24/24</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>6/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>18/18</span>
+                <span class='fraction'>21/21</span>
             </div>
         
             
@@ -102,7 +102,13 @@
 <a name='L37'></a><a href='#L37'>37</a>
 <a name='L38'></a><a href='#L38'>38</a>
 <a name='L39'></a><a href='#L39'>39</a>
-<a name='L40'></a><a href='#L40'>40</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -117,31 +123,38 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1562x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">456x</span>
-<span class="cline-any cline-yes">456x</span>
-<span class="cline-any cline-yes">456x</span>
-<span class="cline-any cline-yes">456x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">410x</span>
-<span class="cline-any cline-yes">45x</span>
-<span class="cline-any cline-yes">456x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3415x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1622x</span>
-<span class="cline-any cline-yes">1622x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">965x</span>
+<span class="cline-any cline-yes">965x</span>
+<span class="cline-any cline-yes">965x</span>
+<span class="cline-any cline-yes">965x</span>
+<span class="cline-any cline-yes">965x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">885x</span>
+<span class="cline-any cline-yes">77x</span>
+<span class="cline-any cline-yes">962x</span>
+<span class="cline-any cline-yes">965x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-yes">3508x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { LazyText } from '../i18n/lazy';
 import { useErrorPopup } from './useFeedback';
 import { useRetryOnReconnect } from './useRetryOnReconnect';
 &nbsp;
@@ -153,11 +166,14 @@ import { useRetryOnReconnect } from './useRetryOnReconnect';
  *
  * Cada petición recibe una señal (`AbortSignal`) que se cancela al cambiar de registro, al
  * reintentar o al salir de la pantalla: la petición anterior se aborta (no sigue ocupando la red ni
- * el servidor) y lo que responda tarde ya no toca el estado.
+ * el servidor) y lo que responda tarde ya no toca el estado. `loading` dice si hay una petición en
+ * curso (p. ej. el botón "Actualizar" mientras se vuelve a pedir; los datos anteriores se conservan).
+ * `errorTitle` como función (`() =&gt; t('…')`): el popup abierto sigue al idioma activo.
  */
-export function useResource&lt;T&gt;(fetch: (signal: AbortSignal) =&gt; Promise&lt;T&gt;, key: string | number, errorTitle: string) {
+export function useResource&lt;T&gt;(fetch: (signal: AbortSignal) =&gt; Promise&lt;T&gt;, key: string | number, errorTitle: LazyText) {
   const [data, setData] = useState&lt;T | null&gt;(null);
   const [error, setError] = useState&lt;unknown&gt;(null);
+  const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const fetchRef = useRef(fetch);
   useLayoutEffect(() =&gt; {
@@ -168,17 +184,19 @@ export function useResource&lt;T&gt;(fetch: (signal: AbortSignal) =&gt; Promise&
     const controller = new AbortController();
     const { signal } = controller;
     setError(null);
+    setLoading(true);
     fetchRef
       .current(signal)
       .then((value) =&gt; !signal.aborted &amp;&amp; setData(value))
-      .catch((err: unknown) =&gt; !signal.aborted &amp;&amp; setError(err));
+      .catch((err: unknown) =&gt; !signal.aborted &amp;&amp; setError(err))
+      .finally(() =&gt; !signal.aborted &amp;&amp; setLoading(false));
     return () =&gt; controller.abort();
   }, [key, reload]);
 &nbsp;
   const retry = useCallback(() =&gt; setReload((n) =&gt; n + 1), []);
   useErrorPopup(error, { title: errorTitle, retry });
   useRetryOnReconnect(error, retry);
-  return { data, setData, error, retry };
+  return { data, setData, error, retry, loading };
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -187,7 +205,7 @@ export function useResource&lt;T&gt;(fetch: (signal: AbortSignal) =&gt; Promise&
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

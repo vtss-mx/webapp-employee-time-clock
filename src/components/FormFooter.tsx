@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useT } from '../i18n';
 import { Button, type ButtonVariant } from './ui/Button';
 import { PanelFooter } from './ui/Panel';
 
@@ -16,10 +17,11 @@ interface FormFooterProps {
 
 /** Pie de toda pantalla de formulario: Cancelar y el botón que envía (con su estado de guardado). */
 export function FormFooter({ submitLabel, submitIcon, submitVariant = 'primary', saving, disabled = false, disabledTitle, onCancel }: FormFooterProps) {
+  const t = useT();
   return (
     <PanelFooter>
       <Button variant="ghost" size="lg" onClick={onCancel} disabled={saving}>
-        Cancelar
+        {t('common.actions.cancel')}
       </Button>
       <Button type="submit" variant={submitVariant} size="lg" icon={submitIcon} loading={saving} disabled={disabled} title={disabled ? disabledTitle : undefined}>
         {submitLabel}

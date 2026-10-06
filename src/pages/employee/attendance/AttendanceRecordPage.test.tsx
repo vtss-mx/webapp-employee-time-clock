@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { actionResult } from '../../../components/attendance/employee/testData';
 import type { CapturedFace } from '../../../components/LiveFaceFlow';
 import { resetPolicyCache } from '../../../hooks/useVerificationPolicy';
+import { setLocale } from '../../../i18n/core';
 import { paths } from '../../../routes/paths';
 import { samplePolicy } from '../../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../../test/http';
@@ -17,6 +18,13 @@ const geo = vi.hoisted(() => ({ read: vi.fn<() => Promise<DeviceLocation>>() }))
 vi.mock('../../../utils/geolocation', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   currentLocation: () => geo.read(),
+}));
+// Cada lectura de la pantalla es una toma (las lecturas de más se prueban en `locationSampling.test.ts`).
+vi.mock('../../../utils/locationSampling', () => ({
+  sampleLocation: async () => {
+    const best = await geo.read();
+    return { best, samples: [best, { ...best, accuracy: best.accuracy + 3 }] };
+  },
 }));
 
 interface FlowProps {
@@ -96,11 +104,11 @@ describe('AttendanceRecordPage (registrar con rostro y ubicación)', () => {
     geo.read.mockReturnValueOnce(new Promise((r) => (resolve = r)));
     const { calls } = server(apiOk(actionResult()));
     renderRecord('check-in');
-    expect(screen.getByRole('heading', { name: 'Obteniendo tu ubicación...' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Obteniendo tu ubicación…' })).toBeInTheDocument();
     expect(screen.getByText('Registrar entrada')).toBeInTheDocument();
     resolve(HERE);
     expect(await faceStep()).toBeInTheDocument();
-    expect(screen.getByText('Registrando tu entrada...')).toBeInTheDocument();
+    expect(screen.getByText('Registrando tu entrada…')).toBeInTheDocument();
     await capture();
     expect(await screen.findByRole('heading', { name: 'Entrada registrada' })).toBeInTheDocument();
     const call = posted(calls)[0];
@@ -117,7 +125,7 @@ describe('AttendanceRecordPage (registrar con rostro y ubicación)', () => {
     renderRecord('break-start');
     expect(await faceStep('Registrar inicio de descanso')).toBeInTheDocument();
     await capture();
-    expect(await screen.findByText('No se registró tu inicio de descanso')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudo registrar tu inicio de descanso')).toBeInTheDocument();
     expect(screen.getByText('Rostro no reconocido')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Intentar de nuevo' }));
     expect(await faceStep('Registrar inicio de descanso')).toBeInTheDocument();
@@ -244,5 +252,37 @@ describe('AttendanceRecordPage (registrar con rostro y ubicación)', () => {
     await userEvent.click(popup().getByRole('button', { name: 'Reintentar' }));
     await waitFor(() => expect(screen.queryByText('Estás fuera de tu sitio de trabajo')).toBeNull());
     expect(geo.read).toHaveBeenCalledOnce();
+  });
+});
+
+describe('AttendanceRecordPage en inglés (en-US)', () => {
+  it('obtener la ubicación, el rostro y lo que no se registró, en inglés', async () => {
+    await setLocale('en-US');
+    let located!: (here: DeviceLocation) => void;
+    geo.read.mockReturnValue(new Promise<DeviceLocation>((resolve) => (located = resolve)));
+    server(apiOk(actionResult()));
+    renderRecord('check-out');
+    expect(await screen.findByText('Getting your location…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    located(HERE);
+    // El nombre de la acción es del catálogo (lo envía el servidor en su idioma).
+    expect(await screen.findByText('Recording your salida…')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'falla de cámara' }));
+    expect(await screen.findByText("Couldn't record your salida")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to my attendance' })).toBeInTheDocument();
+  });
+
+  it('cambio en caliente con el popup abierto: el problema y la pantalla de fondo pasan a inglés', async () => {
+    server(apiFail(403, 'LOCATION_OUT_OF_SITE', 'Estás a 1.2 km de Planta Norte.'), apiOk(actionResult()));
+    renderRecord('check-in');
+    await faceStep();
+    await capture();
+    expect(await screen.findByText('Estás fuera de tu sitio de trabajo')).toBeInTheDocument();
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('heading', { name: "You're outside your work site" })).toBeInTheDocument();
+    expect(popup().getByText('Tap “Retry.”')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "Your attendance wasn't recorded" })).toBeInTheDocument();
+    await userEvent.click(popup().getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('heading', { name: 'Record entrada' })).toBeInTheDocument();
   });
 });

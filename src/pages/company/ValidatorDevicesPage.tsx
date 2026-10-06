@@ -4,10 +4,11 @@ import { DeviceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { PagedItems } from '../../components/ui/PagedItems';
-import { useAction } from '../../hooks/useAction';
+import { useAction, type SuccessNotice } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useResource } from '../../hooks/useResource';
 import { usePagedList } from '../../hooks/usePagedList';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { validatorService } from '../../services/validatorService';
 import type { DeviceStatus, ValidatorDevice } from '../../types';
@@ -17,52 +18,58 @@ import { describeDevice } from '../../utils/userAgent';
 
 type Decision = Exclude<DeviceStatus, 'PENDING'>;
 
-/** Qué hace cada decisión: botón, confirmación (qué implica, color e ícono) y aviso al terminar. */
-const DECISIONS: Record<Decision, { label: string; done: string; detail: string; message: string; tone: ConfirmTone; Icon: LucideIcon }> = {
-  APPROVED: {
-    label: 'Autorizar',
-    done: 'Dispositivo autorizado',
-    detail: 'El validador ya puede iniciar sesión en este dispositivo.',
-    message: 'El validador podrá iniciar sesión e identificar a tu personal en este dispositivo. Puedes revocarlo después.',
-    tone: 'success',
-    Icon: Check,
-  },
-  REJECTED: {
-    label: 'Rechazar',
-    done: 'Dispositivo rechazado',
-    detail: 'El validador no podrá iniciar sesión en este dispositivo.',
-    message: 'El validador no podrá iniciar sesión en este dispositivo. Puedes autorizarlo después si fue un error.',
-    tone: 'danger',
-    Icon: X,
-  },
-  REVOKED: {
-    label: 'Revocar',
-    done: 'Autorización revocada',
-    detail: 'Sus sesiones abiertas se cerraron y ya no podrá iniciar sesión en este dispositivo.',
-    message: 'Se cerrarán las sesiones abiertas del validador y ya no podrá iniciar sesión en este dispositivo hasta que lo autorices de nuevo.',
-    tone: 'danger',
-    Icon: ShieldOff,
-  },
+/**
+ * Qué hace cada decisión: color e ícono de su botón y de su confirmación; sus textos (botón, qué
+ * implica y aviso al terminar) están en `validators.devices.decisions.<texts>`.
+ */
+const DECISIONS: Record<Decision, { texts: 'approved' | 'rejected' | 'revoked'; tone: ConfirmTone; Icon: LucideIcon }> = {
+  APPROVED: { texts: 'approved', tone: 'success', Icon: Check },
+  REJECTED: { texts: 'rejected', tone: 'danger', Icon: X },
+  REVOKED: { texts: 'revoked', tone: 'danger', Icon: ShieldOff },
 };
+
+/** Etiqueta del botón de una decisión ("Autorizar"), en el idioma activo. */
+const decisionLabel = (decision: Decision) => t(`validators.devices.decisions.${DECISIONS[decision].texts}.label`);
 
 /** Toda decisión se confirma: el equipo, su estado "antes → después" (nombres del catálogo) y qué implica. */
 function decisionConfirm(device: ValidatorDevice, decision: Decision, statusName: (status: DeviceStatus) => string): ConfirmInput {
-  const { label, message, tone, Icon } = DECISIONS[decision];
+  const { texts, tone, Icon } = DECISIONS[decision];
   return {
     tone,
     icon: <Icon size={30} />,
-    eyebrow: 'Dispositivo del validador',
-    title: `¿${label} «${device.name}»?`,
-    message,
-    changes: [{ label: 'Estado', before: statusName(device.status), after: statusName(decision) }],
+    eyebrow: t('validators.devices.eyebrow'),
+    title: t(`validators.devices.decisions.${texts}.title`, { name: device.name }),
+    message: t(`validators.devices.decisions.${texts}.message`),
+    changes: [{ label: t('common.fields.status'), before: statusName(device.status), after: statusName(decision) }],
     details: [
-      { label: 'Equipo', value: describeDevice(device.user_agent).label },
-      { label: 'Registrado', value: formatDateTime(device.created_at) },
+      { label: t('validators.devices.equipment'), value: describeDevice(device.user_agent).label },
+      { label: t('validators.devices.registeredLabel'), value: formatDateTime(device.created_at) },
     ],
-    confirmLabel: label,
+    confirmLabel: decisionLabel(decision),
     confirmIcon: <Icon size={18} />,
   };
 }
+
+/** El aviso al terminar (se arma al dibujarse: sigue al idioma activo). */
+const decided = (saved: ValidatorDevice, decision: Decision): SuccessNotice => {
+  const { texts } = DECISIONS[decision];
+  return [t(`validators.devices.decisions.${texts}.done`), t('validators.devices.doneText', { name: saved.name, detail: t(`validators.devices.decisions.${texts}.detail`) })];
+};
+
+/** Fechas e IP del dispositivo en una línea ("Registrado … · Último acceso … · IP …"). */
+function deviceFacts(device: ValidatorDevice): string {
+  return [
+    t('validators.devices.registered', { date: formatDateTime(device.created_at) }),
+    device.last_seen_at && t('validators.devices.lastSeen', { date: formatDateTime(device.last_seen_at) }),
+    device.last_ip && t('validators.devices.ip', { ip: device.last_ip }),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+const loadError = () => t('validators.loadError');
+const devicesError = () => t('validators.devices.loadError');
+const decisionError = () => t('validators.devices.error');
 
 /** Decisiones disponibles según el estado del dispositivo (las mismas reglas que el backend). */
 const AVAILABLE: Record<DeviceStatus, Decision[]> = {
@@ -83,13 +90,14 @@ function DeviceIcon({ device }: { device: ValidatorDevice }) {
  * la empresa lo autoriza, lo rechaza o le retira la autorización (cierra sus sesiones).
  */
 export function ValidatorDevicesPage() {
+  const t = useT();
   const validatorId = Number(useParams().id);
-  const { data: validator } = useResource((signal) => validatorService.get(validatorId, signal), validatorId, 'No se pudo cargar el validador');
+  const { data: validator } = useResource((signal) => validatorService.get(validatorId, signal), validatorId, loadError);
   const { nameOf } = useCatalogs();
   const { busy, run } = useAction<number>();
 
   const list = usePagedList((page, signal) => validatorService.devices(validatorId, page, signal), {
-    errorTitle: 'No se pudieron cargar los dispositivos',
+    errorTitle: devicesError,
     filterKey: String(validatorId),
   });
 
@@ -97,9 +105,9 @@ export function ValidatorDevicesPage() {
   const decide = (device: ValidatorDevice, decision: Decision) =>
     run(() => validatorService.setDeviceStatus(validatorId, device.id, decision), {
       busy: device.id,
-      confirm: decisionConfirm(device, decision, (status) => nameOf('device_statuses', status)),
-      errorTitle: 'No se pudo actualizar el dispositivo',
-      success: (saved) => [DECISIONS[decision].done, `${saved.name}: ${DECISIONS[decision].detail}`],
+      confirm: () => decisionConfirm(device, decision, (status) => nameOf('device_statuses', status)),
+      errorTitle: decisionError,
+      success: (saved) => decided(saved, decision),
       onSuccess: (saved) => list.updateItems((items) => items.map((d) => (d.id === saved.id ? saved : d))),
     });
 
@@ -107,25 +115,22 @@ export function ValidatorDevicesPage() {
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Dispositivos"
-          subtitle={validator ? `${validator.name} · ${validator.email}` : 'Cargando...'}
+          title={t('validators.devices.title')}
+          subtitle={validator ? `${validator.name} · ${validator.email}` : t('common.states.loading')}
           backTo={paths.company.validators}
-          backLabel="Validadores"
+          backLabel={t('validators.back')}
         />
         <PanelSection>
-          <p className="muted small">
-            Cada tableta o teléfono en que el validador inicia sesión queda registrado con una llave propia (no se puede copiar a otro
-            equipo) y solo opera cuando lo autorizas.
-          </p>
+          <p className="muted small">{t('validators.devices.intro')}</p>
           <PagedItems
             list={list}
             skeletonRows={3}
             empty={{
               icon: <MonitorSmartphone />,
-              title: 'No hay dispositivos registrados',
-              description: 'Cuando el validador inicie sesión en una tableta o un teléfono, el dispositivo aparecerá aquí para que lo autorices.',
+              title: t('validators.devices.empty.title'),
+              description: t('validators.devices.empty.description'),
             }}
-            pager={{ noun: { one: 'dispositivo', other: 'dispositivos' } }}
+            pager={{ noun: { one: t('validators.devices.noun.one'), other: t('validators.devices.noun.other') } }}
           >
             {(items) => (
             <ul className={`validator-list stagger ${list.loading ? 'is-loading' : ''}`}>
@@ -136,14 +141,10 @@ export function ValidatorDevicesPage() {
                   </span>
                   <span className="validator-list__info">
                     <strong className="truncate">{device.name}</strong>
-                    <small className="muted truncate">
-                      Registrado {formatDateTime(device.created_at)}
-                      {device.last_seen_at && ` · Último acceso ${formatDateTime(device.last_seen_at)}`}
-                      {device.last_ip && ` · IP ${device.last_ip}`}
-                    </small>
+                    <small className="muted truncate">{deviceFacts(device)}</small>
                     {device.reviewed_by && (
                       <small className="muted truncate">
-                        Revisado por {device.reviewed_by}
+                        {t('validators.devices.reviewedBy', { name: device.reviewed_by })}
                         {device.reviewed_at && ` · ${formatDateTime(device.reviewed_at)}`}
                       </small>
                     )}
@@ -153,7 +154,8 @@ export function ValidatorDevicesPage() {
                   </span>
                   <span className="validator-list__actions">
                     {AVAILABLE[device.status].map((decision) => {
-                      const { label, Icon } = DECISIONS[decision];
+                      const { Icon } = DECISIONS[decision];
+                      const label = decisionLabel(decision);
                       return (
                         <Button
                           key={decision}
@@ -162,7 +164,7 @@ export function ValidatorDevicesPage() {
                           icon={<Icon size={16} />}
                           loading={busy === device.id}
                           disabled={busy !== null}
-                          aria-label={`${label} ${device.name}`}
+                          aria-label={t('validators.devices.actionLabel', { action: label, name: device.name })}
                           onClick={() => void decide(device, decision)}
                         >
                           {label}
@@ -178,7 +180,7 @@ export function ValidatorDevicesPage() {
         </PanelSection>
         <PanelFooter align="center">
           <p className="inline-note small muted">
-            <Ban size={16} /> Retirar la autorización cierra de inmediato las sesiones abiertas del validador.
+            <Ban size={16} /> {t('validators.devices.footer')}
           </p>
         </PanelFooter>
       </Panel>

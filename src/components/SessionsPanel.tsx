@@ -2,6 +2,7 @@ import { Laptop, LogOut, MonitorSmartphone, ShieldAlert, Smartphone } from 'luci
 import { useAction } from '../hooks/useAction';
 import { useAuth } from '../hooks/useAuth';
 import { usePagedList } from '../hooks/usePagedList';
+import { t, useT } from '../i18n';
 import { authService } from '../services/authService';
 import { formatDateTime, timeAgo } from '../utils/format';
 import type { DeviceSession } from '../types';
@@ -12,28 +13,32 @@ import { PanelSection } from './ui/Panel';
 
 /** Sección "Sesiones activas" (dispositivos) con revocación individual o total. */
 export function SessionsPanel() {
+  // Redibuja al cambiar el idioma. Los textos salen de `t` (el idioma activo al llamarse), también los
+  // de los popups, que se arman al dibujarse: una función creada ahora no se queda con el idioma de hoy.
+  useT();
   const { logoutEverywhere } = useAuth();
-  const list = usePagedList((page, signal) => authService.sessions(page, signal), { errorTitle: 'No se pudieron cargar tus sesiones' });
+  const list = usePagedList((page, signal) => authService.sessions(page, signal), { errorTitle: () => t('profile.sessions.loadFailed') });
   const { busy, run } = useAction<string>();
 
-  const revoke = (session: DeviceSession, device: string) =>
+  // Las confirmaciones y avisos se arman al dibujarse: siguen al idioma activo con el popup abierto.
+  const revoke = (session: DeviceSession) =>
     run(() => authService.revokeSession(session.id), {
       busy: session.id,
-      confirm: {
+      confirm: () => ({
         kind: 'delete',
         icon: <LogOut size={30} />,
-        eyebrow: 'Sesión activa',
-        title: `¿Cerrar la sesión de ${device}?`,
-        message: 'Ese dispositivo deberá iniciar sesión de nuevo para usar tu cuenta.',
+        eyebrow: t('profile.sessions.revoke.eyebrow'),
+        title: t('profile.sessions.revoke.title', { device: describeDevice(session.user_agent).label }),
+        message: t('profile.sessions.revoke.message'),
         details: [
-          { label: 'IP', value: session.ip_address ?? 'Desconocida' },
-          { label: 'Inició', value: formatDateTime(session.created_at) },
+          { label: t('profile.sessions.revoke.ip'), value: session.ip_address ?? t('profile.sessions.revoke.unknown') },
+          { label: t('profile.sessions.revoke.started'), value: formatDateTime(session.created_at) },
         ],
-        confirmLabel: 'Cerrar sesión',
+        confirmLabel: t('common.actions.logout'),
         confirmIcon: <LogOut size={18} />,
-      },
-      errorTitle: 'No se pudo cerrar la sesión',
-      success: ['Sesión cerrada', 'Ese dispositivo deberá iniciar sesión de nuevo.'],
+      }),
+      errorTitle: () => t('profile.sessions.revoke.failed'),
+      success: () => [t('profile.sessions.revoke.done'), t('profile.sessions.revoke.doneText')],
       onSuccess: list.retry,
     });
 
@@ -41,30 +46,30 @@ export function SessionsPanel() {
   const revokeAll = () =>
     run(logoutEverywhere, {
       busy: 'all',
-      confirm: {
+      confirm: () => ({
         kind: 'delete',
         icon: <LogOut size={30} />,
-        eyebrow: 'Todas tus sesiones',
-        title: '¿Cerrar la sesión en todos tus dispositivos?',
-        message: 'Se cerrará la sesión en todos tus dispositivos, incluido este: tendrás que volver a iniciar sesión.',
-        confirmLabel: 'Cerrar todas',
+        eyebrow: t('profile.sessions.revokeAllAsk.eyebrow'),
+        title: t('profile.sessions.revokeAllAsk.title'),
+        message: t('profile.sessions.revokeAllAsk.message'),
+        confirmLabel: t('profile.sessions.revokeAllAsk.confirm'),
         confirmIcon: <LogOut size={18} />,
-      },
-      errorTitle: 'No se pudo cerrar sesión en todos los dispositivos',
+      }),
+      errorTitle: () => t('profile.sessions.revokeAllAsk.failed'),
       keepBusy: true,
     });
 
   return (
     <PanelSection
-      title="Sesiones activas"
+      title={t('profile.sessions.title')}
       icon={<MonitorSmartphone size={20} />}
       aside={list.data && <span className="badge badge--info">{list.total}</span>}
     >
       <PagedItems
         list={list}
         skeletonRows={2}
-        empty={{ compact: true, icon: <MonitorSmartphone />, title: 'No hay sesiones abiertas', description: 'Cada dispositivo en que inicies sesión aparecerá aquí para que puedas cerrarlo.' }}
-        pager={{ variant: 'compact', siblings: 0, noun: { one: 'sesión', other: 'sesiones' } }}
+        empty={{ compact: true, icon: <MonitorSmartphone />, title: t('profile.sessions.empty.title'), description: t('profile.sessions.empty.description') }}
+        pager={{ variant: 'compact', siblings: 0, noun: { one: t('profile.sessions.noun.one'), other: t('profile.sessions.noun.other') } }}
       >
         {(sessions) => (
         <ul className={`session-list ${list.loading ? 'is-loading' : ''}`}>
@@ -76,16 +81,19 @@ export function SessionsPanel() {
                 <Icon size={22} />
                 <span className="session-list__info">
                   <strong>
-                    {device.label} {s.current && <span className="badge badge--success">Este dispositivo</span>}
+                    {device.label} {s.current && <span className="badge badge--success">{t('profile.sessions.thisDevice')}</span>}
                   </strong>
                   <span className="muted small">
-                    {s.ip_address ?? 'IP desconocida'} · Activa {timeAgo(s.last_used_at ?? s.created_at)} · Inició{' '}
-                    {formatDateTime(s.created_at)}
+                    {t('profile.sessions.activity', {
+                      ip: s.ip_address ?? t('profile.sessions.unknownIp'),
+                      ago: timeAgo(s.last_used_at ?? s.created_at),
+                      started: formatDateTime(s.created_at),
+                    })}
                   </span>
                 </span>
                 {!s.current && (
-                  <Button size="sm" variant="ghost" loading={busy === s.id} disabled={busy !== null} onClick={() => void revoke(s, device.label)}>
-                    Cerrar
+                  <Button size="sm" variant="ghost" loading={busy === s.id} disabled={busy !== null} onClick={() => void revoke(s)}>
+                    {t('common.actions.close')}
                   </Button>
                 )}
               </li>
@@ -95,10 +103,10 @@ export function SessionsPanel() {
         )}
       </PagedItems>
       <p className="inline-note small muted">
-        <ShieldAlert size={16} /> ¿No reconoces un dispositivo? Ciérralo y cambia tu contraseña.
+        <ShieldAlert size={16} /> {t('profile.sessions.hint')}
       </p>
       <Button variant="danger-outline" block icon={<LogOut size={18} />} loading={busy === 'all'} disabled={busy !== null} onClick={() => void revokeAll()}>
-        Cerrar sesión en todos los dispositivos
+        {t('profile.sessions.revokeAll')}
       </Button>
     </PanelSection>
   );

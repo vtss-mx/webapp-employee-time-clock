@@ -9,6 +9,7 @@ import { useSearchList, type ListQuery } from '../hooks/useSearchList';
 import { adminService } from '../services/adminService';
 import { checkAvailability } from '../services/availabilityService';
 import { ApiError } from '../services/apiClient';
+import { billingReply } from '../test/billing';
 import { apiFail, apiOk, liveCheck, mockFetch } from '../test/http';
 import { WithCatalogs, renderWithProviders } from '../test/render';
 import type { CompanyAdmin, CompanyDetail, CompanyFormValues, Page } from '../types';
@@ -21,28 +22,38 @@ import { KpiCard } from './ui/KpiCard';
 import { ListToolbar } from './ui/ListControls';
 import { ListResults } from './ui/ListResults';
 
-const wrapper = ({ children }: { children: ReactNode }) => <FeedbackProvider>{children}</FeedbackProvider>;
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <FeedbackProvider>
+    <WithCatalogs>{children}</WithCatalogs>
+  </FeedbackProvider>
+);
+const RFC = { tax_country: 'MX', tax_id_type: 'MX_RFC', tax_id: 'PNO120315AB1' };
 const admin: CompanyAdmin = { id: 9, email: 'admin@pan.com', active: true, last_login_at: null, created_at: '2026-01-01T00:00:00Z' };
 const company: CompanyDetail = {
   id: 4,
   name: 'Panificadora',
   legal_name: 'Panificadora del Norte SA de CV',
-  rfc: 'PNO120315AB1',
+  ...RFC,
   phone: '+526621234567',
   active: true,
   max_employees: 50,
   api_enabled: false,
+  max_validators: 0,
+  active_validators: 0,
   employee_count: 3,
   admin_count: 1,
+  billing_status: 'ACTIVE',
+  suspension_reason: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };
 const validCompany: CompanyFormValues = {
   name: 'Panificadora',
   legal_name: 'Panificadora del Norte',
-  rfc: 'PNO120315AB1',
+  ...RFC,
   phone: '+526621234567',
   max_employees: '',
+  max_validators: '0',
   admin_email: 'admin@pan.com',
   admin_password: 'Empresa1234',
   admin_password_confirm: 'Empresa1234',
@@ -58,7 +69,13 @@ describe('adminService', () => {
     ['setAdminStatus', () => adminService.setAdminStatus(4, 9, true), company, 'PATCH', '/api/admin/companies/4/admins/9/status'],
     ['admins', () => adminService.admins(4, { page: 2, size: 10 }), { items: [admin], total: 11, page: 2, size: 10 }, 'GET', '/api/admin/companies/4/admins?page=2&size=10'],
     ['admin', () => adminService.admin(4, 9), admin, 'GET', '/api/admin/companies/4/admins/9'],
-    ['validación en vivo (respaldo HTTP del canal)', () => checkAvailability('company_rfc', 'PNO120315AB1', 4), { field: 'company_rfc', valid: true, available: true, code: 'AVAILABLE', message: 'ok' }, 'GET', '/api/validation?field=company_rfc&value=PNO120315AB1&exclude_id=4'],
+    [
+      'validación en vivo (respaldo HTTP del canal), con «país:tipo»',
+      () => checkAvailability('company_tax_id', 'PNO120315AB1', 4, 'MX:MX_RFC'),
+      { field: 'company_tax_id', valid: true, available: true, code: 'AVAILABLE', message: 'ok' },
+      'GET',
+      '/api/validation?field=company_tax_id&value=PNO120315AB1&exclude_id=4&related=MX%3AMX_RFC',
+    ],
   ])('%s', async (_name, call, data, method, url) => {
     const { calls } = mockFetch(apiOk(data));
     await call();
@@ -68,10 +85,11 @@ describe('adminService', () => {
 
   it('envía los datos limpios: sin espacios, límite numérico o null y el primer administrador', async () => {
     const { calls } = mockFetch(apiOk(company));
-    await adminService.create({ ...validCompany, name: '  Panificadora ', max_employees: '25', admin_email: ' admin@pan.com ' });
-    expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ name: 'Panificadora', max_employees: 25, admin_email: 'admin@pan.com', admin_password: 'Empresa1234' });
-    await adminService.update(4, { max_employees: '', phone: '+526621234567' });
-    expect(JSON.parse(calls[1].init.body as string)).toEqual({ max_employees: null, phone: '+526621234567' });
+    await adminService.create({ ...validCompany, name: '  Panificadora ', tax_id: ' PNO120315AB1 ', max_employees: '25', admin_email: ' admin@pan.com ' });
+    expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ name: 'Panificadora', ...RFC, max_employees: 25, admin_email: 'admin@pan.com', admin_password: 'Empresa1234' });
+    // El identificador fiscal es opcional: el número vacío viaja como null (sin capturar; al editar, lo borra).
+    await adminService.update(4, { max_employees: '', phone: '+526621234567', tax_country: 'US', tax_id_type: 'US_EIN', tax_id: '  ' });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ max_employees: null, phone: '+526621234567', tax_country: 'US', tax_id_type: 'US_EIN', tax_id: null });
     await adminService.addAdmin(4, ' rh@pan.com ', 'Recursos123');
     expect(calls[2].url).toBe('/api/admin/companies/4/admins');
     expect(JSON.parse(calls[2].init.body as string)).toEqual({ admin_email: 'rh@pan.com', admin_password: 'Recursos123' });
@@ -81,7 +99,7 @@ describe('adminService', () => {
 describe('validación de empresas', () => {
   it('RFC de persona moral (12) o física (13), límite opcional y administrador solo en el alta', () => {
     expect(validateCompanyRfc('pno-120315-ab1')).toBeUndefined();
-    expect(validateCompanyRfc('')).toBe('El RFC es obligatorio');
+    expect(validateCompanyRfc('')).toBeUndefined(); // opcional: vacío = sin capturar
     expect(validateCompanyRfc('ABC')).toMatch(/12 caracteres/);
     expect(validateCompanyRfc('PNO121335AB1')).toMatch(/fecha/);
     expect(validateCompanyRfc('XAXX010101000')).toMatch(/genérico/);
@@ -95,22 +113,50 @@ describe('validación de empresas', () => {
 });
 
 describe('useCompanyForm', () => {
-  it('el botón se habilita solo con todo correcto y el RFC/correo verificados como disponibles', async () => {
+  it('el botón se habilita solo con todo correcto y el identificador fiscal y el correo verificados como disponibles', async () => {
     mockFetch(available());
     const { result } = renderHook(() => useCompanyForm({ withAdmin: true }), { wrapper });
     expect(result.current.canSubmit).toBe(false);
-    act(() => result.current.touch('rfc'));
-    expect(result.current.errors.rfc).toBe('El RFC es obligatorio');
+    act(() => result.current.touch('name'));
+    expect(result.current.errors.name).toBe('El nombre comercial es obligatorio');
     act(() => result.current.setValues(validCompany));
     await waitFor(() => expect(result.current.canSubmit).toBe(true));
   });
 
-  it('un RFC ya registrado bloquea el envío y se muestra en el campo', async () => {
-    mockFetch((call) => (call.url.includes('field=company_rfc') ? liveCheck('TAKEN', 'RFC ya registrado', 'company_rfc') : available()));
+  it('el identificador fiscal es opcional: vacío no marca error, no se consulta en vivo y no impide guardar', async () => {
+    const { calls } = mockFetch(available());
+    const { result } = renderHook(() => useCompanyForm({ withAdmin: true }), { wrapper });
+    act(() => result.current.setValues({ ...validCompany, tax_id: '' }));
+    act(() => result.current.touch('tax_id'));
+    await waitFor(() => expect(result.current.canSubmit).toBe(true));
+    expect(result.current.errors.tax_id).toBeUndefined();
+    expect(result.current.live.tax_id.status).toBe('idle');
+    expect(calls.some((c) => c.url.includes('field=company_tax_id'))).toBe(false);
+  });
+
+  it('uno ya registrado bloquea el envío y se muestra en el campo; viaja con su país y su tipo', async () => {
+    const { calls } = mockFetch((call) =>
+      call.url.includes('field=company_tax_id') ? liveCheck('TAKEN', 'Ya existe una empresa con ese identificador fiscal', 'company_tax_id') : available(),
+    );
     const { result } = renderHook(() => useCompanyForm({ withAdmin: true }), { wrapper });
     act(() => result.current.setValues(validCompany));
-    await waitFor(() => expect(result.current.errors.rfc).toBe('RFC ya registrado'));
+    await waitFor(() => expect(result.current.errors.tax_id).toBe('Ya existe una empresa con ese identificador fiscal'));
     expect(result.current.canSubmit).toBe(false);
+    expect(calls.find((c) => c.url.includes('field=company_tax_id'))?.url).toContain('related=MX%3AMX_RFC');
+  });
+
+  it('un formato que no cumple se marca en el cliente y no se consulta; al editar, el mismo no se vuelve a consultar', async () => {
+    const { calls } = mockFetch(available());
+    const original = { tax_country: 'US', tax_id_type: 'US_EIN', tax_id: '123456789' };
+    const { result } = renderHook(() => useCompanyForm({ withAdmin: false, excludeId: 4, original }), { wrapper });
+    act(() => result.current.loadValues({ ...validCompany, ...original, tax_id: '1234' }));
+    expect(result.current.errors.tax_id).toBe('El número de EIN debe tener 9 caracteres');
+    expect(result.current.canSubmit).toBe(false);
+    act(() => result.current.setValues({ ...result.current.values, tax_id: '123456789' }));
+    await waitFor(() => expect(result.current.canSubmit).toBe(true));
+    expect(result.current.live.tax_id.status).toBe('idle'); // el que ya tenía: no se consulta
+    act(() => result.current.setValues({ ...result.current.values, tax_country: 'FR', tax_id_type: 'FR_SIREN' }));
+    await waitFor(() => expect(calls.some((c) => c.url.includes('related=FR%3AFR_SIREN'))).toBe(true)); // otro tipo: sí
   });
 
   it('el teléfono de la empresa también se valida en vivo; la empresa tiene un solo correo', async () => {
@@ -131,23 +177,23 @@ describe('useCompanyForm', () => {
   });
 
   it('errores del servidor por campo; cambiar el campo los descarta; la edición marca lo cargado', async () => {
-    const { result } = renderHook(() => useCompanyForm({ withAdmin: false, excludeId: 4, originalRfc: 'PNO120315AB1' }), { wrapper });
+    const { result } = renderHook(() => useCompanyForm({ withAdmin: false, excludeId: 4, original: RFC }), { wrapper });
     act(() => result.current.loadValues({ ...validCompany, legal_name: '' }));
-    expect(result.current.errors.legal_name).toBe('La razón social es obligatorio');
+    expect(result.current.errors.legal_name).toBe('La razón social es obligatoria'); // concordancia de género corregida
     let saved: Promise<void> = Promise.resolve();
     act(() => {
-      saved = result.current.save(() => Promise.reject(new ApiError({ statusCode: 409, code: 'COMPANY_RFC_TAKEN', message: 'RFC en uso' })), 'No se pudo guardar', {
+      saved = result.current.save(() => Promise.reject(new ApiError({ statusCode: 409, code: 'COMPANY_TAX_ID_TAKEN', message: 'Identificador en uso' })), 'No se pudo guardar', {
         kind: 'edit',
         title: '¿Guardar los cambios?',
-        changes: [{ label: 'RFC', before: 'PNO120315AB1', after: 'ACM010101AB1' }],
+        changes: [{ label: 'Identificador fiscal', before: 'PNO120315AB1', after: 'ACM010101AB1' }],
       });
     });
     await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Guardar los cambios?' })).getByRole('button', { name: 'Guardar cambios' }));
     await act(() => saved);
-    expect(result.current.errors.rfc).toBe('RFC en uso');
+    expect(result.current.errors.tax_id).toBe('Identificador en uso');
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo guardar' })).toBeInTheDocument();
-    act(() => result.current.setValues({ ...result.current.values, rfc: 'ACM010101AB2' }));
-    expect(result.current.errors.rfc).toBeUndefined();
+    act(() => result.current.setValues({ ...result.current.values, tax_id: 'ACM010101AB2' }));
+    expect(result.current.errors.tax_id).toBeUndefined();
     expect(companyServerErrors(new Error('x'))).toEqual({});
     expect(companyServerErrors(new ApiError({ statusCode: 409, code: 'EMAIL_TAKEN', message: 'en uso' }))).toEqual({ admin_email: 'en uso' });
   });
@@ -157,7 +203,7 @@ describe('CompanyForm', () => {
   function Harness() {
     const [values, setValues] = useState<CompanyFormValues>(emptyCompanyForm);
     const idle = { status: 'idle' as const };
-    const props = { values, errors: {}, onChange: setValues, onTouch: vi.fn(), live: { rfc: { status: 'taken' as const, message: 'RFC en uso' }, admin_email: idle } };
+    const props = { values, errors: {}, onChange: setValues, onTouch: vi.fn(), live: { tax_id: { status: 'taken' as const, message: 'Identificador en uso' }, admin_email: idle } };
     return (
       <>
         <CompanyDataFields {...props} />
@@ -167,16 +213,16 @@ describe('CompanyForm', () => {
     );
   }
 
-  it('normaliza RFC, teléfono y límite mientras se escribe; el límite es opcional', async () => {
+  it('normaliza el identificador fiscal, el teléfono y el límite mientras se escribe; el límite es opcional', async () => {
     render(<Harness />, { wrapper: WithCatalogs });
-    await userEvent.type(screen.getByLabelText('RFC de la empresa'), 'pno-120315-ab1');
+    await userEvent.type(screen.getByLabelText('Identificador fiscal'), 'pno-120315-ab1');
     await userEvent.type(screen.getByLabelText('Teléfono'), '(662) 123-4567');
     await userEvent.type(screen.getByLabelText('Límite de empleados'), '1a5');
     await userEvent.type(screen.getByLabelText('Correo del administrador'), 'a@b.com');
     const values = JSON.parse(document.querySelector('output')?.textContent ?? '{}') as CompanyFormValues;
-    expect(values).toMatchObject({ rfc: 'PNO120315AB1', phone: '+526621234567', max_employees: '15', admin_email: 'a@b.com' });
+    expect(values).toMatchObject({ ...RFC, phone: '+526621234567', max_employees: '15', admin_email: 'a@b.com' });
     expect(screen.getByLabelText('Teléfono')).toHaveValue('662 123 4567');
-    expect(screen.getByText('RFC en uso')).toBeInTheDocument(); // validación en vivo
+    expect(screen.getByText('Identificador en uso')).toBeInTheDocument(); // validación en vivo
     expect(screen.getByText('Límite de empleados').closest('label')).not.toHaveClass('is-required');
     expect(screen.getByText('Razón social').closest('label')).toHaveClass('is-required');
   });
@@ -194,7 +240,7 @@ describe('useSearchList + ListControls', () => {
           list={list}
           columns={['Empresa']}
           onOpen={onOpen}
-          empty={{ icon: null, title: 'No se encontraron empresas', action: !list.filtered && <button>Registrar la primera</button> }}
+          empty={{ icon: null, title: 'No se encontraron empresas', description: 'Registra la primera empresa para empezar.', action: !list.filtered && <button>Registrar la primera</button> }}
           renderCells={(row) => <td>{row.name}</td>}
         />
         <span data-testid="state">{`${list.loading ? 'cargando' : 'listo'}|${String(list.filtered)}|${list.data?.total ?? '-'}`}</span>
@@ -255,6 +301,8 @@ describe('useSearchList + ListControls', () => {
 describe('CompanyDetailPage: eliminar empresa', () => {
   const renderDetail = (detail: CompanyDetail, admins: CompanyAdmin[] = [admin], remove: () => Response = () => apiOk(null)) => {
     const mock = mockFetch((call) => {
+      const billing = billingReply(call);
+      if (billing) return billing;
       if (call.init.method === 'DELETE') return remove();
       if (call.url.includes('/admins?')) return apiOk({ items: admins, total: admins.length, page: 1, size: 10 });
       return apiOk(detail);
@@ -290,8 +338,8 @@ describe('CompanyDetailPage: eliminar empresa', () => {
       return { dialog, confirm };
     };
     const first = await askToRemove();
-    expect(within(first.dialog).getByRole('region', { name: 'Se eliminará' })).toHaveTextContent('Razón socialPanificadora del Norte SA de CVRFCPNO120315AB1Administradores1');
-    expect(first.dialog).toHaveTextContent('Esta acción no se puede deshacer.');
+    expect(within(first.dialog).getByRole('region', { name: 'Se eliminará' })).toHaveTextContent('Razón socialPanificadora del Norte SA de CVIdentificador fiscalRFC · PNO120315AB1 · MéxicoAdministradores1');
+    expect(first.dialog).toHaveTextContent('Pasará a «Eliminadas»: podrás restaurarla durante 1 año. Sus datos faciales y fotos se borran para siempre.');
     await userEvent.click(within(first.dialog).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false); // cancelar no envía nada
 
@@ -340,7 +388,7 @@ describe('CompanyDetailPage: eliminar empresa', () => {
 
   it('sin administradores: estado vacío y sin paginador', async () => {
     renderDetail(company, []);
-    expect(await screen.findByText('No hay administradores registrados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin administradores')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
   });
 });

@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>10/10</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -134,40 +134,32 @@
 <a name='L69'></a><a href='#L69'>69</a>
 <a name='L70'></a><a href='#L70'>70</a>
 <a name='L71'></a><a href='#L71'>71</a>
-<a name='L72'></a><a href='#L72'>72</a>
-<a name='L73'></a><a href='#L73'>73</a>
-<a name='L74'></a><a href='#L74'>74</a>
-<a name='L75'></a><a href='#L75'>75</a>
-<a name='L76'></a><a href='#L76'>76</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L72'></a><a href='#L72'>72</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -216,6 +208,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Check, Copy, Info } from 'lucide-react';
 import { useCopy } from '../hooks/useCopy';
 import { useQrImage } from '../hooks/useQrImage';
+import { Trans, useT } from '../i18n';
 import { paths } from '../routes/paths';
 &nbsp;
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
@@ -225,14 +218,12 @@ export function phoneAccessUrl(location: Pick&lt;Location, 'origin' | 'hostname'
   return LOCAL_HOSTS.includes(location.hostname) ? null : `${location.origin}${paths.login}`;
 }
 &nbsp;
-const TEXT = { open: 'Abre la tableta o el teléfono.', scan: 'Escanéalo con la tableta o el teléfono', already: '¿Ya estás en una tableta o un teléfono?' };
-&nbsp;
 /**
  * Cómo continuar en el dispositivo permitido de un validador (tableta o teléfono): pasos, dirección
  * para copiar y código QR para escanear.
  */
 export function PhoneAccessGuide() {
-  const text = TEXT;
+  const t = useT();
   const url = phoneAccessUrl();
   // Si el código no se puede dibujar queda su lugar vacío: la dirección está escrita al lado para copiarla.
   const qr = useQrImage(url).src;
@@ -244,45 +235,42 @@ export function PhoneAccessGuide() {
       &lt;div className={`phone-guide__body ${url ? 'has-qr' : ''}`}&gt;
         &lt;ol className="phone-guide__steps"&gt;
           &lt;li&gt;
-            &lt;strong&gt;{text.open}&lt;/strong&gt; Usa el navegador (Safari, Chrome…) o la cámara.
+            &lt;strong&gt;{t('qr.phoneGuide.open')}&lt;/strong&gt; {t('qr.phoneGuide.openHow')}
           &lt;/li&gt;
           &lt;li&gt;
             {url ? (
               &lt;&gt;
-                &lt;strong&gt;Escanea el código&lt;/strong&gt; o escribe esta dirección:
+                &lt;Trans k="qr.phoneGuide.scanOrType" values={{ scan: &lt;strong&gt;{t('qr.phoneGuide.scanCode')}&lt;/strong&gt; }} /&gt;
                 &lt;span className="phone-guide__url"&gt;
                   &lt;code&gt;{url}&lt;/code&gt;
-                  &lt;button type="button" onClick={copy} aria-label="Copiar dirección"&gt;
+                  &lt;button type="button" onClick={copy} aria-label={t('qr.phoneGuide.copyAddress')}&gt;
                     {copied ? &lt;Check size={16} /&gt; : &lt;Copy size={16} /&gt;}
                   &lt;/button&gt;
                 &lt;/span&gt;
               &lt;/&gt;
             ) : (
-              &lt;&gt;
-                &lt;strong&gt;Ingresa a la dirección de acceso&lt;/strong&gt; que te proporcionó tu empresa.
-              &lt;/&gt;
+              &lt;Trans k="qr.phoneGuide.enterAddress" values={{ address: &lt;strong&gt;{t('qr.phoneGuide.accessAddress')}&lt;/strong&gt; }} /&gt;
             )}
           &lt;/li&gt;
           &lt;li&gt;
-            &lt;strong&gt;Inicia sesión&lt;/strong&gt; con tu mismo correo y contraseña.
+            &lt;Trans k="qr.phoneGuide.signIn" values={{ action: &lt;strong&gt;{t('qr.phoneGuide.signInAction')}&lt;/strong&gt; }} /&gt;
           &lt;/li&gt;
         &lt;/ol&gt;
         {url &amp;&amp; (
           &lt;figure className="phone-guide__qr"&gt;
             {qr ? (
-              &lt;img src={qr} alt={`Código QR para abrir la aplicación. ${text.scan}`} width={168} height={168} /&gt;
+              &lt;img src={qr} alt={t('qr.phoneGuide.qrAlt')} width={168} height={168} /&gt;
             ) : (
               &lt;span className="phone-guide__qr-placeholder" /&gt;
             )}
-            &lt;figcaption&gt;{text.scan}&lt;/figcaption&gt;
+            &lt;figcaption&gt;{t('qr.phoneGuide.scan')}&lt;/figcaption&gt;
           &lt;/figure&gt;
         )}
       &lt;/div&gt;
       &lt;p className="phone-guide__note"&gt;
         &lt;Info size={18} /&gt;
         &lt;span&gt;
-          {text.already} Desactiva la opción &lt;strong&gt;«Sitio de escritorio»&lt;/strong&gt; en el menú de tu navegador y
-          vuelve a intentarlo.
+          &lt;Trans k="qr.phoneGuide.desktopSite" values={{ option: &lt;strong&gt;{t('qr.phoneGuide.desktopSiteOption')}&lt;/strong&gt; }} /&gt;
         &lt;/span&gt;
       &lt;/p&gt;
     &lt;/div&gt;
@@ -295,7 +283,7 @@ export function PhoneAccessGuide() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

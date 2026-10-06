@@ -1,5 +1,7 @@
-import { MessageSquareText, X } from 'lucide-react';
+import { CalendarX, MessageSquareText, X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { t, useT } from '../../../i18n';
+import type { ConfirmInput } from '../../../types/confirm';
 import { Button } from '../../ui/Button';
 
 /** Lista de tarjetas del empleado (sus jornadas o sus solicitudes); atenuada mientras carga otra página. */
@@ -52,9 +54,29 @@ export function ItemNote({ label, children }: { label: string; children: ReactNo
 
 /** "Cancelar solicitud" de una solicitud pendiente (cambio de turno, vacaciones o permiso). */
 export function CancelRequestButton({ busy, onCancel }: { busy: boolean; onCancel: () => void }) {
+  const t = useT();
   return (
     <Button variant="danger-outline" size="lg" icon={<X size={18} />} loading={busy} onClick={onCancel}>
-      Cancelar solicitud
+      {t('myAttendance.items.cancel')}
     </Button>
   );
+}
+
+/**
+ * Confirmación de cancelar una solicitud pendiente (cambio de turno, vacaciones o permiso): lo común
+ * (se elimina, "Cancelar solicitud" y "Conservarla") más su pregunta, qué pasará y sus datos. Se
+ * llama al dibujarse la confirmación: abierta, sigue al idioma activo.
+ */
+export function cancelRequestConfirm({ title, message, details }: Pick<ConfirmInput, 'title' | 'message' | 'details'>): ConfirmInput {
+  return {
+    kind: 'delete',
+    icon: <CalendarX size={30} />,
+    eyebrow: t('myAttendance.cancelRequest.eyebrow'),
+    title,
+    message,
+    details,
+    confirmLabel: t('myAttendance.items.cancel'),
+    confirmIcon: <CalendarX size={18} />,
+    cancelLabel: t('myAttendance.cancelRequest.keep'),
+  };
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { knownLocation } from './geolocation';
+import { currentLocation, knownLocation } from './geolocation';
 
 // jsdom no tiene la API de permisos ni geolocalización: cada prueba pone las del navegador que simula.
 const stub = (name: 'permissions' | 'geolocation', value: unknown) => Object.defineProperty(navigator, name, { value, configurable: true });
@@ -46,5 +46,23 @@ describe('knownLocation: referencia de cercanía sin abrir el aviso del navegado
     await expect(knownLocation()).resolves.toBeNull();
     stub('permissions', { query: () => Promise.reject(new TypeError('geolocation no es un permiso conocido')) });
     await expect(knownLocation()).resolves.toBeNull();
+  });
+});
+
+describe('currentLocation: lectura fresca', () => {
+  it('por omisión precisa y sin caché; el mapa puede pedir la de la red (reciente)', async () => {
+    const calls: (PositionOptions | undefined)[] = [];
+    stub('geolocation', {
+      getCurrentPosition: (ok: PositionCallback, _fail: PositionErrorCallback, options?: PositionOptions) => {
+        calls.push(options);
+        ok({ coords: { latitude: 1, longitude: 2, accuracy: 3 } } as GeolocationPosition);
+      },
+    });
+    await expect(currentLocation()).resolves.toEqual({ latitude: 1, longitude: 2, accuracy: 3 });
+    await currentLocation({ highAccuracy: false, maxAgeMs: 300_000, timeoutMs: 10_000 });
+    expect(calls).toEqual([
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+    ]);
   });
 });

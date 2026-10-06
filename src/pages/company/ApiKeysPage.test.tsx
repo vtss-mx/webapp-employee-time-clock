@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../i18n/core';
 import { catalogsFixture, catalogsWith } from '../../test/catalogs';
 import { apiFail, apiOk, mockFetch } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
@@ -70,7 +71,7 @@ describe('Integraciones (API): llaves de la empresa', () => {
   it('sin llaves: estado vacío que invita a crear la primera', async () => {
     mockFetch(apiOk(page([])));
     renderList();
-    expect(await screen.findByText('No hay llaves de la API')).toBeInTheDocument();
+    expect(await screen.findByText('Sin llaves')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Paginación' })).toBeNull();
     await userEvent.click(screen.getAllByRole('link', { name: 'Crear llave' })[0]);
     expect(screen.getByText('Crear llave')).toBeInTheDocument();
@@ -114,7 +115,7 @@ describe('Integraciones (API): llaves de la empresa', () => {
     await userEvent.click(within(row('Nómina')).getByRole('button', { name: 'Revocar' }));
     const dialog = await screen.findByRole('alertdialog', { name: '¿Revocar «Nómina»?' });
     expect(dialog).toHaveTextContent('el sistema que la usa ya no podrá conectarse');
-    expect(dialog).toHaveTextContent('Esta acción no se puede deshacer.');
+    expect(dialog).toHaveTextContent('No se puede deshacer.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await userEvent.click(within(row('ERP')).getByRole('button', { name: 'Rotar' }));
     const rotate = await screen.findByRole('alertdialog', { name: '¿Rotar «ERP»?' });
@@ -179,10 +180,10 @@ describe('Crear llave (pantalla)', () => {
       'Permisos (solo lectura)Empleados',
       'VigenciaSin vencimiento',
     ]);
-    expect(dialog).toHaveTextContent('El secreto no se puede volver a consultar después.');
+    expect(dialog).toHaveTextContent('El secreto no se podrá volver a consultar.');
     await confirmCreate('Nómina');
 
-    expect(await screen.findByText('Integraciones')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Integraciones')).toBeInTheDocument());
     expect(await screen.findByText(SECRET)).toBeInTheDocument();
     expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Nómina', scopes: ['EMPLOYEES_READ'], expires_in_days: null });
   });
@@ -225,5 +226,73 @@ describe('Crear llave (pantalla)', () => {
     expect(screen.getByLabelText(/Nombre/)).toHaveValue('ERP');
     expect(screen.getByRole('switch', { name: 'Validadores' })).toBeChecked();
     expect(screen.getByRole('button', { name: 'Crear llave' })).toBeEnabled();
+  });
+});
+
+describe('Integraciones: cada falla se explica con su título', () => {
+  it('la lista que no carga', async () => {
+    mockFetch(apiFail(403, 'FORBIDDEN', 'Sin acceso'));
+    renderList();
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudieron cargar las llaves' })).toHaveTextContent('Sin acceso');
+  });
+
+  it('revocar una llave que el servidor no acepta', async () => {
+    mockFetch((call) => (call.init.method === 'DELETE' ? apiFail(409, 'API_KEY_REVOKED', 'Ya estaba revocada') : apiOk(page([key()]))));
+    renderList();
+    await userEvent.click(await screen.findByRole('button', { name: 'Revocar' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Revocar «Nómina»?' })).getByRole('button', { name: 'Revocar llave' }));
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo revocar la llave' })).toHaveTextContent('Ya estaba revocada');
+  });
+});
+
+describe('Integraciones en inglés (en-US)', () => {
+  it('crear: formulario, confirmación y popup del secreto en inglés; el secreto abierto sigue al idioma', async () => {
+    await setLocale('en-US');
+    const { calls } = mockFetch(apiOk({ ...key({ name: 'Payroll' }), secret: SECRET }, { status: 201 }));
+    renderForm();
+    expect(screen.getByRole('heading', { name: 'Create API key' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create key' }));
+    expect(screen.getByText('Enter which system the key is for')).toBeInTheDocument();
+    expect(screen.getByText('Choose at least one permission.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/Name/), 'Payroll');
+    await userEvent.click(screen.getByRole('switch', { name: 'Empleados' })); // los permisos vienen del catálogo
+    await userEvent.click(screen.getByLabelText('Expires in'));
+    await userEvent.click(screen.getByRole('option', { name: /No expiration/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Create key' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Create the key “Payroll”?' });
+    expect(within(within(dialog).getByRole('region', { name: 'To be created' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'NamePayroll',
+      'Permissions (read-only)Empleados',
+      'ExpirationNo expiration',
+    ]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create key' }));
+
+    const secret = await screen.findByRole('dialog', { name: 'Copy the key for “Payroll”' });
+    expect(within(secret).getByText(SECRET)).toBeInTheDocument();
+    expect(secret).toHaveTextContent('Send it in the X-API-Key header of each request.');
+    expect(within(secret).getByRole('button', { name: 'Copy key' })).toBeInTheDocument();
+    await act(() => setLocale('es-MX'));
+    const translated = screen.getByRole('dialog', { name: 'Copia la llave de «Payroll»' });
+    expect(within(translated).getByText(SECRET)).toBeInTheDocument(); // el mismo popup, en el otro idioma
+    await act(() => setLocale('en-US'));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Copy the key for “Payroll”' })).getByRole('button', { name: "I've saved it" }));
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Payroll', scopes: ['EMPLOYEES_READ'], expires_in_days: null });
+  });
+
+  it('la lista: uso, vigencia, guía de conexión y rotar en inglés', async () => {
+    await setLocale('en-US');
+    mockFetch(apiOk(page([key({ created_by: null, expires_at: null }), key({ id: 2, name: 'ERP', status: 'REVOKED', last_used_at: null, revoked_at: '2026-10-02T12:00:00Z', revoked_by: null })])));
+    renderList();
+    const payroll = (await screen.findByText('Nómina')).closest('li')!;
+    expect(payroll).toHaveTextContent(/Created .* · No expiration/);
+    expect(within(payroll).getByText(/Last used 5 minutes ago · IP 189.203.10.4/)).toBeInTheDocument();
+    const erp = screen.getByText('ERP').closest('li')!;
+    expect(erp).toHaveTextContent(/Not used yet/);
+    expect(erp).toHaveTextContent(/Revoked .*2026/);
+    expect(screen.getByText(/lists are paginated with/)).toHaveTextContent('lists are paginated with page and size (up to 50).');
+    await userEvent.click(within(payroll).getByRole('button', { name: 'Rotate' }));
+    const rotate = await screen.findByRole('alertdialog', { name: 'Rotate “Nómina”?' });
+    expect(rotate).toHaveTextContent('The current key will stop working immediately.');
   });
 });

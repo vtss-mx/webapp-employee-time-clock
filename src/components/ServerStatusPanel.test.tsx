@@ -21,6 +21,49 @@ const status = {
       { api: 'GET reports', tier: 'BATCH', recent_requests: 12, latency_ms: null, shed: 0 },
     ],
   },
+  storage: {
+    configured: false,
+    backend: 'disabled',
+    bucket: null,
+    prefix: 'local',
+    reason: 'la llave de la cuenta de servicio aún no está montada (archivo vacío)',
+    count_cap: 10000,
+    images: [{ kind: 'face-enrollment', label: 'Fotos de referencia del registro facial', stored: 12 }],
+    tasks: [
+      {
+        task: 'delete',
+        label: 'Objetos por borrar del bucket',
+        pending: 0,
+        last_run_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+      },
+    ],
+  },
+};
+
+const bucket = {
+  ...status.storage,
+  configured: true,
+  backend: 'gcs',
+  bucket: 'employee-time-clock-fb8ba.firebasestorage.app',
+  reason: null,
+  images: [
+    { kind: 'face-enrollment', label: 'Fotos de referencia del registro facial', stored: 25000 },
+    { kind: 'payment-receipt', label: 'Comprobantes de pago', stored: 3 },
+  ],
+  tasks: [
+    {
+      task: 'delete',
+      label: 'Objetos por borrar del bucket',
+      pending: 3,
+      last_run_at: '2026-10-04T18:00:00Z',
+      last_success_at: '2026-10-04T18:00:00Z',
+      last_error_at: '2026-10-04T17:55:00Z',
+      last_error: 'StorageUnavailable: ConnectionError',
+    },
+  ],
 };
 
 describe('ServerStatusPanel', () => {
@@ -34,6 +77,34 @@ describe('ServerStatusPanel', () => {
     expect(screen.getByText('prioridad crítica · 1,500 peticiones recientes · 210.5 ms · 3 descartadas')).toBeInTheDocument();
     expect(screen.getByText('prioridad BATCH · 12 peticiones recientes')).toBeInTheDocument(); // sin latencia ni descartes
     expect(screen.getByText(/entre 8 y 200/)).toBeInTheDocument();
+  });
+
+  it('sin bucket configurado: por qué está apagado y qué hay en el bucket (nada por migrar: las imágenes nunca viven en la base)', async () => {
+    mockFetch(apiOk(status));
+    renderWithProviders(<ServerStatusPanel />);
+    expect(await screen.findByText('Almacenamiento de imágenes: apagado')).toBeInTheDocument();
+    expect(screen.getByText(/aún no está montada \(archivo vacío\)\. Hasta configurarlo, no se pueden guardar registros faciales/)).toBeInTheDocument();
+    expect(screen.getByText('12 en el bucket')).toBeInTheDocument();
+    expect(screen.getByText('0 por borrar')).toBeInTheDocument(); // el mantenimiento aún no corre
+    expect(screen.queryByText(/por migrar/)).not.toBeInTheDocument();
+  });
+
+  it('sin bucket y sin motivo del backend: solo dice qué no es posible', async () => {
+    mockFetch(apiOk({ ...status, storage: { ...status.storage, reason: null } }));
+    renderWithProviders(<ServerStatusPanel />);
+    expect(await screen.findByText('. Hasta configurarlo, no se pueden guardar registros faciales ni comprobantes')).toBeInTheDocument();
+  });
+
+  it('con el bucket: dónde guarda, conteos con tope, la última vuelta y el último error de cada tarea', async () => {
+    mockFetch(apiOk({ ...status, storage: bucket }));
+    renderWithProviders(<ServerStatusPanel />);
+    expect(await screen.findByText('Almacenamiento de imágenes: gs://employee-time-clock-fb8ba.firebasestorage.app/local/')).toBeInTheDocument();
+    expect(screen.getByText(/la base de datos solo guarda su referencia/)).toBeInTheDocument();
+    expect(screen.getByText('10,000+ en el bucket')).toBeInTheDocument();
+    expect(screen.getByText('3 en el bucket')).toBeInTheDocument();
+    const deletions = screen.getByText(/^3 por borrar · última vuelta correcta/);
+    expect(deletions).toHaveTextContent('último error');
+    expect(deletions).toHaveTextContent('StorageUnavailable: ConnectionError');
   });
 
   it('si el estado no se pudo cargar: límites desconocidos y "Reintentar"', async () => {

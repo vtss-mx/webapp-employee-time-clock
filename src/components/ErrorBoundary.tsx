@@ -1,5 +1,6 @@
 import { AlertOctagon, Home, RotateCcw } from 'lucide-react';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useT } from '../i18n';
 import { reportClientError } from '../services/clientErrorService';
 import { isChunkLoadError, reloadForNewVersion } from '../services/versionReload';
 import { retryFailedLazy } from './retryableLazy';
@@ -18,6 +19,28 @@ interface State {
 /** El componente que se rompió: el primero de la pila de componentes de React («at Nombre (...)»). */
 function brokenComponent(componentStack: string | null | undefined): string | undefined {
   return componentStack ? /at (\S+)/.exec(componentStack)?.[1] : undefined;
+}
+
+/** Lo que se ve en lugar de la pantalla rota (un componente: sus textos siguen al idioma activo). */
+function CrashScreen({ inline = false, onRetry }: { inline?: boolean; onRetry: () => void }) {
+  const t = useT();
+  return (
+    <div className={inline ? 'error-inline' : 'center-page'} role="alert">
+      <span className="icon-tile icon-tile--lg icon-tile--danger">
+        <AlertOctagon size={32} />
+      </span>
+      <h1 style={{ fontSize: inline ? '1.2rem' : undefined }}>{t('system.crash.title')}</h1>
+      <p className="muted">{t('system.crash.message')}</p>
+      <div className="button-row" style={{ justifyContent: 'center' }}>
+        <Button variant="primary" icon={<RotateCcw size={18} />} onClick={onRetry}>
+          {t('common.actions.retry')}
+        </Button>
+        <Button variant="ghost" icon={<Home size={18} />} onClick={() => window.location.assign('/')}>
+          {t('system.goHome')}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -48,24 +71,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override render() {
     if (!this.state.error) return this.props.children;
-    return (
-      <div className={this.props.inline ? 'error-inline' : 'center-page'} role="alert">
-        <span className="icon-tile icon-tile--lg icon-tile--danger">
-          <AlertOctagon size={32} />
-        </span>
-        <h1 style={{ fontSize: this.props.inline ? '1.2rem' : undefined }}>Algo no salió como esperábamos</h1>
-        <p className="muted">
-          Ocurrió un error inesperado en esta pantalla. Tus datos están a salvo; puedes reintentar.
-        </p>
-        <div className="button-row" style={{ justifyContent: 'center' }}>
-          <Button variant="primary" icon={<RotateCcw size={18} />} onClick={this.reset}>
-            Reintentar
-          </Button>
-          <Button variant="ghost" icon={<Home size={18} />} onClick={() => window.location.assign('/')}>
-            Ir al inicio
-          </Button>
-        </div>
-      </div>
-    );
+    return <CrashScreen inline={this.props.inline} onRetry={this.reset} />;
   }
 }

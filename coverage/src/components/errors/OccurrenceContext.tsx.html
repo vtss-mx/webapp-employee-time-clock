@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>15/15</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>12/12</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -120,7 +120,20 @@
 <a name='L55'></a><a href='#L55'>55</a>
 <a name='L56'></a><a href='#L56'>56</a>
 <a name='L57'></a><a href='#L57'>57</a>
-<a name='L58'></a><a href='#L58'>58</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -138,6 +151,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">9x</span>
@@ -146,15 +162,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">9x</span>
@@ -168,6 +175,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -177,7 +187,21 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { ErrorContext } from '../../types';
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { t, Trans, useT } from '../../i18n';
+import type { ErrorContext } from '../../types';
+import { formatCount } from '../../utils/numbers';
 &nbsp;
 const json = (value: unknown) =&gt; JSON.stringify(value, null, 2);
 &nbsp;
@@ -193,8 +217,11 @@ function Block({ title, value }: { title: string; value: unknown }) {
 &nbsp;
 /** «POST /api/employees → 500 · 12 ms», la pantalla de la app web, o dónde lo registró el log. */
 function summaryOf({ request, response, duration_ms: ms, logger, function: fn, client }: ErrorContext): string {
-  if (client) return `Aplicación web: ${client.path}`;
-  if (!request) return `Registrado por ${logger ?? 'el backend'}${fn ? ` (${fn})` : ''}`;
+  if (client) return t('systemErrors.context.client', { path: client.path });
+  if (!request) {
+    const by = logger ?? t('systemErrors.context.backend');
+    return fn ? t('systemErrors.context.loggedByIn', { logger: by, fn }) : t('systemErrors.context.loggedBy', { logger: by });
+  }
   const status = response ? ` → ${response.status}` : '';
   const time = ms != null ? ` · ${ms} ms` : '';
   return `${request.method ?? ''} ${request.path ?? ''}${status}${time}`.trim();
@@ -202,9 +229,11 @@ function summaryOf({ request, response, duration_ms: ms, logger, function: fn, c
 &nbsp;
 /** Quién, de qué empresa y desde qué IP. */
 function whoOf({ user, company_id: company, request, client }: ErrorContext): string {
-  const account = user ? `${user.email ?? `Cuenta #${user.id}`} · ${user.role ?? 'sin rol'}` : 'Sin sesión';
+  const account = user
+    ? `${user.email ?? t('systemErrors.context.account', { id: user.id })} · ${user.role ?? t('systemErrors.context.noRole')}`
+    : t('systemErrors.detail.noSession');
   const ip = request?.ip ?? client?.ip;
-  return [account, company != null &amp;&amp; `Empresa #${company}`, ip &amp;&amp; `IP ${ip}`].filter(Boolean).join(' · ');
+  return [account, company != null &amp;&amp; t('systemErrors.context.company', { id: company }), ip &amp;&amp; t('systemErrors.context.ip', { ip })].filter(Boolean).join(' · ');
 }
 &nbsp;
 /**
@@ -214,23 +243,27 @@ function whoOf({ user, company_id: company, request, client }: ErrorContext): st
  * nombre, tipo y tamaño (lo decide el backend). Plegado: se abre solo cuando hace falta.
  */
 export function OccurrenceContext({ context }: { context: ErrorContext }) {
+  const t = useT();
   const { request, response, client } = context;
   return (
     &lt;details className="occurrence-context"&gt;
       &lt;summary&gt;
-        Contexto: &lt;code&gt;{summaryOf(context)}&lt;/code&gt;
+        &lt;Trans k="systemErrors.context.summary" values={{ summary: &lt;code&gt;{summaryOf(context)}&lt;/code&gt; }} /&gt;
       &lt;/summary&gt;
       &lt;p className="small"&gt;{whoOf(context)}&lt;/p&gt;
       {request &amp;&amp; (
         &lt;&gt;
-          {request.query &amp;&amp; &lt;Block title="Parámetros de la URL" value={request.query} /&gt;}
-          {request.headers &amp;&amp; &lt;Block title="Encabezados" value={request.headers} /&gt;}
-          &lt;Block title={`Cuerpo de la petición${request.body_truncated ? ' (cortado)' : ''} · ${request.body_bytes ?? 0} bytes`} value={request.body ?? null} /&gt;
+          {request.query &amp;&amp; &lt;Block title={t('systemErrors.context.query')} value={request.query} /&gt;}
+          {request.headers &amp;&amp; &lt;Block title={t('systemErrors.context.headers')} value={request.headers} /&gt;}
+          &lt;Block
+            title={t(request.body_truncated ? 'systemErrors.context.bodyCut' : 'systemErrors.context.body', { bytes: formatCount(request.body_bytes ?? 0) })}
+            value={request.body ?? null}
+          /&gt;
         &lt;/&gt;
       )}
-      {response &amp;&amp; &lt;Block title={`Respuesta (${response.status})`} value={response.body} /&gt;}
-      {client &amp;&amp; &lt;Block title="Aplicación web" value={client} /&gt;}
-      {!request &amp;&amp; !client &amp;&amp; &lt;Block title="Dónde" value={{ logger: context.logger, thread: context.thread, function: context.function }} /&gt;}
+      {response &amp;&amp; &lt;Block title={t('systemErrors.context.response', { status: response.status })} value={response.body} /&gt;}
+      {client &amp;&amp; &lt;Block title={t('systemErrors.context.app')} value={client} /&gt;}
+      {!request &amp;&amp; !client &amp;&amp; &lt;Block title={t('systemErrors.list.where')} value={{ logger: context.logger, thread: context.thread, function: context.function }} /&gt;}
     &lt;/details&gt;
   );
 }
@@ -241,7 +274,7 @@ export function OccurrenceContext({ context }: { context: ErrorContext }) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

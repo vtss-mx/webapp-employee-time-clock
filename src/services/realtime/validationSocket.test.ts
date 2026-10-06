@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../i18n/core';
 import { apiOk, mockFetch } from '../../test/http';
 import { configureApiClient } from '../apiClient';
 import { checkAvailability } from '../availabilityService';
@@ -44,8 +45,27 @@ beforeEach(() => configureApiClient({ getToken: () => 'token-1', onUnauthorized:
 afterEach(() => vi.useRealTimers());
 
 describe('ValidationSocket', () => {
-  it('construye la URL ws/wss a partir de la API', () => {
-    expect(realtimeUrl()).toBe('ws://localhost:3000/api/ws/validation');
+  it('construye la URL ws/wss a partir de la API, con el idioma activo', async () => {
+    expect(realtimeUrl()).toBe('ws://localhost:3000/api/ws/validation?lang=es-MX');
+    await setLocale('en-US');
+    expect(realtimeUrl()).toBe('ws://localhost:3000/api/ws/validation?lang=en-US');
+  });
+
+  it('al cambiar el idioma, la siguiente consulta abre una conexión nueva en ese idioma (la anterior se cierra)', async () => {
+    const sockets: FakeSocket[] = [];
+    const channel = new ValidationSocket((url) => {
+      const socket = new FakeSocket(url, server);
+      sockets.push(socket);
+      return socket as unknown as WebSocket;
+    });
+    await channel.request({ type: 'validate', field: 'employee_number', value: 'EMP-2' });
+    await channel.request({ type: 'validate', field: 'employee_number', value: 'EMP-2' });
+    expect(sockets).toHaveLength(1); // mismo idioma: misma conexión
+    await setLocale('en-US');
+    const answer = await channel.request({ type: 'validate', field: 'employee_number', value: 'EMP-2' });
+    expect(answer.code).toBe('AVAILABLE');
+    expect(sockets.map((s) => new URL(s.url).searchParams.get('lang'))).toEqual(['es-MX', 'en-US']);
+    channel.close();
   });
 
   it('se autentica con el primer mensaje y empareja respuestas por id', async () => {
@@ -164,7 +184,7 @@ describe('ValidationSocket: fallas del canal', () => {
     vi.stubEnv('VITE_API_URL', 'https://api.ejemplo.mx/api');
     vi.resetModules();
     const fresh = await import('./validationSocket');
-    expect(fresh.realtimeUrl()).toBe('wss://api.ejemplo.mx/api/ws/validation');
+    expect(fresh.realtimeUrl()).toBe('wss://api.ejemplo.mx/api/ws/validation?lang=es-MX');
     vi.unstubAllEnvs();
     vi.resetModules();
   });

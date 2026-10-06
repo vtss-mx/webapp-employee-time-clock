@@ -2,6 +2,7 @@ import { Ban, QrCode, RefreshCw } from 'lucide-react';
 import { useAction } from '../hooks/useAction';
 import { useResource } from '../hooks/useResource';
 import { useVerificationPolicy } from '../hooks/useVerificationPolicy';
+import { t, useLocale } from '../i18n';
 import { employeeService } from '../services/employeeService';
 import { formatDateTime, timeAgo } from '../utils/format';
 import { Button } from './ui/Button';
@@ -14,61 +15,59 @@ import { RetryState } from './ui/RetryState';
  * imprime. Aquí ve su actividad y puede invalidar el vigente (su teléfono muestra otro).
  */
 export function QrCodePanel({ employeeId }: { employeeId: number }) {
+  useLocale(); // textos con `t` al dibujarse; los popups reciben funciones y siguen al idioma abiertos
   const { policy } = useVerificationPolicy();
-  const { data: summary, setData, error, retry } = useResource((signal) => employeeService.qrSummary(employeeId, signal), employeeId, 'No se pudo cargar la actividad del QR');
+  const { data: summary, setData, error, retry } = useResource((signal) => employeeService.qrSummary(employeeId, signal), employeeId, () => t('qr.panel.errorTitle'));
   const action = useAction();
   const busy = action.busy !== null;
 
   const revoke = () =>
     action.run(() => employeeService.revokeQr(employeeId), {
-      confirm: {
+      confirm: () => ({
         kind: 'delete',
         icon: <Ban size={30} />,
-        eyebrow: 'Código QR',
-        title: '¿Invalidar el código vigente?',
-        message: 'El código que el empleado tiene en pantalla dejará de servir de inmediato; en su teléfono podrá mostrar uno nuevo.',
-        confirmLabel: 'Invalidar',
+        eyebrow: t('qr.panel.revoke.eyebrow'),
+        title: t('qr.panel.revoke.title'),
+        message: t('qr.panel.revoke.message'),
+        confirmLabel: t('qr.panel.revoke.confirm'),
         confirmIcon: <Ban size={18} />,
-      },
-      errorTitle: 'No se pudo invalidar el código',
-      success: ['Código invalidado', 'El código que tenía en pantalla ya no sirve; en su teléfono podrá mostrar uno nuevo.'],
+      }),
+      errorTitle: () => t('qr.panel.revoke.error'),
+      success: () => [t('qr.panel.revoke.done'), t('qr.panel.revoke.doneText')],
       onSuccess: setData,
     });
 
   const live = summary?.live ?? false;
   return (
     <PanelSection
-      title="Código QR dinámico"
+      title={t('qr.panel.title')}
       icon={<QrCode size={20} />}
-      aside={summary && <span className={`badge ${live ? 'badge--success badge--live' : 'badge--muted'}`}>{live ? 'En pantalla' : 'Sin código vigente'}</span>}
+      aside={summary && <span className={`badge ${live ? 'badge--success badge--live' : 'badge--muted'}`}>{live ? t('qr.panel.live') : t('qr.panel.none')}</span>}
     >
-      <p className="muted">
-        El empleado lo genera en su teléfono (Mi código QR). Cambia cada {policy.qr_lifetime_seconds} s y sirve una sola vez: no se
-        descarga ni se imprime.
-      </p>
+      <p className="muted">{t('qr.panel.intro', { seconds: policy.qr_lifetime_seconds })}</p>
       {!summary && error ? <RetryState onRetry={retry} /> : null}
       {summary && (
         <dl className="details">
           <div>
-            <dt>Vigente hasta</dt>
+            <dt>{t('qr.panel.liveUntil')}</dt>
             <dd>{summary.live_until ? formatDateTime(summary.live_until) : '—'}</dd>
           </div>
           <div>
-            <dt>Último generado</dt>
-            <dd title={summary.last_issued_at ? formatDateTime(summary.last_issued_at) : undefined}>{summary.last_issued_at ? timeAgo(summary.last_issued_at) : 'Nunca'}</dd>
+            <dt>{t('qr.panel.lastIssued')}</dt>
+            <dd title={summary.last_issued_at ? formatDateTime(summary.last_issued_at) : undefined}>{summary.last_issued_at ? timeAgo(summary.last_issued_at) : t('qr.panel.never')}</dd>
           </div>
           <div>
-            <dt>Último uso</dt>
-            <dd title={summary.last_used_at ? formatDateTime(summary.last_used_at) : undefined}>{summary.last_used_at ? timeAgo(summary.last_used_at) : 'Nunca'}</dd>
+            <dt>{t('qr.panel.lastUsed')}</dt>
+            <dd title={summary.last_used_at ? formatDateTime(summary.last_used_at) : undefined}>{summary.last_used_at ? timeAgo(summary.last_used_at) : t('qr.panel.never')}</dd>
           </div>
         </dl>
       )}
       <div className="button-row">
         <Button variant="secondary" icon={<RefreshCw size={18} />} disabled={busy} onClick={retry}>
-          Actualizar
+          {t('common.actions.refresh')}
         </Button>
         <Button variant="danger-outline" icon={<Ban size={18} />} loading={busy} disabled={!live} onClick={() => void revoke()}>
-          Invalidar código vigente
+          {t('qr.panel.revoke.action')}
         </Button>
       </div>
     </PanelSection>

@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
+import { useT } from '../../i18n';
 import { foldText } from '../../utils/phone';
 import { Floating } from './Floating';
 
@@ -24,6 +25,8 @@ export interface SelectProps<T extends string = string> {
   'aria-label'?: string;
   /** Etiqueta visible que nombra al control (en lugar de aria-label). */
   'aria-labelledby'?: string;
+  /** Ayuda o error bajo el control (el id del mensaje que lo describe). */
+  'aria-describedby'?: string;
   id?: string;
   /** Ícono fijo del control (si la opción elegida no trae el suyo). */
   icon?: ReactNode;
@@ -164,12 +167,13 @@ function useSelectList<T extends string>(
  */
 export function Select<T extends string = string>(props: SelectProps<T>) {
   const { value, options, onChange, id, renderOption } = props;
+  const t = useT();
   const baseId = useId();
   const ids = { list: `${baseId}-list`, value: `${baseId}-value`, label: `${baseId}-label` };
   const [query, setQuery] = useState('');
   const visible = props.searchable ? filterOptions(options, query) : options;
   const list = useSelectList(options, visible, value, onChange, { disabled: Boolean(props.disabled), searchable: Boolean(props.searchable), onOpen: () => setQuery('') });
-  const view = selectView(props, list.selected, ids.label);
+  const view = selectView(props, list.selected, ids.label, t('ui.select.placeholder'));
   const search = props.searchable ? (
     <SelectSearch
       inputRef={list.searchRef}
@@ -204,6 +208,7 @@ export function Select<T extends string = string>(props: SelectProps<T>) {
         aria-expanded={list.open}
         aria-controls={list.open ? ids.list : undefined}
         aria-labelledby={view.labelledBy && `${view.labelledBy} ${ids.value}`}
+        aria-describedby={props['aria-describedby']}
         title={list.selected?.title}
         onClick={() => (list.open ? list.close() : list.show())}
         onKeyDown={list.onTriggerKey}
@@ -238,14 +243,14 @@ export function Select<T extends string = string>(props: SelectProps<T>) {
 }
 
 /** Lo que muestra el control según sus opciones de personalización (tamaño, tono, ícono...). */
-function selectView<T extends string>(props: SelectProps<T>, selected: SelectOption<T> | null, labelId: string) {
+function selectView<T extends string>(props: SelectProps<T>, selected: SelectOption<T> | null, labelId: string, placeholder: string) {
   const icon = selected?.icon ?? props.icon;
   const classes = ['select', `select--${props.size ?? 'md'}`, `select--${props.tone ?? 'light'}`, icon && 'select--with-icon', props.className];
   return {
     icon,
     className: classes.filter(Boolean).join(' '),
     labelledBy: props['aria-labelledby'] ?? (props['aria-label'] ? labelId : undefined),
-    valueText: selected?.label ?? props.placeholder ?? 'Selecciona una opción',
+    valueText: selected?.label ?? props.placeholder ?? placeholder,
     valueClass: selected ? 'select__value' : 'select__value select__value--placeholder',
   };
 }
@@ -336,7 +341,8 @@ interface SelectSearchProps {
 
 /** Buscador de la lista (patrón combobox: el foco queda en él y las flechas recorren las opciones). */
 function SelectSearch({ inputRef, listId, activeId, options, query, empty, onQuery, onKeyDown }: SelectSearchProps) {
-  const placeholder = options.placeholder ?? 'Buscar...';
+  const t = useT();
+  const placeholder = options.placeholder ?? t('ui.select.search');
   return (
     <>
       <div className="select__search">
@@ -360,7 +366,7 @@ function SelectSearch({ inputRef, listId, activeId, options, query, empty, onQue
       </div>
       {empty && (
         <p className="select__empty" role="status">
-          {options.empty ?? 'Sin resultados'}
+          {options.empty ?? t('ui.select.empty')}
         </p>
       )}
     </>

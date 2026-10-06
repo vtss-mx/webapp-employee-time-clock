@@ -8,9 +8,10 @@ import { PagedItems } from '../../components/ui/PagedItems';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
-import { useAction } from '../../hooks/useAction';
+import { useAction, type SuccessNotice } from '../../hooks/useAction';
 import { useResource } from '../../hooks/useResource';
 import { useSearchList } from '../../hooks/useSearchList';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { departmentService } from '../../services/departmentService';
 import { employeeService } from '../../services/employeeService';
@@ -24,15 +25,16 @@ type Role = 'employees' | 'managers';
  * deja (cada empleado está en uno solo), así que se resalta como un cambio de departamento.
  */
 function assignConfirm(role: Role, department: Department, employee: Employee): ConfirmInput {
-  const person = { label: 'Empleado', value: `${employee.full_name} · No. ${employee.employee_number}` };
+  const person = { label: t('common.fields.employee'), value: t('departments.person', { name: employee.full_name, number: employee.employee_number }) };
+  const names = { name: employee.full_name, department: department.name };
   if (role === 'managers') {
     return {
       icon: <ShieldCheck size={30} />,
-      eyebrow: 'Nuevo responsable',
-      title: `¿Nombrar a ${employee.full_name} responsable de ${department.name}?`,
-      message: 'Un departamento puede tener varios responsables y una persona puede dirigir varios. Su departamento asignado no cambia.',
+      eyebrow: t('departments.assign.managerConfirm.eyebrow'),
+      title: t('departments.assign.managerConfirm.title', names),
+      message: t('departments.assign.managerConfirm.message'),
       details: [person],
-      confirmLabel: 'Nombrar responsable',
+      confirmLabel: t('departments.assign.managers.action'),
       confirmIcon: <UserPlus size={18} />,
     };
   }
@@ -41,54 +43,53 @@ function assignConfirm(role: Role, department: Department, employee: Employee): 
     return {
       tone: 'warning',
       icon: <ArrowRightLeft size={30} />,
-      eyebrow: 'Cambiar de departamento',
-      title: `¿Cambiar a ${employee.full_name} a ${department.name}?`,
-      message: `Dejará ${from}: cada empleado está en un solo departamento.`,
-      changes: [{ label: 'Departamento', before: from, after: department.name }],
+      eyebrow: t('departments.assign.moveConfirm.eyebrow'),
+      title: t('departments.assign.moveConfirm.title', names),
+      message: t('departments.assign.moveConfirm.message', { from }),
+      changes: [{ label: t('common.fields.department'), before: from, after: department.name }],
       details: [person],
-      confirmLabel: 'Cambiar aquí',
+      confirmLabel: t('departments.assign.employees.move'),
       confirmIcon: <ArrowRightLeft size={18} />,
     };
   }
   return {
     icon: <UserPlus size={30} />,
-    eyebrow: 'Asignar empleado',
-    title: `¿Asignar a ${employee.full_name} a ${department.name}?`,
-    message: 'Formará parte de este departamento.',
-    changes: [{ label: 'Departamento', before: 'Sin departamento', after: department.name }],
+    eyebrow: t('departments.assign.assignConfirm.eyebrow'),
+    title: t('departments.assign.assignConfirm.title', names),
+    changes: [{ label: t('common.fields.department'), before: t('departments.noDepartment'), after: department.name }],
     details: [person],
-    confirmLabel: 'Asignar',
+    confirmLabel: t('departments.assign.employees.action'),
     confirmIcon: <UserPlus size={18} />,
   };
 }
 
-const COPY: Record<Role, { title: string; hint: string; icon: typeof Users }> = {
-  employees: {
-    title: 'Asignar empleados',
-    hint: 'Cada empleado está en un solo departamento: si ya está en otro, al asignarlo aquí se cambia a este.',
-    icon: Users,
-  },
-  managers: {
-    title: 'Agregar responsables',
-    hint: 'Los responsables son empleados de tu empresa. Un departamento puede tener varios y una persona puede dirigir varios.',
-    icon: ShieldCheck,
-  },
-};
+/** Ícono de cada lista; sus textos están en `departments.assign.<rol>`. */
+const ICONS: Record<Role, typeof Users> = { employees: Users, managers: ShieldCheck };
+
+const loadError = () => t('departments.loadError');
+const employeesError = () => t('employees.list.loadError');
+const assignError = (role: Role) => () => t(`departments.assign.${role}.error`);
+/** El aviso al terminar (se arma al dibujarse: sigue al idioma activo). */
+const assigned = (role: Role, employee: Employee, department: Department): SuccessNotice => [
+  t(`departments.assign.${role}.done`),
+  t(`departments.assign.${role}.doneText`, { name: employee.full_name, department: department.name }),
+];
 
 /** Elegir empleados (con búsqueda y paginado) para asignarlos al departamento o nombrarlos responsables. */
 export function DepartmentAssignPage() {
+  const t = useT();
   const params = useParams();
   const departmentId = Number(params.id);
   const role: Role = params.role === 'managers' ? 'managers' : 'employees';
-  const { data: department, setData, error, retry } = useResource((signal) => departmentService.get(departmentId, signal), departmentId, 'No se pudo cargar el departamento');
-  const list = useSearchList((query, signal) => employeeService.list(query, signal), { errorTitle: 'No se pudieron cargar los empleados' });
+  const { data: department, setData, error, retry } = useResource((signal) => departmentService.get(departmentId, signal), departmentId, loadError);
+  const list = useSearchList((query, signal) => employeeService.list(query, signal), { errorTitle: employeesError });
   const { busy, run } = useAction<number>();
 
   if (!department) {
     return error ? (
       <div className="page">
         <Panel>
-          <PanelHeader title={COPY[role].title} backTo={paths.company.department(departmentId)} backLabel="Departamento" />
+          <PanelHeader title={t(`departments.assign.${role}.title`)} backTo={paths.company.department(departmentId)} backLabel={t('departments.assign.back')} />
           <PanelSection>
             <RetryState onRetry={retry} />
           </PanelSection>
@@ -99,13 +100,13 @@ export function DepartmentAssignPage() {
     );
   }
 
-  const copy = COPY[role];
+  const Icon = ICONS[role];
   const assign = (employee: Employee) =>
     run(() => (role === 'managers' ? departmentService.addManager(department.id, employee.id) : departmentService.assign(department.id, employee.id)), {
       busy: employee.id,
-      confirm: assignConfirm(role, department, employee),
-      errorTitle: role === 'managers' ? 'No se pudo agregar al responsable' : 'No se pudo asignar al empleado',
-      success: role === 'managers' ? ['Responsable agregado', `${employee.full_name} ahora es responsable de ${department.name}.`] : ['Empleado asignado', `${employee.full_name} ahora está en ${department.name}.`],
+      confirm: () => assignConfirm(role, department, employee),
+      errorTitle: assignError(role),
+      success: () => assigned(role, employee, department),
       onSuccess: (saved: Department) => {
         setData(saved);
         if (role === 'employees') {
@@ -117,24 +118,24 @@ export function DepartmentAssignPage() {
   return (
     <div className="page">
       <Panel>
-        <PanelHeader title={copy.title} subtitle={department.name} backTo={paths.company.department(department.id)} backLabel={department.name} />
-        <PanelSection title="Empleados de tu empresa" icon={<copy.icon size={20} />}>
-          <p className="muted small">{copy.hint}</p>
+        <PanelHeader title={t(`departments.assign.${role}.title`)} subtitle={department.name} backTo={paths.company.department(department.id)} backLabel={department.name} />
+        <PanelSection title={t('departments.assign.section')} icon={<Icon size={20} />}>
+          <p className="muted small">{t(`departments.assign.${role}.hint`)}</p>
           <ListToolbar
             search={list.search}
             onSearch={list.setSearch}
-            placeholder="Buscar por nombre, número, RFC o correo"
-            label="Buscar empleados"
+            placeholder={t('employees.list.searchPlaceholder')}
+            label={t('employees.list.searchLabel')}
             filter={list.filter}
             onFilter={list.setFilter}
           />
           <PagedItems
             list={list}
-            pager={{ noun: { one: 'empleado', other: 'empleados' } }}
+            pager={{ noun: { one: t('employees.noun.one'), other: t('employees.noun.other') } }}
             empty={
               list.filtered
-                ? { icon: <SearchX />, title: 'Ningún empleado coincide con la búsqueda', description: 'Prueba con otro nombre, número de empleado, RFC o correo.' }
-                : { icon: <Users />, title: 'No hay empleados registrados', description: 'Registra a tu personal en Empleados para asignarlo a sus departamentos.' }
+                ? { icon: <SearchX />, title: t('employees.list.noMatch.title'), description: t('departments.assign.noMatch') }
+                : { icon: <Users />, title: t('employees.list.empty.title'), description: t('departments.assign.empty') }
             }
           >
             {(items) => (
@@ -148,7 +149,7 @@ export function DepartmentAssignPage() {
         </PanelSection>
         <PanelFooter>
           <ButtonLink to={paths.company.department(department.id)} variant="primary" size="lg" icon={<Check size={20} />}>
-            Listo
+            {t('departments.assign.done')}
           </ButtonLink>
         </PanelFooter>
       </Panel>
@@ -168,10 +169,11 @@ interface CandidateProps {
 
 /** Un empleado en la lista: si ya es parte (o responsable) se indica; si no, el botón para hacerlo. */
 function Candidate({ employee, department, role, busy, locked, onAssign }: CandidateProps) {
+  const t = useT();
   const here = role === 'managers' ? department.managers.some((m) => m.employee_id === employee.id) : employee.department_id === department.id;
   const elsewhere = role === 'employees' && !here && employee.department_name;
-  const detail = elsewhere ? `No. ${employee.employee_number} · En ${employee.department_name}` : `No. ${employee.employee_number}`;
-  const label = role === 'managers' ? 'Nombrar responsable' : elsewhere ? 'Cambiar aquí' : 'Asignar';
+  const detail = elsewhere ? t('departments.assign.elsewhere', { number: employee.employee_number, department: elsewhere }) : t('employees.number', { number: employee.employee_number });
+  const label = elsewhere ? t('departments.assign.employees.move') : t(`departments.assign.${role}.action`);
   return (
     <PersonItem
       name={employee.full_name}
@@ -180,10 +182,10 @@ function Candidate({ employee, department, role, busy, locked, onAssign }: Candi
       actions={
         here ? (
           <span className="badge badge--success">
-            <Check size={14} /> {role === 'managers' ? 'Responsable' : 'Asignado'}
+            <Check size={14} /> {t(`departments.assign.${role}.badge`)}
           </span>
         ) : (
-          <Button size="sm" variant="secondary" icon={elsewhere ? <ArrowRightLeft size={16} /> : <UserPlus size={16} />} loading={busy} disabled={locked} aria-label={`${label}: ${employee.full_name}`} onClick={onAssign}>
+          <Button size="sm" variant="secondary" icon={elsewhere ? <ArrowRightLeft size={16} /> : <UserPlus size={16} />} loading={busy} disabled={locked} aria-label={t('departments.assign.actionLabel', { action: label, name: employee.full_name })} onClick={onAssign}>
             {label}
           </Button>
         )

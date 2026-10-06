@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../hooks/useAuth';
+import { resolveLazy } from '../i18n';
 import { currentAccessToken, renewAccessToken } from '../services/apiClient';
 import { authService } from '../services/authService';
 import { apiFail, apiOk, envelope, jsonResponse, type MockCall, mockFetch, testSession } from '../test/http';
@@ -67,7 +68,7 @@ describe('AuthProvider: renovación y restauración', () => {
       await expect(renewAccessToken()).resolves.toBe(false);
     });
     expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.logoutReason).toBe('Tu sesión ha expirado. Inicia sesión nuevamente.');
+    expect(resolveLazy(result.current.logoutReason ?? '')).toBe('Tu sesión expiró. Inicia sesión de nuevo.');
   });
 
   it('una renovación que falla sin motivo no se toma como éxito: queda anónimo', async () => {

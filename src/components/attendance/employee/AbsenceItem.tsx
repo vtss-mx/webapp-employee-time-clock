@@ -1,4 +1,5 @@
 import { useCatalogs } from '../../../hooks/useCatalogs';
+import { useT } from '../../../i18n';
 import type { Absence } from '../../../types';
 import { formatDateTime, timeAgo } from '../../../utils/format';
 import { daysText, rangeText } from '../../calendar/calendarRules';
@@ -20,6 +21,7 @@ interface AbsenceItemProps {
  */
 export function AbsenceItem({ absence, busy, onCancel }: AbsenceItemProps) {
   const { nameOf } = useCatalogs();
+  const t = useT();
   const Icon = dayOffIcon(absence.type);
   return (
     <AttendanceItem
@@ -31,21 +33,21 @@ export function AbsenceItem({ absence, busy, onCancel }: AbsenceItemProps) {
     >
       <dl className="details attendance-item__facts">
         <div>
-          <dt>Días</dt>
+          <dt>{t('myAttendance.items.days')}</dt>
           <dd>{daysText(absence.days)}</dd>
         </div>
         <div>
-          <dt>{absence.requested_by_employee ? 'La pediste' : 'La registró tu empresa'}</dt>
+          <dt>{t(absence.requested_by_employee ? 'myAttendance.items.requestedByYou' : 'myAttendance.items.registeredByCompany')}</dt>
           <dd title={formatDateTime(absence.created_at)}>{timeAgo(absence.created_at)}</dd>
         </div>
         {absence.note && (
           <div className="attendance-item__wide">
-            <dt>Nota</dt>
+            <dt>{t('common.fields.note')}</dt>
             <dd>{absence.note}</dd>
           </div>
         )}
       </dl>
-      {absence.decision_note && <ItemNote label="Respuesta de tu empresa:">{absence.decision_note}</ItemNote>}
+      {absence.decision_note && <ItemNote label={t('myAttendance.items.companyReply')}>{absence.decision_note}</ItemNote>}
     </AttendanceItem>
   );
 }

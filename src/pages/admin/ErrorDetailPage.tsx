@@ -13,18 +13,20 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { usePagedList } from '../../hooks/usePagedList';
 import { notifyErrorsChanged } from '../../hooks/usePendingErrors';
 import { useResource } from '../../hooks/useResource';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { errorReportService } from '../../services/errorReportService';
 import type { ErrorReportDetail, ErrorStatus } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
 import { formatDateTime } from '../../utils/format';
+import { formatCount } from '../../utils/numbers';
 import { whereOf } from './ErrorsPage';
 
-const SOURCES: Record<string, string> = {
-  HTTP: 'Respuesta de la API',
-  LOG: 'Proceso del backend (segundo plano o interno)',
-  WEBSOCKET: 'Canal en vivo (WebSocket)',
-  CLIENT: 'Aplicación web (navegador)',
+/** De dónde vino el error (código del backend → su texto); uno desconocido se muestra tal cual. */
+const SOURCES: Partial<Record<string, 'http' | 'log' | 'websocket' | 'client'>> = { HTTP: 'http', LOG: 'log', WEBSOCKET: 'websocket', CLIENT: 'client' };
+const sourceText = (source: string) => {
+  const key = SOURCES[source];
+  return key ? t(`systemErrors.detail.sources.${key}`) : source;
 };
 
 /** Cambiar el seguimiento: "antes → después" con los nombres del catálogo y de qué error se trata. */
@@ -34,27 +36,34 @@ function statusConfirm(report: ErrorReportDetail, status: ErrorStatus, current: 
     kind: 'edit',
     tone: resolved ? 'success' : 'primary',
     icon: resolved ? <CheckCheck size={30} /> : <ListChecks size={30} />,
-    eyebrow: 'Seguimiento del error',
-    title: `¿Marcar ${report.code} como ${next.toLowerCase()}?`,
-    message: resolved ? 'Si vuelve a ocurrir, se reabre solo como pendiente.' : 'Queda registrado quién lo cambió y cuándo.',
-    changes: [{ label: 'Seguimiento', before: current, after: next }],
+    eyebrow: t('systemErrors.detail.confirmEyebrow'),
+    title: t('systemErrors.detail.confirmTitle', { code: report.code, status: next.toLowerCase() }),
+    message: t(resolved ? 'systemErrors.detail.confirmResolved' : 'systemErrors.detail.confirmMessage'),
+    changes: [{ label: t('systemErrors.list.status'), before: current, after: next }],
     details: [
-      { label: 'Mensaje', value: report.message },
-      { label: 'Dónde', value: whereOf(report) },
-      { label: 'Ocurrencias', value: report.occurrences.toLocaleString('es-MX') },
+      { label: t('systemErrors.detail.message'), value: report.message },
+      { label: t('systemErrors.list.where'), value: whereOf(report) },
+      { label: t('systemErrors.detail.occurrences'), value: formatCount(report.occurrences) },
     ],
-    confirmLabel: `Marcar como ${next.toLowerCase()}`,
+    confirmLabel: t('systemErrors.detail.markAs', { status: next.toLowerCase() }),
     confirmIcon: resolved ? <CheckCheck size={18} /> : <ListChecks size={18} />,
   };
 }
 
+/* Títulos y avisos que se traducen al dibujarse (un popup abierto sigue al idioma activo). */
+const loadError = () => t('systemErrors.detail.loadError');
+const occurrencesError = () => t('systemErrors.detail.occurrencesError');
+const statusError = () => t('systemErrors.detail.statusError');
+const statusNotice = () => [t('systemErrors.detail.statusSaved')] as const;
+
 /** Detalle de un error del sistema: dónde y cuántas veces, su stack trace, quién lo provocó y su seguimiento. */
 export function ErrorDetailPage() {
+  const t = useT();
   const reportId = Number(useParams().id);
   const { active, nameOf } = useCatalogs();
-  const { data: report, setData, error, retry } = useResource((signal) => errorReportService.get(reportId, signal), reportId, 'No se pudo cargar el error');
+  const { data: report, setData, error, retry } = useResource((signal) => errorReportService.get(reportId, signal), reportId, loadError);
   const occurrences = usePagedList((page, signal) => errorReportService.occurrences(reportId, page, signal), {
-    errorTitle: 'No se pudieron cargar sus ocurrencias',
+    errorTitle: occurrencesError,
     filterKey: String(reportId),
   });
   const { busy, run } = useAction<ErrorStatus>();
@@ -63,7 +72,7 @@ export function ErrorDetailPage() {
     return error ? (
       <div className="page">
         <Panel>
-          <PanelHeader title="Error del sistema" backTo={paths.admin.errors} backLabel="Errores del sistema" />
+          <PanelHeader title={t('systemErrors.detail.title')} backTo={paths.admin.errors} backLabel={t('systemErrors.title')} />
           <PanelSection>
             <RetryState onRetry={retry} />
           </PanelSection>
@@ -77,9 +86,9 @@ export function ErrorDetailPage() {
   const mark = (status: ErrorStatus, name: string) =>
     run(() => errorReportService.setStatus(report.id, status), {
       busy: status,
-      confirm: statusConfirm(report, status, nameOf('error_statuses', report.status), name),
-      errorTitle: 'No se pudo actualizar el seguimiento',
-      success: ['Seguimiento actualizado', `El error quedó como «${name}».`],
+      confirm: () => statusConfirm(report, status, nameOf('error_statuses', report.status), name),
+      errorTitle: statusError,
+      success: statusNotice,
       onSuccess: (saved) => {
         setData(saved);
         notifyErrorsChanged();
@@ -93,7 +102,7 @@ export function ErrorDetailPage() {
           title={report.code}
           subtitle={report.message}
           backTo={paths.admin.errors}
-          backLabel="Errores del sistema"
+          backLabel={t('systemErrors.title')}
           actions={
             <>
               <CatalogStatusBadge catalog="error_severities" code={report.severity} />
@@ -101,74 +110,70 @@ export function ErrorDetailPage() {
             </>
           }
         />
-        <PanelSection title="Seguimiento" icon={<ListChecks size={20} />}>
+        <PanelSection title={t('systemErrors.list.status')} icon={<ListChecks size={20} />}>
           <p className="muted small">
             {report.status_changed_by
-              ? `Último cambio: ${report.status_changed_by}, ${formatDateTime(report.status_changed_at)}.`
-              : 'Aún nadie le ha dado seguimiento.'}{' '}
-            Si un error solucionado vuelve a ocurrir, se reabre solo como pendiente.
+              ? t('systemErrors.detail.lastChange', { who: report.status_changed_by, date: formatDateTime(report.status_changed_at) })
+              : t('systemErrors.detail.noFollowUp')}{' '}
+            {t('systemErrors.detail.reopenNote')}
           </p>
           <div className="button-row">
             {active('error_statuses')
               .filter((s) => s.code !== report.status)
               .map((s) => (
                 <Button key={s.code} variant={s.code === 'RESOLVED' ? 'success' : 'secondary'} loading={busy === s.code} disabled={busy !== null} onClick={() => void mark(s.code, s.name)}>
-                  Marcar como {s.name.toLowerCase()}
+                  {t('systemErrors.detail.markAs', { status: s.name.toLowerCase() })}
                 </Button>
               ))}
           </div>
         </PanelSection>
         <PanelGrid>
-          <PanelSection title="Datos" icon={<ClipboardList size={20} />}>
+          <PanelSection title={t('systemErrors.detail.data')} icon={<ClipboardList size={20} />}>
             <dl className="details">
               <div>
-                <dt>Origen</dt>
-                <dd>{SOURCES[report.source] ?? report.source}</dd>
+                <dt>{t('systemErrors.detail.source')}</dt>
+                <dd>{sourceText(report.source)}</dd>
               </div>
               <div>
-                <dt>Dónde</dt>
+                <dt>{t('systemErrors.list.where')}</dt>
                 <dd>{whereOf(report)}</dd>
               </div>
               <div>
-                <dt>Excepción</dt>
-                <dd>{report.exception_type ?? <span className="muted">Controlado (sin excepción)</span>}</dd>
+                <dt>{t('systemErrors.detail.exception')}</dt>
+                <dd>{report.exception_type ?? <span className="muted">{t('systemErrors.detail.handled')}</span>}</dd>
               </div>
               <div>
-                <dt>Ocurrencias</dt>
+                <dt>{t('systemErrors.detail.occurrences')}</dt>
                 <dd>
-                  {report.occurrences.toLocaleString('es-MX')}
-                  {report.reopened > 0 && ` · reabierto ${report.reopened} ${report.reopened === 1 ? 'vez' : 'veces'}`}
+                  {formatCount(report.occurrences)}
+                  {report.reopened > 0 && ` · ${t('systemErrors.detail.reopened', { count: report.reopened })}`}
                 </dd>
               </div>
               <div>
-                <dt>Primera vez</dt>
+                <dt>{t('systemErrors.detail.firstSeen')}</dt>
                 <dd>{formatDateTime(report.first_seen_at)}</dd>
               </div>
               <div>
-                <dt>Última vez</dt>
+                <dt>{t('systemErrors.list.lastSeen')}</dt>
                 <dd>{formatDateTime(report.last_seen_at)}</dd>
               </div>
             </dl>
             {report.last_trace_id && (
               <div className="stack">
-                <span className="small muted">Último traceId (búscalo en los logs del servidor)</span>
-                <CopyField value={report.last_trace_id} label="Copiar traceId" />
+                <span className="small muted">{t('systemErrors.detail.lastTrace')}</span>
+                <CopyField value={report.last_trace_id} label={t('systemErrors.detail.copyTrace')} />
               </div>
             )}
           </PanelSection>
-          <PanelSection title="Detalle técnico" icon={<Code2 size={20} />}>
-            {report.detail ? (
-              <pre className="code-block">{report.detail}</pre>
-            ) : (
-              <p className="muted">Sin stack trace: el backend lo respondió de forma controlada ({report.code}).</p>
-            )}
+          <PanelSection title={t('systemErrors.detail.technical')} icon={<Code2 size={20} />}>
+            {report.detail ? <pre className="code-block">{report.detail}</pre> : <p className="muted">{t('systemErrors.detail.noStack', { code: report.code })}</p>}
           </PanelSection>
         </PanelGrid>
-        <PanelSection title="Ocurrencias recientes" icon={<Activity size={20} />}>
+        <PanelSection title={t('systemErrors.detail.recent')} icon={<Activity size={20} />}>
           <PagedItems
             list={occurrences}
-            pager={{ noun: { one: 'ocurrencia', other: 'ocurrencias' } }}
-            empty={{ compact: true, icon: <Bug />, title: 'Sin ocurrencias recientes', description: 'Las ocurrencias viejas se depuran solas; el total sigue contando arriba.' }}
+            pager={{ noun: { one: t('systemErrors.detail.occurrenceNoun.one'), other: t('systemErrors.detail.occurrenceNoun.other') } }}
+            empty={{ compact: true, icon: <Bug />, title: t('systemErrors.detail.noRecentTitle'), description: t('systemErrors.detail.noRecentDescription') }}
           >
             {(items) => (
               <ul className="log-list log-list--stacked">
@@ -176,7 +181,9 @@ export function ErrorDetailPage() {
                   <li key={o.id}>
                     <strong>{formatDateTime(o.occurred_at)}</strong>
                     <span className="small muted">
-                      {[o.user_label ?? 'Sin sesión', o.company_name, o.trace_id && `traceId ${o.trace_id}`].filter(Boolean).join(' · ')}
+                      {[o.user_label ?? t('systemErrors.detail.noSession'), o.company_name, o.trace_id && t('systemErrors.detail.trace', { id: o.trace_id })]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                     <span className="small">{o.message}</span>
                     {o.context && <OccurrenceContext context={o.context} />}

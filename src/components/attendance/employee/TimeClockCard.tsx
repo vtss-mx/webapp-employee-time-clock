@@ -2,6 +2,7 @@ import { CalendarClock, Coffee } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCatalogs } from '../../../hooks/useCatalogs';
 import { useConfirm } from '../../../hooks/useConfirm';
+import { t, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { ATTENDANCE_SLUGS } from '../../../services/attendanceService';
 import type { AttendanceAction, AttendanceToday, Occurrence, ShiftRef, WorkSession } from '../../../types';
@@ -13,6 +14,7 @@ import { MinutesBadge } from '../MinutesBadge';
 import { ACTION_ICONS } from '../sessionFacts';
 import { usePlaceLabel } from '../SessionTimeline';
 import { DayOffCard } from './DayOffCard';
+import type { SiteCodeIntent } from './SiteCodeStep';
 import { Countdown, Elapsed } from './LiveTime';
 import { minutesBetween } from './serverTime';
 import { breakWindowText, clockCountdown, clockState, openBreak, primaryAction, recordLabel } from './todayView';
@@ -27,6 +29,7 @@ interface ClockProps {
 
 /** Su turno (nombre, horario y días) y, si ahora no hay jornada que checar, cuándo es la siguiente. */
 function ClockShift({ shift, next }: { shift: ShiftRef; next: Occurrence | null }) {
+  const t = useT();
   return (
     <div className="time-clock__shift">
       <span className="time-clock__eyebrow">{shift.name}</span>
@@ -34,7 +37,7 @@ function ClockShift({ shift, next }: { shift: ShiftRef; next: Occurrence | null 
       <span className="time-clock__days">{weekdaysLabel(shift.weekdays)}</span>
       {next && (
         <span className="time-clock__days">
-          <CalendarClock size={16} aria-hidden /> Próxima jornada: {formatDate(next.work_date)} · puedes checar desde las {formatTime(next.opens)}
+          <CalendarClock size={16} aria-hidden /> {t('myAttendance.clock.nextWorkday', { date: formatDate(next.work_date), time: formatTime(next.opens) })}
         </span>
       )}
     </div>
@@ -46,18 +49,19 @@ function ClockShift({ shift, next }: { shift: ShiftRef; next: Occurrence | null 
  * descanso se detiene) y los descansos usados de los permitidos.
  */
 function OpenSession({ session, offsetMs }: { session: WorkSession; offsetMs: number }) {
+  const t = useT();
   const place = usePlaceLabel();
   const pause = openBreak(session);
   return (
     <dl className="time-clock__facts">
       <div>
-        <dt>Entrada</dt>
+        <dt>{t('myAttendance.clock.checkIn')}</dt>
         <dd>
           {formatTime(session.check_in_at)} <small>{place(session.check_in_mode, session.check_in_site)}</small>
         </dd>
       </div>
       <div>
-        <dt>Trabajado</dt>
+        <dt>{t('myAttendance.clock.worked')}</dt>
         <dd>
           {pause ? (
             formatMinutes(minutesBetween(session.check_in_at, pause.started_at) - session.break_minutes)
@@ -68,26 +72,22 @@ function OpenSession({ session, offsetMs }: { session: WorkSession; offsetMs: nu
       </div>
       {pause && (
         <div>
-          <dt>En descanso desde</dt>
+          <dt>{t('myAttendance.clock.onBreakSince')}</dt>
           <dd>{formatTime(pause.started_at)}</dd>
         </div>
       )}
       {session.breaks_allowed > 0 && (
         <div>
-          <dt>Descansos</dt>
+          <dt>{t('myAttendance.clock.breaks')}</dt>
           <dd>
-            {session.breaks.length} de {session.breaks_allowed} <small>de {formatMinutes(session.break_minutes_allowed)} cada uno</small>
+            {t('myAttendance.clock.breaksUsed', { used: session.breaks.length, allowed: session.breaks_allowed })}{' '}
+            <small>{t('myAttendance.clock.breakLength', { duration: formatMinutes(session.break_minutes_allowed) })}</small>
           </dd>
         </div>
       )}
     </dl>
   );
 }
-
-/** Lo que se aclara al confirmar cada registro (la salida cierra la jornada). */
-const RECORD_NOTES: Partial<Record<AttendanceAction, string>> = {
-  CHECK_OUT: 'Con tu salida se cierra tu jornada de hoy.',
-};
 
 /**
  * Botones grandes de lo que el servidor permite ahora (`today.actions`), al alcance del pulgar. Cada
@@ -101,20 +101,26 @@ function ClockActions({ today, shift }: { today: AttendanceToday; shift: ShiftRe
   if (!today.actions.length) return null;
   const primary = primaryAction(today);
   const record = async (action: AttendanceAction) => {
-    const name = nameOf('attendance_actions', action);
     const Icon = ACTION_ICONS[action];
-    const ok = await confirm({
-      kind: 'create',
-      icon: <Icon size={30} />,
-      eyebrow: 'Mi asistencia',
-      title: `¿Registrar tu ${name.toLowerCase()}?`,
-      message: 'Se leerá tu ubicación y se abrirá la cámara para confirmar que eres tú. La hora la pone el servidor.',
-      details: [{ label: 'Turno', value: `${shift.name} · ${shiftSchedule(shift)}` }],
-      note: RECORD_NOTES[action],
-      confirmLabel: recordLabel(name),
-      confirmIcon: <Icon size={18} />,
+    // Se arma al dibujarse: la confirmación abierta sigue al idioma activo.
+    const ok = await confirm(() => {
+      const name = nameOf('attendance_actions', action);
+      return {
+        kind: 'create',
+        icon: <Icon size={30} />,
+        eyebrow: t('myAttendance.home.eyebrow'),
+        title: t('myAttendance.record.confirm.title', { action: name.toLowerCase() }),
+        message: t('myAttendance.record.confirm.message'),
+        details: [{ label: t('myAttendance.labels.shift'), value: `${shift.name} · ${shiftSchedule(shift)}` }],
+        // Lo que se aclara: la salida cierra la jornada.
+        note: action === 'CHECK_OUT' ? t('myAttendance.record.confirm.checkOutNote') : undefined,
+        confirmLabel: recordLabel(name),
+        confirmIcon: <Icon size={18} />,
+      };
     });
-    if (ok) void navigate(paths.employee.recordAttendance(ATTENDANCE_SLUGS[action]));
+    // El registro sabe si el sitio pide su código y si hoy se puede checar remoto (antifraude 2b; `SiteCodeStep`).
+    const intent: SiteCodeIntent = { siteCode: today.site_code, remoteAllowed: today.remote_allowed };
+    if (ok) void navigate(paths.employee.recordAttendance(ATTENDANCE_SLUGS[action]), { state: intent });
   };
   return (
     <div className="time-clock__actions">
@@ -136,12 +142,13 @@ function ClockActions({ today, shift }: { today: AttendanceToday; shift: ShiftRe
  * cuándo puede tomar su descanso y los botones de lo que puede registrar ahora.
  */
 export function TimeClockCard({ today, shift, offsetMs }: ClockProps) {
+  const t = useT();
   const state = clockState(today);
   const countdown = clockCountdown(today);
   const breakNote = breakWindowText(today);
   const session = today.session;
   return (
-    <section className="time-clock" aria-label="Reloj checador">
+    <section className="time-clock" aria-label={t('myAttendance.clock.label')}>
       <div className="time-clock__top">
         <ClockShift shift={shift} next={today.next_occurrence} />
         <span className="time-clock__badges">

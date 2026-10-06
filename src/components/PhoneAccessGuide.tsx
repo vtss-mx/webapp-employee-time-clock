@@ -1,6 +1,7 @@
 import { Check, Copy, Info } from 'lucide-react';
 import { useCopy } from '../hooks/useCopy';
 import { useQrImage } from '../hooks/useQrImage';
+import { Trans, useT } from '../i18n';
 import { paths } from '../routes/paths';
 
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
@@ -10,14 +11,12 @@ export function phoneAccessUrl(location: Pick<Location, 'origin' | 'hostname'> =
   return LOCAL_HOSTS.includes(location.hostname) ? null : `${location.origin}${paths.login}`;
 }
 
-const TEXT = { open: 'Abre la tableta o el teléfono.', scan: 'Escanéalo con la tableta o el teléfono', already: '¿Ya estás en una tableta o un teléfono?' };
-
 /**
  * Cómo continuar en el dispositivo permitido de un validador (tableta o teléfono): pasos, dirección
  * para copiar y código QR para escanear.
  */
 export function PhoneAccessGuide() {
-  const text = TEXT;
+  const t = useT();
   const url = phoneAccessUrl();
   // Si el código no se puede dibujar queda su lugar vacío: la dirección está escrita al lado para copiarla.
   const qr = useQrImage(url).src;
@@ -29,45 +28,42 @@ export function PhoneAccessGuide() {
       <div className={`phone-guide__body ${url ? 'has-qr' : ''}`}>
         <ol className="phone-guide__steps">
           <li>
-            <strong>{text.open}</strong> Usa el navegador (Safari, Chrome…) o la cámara.
+            <strong>{t('qr.phoneGuide.open')}</strong> {t('qr.phoneGuide.openHow')}
           </li>
           <li>
             {url ? (
               <>
-                <strong>Escanea el código</strong> o escribe esta dirección:
+                <Trans k="qr.phoneGuide.scanOrType" values={{ scan: <strong>{t('qr.phoneGuide.scanCode')}</strong> }} />
                 <span className="phone-guide__url">
                   <code>{url}</code>
-                  <button type="button" onClick={copy} aria-label="Copiar dirección">
+                  <button type="button" onClick={copy} aria-label={t('qr.phoneGuide.copyAddress')}>
                     {copied ? <Check size={16} /> : <Copy size={16} />}
                   </button>
                 </span>
               </>
             ) : (
-              <>
-                <strong>Ingresa a la dirección de acceso</strong> que te proporcionó tu empresa.
-              </>
+              <Trans k="qr.phoneGuide.enterAddress" values={{ address: <strong>{t('qr.phoneGuide.accessAddress')}</strong> }} />
             )}
           </li>
           <li>
-            <strong>Inicia sesión</strong> con tu mismo correo y contraseña.
+            <Trans k="qr.phoneGuide.signIn" values={{ action: <strong>{t('qr.phoneGuide.signInAction')}</strong> }} />
           </li>
         </ol>
         {url && (
           <figure className="phone-guide__qr">
             {qr ? (
-              <img src={qr} alt={`Código QR para abrir la aplicación. ${text.scan}`} width={168} height={168} />
+              <img src={qr} alt={t('qr.phoneGuide.qrAlt')} width={168} height={168} />
             ) : (
               <span className="phone-guide__qr-placeholder" />
             )}
-            <figcaption>{text.scan}</figcaption>
+            <figcaption>{t('qr.phoneGuide.scan')}</figcaption>
           </figure>
         )}
       </div>
       <p className="phone-guide__note">
         <Info size={18} />
         <span>
-          {text.already} Desactiva la opción <strong>«Sitio de escritorio»</strong> en el menú de tu navegador y
-          vuelve a intentarlo.
+          <Trans k="qr.phoneGuide.desktopSite" values={{ option: <strong>{t('qr.phoneGuide.desktopSiteOption')}</strong> }} />
         </span>
       </p>
     </div>

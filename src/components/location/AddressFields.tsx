@@ -1,9 +1,10 @@
-import { Building, Hash, Landmark, Mailbox, MapPinned, Signpost } from 'lucide-react';
+import { Building2, DoorOpen, Globe, Hash, House, Landmark, Mailbox, MapPinned, Signpost } from 'lucide-react';
 import { useId, useMemo, type ReactNode } from 'react';
 import { useCatalogs } from '../../hooks/useCatalogs';
+import { useT } from '../../i18n';
 import { ADDRESS_MAX, normalizePostalCode, type AddressValues } from '../../utils/address';
 import { flagOf } from '../../utils/phone';
-import { FieldLabel, FieldMessage, FormField } from '../FormField';
+import { describedBy, FieldLabel, FieldMessage, FormField, TextAreaField } from '../FormField';
 import { Select, type SelectOption } from '../ui/Select';
 
 interface AddressFieldsProps {
@@ -14,23 +15,25 @@ interface AddressFieldsProps {
   disabled?: boolean;
 }
 
-type TextField = Exclude<keyof AddressValues, 'country_code'>;
+type TextField = Exclude<keyof AddressValues, 'country_code' | 'reference_notes'>;
 
-/** Etiqueta, ícono y ayuda de cada campo de texto (en el orden en que se piden). */
-const FIELDS: Array<{ field: TextField; label: string; icon: ReactNode; required: boolean; hint?: string; inputMode?: 'numeric' | 'text' }> = [
-  { field: 'street', label: 'Calle', icon: <Signpost size={18} />, required: true },
-  { field: 'exterior_number', label: 'Número exterior', icon: <Hash size={18} />, required: true, hint: 'Si no tiene, escribe S/N' },
-  { field: 'interior_number', label: 'Número interior', icon: <Building size={18} />, required: false, hint: 'Opcional: local, piso, oficina...' },
-  { field: 'postal_code', label: 'Código postal', icon: <Mailbox size={18} />, required: true },
-];
-const REGION_FIELDS: Array<{ field: TextField; label: string; icon: ReactNode }> = [
-  { field: 'state', label: 'Estado', icon: <Landmark size={18} /> },
-  { field: 'municipality', label: 'Municipio o alcaldía', icon: <MapPinned size={18} /> },
-  { field: 'city', label: 'Ciudad', icon: <Building size={18} /> },
+/** Llave de la etiqueta y la ayuda de cada campo de texto (`location.address.<copy>`; textos del dueño del producto). */
+type FieldCopy = 'state' | 'municipality' | 'city' | 'neighborhood' | 'postalCode' | 'street' | 'exteriorNumber' | 'interiorNumber';
+
+/** Campos de texto en el orden en que se piden (después del país y antes de las referencias). */
+const TEXT_FIELDS: Array<{ field: TextField; copy: FieldCopy; icon: ReactNode; required: boolean }> = [
+  { field: 'state', copy: 'state', icon: <Landmark size={18} />, required: true },
+  { field: 'municipality', copy: 'municipality', icon: <MapPinned size={18} />, required: true },
+  { field: 'city', copy: 'city', icon: <Building2 size={18} />, required: true },
+  { field: 'neighborhood', copy: 'neighborhood', icon: <House size={18} />, required: true },
+  { field: 'postal_code', copy: 'postalCode', icon: <Mailbox size={18} />, required: true },
+  { field: 'street', copy: 'street', icon: <Signpost size={18} />, required: true },
+  { field: 'exterior_number', copy: 'exteriorNumber', icon: <Hash size={18} />, required: true },
+  { field: 'interior_number', copy: 'interiorNumber', icon: <DoorOpen size={18} />, required: false },
 ];
 
 /** Países activos del catálogo (los destacados primero) con su bandera, para la lista con búsqueda. */
-function useCountryOptions(): Array<SelectOption> {
+export function useCountryOptions(): Array<SelectOption> {
   const { countries } = useCatalogs();
   return useMemo(
     () =>
@@ -43,51 +46,70 @@ function useCountryOptions(): Array<SelectOption> {
 }
 
 /**
- * Domicilio: calle, número exterior e interior, código postal, país (lista con búsqueda del
- * catálogo), estado, municipio y ciudad. El mapa (LocationPicker) los llena cuando puede.
+ * Domicilio, en el orden y con los textos que pidió el dueño del producto: país (lista con búsqueda
+ * del catálogo), estado o provincia, municipio o alcaldía, ciudad o localidad, colonia o barrio,
+ * código postal, calle o vialidad, número exterior, número interior y referencias (varios renglones,
+ * con contador). El mapa (LocationPicker) los llena cuando puede; las referencias, nunca.
  */
 export function AddressFields({ values, errors, onChange, onTouch, disabled = false }: AddressFieldsProps) {
+  const t = useT();
+  const countryHint = t('location.address.country.hint');
   const countryOptions = useCountryOptions();
   const countryId = useId();
-  const text = (field: TextField, label: string, icon: ReactNode, extra: { required?: boolean; hint?: string } = {}) => (
-    <FormField
-      key={field}
-      label={label}
-      icon={icon}
-      required={extra.required ?? true}
-      hint={extra.hint}
-      maxLength={ADDRESS_MAX[field]}
-      autoComplete="off"
-      inputMode={field === 'postal_code' && values.country_code === 'MX' ? 'numeric' : undefined}
-      disabled={disabled}
-      value={values[field]}
-      error={errors[field]}
-      onBlur={() => onTouch(field)}
-      onChange={(e) => onChange(field, field === 'postal_code' ? normalizePostalCode(e.target.value) : e.target.value)}
-    />
-  );
 
   return (
     <div className="form-grid address-fields">
-      {FIELDS.map(({ field, label, icon, required, hint }) => text(field, label, icon, { required, hint }))}
       <div className={`field ${errors.country_code ? 'field--error' : ''}`}>
-        <FieldLabel htmlFor={countryId} label="País" required />
+        <FieldLabel htmlFor={countryId} label={t('location.address.country.label')} required />
         <Select
           id={countryId}
           className="select--block"
+          icon={<Globe size={18} />}
           value={values.country_code}
           options={countryOptions}
-          placeholder="Elige el país"
-          searchable={{ placeholder: 'Buscar país', empty: 'Ningún país coincide' }}
+          placeholder={t('location.address.country.placeholder')}
+          searchable={{ placeholder: t('location.address.country.search'), empty: t('location.address.country.empty') }}
           disabled={disabled}
+          aria-describedby={describedBy(countryId, errors.country_code, countryHint)}
           onChange={(code) => {
             onChange('country_code', code);
             onTouch('country_code');
           }}
         />
-        <FieldMessage id={countryId} error={errors.country_code} />
+        <FieldMessage id={countryId} error={errors.country_code} hint={countryHint} />
       </div>
-      {REGION_FIELDS.map(({ field, label, icon }) => text(field, label, icon))}
+      {TEXT_FIELDS.map(({ field, copy, icon, required }) => (
+        <FormField
+          key={field}
+          label={t(`location.address.${copy}.label`)}
+          icon={icon}
+          required={required}
+          hint={t(`location.address.${copy}.hint`)}
+          maxLength={ADDRESS_MAX[field]}
+          autoComplete="off"
+          inputMode={field === 'postal_code' && values.country_code === 'MX' ? 'numeric' : undefined}
+          disabled={disabled}
+          value={values[field]}
+          error={errors[field]}
+          onBlur={() => onTouch(field)}
+          onChange={(e) => onChange(field, field === 'postal_code' ? normalizePostalCode(e.target.value) : e.target.value)}
+        />
+      ))}
+      <TextAreaField
+        className="address-fields__wide"
+        label={t('location.address.referenceNotes.label')}
+        hint={t('location.address.referenceNotes.hint')}
+        rows={3}
+        maxLength={ADDRESS_MAX.reference_notes}
+        counter
+        autoComplete="off"
+        placeholder={t('location.address.referenceNotes.placeholder')}
+        disabled={disabled}
+        value={values.reference_notes}
+        error={errors.reference_notes}
+        onBlur={() => onTouch('reference_notes')}
+        onChange={(value) => onChange('reference_notes', value)}
+      />
     </div>
   );
 }

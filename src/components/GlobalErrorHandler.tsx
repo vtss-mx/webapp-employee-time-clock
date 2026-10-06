@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
 import { useFeedback } from '../hooks/useFeedback';
+import { localizedError, t } from '../i18n';
 import { ApiError } from '../services/apiClient';
 import { reportClientError } from '../services/clientErrorService';
 import { reloadForNewVersion } from '../services/versionReload';
-
-const GENERIC_TEXT = 'Intenta nuevamente. Si persiste, recarga la página.';
 
 /**
  * Red de seguridad para errores asíncronos no capturados (promesas rechazadas, errores de
@@ -21,8 +20,10 @@ export function GlobalErrorHandler() {
       const now = Date.now();
       if (now - last < 4000) return; // evita ráfagas de mensajes
       last = now;
-      // Los errores de la API llevan su mensaje y código de rastreo; los demás, un texto amable.
-      void feedback.fromError(error instanceof ApiError ? error : new Error(GENERIC_TEXT), { title: 'Ocurrió un problema' });
+      // Los errores de la API llevan su mensaje y código de rastreo; los demás, un texto amable (en el
+      // idioma activo aunque cambie con el popup abierto).
+      const shown = error instanceof ApiError ? error : localizedError(() => t('system.unexpected.text'));
+      void feedback.fromError(shown, { title: () => t('system.unexpected.title') });
     };
 
     const onRejection = (event: PromiseRejectionEvent) => {

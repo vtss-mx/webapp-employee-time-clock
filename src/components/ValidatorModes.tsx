@@ -1,5 +1,6 @@
 import { QrCode, ScanFace, ShieldCheck, SplitSquareHorizontal, type LucideIcon } from 'lucide-react';
 import { useCatalogs } from '../hooks/useCatalogs';
+import { useT } from '../i18n';
 import type { ValidatorMode, ValidatorModeItem, VerificationMethod } from '../types';
 import { ChoiceGroup } from './ui/ChoiceGroup';
 import { RadioCard } from './ui/RadioCard';
@@ -42,9 +43,10 @@ interface ValidatorModePickerProps {
  * los modos): solo los modos activos del catálogo.
  */
 export function ValidatorModePicker({ value, onChange, disabled = false }: ValidatorModePickerProps) {
+  const t = useT();
   const { active } = useCatalogs();
   return (
-    <ChoiceGroup label="Cómo identifica" className="mode-picker" radio disabled={disabled}>
+    <ChoiceGroup label={t('validators.form.modes')} className="mode-picker" radio disabled={disabled}>
       {active('validator_modes').map(({ code, name, description }) => {
         const Icon = modeIcon(code);
         return <RadioCard key={code} name="validator-mode" value={code} checked={value === code} onChange={onChange} title={name} description={description} icon={<Icon size={22} />} />;

@@ -8,7 +8,7 @@ import type { AttendanceEvent, BreakTimes, WorkSession } from '../../types';
 import { formatDateTime } from '../../utils/format';
 import { BreaksEditor, type BreaksEditorProps } from './BreaksEditor';
 import { EventTimeline } from './EventTimeline';
-import { emptyValues, MANUAL_LABELS, manualFacts, manualServerErrors, manualTimes, newSessionPath, sessionValues, validateManual, type ManualValues } from './manualSession';
+import { emptyValues, manualFacts, manualLabels, manualServerErrors, manualTimes, newSessionPath, sessionValues, validateManual, type ManualValues } from './manualSession';
 import { SessionSummary } from './SessionSummary';
 import { SessionTimeline } from './SessionTimeline';
 import { workSession } from './employee/testData';
@@ -184,7 +184,7 @@ describe('Reglas de la jornada que registra o corrige la empresa', () => {
       work_date: 'Elige el día que trabajó',
       check_in: 'Indica la hora de entrada',
       check_out: 'Indica la hora de salida o marca «Aún no sale»',
-      reason: 'Explica brevemente el motivo (al menos 5 caracteres)',
+      reason: 'Explica el motivo (al menos 5 caracteres)',
     });
     expect(empty.breaks).toBeUndefined();
     expect(validateManual(filled({ work_date: '31/02/2026' }), { today: TODAY, withDate: true }).work_date).toBe('Escribe una fecha válida (dd/mm/aaaa)');
@@ -205,7 +205,7 @@ describe('Reglas de la jornada que registra o corrige la empresa', () => {
     expect(manualFacts(filled({ breaks: [{ start: '12:00', end: '12:30' }, { start: '16:00', end: '16:15' }] })).breaks).toBe('12:00 – 12:30, 16:00 – 16:15');
     // Aún no sale: lo dice aunque quedara una hora escrita; sin descansos, también lo dice.
     expect(manualFacts(filled({ stillWorking: true, breaks: [] }))).toEqual({ check_in: '08:05', check_out: 'Aún no sale', breaks: 'Sin descansos' });
-    expect(MANUAL_LABELS).toEqual({ check_in: 'Entrada', check_out: 'Salida', breaks: 'Descansos' });
+    expect(manualLabels()).toEqual({ check_in: 'Entrada', check_out: 'Salida', breaks: 'Descansos' });
   });
 
   it('al corregir: lo registrado en la hora del negocio; abierta sigue sin salida y un descanso en curso queda sin fin', () => {
@@ -232,7 +232,7 @@ describe('Reglas de la jornada que registra o corrige la empresa', () => {
     const nested = new ApiError({
       statusCode: 422,
       code: 'VALIDATION_ERROR',
-      message: 'Los datos enviados no son válidos',
+      message: 'Datos no válidos',
       errors: [
         { code: 'TIME_PARSING', message: 'Hora inválida', field: 'breaks.0.end', details: null },
         { code: 'TIME_PARSING', message: 'Otra hora inválida', field: 'breaks.1.start', details: null },

@@ -2,16 +2,50 @@ import { UserPlus } from 'lucide-react';
 import type { SubmitEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmployeeFormFields, HeadwearExemptField } from '../../components/EmployeeForm';
+import type { MessageInput } from '../../components/MessageDialog';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { Button } from '../../components/ui/Button';
-import { EMPLOYEE_LABELS, useEmployeeForm } from '../../hooks/useEmployeeForm';
+import { employeeLabels, useEmployeeForm } from '../../hooks/useEmployeeForm';
 import { useFeedback } from '../../hooks/useFeedback';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { employeeService } from '../../services/employeeService';
+import type { Employee, EmployeeFormValues } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
 import { describeValues } from '../../utils/changes';
+import { documentsPayload } from '../../utils/formRules';
+
+/** Antes de registrar: a quién y con qué datos (al vincular, que conserva su cuenta y su contraseña). */
+function createConfirm(values: EmployeeFormValues, headwearExempt: boolean, linking: boolean): ConfirmInput {
+  const name = `${values.first_name.trim()} ${values.last_name.trim()}`;
+  return {
+    kind: 'create',
+    icon: <UserPlus size={30} />,
+    title: t(linking ? 'employees.create.linkConfirm.title' : 'employees.create.confirm.title', { name }),
+    message: t(linking ? 'employees.create.linkConfirm.message' : 'employees.create.confirm.message'),
+    detailsTitle: t(linking ? 'employees.create.linkConfirm.detailsTitle' : 'employees.create.confirm.detailsTitle'),
+    // La contraseña nunca se muestra; al vincular no se envía (conserva la suya).
+    details: describeValues({ ...values, password: linking ? '' : values.password, headwear_exempt: headwearExempt || undefined }, employeeLabels()),
+    confirmLabel: t(linking ? 'employees.create.linkConfirm.confirm' : 'employees.create.title'),
+    confirmIcon: <UserPlus size={18} />,
+  };
+}
+
+/** Qué sigue para el empleado registrado (antes era una nota fija en el formulario). */
+function createdMessage(employee: Employee): MessageInput {
+  const linked = employee.shared_account;
+  return {
+    variant: 'success',
+    title: t(linked ? 'employees.create.linked.title' : 'employees.create.created.title'),
+    text: t(linked ? 'employees.create.linked.text' : 'employees.create.created.text', { name: employee.full_name }),
+    details: [t('employees.create.next.qr'), t('employees.create.next.face'), t('employees.create.next.review')],
+    detailsStyle: 'checks',
+  };
+}
 
 /** Alta de empleado: solo datos. El rostro lo registra el propio empleado y aquí se valida después. */
 export function EmployeeCreatePage() {
+  const t = useT();
   const navigate = useNavigate();
   const feedback = useFeedback();
   const { values, setValues, touch, headwearExempt, setHeadwearExempt, errors, saving, canSubmit, validate, save, live, linking } =
@@ -20,50 +54,25 @@ export function EmployeeCreatePage() {
   const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const name = `${values.first_name.trim()} ${values.last_name.trim()}`;
     await save(async () => {
       // Persona de otra empresa: se vincula su cuenta y conserva su contraseña (no se envía).
       const { password_confirm: _confirm, ...data } = values;
       const employee = await employeeService.create({
         ...data,
+        ...documentsPayload(values), // RFC, CURP y NSS opcionales: vacíos viajan como null
         password: linking ? undefined : values.password,
         headwear_exempt: headwearExempt,
       });
       void navigate(paths.company.employee(employee.id), { replace: true });
-      // Qué sigue para este empleado (antes era una nota fija en el formulario).
-      void feedback.show({
-        variant: 'success',
-        title: employee.shared_account ? 'Persona vinculada a tu empresa' : 'Empleado registrado',
-        text: employee.shared_account
-          ? `${employee.full_name} ya trabajaba en otra empresa: entra con su misma cuenta y elige tu empresa al iniciar sesión.`
-          : `${employee.full_name} ya puede iniciar sesión con su correo y contraseña.`,
-        details: [
-          'Se generó su código QR personal.',
-          'Registrará su rostro en su primer inicio de sesión, con prueba de vida.',
-          'Recibirás la solicitud en Validaciones para aceptar o rechazar su identidad.',
-        ],
-        detailsStyle: 'checks',
-      });
-    }, {
-      kind: 'create',
-      icon: <UserPlus size={30} />,
-      title: linking ? `¿Vincular a ${name} a tu empresa?` : `¿Registrar a ${name}?`,
-      message: linking
-        ? 'Ya trabaja en otra empresa: entrará con su misma cuenta y contraseña, y elegirá tu empresa al iniciar sesión.'
-        : 'Podrá iniciar sesión con su correo y la contraseña que asignaste. Registrará su rostro en su primer acceso.',
-      detailsTitle: linking ? 'Se vinculará' : 'Se registrará',
-      // La contraseña nunca se muestra; al vincular no se envía (conserva la suya).
-      details: describeValues({ ...values, password: linking ? '' : values.password, headwear_exempt: headwearExempt || undefined }, EMPLOYEE_LABELS),
-      confirmLabel: linking ? 'Vincular a mi empresa' : 'Registrar empleado',
-      confirmIcon: <UserPlus size={18} />,
-    });
+      void feedback.show(() => createdMessage(employee));
+    }, () => createConfirm(values, headwearExempt, linking));
   };
 
   return (
     <div className="page">
       <Panel onSubmit={(e) => void onSubmit(e)}>
-        <PanelHeader title="Registrar empleado" backTo={paths.company.employees} backLabel="Empleados" />
-        <PanelSection title="Datos del empleado" icon={<UserPlus size={20} />}>
+        <PanelHeader title={t('employees.create.title')} backTo={paths.company.employees} backLabel={t('employees.back')} />
+        <PanelSection title={t('employees.form.section')} icon={<UserPlus size={20} />}>
           <EmployeeFormFields
             values={values}
             errors={errors}
@@ -77,7 +86,7 @@ export function EmployeeCreatePage() {
         </PanelSection>
         <PanelFooter>
           <Button variant="ghost" size="lg" onClick={() => void navigate(-1)} disabled={saving}>
-            Cancelar
+            {t('common.actions.cancel')}
           </Button>
           <Button
             type="submit"
@@ -85,10 +94,10 @@ export function EmployeeCreatePage() {
             size="lg"
             loading={saving}
             disabled={!canSubmit}
-            title={canSubmit ? undefined : 'Completa correctamente todos los campos obligatorios'}
+            title={canSubmit ? undefined : t('employees.form.incomplete')}
             icon={<UserPlus size={20} />}
           >
-            Registrar empleado
+            {t('employees.create.title')}
           </Button>
         </PanelFooter>
       </Panel>

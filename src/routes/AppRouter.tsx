@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { AppLayout } from '../layouts/AppLayout';
 import type { Screen } from '../types';
 import { CatalogGate } from './CatalogGate';
-import { ForbiddenPage, LoginPage, NotFoundPage } from './lazyPages';
+import { ForbiddenPage, KioskPage, LoginPage, NotFoundPage } from './lazyPages';
 import { homeForUser, paths } from './paths';
 import { GuestOnlyRoute, ProtectedRoute, RoleHomeRedirect } from './ProtectedRoute';
 import { KNOWN_ROUTES, SCREEN_VIEWS } from './screens';
@@ -33,6 +33,7 @@ function NotGranted() {
 
 /**
  * Rutas de la aplicación. Guardas (de afuera hacia adentro):
+ * - Sin guarda: /kiosk, la tableta de un sitio (se identifica con la llave de su dispositivo, no con una sesión).
  * - GuestOnlyRoute: /login solo sin sesión (con sesión, a su inicio).
  * - ProtectedRoute: requiere sesión.
  * - CatalogGate: con sesión, espera los catálogos de la BD (GET /api/catalogs, una vez por sesión).
@@ -44,9 +45,11 @@ export function AppRouter() {
   const { user } = useAuth();
   const screens = user?.screens ?? [];
   return (
-    <Suspense fallback={<PageLoader text="Cargando..." />}>
+    <Suspense fallback={<PageLoader fullscreen />}>
       <Routes>
         <Route path="/" element={<RoleHomeRedirect />} />
+        {/* Tableta de un sitio: pública (sin sesión ni catálogos), con o sin una sesión abierta en el navegador. */}
+        <Route path={paths.kiosk} element={<KioskPage />} />
         <Route element={<GuestOnlyRoute />}>
           <Route path={paths.login} element={<LoginPage />} />
         </Route>

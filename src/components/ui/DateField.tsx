@@ -2,18 +2,21 @@ import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-rea
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
-import { businessDate } from '../../utils/format';
+import { useT } from '../../i18n';
+import { businessDate, localeDateFormat } from '../../utils/format';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
 import { Floating } from './Floating';
 
 /**
  * Campo de fecha propio (no el nativo del navegador): mismo alto y estilo que los demás
- * controles, formato en español "dd/mm/aaaa" y calendario personalizado con selección rápida
- * de mes y año, límites (min/max) y navegación con teclado.
+ * controles, la fecha se escribe en el orden del idioma activo ("dd/mm/aaaa" en es-MX,
+ * "mm/dd/yyyy" en en-US) y el calendario personalizado (nombres de meses y días del idioma)
+ * tiene selección rápida de mes y año, límites (min/max) y navegación con teclado.
  *
- * El valor es ISO "aaaa-mm-dd" (como un <input type="date">). Mientras se escribe una fecha
- * incompleta el valor es "" y, si está completa pero no existe (31/02), se entrega el texto tal
- * cual para que la validación del formulario la marque como inválida.
+ * El valor es ISO "aaaa-mm-dd" (como un <input type="date">) en cualquier idioma. Mientras se
+ * escribe una fecha incompleta el valor es "" y, si está completa pero no existe (31/02), se
+ * entrega el texto tal cual para que la validación del formulario la marque como inválida. Al
+ * cambiar el idioma, la fecha elegida se vuelve a escribir en el orden del idioma nuevo.
  */
 interface DateFieldProps {
   label: string;
@@ -30,9 +33,29 @@ interface DateFieldProps {
   openTo?: string;
 }
 
-const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const WEEKDAYS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
 const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Orden en que se escriben el día y el mes: "dd/mm/aaaa" (es-MX) o "mm/dd/yyyy" (en-US). */
+export type DateOrder = 'dmy' | 'mdy';
+
+/** El orden de la fecha corta del idioma activo (lo dice `Intl`, no una lista de idiomas). */
+export function dateOrder(): DateOrder {
+  const parts = localeDateFormat({ day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).formatToParts(0);
+  return parts.findIndex((part) => part.type === 'month') < parts.findIndex((part) => part.type === 'day') ? 'mdy' : 'dmy';
+}
+
+/** Primera letra en mayúscula: `Intl` da los meses y los días del español en minúsculas ("junio" → "Junio" en un título). */
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Formato de un día de calendario (fecha local) en el idioma activo; en UTC para que la zona no cambie el día. */
+const formatDay = (date: Date, options: Intl.DateTimeFormatOptions) =>
+  localeDateFormat({ ...options, timeZone: 'UTC' }).format(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+/** Nombre del mes (0-11) en el idioma activo: "Junio" / "June" (largo) o "Jun" (corto). */
+const monthName = (month: number, style: 'long' | 'short') => capitalize(formatDay(new Date(2000, month, 1), { month: style }));
+
+/** Días de la semana de lunes a domingo en dos letras: "Lu", "Ma"… / "Mo", "Tu"… (el 1 de enero de 2024 fue lunes). */
+const weekdayNames = () => Array.from({ length: 7 }, (_, i) => capitalize(formatDay(new Date(2024, 0, 1 + i), { weekday: 'short' }).slice(0, 2)));
 
 export function toIso(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -45,22 +68,26 @@ export function parseIso(value: string | undefined): Date | null {
   return date.getMonth() === Number(match[2]) - 1 ? date : null;
 }
 
-export function isoToDisplay(value: string): string {
+/** ISO → lo que se ve en el campo, en el orden del idioma ("" si no es una fecha). */
+export function isoToDisplay(value: string, order: DateOrder = dateOrder()): string {
   const date = parseIso(value);
-  return date ? `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}` : '';
+  if (!date) return '';
+  const [day, month] = [pad(date.getDate()), pad(date.getMonth() + 1)];
+  return `${order === 'mdy' ? `${month}/${day}` : `${day}/${month}`}/${date.getFullYear()}`;
 }
 
-/** Aplica la máscara dd/mm/aaaa mientras se escribe. */
+/** Aplica la máscara mientras se escribe (dd/mm/aaaa y mm/dd/yyyy tienen la misma forma: 2/2/4 dígitos). */
 export function maskDate(text: string): string {
   const digits = text.replace(/\D/g, '').slice(0, 8);
   return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean).join('/');
 }
 
-/** "dd/mm/aaaa" → ISO; "" si está incompleta; el texto si está completa pero no existe. */
-export function displayToValue(text: string): string {
+/** Lo escrito (en el orden del idioma) → ISO; "" si está incompleta; el texto si está completa pero no existe. */
+export function displayToValue(text: string, order: DateOrder = dateOrder()): string {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
   if (!match) return '';
-  const iso = `${match[3]}-${match[2]}-${match[1]}`;
+  const [day, month] = order === 'mdy' ? [match[2], match[1]] : [match[1], match[2]];
+  const iso = `${match[3]}-${month}-${day}`;
   return parseIso(iso) ? iso : text;
 }
 
@@ -84,17 +111,12 @@ interface CalendarProps {
 }
 
 type View = 'days' | 'months' | 'years';
-const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTH_INDEXES = Array.from({ length: 12 }, (_, m) => m);
 const YEARS_PER_PAGE = 20;
 const COLUMNS: Record<Exclude<View, 'days'>, number> = { months: 3, years: 4 };
-const NAV_LABELS: Record<View, [string, string]> = {
-  days: ['Mes anterior', 'Mes siguiente'],
-  months: ['Año anterior', 'Año siguiente'],
-  years: ['Años anteriores', 'Años siguientes'],
-};
 
-/** Flechas dentro de una cuadrícula de botones (meses o años): mueve el foco entre opciones. */
-function moveInGrid(event: KeyboardEvent, columns: number): boolean {
+/** Flechas dentro de una cuadrícula de botones (meses o años): mueve el foco entre opciones (también el selector de mes del calendario). */
+export function moveInGrid(event: KeyboardEvent, columns: number): boolean {
   const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns };
   if (!(event.key in steps)) return false;
   const buttons = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
@@ -109,6 +131,7 @@ function moveInGrid(event: KeyboardEvent, columns: number): boolean {
  * mismo estilo de la aplicación. Flujo rápido para fechas lejanas: año → mes → día.
  */
 function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: CalendarProps) {
+  const t = useT();
   const initial = selected ?? openTo ?? max ?? businessDate();
   const [view, setView] = useState<View>('days');
   const [month, setMonth] = useState({ year: initial.getFullYear(), month: initial.getMonth() });
@@ -169,9 +192,9 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
   };
 
   return (
-    <div className="datepicker" role="dialog" aria-label="Elegir fecha" onKeyDown={onKeyDown}>
+    <div className="datepicker" role="dialog" aria-label={t('ui.dateField.dialog')} onKeyDown={onKeyDown}>
       <div className="datepicker__head">
-        <button type="button" className="datepicker__nav" onClick={() => shift(-1)} disabled={!canShift(-1)} aria-label={NAV_LABELS[view][0]}>
+        <button type="button" className="datepicker__nav" onClick={() => shift(-1)} disabled={!canShift(-1)} aria-label={t(`ui.dateField.nav.${view}.previous`)}>
           <ChevronLeft size={18} />
         </button>
         <div className="datepicker__title">
@@ -182,8 +205,8 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
           ) : (
             <>
               {view === 'days' && (
-                <button type="button" className="datepicker__switch" onClick={() => setView('months')} aria-label={`Elegir mes, actual: ${MONTHS[month.month]}`}>
-                  {MONTHS[month.month]} <ChevronDown size={14} />
+                <button type="button" className="datepicker__switch" onClick={() => setView('months')} aria-label={t('ui.dateField.chooseMonth', { month: monthName(month.month, 'long') })}>
+                  {monthName(month.month, 'long')} <ChevronDown size={14} />
                 </button>
               )}
               <button
@@ -193,14 +216,14 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
                   setYearPage(Math.floor((month.year - minYear) / YEARS_PER_PAGE));
                   setView('years');
                 }}
-                aria-label={`Elegir año, actual: ${month.year}`}
+                aria-label={t('ui.dateField.chooseYear', { year: month.year })}
               >
                 {month.year} <ChevronDown size={14} />
               </button>
             </>
           )}
         </div>
-        <button type="button" className="datepicker__nav" onClick={() => shift(1)} disabled={!canShift(1)} aria-label={NAV_LABELS[view][1]}>
+        <button type="button" className="datepicker__nav" onClick={() => shift(1)} disabled={!canShift(1)} aria-label={t(`ui.dateField.nav.${view}.next`)}>
           <ChevronRight size={18} />
         </button>
       </div>
@@ -208,8 +231,8 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
       <div ref={bodyRef} className={`datepicker__body datepicker__body--${view}`} key={view}>
         {view === 'days' && (
           <div className="datepicker__grid" role="grid" onKeyDown={onDaysKey}>
-            {WEEKDAYS.map((day) => (
-              <span key={day} className="datepicker__weekday" role="columnheader">
+            {weekdayNames().map((day, index) => (
+              <span key={index} className="datepicker__weekday" role="columnheader">
                 {day}
               </span>
             ))}
@@ -232,7 +255,7 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
                   tabIndex={sameDay(day, focused) ? 0 : -1}
                   data-focused={sameDay(day, focused)}
                   aria-selected={sameDay(day, selected)}
-                  aria-label={`${day.getDate()} de ${MONTHS[day.getMonth()]} de ${day.getFullYear()}`}
+                  aria-label={formatDay(day, { dateStyle: 'long' })}
                   onClick={() => onSelect(day)}
                 >
                   {day.getDate()}
@@ -243,25 +266,25 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
         )}
 
         {view === 'months' && (
-          <div className="datepicker__options datepicker__options--months" role="group" aria-label={`Meses de ${month.year}`} onKeyDown={(e) => moveInGrid(e, COLUMNS.months)}>
-            {MONTHS_SHORT.map((name, m) => {
+          <div className="datepicker__options datepicker__options--months" role="group" aria-label={t('ui.dateField.monthsOf', { year: month.year })} onKeyDown={(e) => moveInGrid(e, COLUMNS.months)}>
+            {MONTH_INDEXES.map((m) => {
               const isSelected = selected?.getFullYear() === month.year && selected.getMonth() === m;
               return (
                 <button
-                  key={name}
+                  key={m}
                   type="button"
                   className={`datepicker__option ${isSelected ? 'is-selected' : ''} ${m === month.month ? 'is-current' : ''}`}
                   disabled={monthOutOfRange(month.year, m)}
                   data-focused={m === month.month}
                   aria-pressed={isSelected}
-                  aria-label={`${MONTHS[m]} de ${month.year}`}
+                  aria-label={capitalize(formatDay(new Date(month.year, m, 1), { month: 'long', year: 'numeric' }))}
                   onClick={() => {
                     goToMonth(month.year, m);
                     setFocused(new Date(month.year, m, Math.min(focused.getDate(), new Date(month.year, m + 1, 0).getDate())));
                     setView('days');
                   }}
                 >
-                  {name}
+                  {monthName(m, 'short')}
                 </button>
               );
             })}
@@ -269,7 +292,7 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
         )}
 
         {view === 'years' && (
-          <div className="datepicker__options datepicker__options--years" role="group" aria-label="Años" onKeyDown={(e) => moveInGrid(e, COLUMNS.years)}>
+          <div className="datepicker__options datepicker__options--years" role="group" aria-label={t('ui.dateField.years')} onKeyDown={(e) => moveInGrid(e, COLUMNS.years)}>
             {years.map((year) => {
               const isSelected = selected?.getFullYear() === year;
               return (
@@ -296,8 +319,10 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
 }
 
 export function DateField({ label, value, onChange, min, max, error, hint, disabled = false, required, name, openTo }: DateFieldProps) {
+  const t = useT();
+  const order = dateOrder();
   const id = useId();
-  const [text, setText] = useState(() => isoToDisplay(value) || value);
+  const [text, setText] = useState(() => isoToDisplay(value, order) || value);
   const [open, setOpen] = useState(false);
   const controlRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -306,8 +331,11 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
 
   // Cambios externos (p. ej. al cargar el empleado a editar).
   useSyncOnChange(value, (next) => {
-    if (displayToValue(text) !== next) setText(isoToDisplay(next) || (next.includes('/') ? next : ''));
+    if (displayToValue(text, order) !== next) setText(isoToDisplay(next, order) || (next.includes('/') ? next : ''));
   });
+  // Cambio de idioma en caliente: la fecha elegida se escribe en el orden nuevo (el valor ISO no
+  // cambia); lo que se está escribiendo a medias se conserva tal cual.
+  useSyncOnChange(order, (next) => setText((current) => isoToDisplay(value, next) || current));
 
   useDismissOnOutsidePointer([controlRef, calendarRef], open, () => setOpen(false));
 
@@ -324,7 +352,7 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
           type="text"
           inputMode="numeric"
           autoComplete="bday"
-          placeholder="dd/mm/aaaa"
+          placeholder={t('ui.dateField.placeholder')}
           value={text}
           disabled={disabled}
           required={required}
@@ -333,13 +361,13 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
           onChange={(e) => {
             const masked = maskDate(e.target.value);
             setText(masked);
-            onChange(displayToValue(masked));
+            onChange(displayToValue(masked, order));
           }}
         />
         <button
           type="button"
           className="field__toggle"
-          aria-label="Abrir calendario"
+          aria-label={t('ui.dateField.open')}
           aria-expanded={open}
           disabled={disabled}
           onClick={() => setOpen((v) => !v)}
@@ -356,7 +384,7 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
               onClose={() => setOpen(false)}
               onSelect={(date) => {
                 const iso = toIso(date);
-                setText(isoToDisplay(iso));
+                setText(isoToDisplay(iso, order));
                 onChange(iso);
                 setOpen(false);
               }}

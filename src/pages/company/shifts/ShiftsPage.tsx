@@ -1,45 +1,65 @@
-import { CalendarClock, Inbox, Moon, Plus, SearchX, UsersRound } from 'lucide-react';
+import { CalendarClock, Inbox, Moon, Plus, UsersRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { breaksText } from '../../../components/shifts/shiftRules';
+import { shiftRestore } from '../../../components/shifts/RecordTrash';
+import { breaksText, placeText, shiftsLoadError } from '../../../components/shifts/shiftRules';
 import { StatusBadge } from '../../../components/StatusBadge';
+import { listEmpty, listSubtitle, noMatchEmpty, TrashCells, trashColumns } from '../../../components/trash/TrashParts';
+import { useRestore } from '../../../components/trash/useRestore';
 import { ButtonLink } from '../../../components/ui/Button';
 import { ListToolbar } from '../../../components/ui/ListControls';
 import { ListResults } from '../../../components/ui/ListResults';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { useSearchList } from '../../../hooks/useSearchList';
+import { useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { shiftService } from '../../../services/shiftService';
+import type { Shift } from '../../../types';
 import { formatMinutes } from '../../../utils/format';
+import { formatCount } from '../../../utils/numbers';
 import { shiftSchedule, weekdaysLabel } from '../../../utils/shifts';
 
 /**
- * Turnos de la empresa: horario, días, descansos, tolerancia y cuántos empleados lo tienen hoy.
+ * Turnos de la empresa: horario, días, dónde se checa (sitios y días remotos), descansos, tolerancia
+ * y cuántos empleados lo tienen hoy.
  * Desde aquí se crean, se editan (la fila abre la edición), se asigna uno a varios empleados a la vez
- * y se llega a las solicitudes de cambio.
+ * y se llega a las solicitudes de cambio. En «Eliminados», cuándo y quién y «Restaurar».
  */
 export function ShiftsPage() {
+  const t = useT();
   const navigate = useNavigate();
-  const list = useSearchList((query, signal) => shiftService.list(query, signal), { errorTitle: 'No se pudieron cargar los turnos' });
+  const list = useSearchList((query, signal) => shiftService.list(query, signal), { errorTitle: shiftsLoadError });
+  const { restoring, restore } = useRestore();
+  const { trash } = list;
+  const restoreShift = (shift: Shift) => void restore(shift.id, () => shiftService.restore(shift.id), () => shiftRestore(shift), list.retry);
   const create = (
     <ButtonLink to={paths.company.newShift} variant="primary" icon={<Plus size={18} />}>
-      Nuevo turno
+      {t('shifts.list.new')}
     </ButtonLink>
   );
+
+  const columns = {
+    shift: t('shifts.list.columns.shift'),
+    days: t('shifts.list.columns.days'),
+    place: t('shifts.list.columns.place'),
+    breaks: t('shifts.list.columns.breaks'),
+    tolerance: t('shifts.list.columns.tolerance'),
+    employees: t('shifts.list.columns.employees'),
+  };
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Turnos"
-          subtitle={list.data ? `${list.total} ${list.total === 1 ? 'turno' : 'turnos'} · horario, días y tolerancias para checar` : 'Cargando...'}
+          title={t('shifts.list.title')}
+          subtitle={listSubtitle(list, (count) => t('shifts.list.subtitle', { count }))}
           actions={
             <>
               <ButtonLink to={paths.company.shiftRequests} variant="ghost" icon={<Inbox size={18} />}>
-                Solicitudes de cambio
+                {t('shifts.list.requests')}
               </ButtonLink>
-              {list.data && list.total > 0 && (
+              {list.data && list.total > 0 && !trash && (
                 <ButtonLink to={paths.company.bulkAssignShift} variant="secondary" icon={<UsersRound size={18} />}>
-                  Asignar a varios
+                  {t('shifts.list.assignMany')}
                 </ButtonLink>
               )}
               {create}
@@ -47,22 +67,16 @@ export function ShiftsPage() {
           }
         />
         <PanelSection>
-          <ListToolbar search={list.search} onSearch={list.setSearch} placeholder="Buscar por nombre" label="Buscar turnos" filter={list.filter} onFilter={list.setFilter} />
+          <ListToolbar search={list.search} onSearch={list.setSearch} placeholder={t('shifts.list.searchPlaceholder')} label={t('shifts.list.searchLabel')} filter={list.filter} onFilter={list.setFilter} trash />
           <ListResults
             list={list}
-            pager={{ noun: { one: 'turno', other: 'turnos' } }}
-            columns={['Turno', 'Días', 'Descansos', 'Tolerancia', 'Empleados hoy', 'Estado']}
-            onOpen={(shift) => void navigate(paths.company.editShift(shift.id))}
-            empty={
-              list.filtered
-                ? { icon: <SearchX />, title: 'Ningún turno coincide con la búsqueda', description: 'Prueba con otra parte del nombre o cambia el filtro de estado.' }
-                : {
-                    icon: <CalendarClock />,
-                    title: 'Aún no hay turnos',
-                    description: 'Crea los horarios de tu empresa (matutino, vespertino, nocturno...) para asignarlos a tu personal y llevar su asistencia.',
-                    action: create,
-                  }
-            }
+            pager={{ noun: { one: t('shifts.list.noun.one'), other: t('shifts.list.noun.other') } }}
+            columns={trash ? [columns.shift, columns.days, ...trashColumns()] : [columns.shift, columns.days, columns.place, columns.breaks, columns.tolerance, columns.employees, t('common.fields.status')]}
+            onOpen={trash ? undefined : (shift) => void navigate(paths.company.editShift(shift.id))}
+            empty={listEmpty(list, {
+              noMatch: noMatchEmpty(t('shifts.list.noMatch.title'), t('shifts.list.noMatch.description')),
+              empty: { icon: <CalendarClock />, title: t('shifts.list.empty.title'), description: t('shifts.list.empty.description'), action: create },
+            })}
             renderCells={(shift) => (
               <>
                 <td className="table__primary">
@@ -76,15 +90,24 @@ export function ShiftsPage() {
                     </span>
                   </span>
                 </td>
-                <td data-label="Días">{weekdaysLabel(shift.weekdays)}</td>
-                <td data-label="Descansos">{breaksText(shift.breaks_count, shift.break_minutes)}</td>
-                <td data-label="Tolerancia">{shift.late_tolerance_minutes ? `${shift.late_tolerance_minutes} min de retardo` : 'Sin retardo tolerado'}</td>
-                <td data-label="Empleados hoy">
-                  <span className="badge badge--info badge--plain">{shift.employees}</span>
-                </td>
-                <td data-label="Estado">
-                  <StatusBadge active={shift.active} />
-                </td>
+                <td data-label={columns.days}>{weekdaysLabel(shift.weekdays)}</td>
+                {trash ? (
+                  <TrashCells record={shift} name={shift.name} busy={restoring === shift.id} disabled={restoring !== null} onRestore={() => restoreShift(shift)} />
+                ) : (
+                  <>
+                    <td data-label={columns.place} className="table__wide">
+                      <span className="truncate">{placeText(shift)}</span>
+                    </td>
+                    <td data-label={columns.breaks}>{breaksText(shift.breaks_count, shift.break_minutes)}</td>
+                    <td data-label={columns.tolerance}>{shift.late_tolerance_minutes ? t('shifts.list.lateTolerance', { minutes: shift.late_tolerance_minutes }) : t('shifts.list.noLateTolerance')}</td>
+                    <td data-label={columns.employees}>
+                      <span className="badge badge--info badge--plain">{formatCount(shift.employees)}</span>
+                    </td>
+                    <td data-label={t('common.fields.status')}>
+                      <StatusBadge active={shift.active} />
+                    </td>
+                  </>
+                )}
               </>
             )}
           />

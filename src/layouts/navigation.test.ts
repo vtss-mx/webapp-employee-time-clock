@@ -9,7 +9,8 @@ describe('menú por módulos', () => {
     const groups = navGroups(user, navFor(user));
     expect(groups.map((g) => [g.code, g.name, g.entries.map((e) => e.to)])).toEqual([
       ['PLATFORM', 'Plataforma', ['/admin/dashboard', '/admin/companies']],
-      ['OPERATIONS', 'Operación', ['/admin/errors', '/admin/face-security']],
+      ['BUSINESS', 'Negocio', ['/admin/billing', '/admin/usage']],
+      ['OPERATIONS', 'Operación', ['/admin/errors', '/admin/face-security', '/admin/fraud-cases', '/admin/performance']],
       ['ACCOUNT', 'Cuenta', ['/profile']],
     ]);
   });
@@ -17,8 +18,8 @@ describe('menú por módulos', () => {
   it('sin módulos (o con pantallas sin módulo conocido) quedan al final, en un grupo sin encabezado', () => {
     const user = withScreens({ ...sampleUser, role: 'ADMIN', employee: null });
     const legacy = { ...user, modules: undefined, screens: user.screens.map((s) => ({ ...s, module: undefined })) };
-    expect(navGroups(legacy, navFor(legacy)).map((g) => [g.code, g.name, g.entries.length])).toEqual([['', '', 5]]);
+    expect(navGroups(legacy, navFor(legacy)).map((g) => [g.code, g.name, g.entries.length])).toEqual([['', '', 9]]);
     const unknown = { ...user, screens: user.screens.map((s) => (s.code === 'PROFILE' ? { ...s, module: 'OTRO' } : s)) };
-    expect(navGroups(unknown, navFor(unknown)).map((g) => g.code)).toEqual(['PLATFORM', 'OPERATIONS', '']);
+    expect(navGroups(unknown, navFor(unknown)).map((g) => g.code)).toEqual(['PLATFORM', 'BUSINESS', 'OPERATIONS', '']);
   });
 });

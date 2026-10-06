@@ -1,6 +1,9 @@
-import type { ShiftAssignment, Weekday } from '../../types';
+import { t } from '../../i18n';
+import type { ShiftAssignment, ShiftSummary, SiteRef, Weekday } from '../../types';
+import type { ConfirmDetail } from '../../types/confirm';
 import { businessDate, formatDate } from '../../utils/format';
-import { weekdaysLabel } from '../../utils/shifts';
+import { formatDistance } from '../../utils/numbers';
+import { clockLabel, shiftSchedule, weekdaysLabel } from '../../utils/shifts';
 import { toIso } from '../ui/DateField';
 
 /**
@@ -17,6 +20,10 @@ export const BREAK_MINUTES_MAX = 240;
 export const TOLERANCE_MAX = 240;
 export const CHECK_OUT_WINDOW_MAX = 720;
 const MINUTES_PER_DAY = 1440;
+
+/** Títulos de los popups cuando no cargan los turnos o los sitios (listados y selectores), en el idioma activo. */
+export const shiftsLoadError = () => t('shifts.list.loadError');
+export const sitesLoadError = () => t('sites.list.loadError');
 
 /** "HH:MM" (o "HH:MM:SS") → minutos desde la medianoche; null si no es una hora completa. */
 export function clockMinutes(value: string): number | null {
@@ -39,10 +46,11 @@ export function momentAt(minutes: number): Moment {
   return { clock: `${pad(Math.floor(rest / 60))}:${pad(rest % 60)}`, day };
 }
 
-/** "07:45", "23:45 del día anterior" o "01:00 del día siguiente". */
+/** "07:45", "23:45 del día anterior" o "01:00 del día siguiente" (la hora, en el formato del idioma activo). */
 export function momentText({ clock, day }: Moment): string {
-  if (day < 0) return `${clock} del día anterior`;
-  return day > 0 ? `${clock} del día siguiente` : clock;
+  const time = clockLabel(clock);
+  if (day < 0) return t('shifts.moment.dayBefore', { time });
+  return day > 0 ? t('shifts.moment.dayAfter', { time }) : time;
 }
 
 /** Horario y tolerancias del turno en minutos (lo que se captura en el formulario). */
@@ -95,17 +103,17 @@ export const fitsInADay = (timeline: ShiftTimeline) => timeline.window < MINUTES
 /** Minutos enteros dentro de un rango (descansos y tolerancias). */
 export function validateMinutes(value: string, min: number, max: number): string | undefined {
   const text = value.trim();
-  if (!text) return 'Indica los minutos';
+  if (!text) return t('shifts.validation.minutesRequired');
   const minutes = Number(text);
-  if (!Number.isInteger(minutes)) return 'Escribe minutos enteros';
-  return minutes < min || minutes > max ? `Entre ${min} y ${max} min` : undefined;
+  if (!Number.isInteger(minutes)) return t('shifts.validation.minutesWhole');
+  return minutes < min || minutes > max ? t('shifts.validation.minutesRange', { min, max }) : undefined;
 }
 
-/** Nombre de un turno o un sitio: obligatorio (2 caracteres o más) y con su máximo. */
+/** Nombre de un turno o un sitio: obligatorio (2 caracteres o más) y con su máximo; `example` ya traducido. */
 export function validateName(value: string, max: number, example: string): string | undefined {
   const name = value.trim();
-  if (name.length < 2) return `Escribe un nombre (p. ej. "${example}")`;
-  return name.length > max ? `Máximo ${max} caracteres` : undefined;
+  if (name.length < 2) return t('shifts.validation.nameRequired', { example });
+  return name.length > max ? t('shifts.validation.nameMax', { max }) : undefined;
 }
 
 /** Días ordenados y sin repetir (como los guarda el backend). */
@@ -117,23 +125,45 @@ export function businessTomorrow(now: Date = new Date()): string {
   return toIso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1));
 }
 
-/** Radio de un sitio: "100 m" o "1.5 km". */
+/** Radio de un sitio: "100 m" o "1.5 km" (hasta 3 decimales en km: "1.234 km"), con los separadores del idioma activo. */
 export function metersText(meters: number): string {
-  return meters >= 1000 ? `${(meters / 1000).toLocaleString('es-MX')} km` : `${meters.toLocaleString('es-MX')} m`;
+  return formatDistance(meters, 3);
 }
 
 /** Descansos de un turno: "Sin descansos", "1 × 30 min" o "2 × 15 min". */
 export function breaksText(count: number, minutes: number): string {
-  return count > 0 ? `${count} × ${minutes} min` : 'Sin descansos';
+  return count > 0 ? t('shifts.breaks.each', { count, minutes }) : t('shifts.breaks.none');
 }
 
 /** Vigencia de una asignación: "Desde el 5 oct 2026" o "Del 1 sep 2026 al 4 oct 2026". */
 export function periodText({ valid_from, valid_to }: Pick<ShiftAssignment, 'valid_from' | 'valid_to'>): string {
-  return valid_to ? `Del ${formatDate(valid_from)} al ${formatDate(valid_to)}` : `Desde el ${formatDate(valid_from)}`;
+  return valid_to ? t('shifts.period.range', { from: formatDate(valid_from), to: formatDate(valid_to) }) : t('shifts.period.from', { from: formatDate(valid_from) });
 }
 
-/** Dónde checa: "Remoto: Lun y mié · En sitio: Planta Norte" o "Solo en sitio: Planta Norte". */
-export function placeText({ remote_weekdays, sites }: Pick<ShiftAssignment, 'remote_weekdays' | 'sites'>): string {
-  const onSite = sites.length ? sites.map((site) => site.name).join(', ') : 'ningún sitio';
-  return remote_weekdays.length ? `Remoto: ${weekdaysLabel(remote_weekdays)} · En sitio: ${onSite}` : `Solo en sitio: ${onSite}`;
+/** Lo que dice el turno de dónde se checa: sus días y días remotos, y sus sitios. */
+type ShiftPlace = Pick<ShiftSummary, 'weekdays' | 'remote_weekdays' | 'sites'>;
+
+/** Sitios de un turno: "Planta Norte, Planta Sur" o "Ninguno: todos sus días son remotos". */
+export function sitesText(sites: readonly Pick<SiteRef, 'name'>[]): string {
+  return sites.length ? sites.map((site) => site.name).join(', ') : t('shifts.place.noSites');
+}
+
+/** Días remotos de un turno: "Lun y mar" o "Ninguno". */
+export const remoteText = (days: readonly Weekday[]) => (days.length ? weekdaysLabel(days) : t('shifts.place.none'));
+
+/** Dónde se checa con el turno: "Remoto: Lun y mié · En sitio: Planta Norte", "Solo en sitio: Planta Norte" o "Remoto todos sus días". */
+export function placeText({ weekdays, remote_weekdays, sites }: ShiftPlace): string {
+  const onSite = sites.map((site) => site.name).join(', ');
+  if (!remote_weekdays.length) return t('shifts.place.onSiteOnly', { sites: onSite });
+  if (!sites.length && remote_weekdays.length === weekdays.length) return t('shifts.place.allRemote');
+  return t('shifts.place.mixed', { days: weekdaysLabel(remote_weekdays), sites: onSite || t('shifts.place.noSite') });
+}
+
+/** El turno en una confirmación (asignar, aprobar un cambio): su horario, dónde se checa en persona y qué días es remoto. */
+export function shiftFacts(shift: ShiftSummary): ConfirmDetail[] {
+  return [
+    { label: t('shifts.facts.schedule'), value: `${shiftSchedule(shift)} · ${weekdaysLabel(shift.weekdays)}` },
+    { label: t('shifts.facts.sites'), value: sitesText(shift.sites) },
+    { label: t('shifts.facts.remoteDays'), value: remoteText(shift.remote_weekdays) },
+  ];
 }

@@ -3,29 +3,22 @@ import { useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useFeedback } from '../../hooks/useFeedback';
-import type { Role, User } from '../../types';
-import { formatDateTime, initials, timeAgo } from '../../utils/format';
+import { t, useT } from '../../i18n';
+import type { User } from '../../types';
+import { formatDateTime, timeAgo } from '../../utils/format';
 import { describeDevice } from '../../utils/userAgent';
 import type { MessageInput } from '../MessageDialog';
-
-/** Qué deja de pasar al salir, según lo que hace cada rol en la aplicación. */
-const CONSEQUENCE: Record<Role, string> = {
-  EMPLOYEE: 'Para identificarte o mostrar tu código QR tendrás que volver a iniciar sesión.',
-  VALIDATOR: 'Este punto de control dejará de identificar al personal hasta que alguien vuelva a iniciar sesión en este dispositivo.',
-  COMPANY: 'Tu trabajo ya está guardado. Para administrar tu empresa tendrás que volver a iniciar sesión.',
-  ADMIN: 'Tu trabajo ya está guardado. Para administrar la plataforma tendrás que volver a iniciar sesión.',
-};
+import { Avatar } from '../ui/Avatar';
 
 /** La cuenta que se cierra: quién es, en qué empresa y desde qué dispositivo. */
 function LogoutCard({ user, role }: { user: User; role: string }) {
+  const t = useT();
   const name = user.employee?.full_name ?? user.email;
   const device = describeDevice(navigator.userAgent);
   return (
     <div className="logout-card">
       <div className="logout-card__who">
-        <span className="avatar logout-card__avatar" aria-hidden>
-          {initials(name)}
-        </span>
+        <Avatar name={name} src={user.avatar} className="logout-card__avatar" decorative />
         <span className="logout-card__identity">
           <strong className="truncate">{name}</strong>
           {name !== user.email && <span className="muted small truncate">{user.email}</span>}
@@ -35,14 +28,14 @@ function LogoutCard({ user, role }: { user: User; role: string }) {
       <dl className="logout-card__session">
         <div>
           <dt>
-            <MonitorSmartphone size={16} aria-hidden /> Este dispositivo
+            <MonitorSmartphone size={16} aria-hidden /> {t('auth.logout.thisDevice')}
           </dt>
           <dd>{device.label}</dd>
         </div>
         {user.last_login_at && (
           <div>
             <dt>
-              <Clock size={16} aria-hidden /> Último inicio de sesión
+              <Clock size={16} aria-hidden /> {t('auth.logout.lastLogin')}
             </dt>
             <dd title={formatDateTime(user.last_login_at)}>{timeAgo(user.last_login_at)}</dd>
           </div>
@@ -52,19 +45,22 @@ function LogoutCard({ user, role }: { user: User; role: string }) {
   );
 }
 
-/** Popup "¿Estás seguro de que deseas cerrar sesión?" con la cuenta y lo que implica salir. */
+/**
+ * Popup "¿Cerrar sesión?" con la cuenta y lo que implica salir según el
+ * rol, en el idioma activo (quien lo abre lo pide al dibujarse para que siga al idioma).
+ */
 export function logoutMessage(user: User, role: string): MessageInput {
   return {
     variant: 'warning',
     icon: <LogOut size={30} />,
-    eyebrow: 'Cerrar sesión',
-    title: '¿Estás seguro de que deseas cerrar sesión?',
-    text: CONSEQUENCE[user.role],
+    eyebrow: t('common.actions.logout'),
+    title: t('auth.logout.title'),
+    text: t(`auth.logout.consequence.${user.role}`),
     body: <LogoutCard user={user} role={role} />,
     actions: [
-      { id: 'stay', label: 'Seguir aquí', variant: 'ghost' },
-      { id: 'everywhere', label: 'Salir de todos mis dispositivos', variant: 'danger-outline', icon: <MonitorX size={18} /> },
-      { id: 'logout', label: 'Cerrar sesión', variant: 'danger', icon: <LogOut size={18} /> },
+      { id: 'stay', label: t('auth.logout.stay'), variant: 'ghost' },
+      { id: 'everywhere', label: t('auth.logout.everywhere'), variant: 'danger-outline', icon: <MonitorX size={18} /> },
+      { id: 'logout', label: t('common.actions.logout'), variant: 'danger', icon: <LogOut size={18} /> },
     ],
     key: 'confirm-logout',
   };
@@ -81,14 +77,15 @@ export function useConfirmLogout() {
   const { nameOf } = useCatalogs();
   return useCallback(async () => {
     if (!user) return;
-    const choice = await feedback.show(logoutMessage(user, nameOf('roles', user.role)));
+    const role = nameOf('roles', user.role);
+    const choice = await feedback.show(() => logoutMessage(user, role));
     if (choice === 'logout') {
       await logout();
     } else if (choice === 'everywhere') {
       try {
         await logoutEverywhere();
       } catch (error) {
-        void feedback.fromError(error, { title: 'No se pudo cerrar sesión en todos los dispositivos' });
+        void feedback.fromError(error, { title: () => t('auth.logout.everywhereFailed') });
       }
     }
   }, [user, logout, logoutEverywhere, feedback, nameOf]);

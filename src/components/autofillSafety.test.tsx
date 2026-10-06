@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
+import { setLocale } from '../i18n/core';
 import { LoginPage } from '../pages/LoginPage';
 import { AuthProvider } from '../context/AuthContext';
 import { WithCatalogs } from '../test/render';
@@ -41,6 +42,22 @@ describe('etiquetas a salvo del autollenado de tarjetas de Chrome', () => {
     );
     const found = labels(container);
     expect(found.length).toBeGreaterThan(0);
+    for (const label of found) {
+      expect(label, `"${label}" parece campo de tarjeta para Chrome`).not.toMatch(CARD_NUMBER);
+      expect(label).not.toMatch(CARD_HOLDER);
+      expect(label).not.toMatch(CVC);
+    }
+  });
+
+  it('alta/edición de empleado en inglés (en-US): tampoco parecen campos de tarjeta', async () => {
+    await setLocale('en-US');
+    const { container } = render(
+      <WithCatalogs>
+        <EmployeeFormFields values={emptyEmployeeForm} errors={{}} onChange={() => undefined} />
+      </WithCatalogs>,
+    );
+    const found = labels(container);
+    expect(found).toContain('Employee No.');
     for (const label of found) {
       expect(label, `"${label}" parece campo de tarjeta para Chrome`).not.toMatch(CARD_NUMBER);
       expect(label).not.toMatch(CARD_HOLDER);

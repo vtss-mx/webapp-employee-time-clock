@@ -4,10 +4,10 @@ import type { ReactElement } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
-import { AccessoryReviewPrompt } from '../../components/LiveFaceFlow';
+import { AccessoryReviewPrompt } from '../../components/LiveFaceParts';
 import { catalogsFixture, catalogsWith } from '../../test/catalogs';
 import { publishPolicy, resetPolicyCache, useVerificationPolicy } from '../../hooks/useVerificationPolicy';
-import { samplePolicy } from '../../test/fixtures';
+import { sampleAdminPolicy, samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import { CompanyPolicyPage } from './CompanyPolicyPage';
@@ -24,18 +24,40 @@ const company = {
   api_enabled: false,
   employee_count: 3,
   admin_count: 1,
+  billing_status: 'ACTIVE',
+  suspension_reason: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };
 
 const learning = { enabled: true, approved_employees: 3, employees_learning: 1, learned_samples: 2, identifications: 9, learned_identifications: 1, last_learned_at: null };
 
+/**
+ * Lo que el ADMIN recibe además de lo que lee la empresa (motor de riesgo y antifraude). Estas pruebas son de los
+ * controles de siempre: la regla de dos personas apagada (sus avisos se prueban en `policyGovernance.test.tsx`).
+ */
+const { block_glasses: _g, ...adminExtras } = { ...sampleAdminPolicy, two_person_rule: false };
+
+/**
+ * Responde como el ADMIN: la política con sus campos del antifraude y cada PUT como `{ policy, change }` (aplicado).
+ * Un error del servidor pasa tal cual.
+ */
+async function asAdmin(response: Response, call: MockCall): Promise<Response> {
+  if (!response.ok) return response;
+  const { data } = (await response.clone().json()) as { data: Record<string, unknown> };
+  const policy = { ...adminExtras, ...data };
+  if (call.init.method !== 'PUT') return apiOk(policy);
+  const change = { id: 1, status: 'APPLIED', relaxes: false, preset: null, changes: [], reason: null, simulation: null, requested_by: 'superadmin@plataforma.com', requested_by_me: true, created_at: '2026-10-01T10:00:00Z', expires_at: null, decided_by: null, decided_at: null, decision_note: null };
+  return apiOk({ policy, change });
+}
+
 /** El servidor de la consola: la empresa, su aprendizaje y su política (`policyResponse` responde GET y PUT de la política). */
 function serve(policyResponse: Response | ((call: MockCall) => Response)) {
   return mockFetch((call) => {
     if (call.url.endsWith('/face-learning')) return apiOk(learning);
+    if (call.url.includes('/verification-policy/changes')) return apiOk({ items: [], total: 0, page: 1, size: 5 });
     if (!call.url.includes('/verification-policy')) return apiOk(company);
-    return typeof policyResponse === 'function' ? policyResponse(call) : policyResponse.clone();
+    return asAdmin(typeof policyResponse === 'function' ? policyResponse(call) : policyResponse.clone(), call);
   });
 }
 
@@ -297,7 +319,7 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
     renderPolicy();
     expect(await screen.findByText('Dispositivos de los validadores')).toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Solo desde teléfono celular' })).toBeNull();
-    expect(screen.getByText(/Empleados y administradores usan la aplicación desde cualquier dispositivo/)).toBeInTheDocument();
+    expect(screen.getByText(/empleados y administradores usan cualquier dispositivo/)).toBeInTheDocument();
   });
 
   it('validadores solo desde tableta o teléfono (confirmación propia al desactivarlo)', async () => {

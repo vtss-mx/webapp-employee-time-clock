@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { useId, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useT } from '../i18n';
 import type { NavEntry, NavGroup } from './navigation';
 
 /** ¿La ruta actual es esta opción o una de sus subpantallas? */
@@ -60,6 +61,7 @@ function Submenu({ group, open, current, onToggle }: SubmenuProps) {
  * pantallas, separadas por módulo.
  */
 export function SidebarNav({ groups, compact }: { groups: NavGroup[]; compact: boolean }) {
+  const t = useT();
   const { pathname } = useLocation();
   const current = activeGroup(groups, pathname);
   const [state, setState] = useState({ current, open: current });
@@ -69,7 +71,7 @@ export function SidebarNav({ groups, compact }: { groups: NavGroup[]; compact: b
   const setOpen = (code: string | null) => setState({ current, open: code });
 
   return (
-    <nav className={`sidebar__nav ${compact ? 'is-compact' : ''}`} aria-label="Menú">
+    <nav className={`sidebar__nav ${compact ? 'is-compact' : ''}`} aria-label={t('layout.menu.label')}>
       {groups.map((group) => {
         // Una sola pantalla, sin nombre de módulo (backend anterior) o menú contraído: opciones directas.
         if (group.entries.length === 1 || !group.name || compact) {

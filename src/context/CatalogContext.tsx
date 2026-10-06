@@ -2,6 +2,7 @@ import { createContext, useCallback, useEffect, useMemo, useState, type ReactNod
 import { useAuth } from '../hooks/useAuth';
 import { useErrorPopup } from '../hooks/useFeedback';
 import { useRetryOnReconnect } from '../hooks/useRetryOnReconnect';
+import { t, useLocale } from '../i18n';
 import { catalogService } from '../services/catalogService';
 import { createCatalogApi, type CatalogApi } from '../utils/catalogs';
 
@@ -16,14 +17,18 @@ export const CatalogContext = createContext<CatalogState | null>(null);
  * Catálogos de la BD (GET /api/catalogs), única fuente de todo lo que la interfaz muestra como
  * lista o etiqueta. Se cargan UNA vez por sesión al autenticarse, viven solo en memoria (nunca en
  * el navegador) y se descartan al cerrar la sesión. Un error de carga se avisa en el popup.
+ * Sus textos (`name`, `description`, `message`, `phrase`...) llegan en el idioma de la petición: al
+ * cambiar el idioma se vuelven a pedir y, mientras llegan, se siguen mostrando los anteriores (la
+ * pantalla no se vacía ni se recarga).
  */
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const [catalogs, setCatalogs] = useState<CatalogApi | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [attempt, setAttempt] = useState(0);
+  const locale = useLocale();
 
-  // Se carga al autenticarse (y en cada reintento); al cerrar la sesión se cancela y se descarta.
+  // Se carga al autenticarse, en cada reintento y al cambiar el idioma; al cerrar la sesión se cancela y se descarta.
   useEffect(() => {
     if (!isAuthenticated) {
       setCatalogs(null);
@@ -36,13 +41,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       .then((data) => !controller.signal.aborted && setCatalogs(createCatalogApi(data)))
       .catch((cause: unknown) => !controller.signal.aborted && setError(cause));
     return () => controller.abort();
-  }, [isAuthenticated, attempt]);
+  }, [isAuthenticated, attempt, locale]);
 
   const retry = useCallback(() => {
     setError(null);
     setAttempt((n) => n + 1);
   }, []);
-  useErrorPopup(error, { title: 'No se pudieron cargar los catálogos', retry });
+  useErrorPopup(error, { title: () => t('app.catalogsLoadFailed'), retry });
   useRetryOnReconnect(error, retry);
 
   const state = useMemo<CatalogState>(() => {

@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowRight, CheckCircle2, FilePlus2, HelpCircle, Info, PencilLine, Plus, Save, Trash2, type LucideIcon } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
+import { useT, type Translate } from '../i18n';
 import type { ConfirmDetail, ConfirmInput, ConfirmKind, ConfirmTone, FieldChange } from '../types/confirm';
 import type { MessageVariant } from '../utils/errorPresentation';
 import { FormField } from './FormField';
@@ -53,19 +54,24 @@ const TONES = {
   danger: { variant: 'error', icon: AlertTriangle, button: 'danger' },
 } as const;
 
+/** Botón principal por omisión de cada tipo (llaves: se traducen al dibujarse). */
+type ConfirmLabelKey = `common.actions.${'create' | 'saveChanges' | 'delete' | 'confirm'}`;
+
 /**
  * Lo que pone cada tipo de confirmación por omisión (todo se puede cambiar con `ConfirmInput`):
- * crear en azul con "Crear", editar con "Guardar cambios" y eliminar en rojo con "Eliminar".
+ * crear en azul con "Crear", editar con "Guardar cambios" y eliminar en rojo con "Eliminar". Su
+ * etiqueta es `dialogs.confirm.eyebrow.<tipo>`. Los textos se traducen al dibujarse: la confirmación
+ * abierta sigue al idioma activo.
  */
-const KINDS: Record<ConfirmKind, { tone: ConfirmTone; icon?: LucideIcon; button?: LucideIcon; eyebrow: string; confirmLabel: string }> = {
-  create: { tone: 'primary', icon: FilePlus2, button: Plus, eyebrow: 'Nuevo registro', confirmLabel: 'Crear' },
-  edit: { tone: 'primary', icon: PencilLine, button: Save, eyebrow: 'Confirmar cambios', confirmLabel: 'Guardar cambios' },
-  delete: { tone: 'danger', icon: Trash2, button: Trash2, eyebrow: 'Eliminar', confirmLabel: 'Eliminar' },
-  action: { tone: 'primary', eyebrow: 'Confirmación', confirmLabel: 'Confirmar' },
+const KINDS: Record<ConfirmKind, { tone: ConfirmTone; icon?: LucideIcon; button?: LucideIcon; confirmLabel: ConfirmLabelKey }> = {
+  create: { tone: 'primary', icon: FilePlus2, button: Plus, confirmLabel: 'common.actions.create' },
+  edit: { tone: 'primary', icon: PencilLine, button: Save, confirmLabel: 'common.actions.saveChanges' },
+  delete: { tone: 'danger', icon: Trash2, button: Trash2, confirmLabel: 'common.actions.delete' },
+  action: { tone: 'primary', confirmLabel: 'common.actions.confirm' },
 };
 
-/** Apariencia final de una confirmación: lo que pidió quien pregunta y, si no, lo de su tipo. */
-function confirmLook({ kind = 'action', tone, icon, eyebrow, confirmLabel, confirmIcon, cancelLabel }: ConfirmInput) {
+/** Apariencia final de una confirmación: lo que pidió quien pregunta y, si no, lo de su tipo (en el idioma activo). */
+function confirmLook({ kind = 'action', tone, icon, eyebrow, confirmLabel, confirmIcon, cancelLabel }: ConfirmInput, t: Translate) {
   const preset = KINDS[kind];
   const style = TONES[tone ?? preset.tone];
   const HeroIcon = preset.icon ?? style.icon;
@@ -73,32 +79,31 @@ function confirmLook({ kind = 'action', tone, icon, eyebrow, confirmLabel, confi
   return {
     style,
     icon: icon ?? <HeroIcon size={30} />,
-    eyebrow: eyebrow ?? preset.eyebrow,
-    confirmLabel: confirmLabel ?? preset.confirmLabel,
+    eyebrow: eyebrow ?? t(`dialogs.confirm.eyebrow.${kind}`),
+    confirmLabel: confirmLabel ?? t(preset.confirmLabel),
     confirmIcon: confirmIcon ?? (ButtonIcon && <ButtonIcon size={18} />),
-    cancelLabel: cancelLabel ?? 'Cancelar',
+    cancelLabel: cancelLabel ?? t('common.actions.cancel'),
   };
 }
 
 /** Edición: los campos que cambian, "antes → después". */
 function ChangeList({ changes }: { changes: FieldChange[] }) {
+  const t = useT();
   return (
-    <section className="confirm-block" aria-label="Cambios">
-      <h3 className="confirm-block__title">
-        {changes.length === 1 ? '1 cambio' : `${changes.length} cambios`}
-      </h3>
+    <section className="confirm-block" aria-label={t('dialogs.confirm.changes')}>
+      <h3 className="confirm-block__title">{t('dialogs.confirm.changeCount', { count: changes.length })}</h3>
       <ul className="confirm-changes">
         {changes.map((change) => (
           <li key={change.label}>
             <span className="confirm-changes__label">{change.label}</span>
             <span className="confirm-changes__values">
               <span className="confirm-changes__before">
-                <span className="sr-only">Antes: </span>
+                <span className="sr-only">{t('dialogs.confirm.before')} </span>
                 {change.before}
               </span>
               <ArrowRight size={16} aria-hidden className="confirm-changes__arrow" />
               <span className="confirm-changes__after">
-                <span className="sr-only">Después: </span>
+                <span className="sr-only">{t('dialogs.confirm.after')} </span>
                 {change.after}
               </span>
             </span>
@@ -111,8 +116,9 @@ function ChangeList({ changes }: { changes: FieldChange[] }) {
 
 /** Lo que se crea o se afecta: líneas sueltas o filas "Etiqueta: valor". */
 function DetailList({ title, details }: { title?: string; details: ConfirmDetail[] }) {
+  const t = useT();
   return (
-    <section className="confirm-block" aria-label={title ?? 'Detalles'}>
+    <section className="confirm-block" aria-label={title ?? t('dialogs.confirm.details')}>
       {title && <h3 className="confirm-block__title">{title}</h3>}
       <ul className="confirm-facts">
         {details.map((detail, index) =>
@@ -145,11 +151,12 @@ export function ConfirmDialog({ open, ...props }: ConfirmDialogProps) {
 
 function ConfirmDialogBody({ loading = false, onConfirm, onCancel, ...input }: Omit<ConfirmDialogProps, 'open'>) {
   const { title, message, details, detailsTitle, changes, note, confirmText } = input;
+  const t = useT();
   const titleId = useId();
   const textId = useId();
   const [typed, setTyped] = useState('');
   const confirmed = !confirmText || typed.trim() === confirmText.trim();
-  const look = confirmLook(input);
+  const look = confirmLook(input, t);
   const cancel = loading ? undefined : onCancel;
   return (
     <Overlay
@@ -176,7 +183,7 @@ function ConfirmDialogBody({ loading = false, onConfirm, onCancel, ...input }: O
         )}
         {confirmText && (
           <FormField
-            label={`Escribe «${confirmText}» para confirmar`}
+            label={t('dialogs.confirm.typeToConfirm', { text: confirmText })}
             value={typed}
             autoComplete="off"
             disabled={loading}

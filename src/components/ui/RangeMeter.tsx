@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react';
+import { useT } from '../../i18n';
+import { formatNumber } from '../../utils/numbers';
 
 export interface RangeMeterProps {
   value: number;
@@ -16,7 +18,8 @@ export interface RangeMeterProps {
   className?: string;
 }
 
-const plain = (value: number) => value.toLocaleString('es-MX', { maximumFractionDigits: 3 });
+/** Hasta 3 decimales, con los separadores del idioma activo. */
+const plain = (value: number) => formatNumber(value, 3);
 
 /**
  * Medidor propio de un valor dentro de un rango (nunca `<meter>` ni `<progress>` nativos): barra con
@@ -24,6 +27,7 @@ const plain = (value: number) => value.toLocaleString('es-MX', { maximumFraction
  * `--meter-*` y expone `role="meter"` para lectores de pantalla.
  */
 export function RangeMeter({ value, min, max, label, format = plain, labels = {}, tone = 'primary', className = '' }: RangeMeterProps) {
+  const t = useT();
   const span = max - min;
   const ratio = span > 0 ? Math.max(0, Math.min(1, (value - min) / span)) : 1;
   return (
@@ -43,10 +47,10 @@ export function RangeMeter({ value, min, max, label, format = plain, labels = {}
       </div>
       <div className="range-meter__scale" aria-hidden>
         <span>
-          {labels.min ?? 'Mínimo'} {format(min)}
+          {labels.min ?? t('ui.rangeMeter.min')} {format(min)}
         </span>
         <span>
-          {labels.max ?? 'Tope'} {format(max)}
+          {labels.max ?? t('ui.rangeMeter.max')} {format(max)}
         </span>
       </div>
     </div>

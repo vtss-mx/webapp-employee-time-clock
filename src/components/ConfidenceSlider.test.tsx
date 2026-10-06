@@ -1,6 +1,7 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { setLocale, t } from '../i18n/core';
 import { catalogsFixture, catalogsWith } from '../test/catalogs';
 import { renderWithProviders } from '../test/render';
 import { ConfidenceSlider } from './ConfidenceSlider';
@@ -69,5 +70,34 @@ describe('ConfidenceSlider', () => {
       catalogs: catalogsWith({ confidence_levels: [] }),
     });
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('ConfidenceSlider en inglés (en-US) y cambio de idioma en caliente', () => {
+  it('la confirmación abierta (con la etiqueta del control) cambia de idioma sin cerrarse', async () => {
+    const onSave = vi.fn();
+    const label = () => (t('common.actions.save') === 'Save' ? 'Identify level' : 'Nivel para identificar');
+    renderWithProviders(<ConfidenceSlider value={0.9} label={label} onSave={onSave} />);
+    await pick('95', 'Nivel para identificar');
+    expect(await screen.findByRole('dialog', { name: '¿Exigir 95 % de confianza?' })).toBeInTheDocument();
+
+    await act(() => setLocale('en-US'));
+    const popup = screen.getByRole('dialog', { name: 'Require 95% confidence?' });
+    expect(popup).toHaveTextContent('A higher level better protects against look-alikes.');
+    expect(within(popup).getByRole('region', { name: 'With this level' })).toHaveTextContent('Required similarity0.427');
+    expect(popup).toHaveTextContent('Identify level');
+    expect(screen.getByRole('slider', { name: 'Identify level' })).toHaveAttribute('aria-valuetext', '95% (Alto)');
+    await userEvent.click(within(popup).getByRole('button', { name: 'Save level' }));
+    expect(onSave).toHaveBeenCalledWith(0.95);
+  });
+
+  it('el control en inglés: nivel vigente, cifras y acciones', async () => {
+    await setLocale('en-US');
+    renderWithProviders(<ConfidenceSlider value={0.95} onSave={vi.fn()} />);
+    expect(screen.getByRole('slider', { name: 'Required confidence level' })).toBeInTheDocument();
+    expect(screen.getByText('Current')).toBeInTheDocument();
+    expect(screen.getByText('Impostors accepted')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save level' })).toHaveAttribute('title', 'Move the slider to choose another level');
   });
 });

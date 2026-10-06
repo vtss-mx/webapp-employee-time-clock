@@ -99,7 +99,43 @@ export interface ApiDemand {
   shed: number;
 }
 
-/** Estado del servidor (GET /api/admin/errors/server): dependencias y capacidad adaptativa. */
+/** Un tipo de imagen o archivo y cuántos hay en el bucket (ninguno vive en la base de datos). */
+export interface StoredImageCount {
+  kind: string;
+  label: string;
+  /** Objetos en el bucket; a lo más `count_cap`. */
+  stored: number;
+}
+
+/** Una tarea del bucket en segundo plano (hoy `delete`: la cola de borrado) con su última vuelta. */
+export interface StorageTask {
+  task: string;
+  label: string;
+  /** Objetos en la cola; a lo más `count_cap`. */
+  pending: number;
+  last_run_at: string | null;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  last_error: string | null;
+}
+
+/** Imágenes y archivos cifrados en el bucket privado (Google Cloud Storage / Firebase Storage): nunca en la BD. */
+export interface ObjectStorageStatus {
+  configured: boolean;
+  /** gcs o disabled. */
+  backend: string;
+  bucket: string | null;
+  /** Carpeta de este entorno dentro del bucket. */
+  prefix: string;
+  /** Por qué está apagado (sin bucket, sin llave, llave inválida). */
+  reason: string | null;
+  /** Los conteos llegan a lo más a este número ("10,000+"). */
+  count_cap: number;
+  images: StoredImageCount[];
+  tasks: StorageTask[];
+}
+
+/** Estado del servidor (GET /api/admin/errors/server): dependencias, capacidad adaptativa y bucket de imágenes. */
 export interface ServerStatus {
   /** ok, degraded (sin motor facial) o unavailable (sin base de datos). */
   status: 'ok' | 'degraded' | 'unavailable';
@@ -114,4 +150,5 @@ export interface ServerStatus {
     latency_ratio: number | null;
     top_demand: ApiDemand[];
   };
+  storage: ObjectStorageStatus;
 }

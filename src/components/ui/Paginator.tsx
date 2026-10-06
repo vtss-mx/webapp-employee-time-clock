@@ -1,6 +1,8 @@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
+import { Trans, useT, type Translate } from '../../i18n';
 import { config } from '../../utils/config';
+import { formatCount } from '../../utils/numbers';
 import { Select } from './Select';
 
 export type PageItem = number | 'gap-start' | 'gap-end';
@@ -34,25 +36,20 @@ export interface PaginatorLabels {
   status: (page: number, totalPages: number) => ReactNode;
 }
 
-export const DEFAULT_PAGINATOR_LABELS: PaginatorLabels = {
-  navigation: 'Paginación',
+/** Textos por omisión en el idioma activo (se piden al dibujarse: siguen un cambio de idioma). */
+const defaultPaginatorLabels = (t: Translate): PaginatorLabels => ({
+  navigation: t('ui.paginator.navigation'),
   range: (from, to, total, noun) => (
-    <>
-      Mostrando <strong>{from === to ? from : `${from}–${to}`}</strong> de <strong>{total}</strong> {noun}
-    </>
+    <Trans k="ui.paginator.range" values={{ range: <strong>{from === to ? formatCount(from) : `${formatCount(from)}–${formatCount(to)}`}</strong>, total: <strong>{formatCount(total)}</strong>, noun }} />
   ),
-  perPage: 'Por página',
-  first: 'Primera página',
-  previous: 'Página anterior',
-  next: 'Página siguiente',
-  last: 'Última página',
-  page: (page) => `Página ${page}`,
-  status: (page, totalPages) => (
-    <>
-      Página <strong>{page}</strong> de <strong>{totalPages}</strong>
-    </>
-  ),
-};
+  perPage: t('ui.paginator.perPage'),
+  first: t('ui.paginator.first'),
+  previous: t('ui.paginator.previous'),
+  next: t('ui.paginator.next'),
+  last: t('ui.paginator.last'),
+  page: (page) => t('ui.paginator.page', { page }),
+  status: (page, totalPages) => <Trans k="ui.paginator.status" values={{ page: <strong>{page}</strong>, pages: <strong>{totalPages}</strong> }} />,
+});
 
 export type PaginatorPart = 'range' | 'sizes' | 'edges' | 'pages';
 
@@ -93,8 +90,9 @@ export interface PaginatorProps extends PaginatorOptions {
  */
 export function Paginator(props: PaginatorProps) {
   const { page, size, total, loading = false, onPage, onSize } = props;
+  const t = useT();
   if (total <= 0) return null;
-  const labels = { ...DEFAULT_PAGINATOR_LABELS, ...props.labels };
+  const labels = { ...defaultPaginatorLabels(t), ...props.labels };
   const show = { range: true, sizes: true, edges: true, pages: true, ...props.show };
   const totalPages = Math.max(1, Math.ceil(total / size));
   const current = Math.min(Math.max(page, 1), totalPages);
@@ -108,7 +106,7 @@ export function Paginator(props: PaginatorProps) {
   return (
     <nav className={classes.filter(Boolean).join(' ')} aria-label={labels.navigation} aria-busy={loading || undefined}>
       <div className="pager__inner">
-        {show.range && <PagerRange labels={labels} current={current} size={size} total={total} noun={props.noun} />}
+        {show.range && <PagerRange labels={labels} current={current} size={size} total={total} noun={props.noun ?? { one: t('ui.paginator.noun.one'), other: t('ui.paginator.noun.other') }} />}
         {show.sizes && onSize && <PageSizeSelect label={labels.perPage} size={size} sizes={props.sizes ?? config.pageSizes} onSize={onSize} />}
         <div className="pager__nav">
           {show.edges && <PagerButton label={labels.first} icon={<ChevronsLeft size={18} />} disabled={atStart} onClick={() => go(1)} />}
@@ -128,13 +126,13 @@ interface PagerRangeProps {
   current: number;
   size: number;
   total: number;
-  noun?: { one: string; other: string };
+  noun: { one: string; other: string };
 }
 
 function PagerRange({ labels, current, size, total, noun }: PagerRangeProps) {
   const from = (current - 1) * size + 1;
   const to = Math.min(total, current * size);
-  const word = total === 1 ? (noun?.one ?? 'resultado') : (noun?.other ?? 'resultados');
+  const word = total === 1 ? noun.one : noun.other;
   return (
     <p className="pager__range" aria-live="polite">
       {labels.range(from, to, total, word)}

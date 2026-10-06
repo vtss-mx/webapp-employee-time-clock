@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { t, useLocale } from '../i18n';
+import { localizedError } from '../i18n/lazy';
 import { deviceStore } from '../utils/deviceStore';
-import { CameraNotReadyError, describeCameraProblem, errorKind, type CameraProblem, type CameraProblemKind } from '../utils/cameraDiagnostics';
+import { cameraProblemText, CameraNotReadyError, describeCameraProblem, errorKind, type CameraProblem, type CameraProblemKind } from '../utils/cameraDiagnostics';
 import {
   activeKind,
   cameraConstraints,
@@ -35,8 +37,9 @@ export interface CameraController {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   facing: CameraFacing;
   status: CameraStatus;
+  /** Causa del error en el idioma activo (la misma de `problem`). */
   error: string | null;
-  /** Causa del error con los pasos para resolverla según sistema operativo y navegador. */
+  /** Causa del error (sin textos: `cameraProblemText` da los pasos según sistema operativo y navegador). */
   problem: CameraProblem | null;
   devices: CameraDevice[];
   activeDeviceId: string | null;
@@ -52,6 +55,8 @@ export interface CameraController {
   switchCamera: () => void;
   selectCamera: (deviceId: string) => void;
   captureFrame: (options?: CaptureOptions) => Promise<Blob>;
+  /** La pista de video abierta (o null): su configuración viaja en la telemetría de la toma (antifraude). */
+  videoTrack: () => MediaStreamTrack | null;
 }
 
 /** Cámara que realmente abrió el navegador: su id (para recordarla o volver a ella) y su lado. */
@@ -88,10 +93,14 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
   const mutedRef = useRef(false);
   const prefKey = `tc.camera.${facing}`;
 
+  // Los nombres de las cámaras y el error se escriben al dibujarse: un cambio de idioma los traduce
+  // sin tocar la cámara (el estado guarda solo lo que da el navegador y el tipo de problema).
+  useLocale();
   const [status, setStatus] = useState<CameraStatus>('idle');
   const [problem, setProblem] = useState<CameraProblem | null>(null);
-  const error = problem?.message ?? null;
-  const [devices, setDevices] = useState<CameraDevice[]>([]);
+  const error = problem ? cameraProblemText(problem).message : null;
+  const [inputs, setInputs] = useState<Array<Pick<MediaDeviceInfo, 'deviceId' | 'label'>>>([]);
+  const devices = toCameraDevices(inputs);
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
   const [kind, setKind] = useState<CameraKind>('unknown');
@@ -142,9 +151,9 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
   const refreshDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return [];
     const all = await navigator.mediaDevices.enumerateDevices();
-    const list = toCameraDevices(all.filter((d) => d.kind === 'videoinput' && d.deviceId));
-    setDevices(list);
-    return list;
+    const found = all.filter((d) => d.kind === 'videoinput' && d.deviceId);
+    setInputs(found);
+    return found;
   }, []);
 
   const open = useCallback(
@@ -200,7 +209,7 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
       if (opened.id) void deviceStore.set(prefKey, { deviceId: opened.id, kind: opened.kind });
 
       // Tras conceder permiso, enumerateDevices ya devuelve etiquetas reales.
-      const list = await refreshDevices().catch(() => [] as CameraDevice[]);
+      const list = await refreshDevices().catch(() => []);
       if (requestId !== requestIdRef.current) return;
 
       setIsMirrored(shouldMirror(opened.kind, facing, list.length));
@@ -237,17 +246,26 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('No se pudo procesar la imagen');
+    if (!ctx) throw localizedError(() => t('face.camera.processFailed'));
     // Se captura la imagen real (sin espejo), que es la que procesa el backend.
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return new Promise<Blob>((resolve, reject) =>
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('No se pudo capturar la imagen'))),
+        (blob) => {
+          // El lienzo se suelta en cuanto se codifica: el registro toma 36 fotos seguidas y Safari en iPhone limita la
+          // memoria de los lienzos que aún no recoge (sin esto se acumularían hasta la siguiente limpieza).
+          canvas.width = 0;
+          canvas.height = 0;
+          if (blob) resolve(blob);
+          else reject(localizedError(() => t('face.camera.captureFailed')));
+        },
         'image/jpeg',
         quality,
       ),
     );
   }, []);
+
+  const videoTrack = useCallback(() => streamRef.current?.getVideoTracks()[0] ?? null, []);
 
   // Inicio automático (con la última cámara elegida para este propósito) y limpieza al desmontar.
   useEffect(() => {
@@ -304,5 +322,6 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
     switchCamera,
     selectCamera,
     captureFrame,
+    videoTrack,
   };
 }

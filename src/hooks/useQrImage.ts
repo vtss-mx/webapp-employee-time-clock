@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { t } from '../i18n/core';
+import { localizedError } from '../i18n/lazy';
 import { importWithRetry } from '../utils/importRetry';
 
 interface QrImageOptions {
@@ -16,7 +18,8 @@ export interface QrImage {
   retry: () => void;
 }
 
-const LOAD_ERROR = 'No se pudo preparar el código QR. Revisa tu conexión e intenta de nuevo.';
+/** El error se traduce al leerse (`error.message`): la pantalla que lo explica sigue al idioma activo. */
+const loadError = () => localizedError(() => t('services.qr.loadFailed'));
 
 /**
  * Código QR (data URL) dibujado en el navegador. La librería se carga solo cuando hace falta (y se
@@ -34,7 +37,7 @@ export function useQrImage(text: string | null | undefined, { width = 232, dark 
     importWithRetry(() => import('qrcode'))
       .then(({ toDataURL }) => toDataURL(text, { margin: 1, width, errorCorrectionLevel: 'M', color: { dark, light: '#ffffff' } }))
       .then((src) => !cancelled && setImage({ text, src }))
-      .catch(() => !cancelled && setFailure({ text, error: new Error(LOAD_ERROR) }));
+      .catch(() => !cancelled && setFailure({ text, error: loadError() }));
     return () => {
       cancelled = true;
     };

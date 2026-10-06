@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/core';
 import { checkAvailability, type AvailabilityField } from '../services/availabilityService';
 import type { AvailabilityState, AvailabilityStatus, FieldStatus } from '../types';
 import { config } from '../utils/config';
@@ -80,7 +81,7 @@ export function availabilityBlocks(state: AvailabilityState): boolean {
 export function liveFeedback(state: AvailabilityState | undefined): { error?: string; status?: FieldStatus } {
   switch (state?.status) {
     case 'checking':
-      return { status: { tone: 'checking', text: 'Verificando disponibilidad…' } };
+      return { status: { tone: 'checking', text: t('services.availability.checking') } };
     case 'available':
       return { status: { tone: 'success', text: state.message } };
     case 'linkable':

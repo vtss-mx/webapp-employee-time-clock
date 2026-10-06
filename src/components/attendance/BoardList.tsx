@@ -2,17 +2,27 @@ import { ChevronRight, ClipboardPen, PencilLine } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useCatalogs } from '../../hooks/useCatalogs';
+import { useT, type MessageKey } from '../../i18n';
 import { paths } from '../../routes/paths';
 import type { BoardRow } from '../../types';
-import { initials } from '../../utils/format';
 import { CatalogStatusBadge } from '../StatusBadge';
 import { ButtonLink } from '../ui/Button';
 import { newSessionPath } from './manualSession';
 import { MinutesBadge } from './MinutesBadge';
+import { ReviewBadge } from './ReviewParts';
 import { breaksUsed, clockOn, scheduleRange } from './sessionFacts';
+import { Avatar } from '../ui/Avatar';
+import { DeletedMark } from '../ui/DeletedMark';
 
 /** Encabezados de las columnas (solo en contenedores anchos; en tarjetas cada dato lleva su etiqueta). */
-const COLUMNS = ['Empleado', 'Turno', 'Estado', 'Entrada', 'Descansos', 'Salida'];
+const COLUMNS = [
+  'common.fields.employee',
+  'attendance.fields.shift',
+  'common.fields.status',
+  'attendance.fields.checkIn',
+  'attendance.fields.breaks',
+  'attendance.fields.checkOut',
+] as const satisfies readonly MessageKey[];
 
 function Cell({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) {
   return (
@@ -28,6 +38,7 @@ function RowState({ row }: { row: BoardRow }) {
   return (
     <span className="att-row__state">
       <CatalogStatusBadge catalog="board_states" code={row.state} />
+      {row.session && <ReviewBadge session={row.session} />}
       {row.state === 'DAY_OFF' && row.day_off && <small className="att-row__reason">{row.day_off.name}</small>}
     </span>
   );
@@ -35,25 +46,29 @@ function RowState({ row }: { row: BoardRow }) {
 
 /** Lo que se ve de un empleado en el tablero: quién es, su turno, en qué va y sus registros del día. */
 function RowContent({ row }: { row: BoardRow }) {
+  const t = useT();
   const { nameOf } = useCatalogs();
   const { employee, session } = row;
   return (
     <>
       <span className="person att-row__person">
-        <span className="avatar">{initials(employee.full_name)}</span>
+        <Avatar name={employee.full_name} decorative />
         <span className="person__info">
           <strong className="truncate">{employee.full_name}</strong>
-          <small className="truncate">{[employee.employee_number, row.department].filter(Boolean).join(' · ')}</small>
+          <small className="truncate">
+            {[employee.employee_number, row.department].filter(Boolean).join(' · ')}
+            <DeletedMark deleted={employee.deleted} />
+          </small>
         </span>
       </span>
       <RowState row={row} />
       {session && <ChevronRight className="att-row__chevron" size={18} aria-hidden="true" />}
       <span className="att-row__facts">
-        <Cell label="Turno" className="att-cell--shift">
+        <Cell label={t('attendance.fields.shift')} className="att-cell--shift">
           <strong className="truncate">{row.shift_name}</strong>
           <small>{scheduleRange(row.scheduled_start, row.scheduled_end)}</small>
         </Cell>
-        <Cell label="Entrada">
+        <Cell label={t('attendance.fields.checkIn')}>
           {session ? (
             <>
               <span className="att-cell__value">
@@ -65,8 +80,8 @@ function RowContent({ row }: { row: BoardRow }) {
             '—'
           )}
         </Cell>
-        <Cell label="Descansos">{session ? breaksUsed(session) : '—'}</Cell>
-        <Cell label="Salida">
+        <Cell label={t('attendance.fields.breaks')}>{session ? breaksUsed(session) : '—'}</Cell>
+        <Cell label={t('attendance.fields.checkOut')}>
           {session?.check_out_at ? (
             <span className="att-cell__value">
               {clockOn(session.check_out_at, session.work_date)} <MinutesBadge kind="early" minutes={session.early_leave_minutes} />
@@ -90,18 +105,20 @@ const canRegister = (row: BoardRow) => !row.session && (row.state === 'MISSING' 
  * su texto para el lector de pantalla y su globo de ayuda).
  */
 function RowActions({ row, workDate }: { row: BoardRow; workDate: string }) {
+  const t = useT();
   const { employee, session } = row;
+  const name = employee.full_name;
   let action: ReactNode = null;
   if (session) {
     action = (
-      <ButtonLink to={paths.company.correctAttendanceSession(session.id)} variant="secondary" size="sm" icon={<PencilLine size={16} aria-hidden />} title={`Corregir la jornada de ${employee.full_name}`}>
-        <span className="att-board__action-text">Corregir</span>
+      <ButtonLink to={paths.company.correctAttendanceSession(session.id)} variant="secondary" size="sm" icon={<PencilLine size={16} aria-hidden />} title={t('attendance.board.correctTitle', { name })}>
+        <span className="att-board__action-text">{t('attendance.board.correct')}</span>
       </ButtonLink>
     );
   } else if (canRegister(row)) {
     action = (
-      <ButtonLink to={newSessionPath(employee.id, workDate)} variant="secondary" size="sm" icon={<ClipboardPen size={16} aria-hidden />} title={`Registrar la asistencia de ${employee.full_name}`}>
-        <span className="att-board__action-text">Registrar asistencia</span>
+      <ButtonLink to={newSessionPath(employee.id, workDate)} variant="secondary" size="sm" icon={<ClipboardPen size={16} aria-hidden />} title={t('attendance.board.recordTitle', { name })}>
+        <span className="att-board__action-text">{t('attendance.record')}</span>
       </ButtonLink>
     );
   }
@@ -115,11 +132,12 @@ function RowActions({ row, workDate }: { row: BoardRow; workDate: string }) {
  * enlace. Las acciones de la empresa (corregir, registrar) van a un lado, fuera del enlace de la fila.
  */
 export function BoardList({ rows, loading, workDate }: { rows: BoardRow[]; loading: boolean; workDate: string }) {
+  const t = useT();
   return (
     <div className={`table-wrap att-board ${loading ? 'is-loading' : ''}`}>
       <div className="att-board__head" aria-hidden="true">
         {COLUMNS.map((column) => (
-          <span key={column}>{column}</span>
+          <span key={column}>{t(column)}</span>
         ))}
       </div>
       <ul className="att-board__list">

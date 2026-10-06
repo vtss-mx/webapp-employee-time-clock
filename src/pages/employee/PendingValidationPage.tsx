@@ -6,10 +6,12 @@ import { StatusMark } from '../../components/ui/StatusMark';
 import { useAction } from '../../hooks/useAction';
 import { useAuth } from '../../hooks/useAuth';
 import { usePolling } from '../../hooks/usePolling';
+import { t, useLocale } from '../../i18n';
 import { config } from '../../utils/config';
 
 /** Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. */
 export function PendingValidationPage() {
+  useLocale(); // textos con `t` al dibujarse: un cambio de idioma los traduce
   const { user, refreshUser } = useAuth();
   const { busy, run } = useAction();
 
@@ -18,7 +20,7 @@ export function PendingValidationPage() {
   usePolling(poll, { intervalMs: config.validationStatusPollMs, immediate: false });
 
   // A mano: si falla (sin red, servidor ocupado) se avisa con su popup; la revisión automática sigue.
-  const check = () => run(refreshUser, { errorTitle: 'No se pudo actualizar el estado' });
+  const check = () => run(refreshUser, { errorTitle: () => t('employee.pending.errorTitle') });
 
   return (
     <div className="page page--narrow page-transition">
@@ -28,11 +30,8 @@ export function PendingValidationPage() {
           <span style={{ justifySelf: 'center' }}>
             <FaceStatusBadge status="PENDING_REVIEW" />
           </span>
-          <h1>Estamos validando tu identidad</h1>
-          <p className="muted">
-            {user?.employee?.first_name}, tu registro facial se envió correctamente. Un administrador de tu empresa lo
-            revisará y te avisaremos aquí en cuanto quede aprobado.
-          </p>
+          <h1>{t('employee.pending.title')}</h1>
+          <p className="muted">{t('employee.pending.text', { name: user?.employee?.first_name ?? '' })}</p>
         </div>
 
         <ol className="timeline">
@@ -41,8 +40,8 @@ export function PendingValidationPage() {
               <Check size={16} />
             </span>
             <div>
-              <strong>Registro facial enviado</strong>
-              <span className="muted small">Rostro, prueba de vida y calidad verificados.</span>
+              <strong>{t('employee.pending.sent.title')}</strong>
+              <span className="muted small">{t('employee.pending.sent.text')}</span>
             </div>
           </li>
           <li className="is-current">
@@ -50,8 +49,8 @@ export function PendingValidationPage() {
               <Clock size={16} />
             </span>
             <div>
-              <strong>Validación por tu empresa</strong>
-              <span className="muted small">Un administrador confirma que eres tú.</span>
+              <strong>{t('employee.pending.review.title')}</strong>
+              <span className="muted small">{t('employee.pending.review.text')}</span>
             </div>
           </li>
           <li>
@@ -59,17 +58,17 @@ export function PendingValidationPage() {
               <UserCheck size={16} />
             </span>
             <div>
-              <strong>Acceso habilitado</strong>
-              <span className="muted small">Podrás identificarte con tu rostro o tu código QR.</span>
+              <strong>{t('employee.pending.access.title')}</strong>
+              <span className="muted small">{t('employee.pending.access.text')}</span>
             </div>
           </li>
         </ol>
 
         <Button variant="secondary" size="lg" block loading={busy !== null} icon={<RefreshCw size={18} />} onClick={() => void check()}>
-          Actualizar estado
+          {t('employee.pending.refresh')}
         </Button>
         <p className="inline-note inline-note--center small muted">
-          <ScanFace size={16} /> Esta pantalla se actualiza automáticamente.
+          <ScanFace size={16} /> {t('employee.pending.auto')}
         </p>
       </div>
     </div>

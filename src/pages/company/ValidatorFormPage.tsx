@@ -3,6 +3,7 @@ import type { SubmitEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AddressFields } from '../../components/location/AddressFields';
 import { LocationPicker } from '../../components/location/LocationPicker';
+import type { MessageInput } from '../../components/MessageDialog';
 import { metersText } from '../../components/shifts/shiftRules';
 import { ValidatorAccountFields, ValidatorLocationRule } from '../../components/ValidatorForm';
 import { Button } from '../../components/ui/Button';
@@ -12,26 +13,30 @@ import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
-import { settingsOf, useValidatorForm, validateRadius } from '../../hooks/useValidatorForm';
+import { radiusText, settingsOf, useValidatorForm, validateRadius } from '../../hooks/useValidatorForm';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { validatorService } from '../../services/validatorService';
 import type { Address, Validator, ValidatorMode, ValidatorSettings } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
 import { addressLine, formatPoint, pickAddress, type AddressValues } from '../../utils/address';
 import { describeChanges, describeValues, type FieldLabels } from '../../utils/changes';
+import { DeletedValidator } from './ValidatorTrash';
 
 /**
  * Alta (/company/validators/new) o edición (/company/validators/:id/edit) de un validador de
  * identidad: cuenta y modo, domicilio del acceso con su punto en el mapa y "requiere ubicación".
+ * Uno en «Eliminados» no se edita: solo su aviso con «Restaurar».
  */
 export function ValidatorFormPage() {
+  const t = useT();
   const { id } = useParams();
   const validatorId = id ? Number(id) : null;
   // Alta: no hay nada que cargar (el validador se crea en esta pantalla).
-  const { data: original, error, retry: load } = useResource(
+  const { data: original, setData, error, retry: load } = useResource(
     (signal) => (validatorId === null ? Promise.resolve(null) : validatorService.get(validatorId, signal)),
     validatorId ?? 'new',
-    'No se pudo cargar el validador',
+    loadError,
   );
 
   if (validatorId === null) return <ValidatorForm original={null} />;
@@ -39,7 +44,7 @@ export function ValidatorFormPage() {
     return error ? (
       <div className="page">
         <Panel>
-          <PanelHeader title="Editar validador" backTo={paths.company.validators} backLabel="Validadores" />
+          <PanelHeader title={t('validators.form.editTitle')} backTo={paths.company.validators} backLabel={t('validators.back')} />
           <PanelSection>
             <RetryState onRetry={load} />
           </PanelSection>
@@ -49,6 +54,7 @@ export function ValidatorFormPage() {
       <SkeletonCard lines={8} />
     );
   }
+  if (original.deleted_at) return <DeletedValidator validator={original} onRestored={setData} />;
   return <ValidatorForm key={original.id} original={original} />;
 }
 
@@ -61,8 +67,10 @@ interface ValidatorSummary {
   name: string;
   email: string;
   mode: string;
-  /** Todos los campos del domicilio (cualquier cambio cuenta); se muestra en una línea. */
+  /** Todos los campos del domicilio salvo las referencias (cualquier cambio cuenta); se muestra en una línea. */
   address: AddressValues;
+  /** Las referencias, en su propia fila (no forman parte de la línea del domicilio). */
+  references: string;
   point: string;
   rule: string;
 }
@@ -70,18 +78,19 @@ interface ValidatorSummary {
 /** Domicilio en una línea; el municipio, si no es la ciudad, entre paréntesis. */
 function placeText(address: AddressValues): string {
   const line = addressLine(address);
-  return address.municipality && address.municipality !== address.city ? `${line} (municipio ${address.municipality})` : line;
+  return address.municipality && address.municipality !== address.city ? t('validators.form.summary.municipality', { address: line, municipality: address.municipality }) : line;
 }
 
-/** Filas de la confirmación, en este orden (sin la contraseña: nunca se muestra). */
-const SUMMARY_LABELS: FieldLabels<ValidatorSummary> = {
-  name: 'Nombre',
-  email: 'Correo de acceso',
-  mode: 'Modo de identificación',
-  address: { label: 'Domicilio', format: placeText },
-  point: 'Punto en el mapa',
-  rule: 'Exige ubicación',
-};
+/** Filas de la confirmación, en este orden (sin la contraseña: nunca se muestra) y en el idioma activo. */
+const summaryLabels = (): FieldLabels<ValidatorSummary> => ({
+  name: t('common.fields.name'),
+  email: t('validators.accessEmail'),
+  mode: t('validators.form.summary.mode'),
+  address: { label: t('validators.form.summary.address'), format: placeText },
+  references: t('validators.form.summary.references'),
+  point: t('validators.form.summary.point'),
+  rule: t('validators.form.summary.rule'),
+});
 
 function summaryOf(settings: ValidatorSettings, modeName: (mode: ValidatorMode) => string, email = ''): ValidatorSummary {
   const { latitude, longitude } = settings.address;
@@ -89,9 +98,10 @@ function summaryOf(settings: ValidatorSettings, modeName: (mode: ValidatorMode) 
     name: settings.name,
     email,
     mode: modeName(settings.mode),
-    address: pickAddress(settings.address),
-    point: latitude !== null && longitude !== null ? formatPoint({ lat: latitude, lng: longitude }) : 'Sin marcar',
-    rule: settings.location_required && settings.location_radius_m ? `Sí, a ${metersText(settings.location_radius_m)}` : 'No',
+    address: { ...pickAddress(settings.address), reference_notes: '' },
+    references: settings.address.reference_notes ?? '',
+    point: latitude !== null && longitude !== null ? formatPoint({ lat: latitude, lng: longitude }) : t('validators.form.summary.unmarked'),
+    rule: settings.location_required && settings.location_radius_m ? t('validators.form.summary.ruleRadius', { radius: metersText(settings.location_radius_m) }) : t('common.values.no'),
   };
 }
 
@@ -100,11 +110,11 @@ function createConfirm(settings: ValidatorSettings, email: string, modeName: (mo
   return {
     kind: 'create',
     icon: <ScanLine size={30} />,
-    title: `¿Agregar el validador ${settings.name}?`,
-    message: 'Podrá iniciar sesión con este correo y la contraseña que asignaste desde una tableta o un teléfono; cada dispositivo nuevo queda por autorizar.',
-    detailsTitle: 'Se registrará',
-    details: describeValues(summaryOf(settings, modeName, email), SUMMARY_LABELS),
-    confirmLabel: 'Agregar validador',
+    title: t('validators.form.createConfirm.title', { name: settings.name }),
+    message: t('validators.form.createConfirm.message'),
+    detailsTitle: t('validators.form.createConfirm.detailsTitle'),
+    details: describeValues(summaryOf(settings, modeName, email), summaryLabels()),
+    confirmLabel: t('validators.form.addTitle'),
     confirmIcon: <ScanLine size={18} />,
   };
 }
@@ -113,28 +123,28 @@ function createConfirm(settings: ValidatorSettings, email: string, modeName: (mo
 function editConfirm(original: Validator, settings: ValidatorSettings, modeName: (mode: ValidatorMode) => string): ConfirmInput {
   return {
     kind: 'edit',
-    title: `¿Guardar los cambios de ${original.name}?`,
-    changes: describeChanges(summaryOf(settingsOf(original), modeName), summaryOf(settings, modeName), SUMMARY_LABELS),
-    note: settings.location_required && locationRule(settings) !== locationRule(original) ? 'Su sesión abierta se cerrará: deberá iniciar sesión de nuevo desde ese lugar.' : undefined,
+    title: t('validators.form.editConfirm.title', { name: original.name }),
+    changes: describeChanges(summaryOf(settingsOf(original), modeName), summaryOf(settings, modeName), summaryLabels()),
+    note: settings.location_required && locationRule(settings) !== locationRule(original) ? t('validators.form.editConfirm.note') : undefined,
   };
 }
 
-/** El aviso al guardar: qué cambia para quien usa el validador. */
-function savedMessage(saved: Validator, original: Validator | null) {
+/** El aviso al guardar: qué cambia para quien usa el validador (se arma al dibujarse: sigue al idioma activo). */
+function savedMessage(saved: Validator, original: Validator | null): MessageInput {
   const details = [
-    saved.location_required && saved.location_radius_m
-      ? `Solo podrá iniciar sesión a no más de ${saved.location_radius_m.toLocaleString('es-MX')} m del punto marcado.`
-      : 'Puede iniciar sesión desde cualquier lugar.',
+    saved.location_required && saved.location_radius_m ? t('validators.form.saved.radius', { radius: radiusText(saved.location_radius_m) }) : t('validators.form.anywhere'),
   ];
   if (original && saved.location_required && locationRule(saved) !== locationRule(original)) {
-    details.push('Su sesión abierta se cerró: deberá iniciar sesión de nuevo desde ese lugar.');
+    details.push(t('validators.form.saved.sessionClosed'));
   }
-  return original
-    ? { title: 'Validador actualizado', text: `${saved.name} quedó actualizado.`, details }
-    : { title: 'Validador agregado', text: `${saved.email} ya puede iniciar sesión desde una tableta o un teléfono.`, details };
+  const text = original ? undefined : t('validators.form.saved.addedText', { email: saved.email });
+  return { variant: 'success', title: t(original ? 'validators.form.saved.updated' : 'validators.form.saved.added'), text, details, detailsStyle: 'checks' };
 }
 
+const loadError = () => t('validators.loadError');
+
 function ValidatorForm({ original }: { original: Validator | null }) {
+  const t = useT();
   const navigate = useNavigate();
   const feedback = useFeedback();
   const form = useValidatorForm(original);
@@ -148,8 +158,7 @@ function ValidatorForm({ original }: { original: Validator | null }) {
     event.preventDefault();
     void form.save(
       (saved) => {
-        const message = savedMessage(saved, original);
-        void feedback.success(message.title, message.text, { details: message.details, detailsStyle: 'checks' });
+        void feedback.show(() => savedMessage(saved, original));
         back();
       },
       (settings) => (original ? editConfirm(original, settings, modeName) : createConfirm(settings, form.values.email.trim(), modeName)),
@@ -161,16 +170,16 @@ function ValidatorForm({ original }: { original: Validator | null }) {
     <div className="page">
       <Panel onSubmit={onSubmit}>
         <PanelHeader
-          title={form.creating ? 'Agregar validador' : 'Editar validador'}
-          subtitle={original?.email ?? 'Cuenta para la tableta o el teléfono de un acceso: recepción, comedor, planta...'}
+          title={t(form.creating ? 'validators.form.addTitle' : 'validators.form.editTitle')}
+          subtitle={original?.email ?? t('validators.form.subtitle')}
           backTo={paths.company.validators}
-          backLabel="Validadores"
+          backLabel={t('validators.back')}
         />
-        <PanelSection title="Cuenta y modo de identificación" icon={<ShieldCheck size={20} />}>
+        <PanelSection title={t('validators.form.accountSection')} icon={<ShieldCheck size={20} />}>
           <ValidatorAccountFields form={form} />
         </PanelSection>
-        <PanelSection title="Domicilio del acceso" icon={<MapPinHouse size={20} />}>
-          <p className="muted small">Busca el lugar o toca el mapa: el domicilio se llena con lo que Google conoce del punto y puedes corregirlo.</p>
+        <PanelSection title={t('validators.form.addressSection')} icon={<MapPinHouse size={20} />}>
+          <p className="muted small">{t('validators.form.addressIntro')}</p>
           <LocationPicker
             point={form.point}
             radius={radius}
@@ -182,15 +191,15 @@ function ValidatorForm({ original }: { original: Validator | null }) {
           />
           <AddressFields values={addressValues} errors={form.errors} onChange={form.set} onTouch={form.touch} disabled={form.saving} />
         </PanelSection>
-        <PanelSection title="Ubicación para iniciar sesión" icon={<MapIcon size={20} />}>
+        <PanelSection title={t('validators.form.locationSection')} icon={<MapIcon size={20} />}>
           <ValidatorLocationRule form={form} />
         </PanelSection>
         <PanelFooter>
           <Button variant="ghost" size="lg" onClick={back} disabled={form.saving}>
-            Cancelar
+            {t('common.actions.cancel')}
           </Button>
           <Button type="submit" variant="primary" size="lg" icon={<Icon size={20} />} loading={form.saving} disabled={form.checking}>
-            {form.creating ? 'Agregar validador' : 'Guardar cambios'}
+            {t(form.creating ? 'validators.form.addTitle' : 'common.actions.saveChanges')}
           </Button>
         </PanelFooter>
       </Panel>

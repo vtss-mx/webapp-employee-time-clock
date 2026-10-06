@@ -1,12 +1,15 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { FeedbackProvider } from '../../context/FeedbackContext';
+import { setLocale } from '../../i18n/core';
+import { billingReply } from '../../test/billing';
 import { apiFail, apiOk, liveCheck, mockFetch, type MockCall } from '../../test/http';
 import { WithCatalogs } from '../../test/render';
 import type { CompanyAdmin, CompanyDetail } from '../../types';
+import { businessToday, formatDate } from '../../utils/format';
 import { CompanyAdminFormPage } from './CompanyAdminFormPage';
 import { CompanyCreatePage } from './CompanyCreatePage';
 import { CompanyDetailPage } from './CompanyDetailPage';
@@ -16,18 +19,24 @@ const company: CompanyDetail = {
   id: 4,
   name: 'Panificadora',
   legal_name: 'Panificadora del Norte SA de CV',
-  rfc: 'PNO120315AB1',
+  tax_country: 'MX',
+  tax_id_type: 'MX_RFC',
+  tax_id: 'PNO120315AB1',
   phone: '+526621234567',
   active: true,
   max_employees: 50,
   api_enabled: false,
+  max_validators: 0,
+  active_validators: 0,
   employee_count: 3,
   admin_count: 1,
+  billing_status: 'ACTIVE',
+  suspension_reason: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };
-/** Empresa capturada solo con lo mínimo (sin razón social, RFC, teléfono ni límite). */
-const bare: CompanyDetail = { ...company, legal_name: null, rfc: null, phone: null, max_employees: null };
+/** Empresa capturada solo con lo mínimo (sin razón social, identificador fiscal, teléfono ni límite). */
+const bare: CompanyDetail = { ...company, legal_name: null, tax_country: null, tax_id_type: null, tax_id: null, phone: null, max_employees: null };
 const admin: CompanyAdmin = { id: 9, email: 'admin@pan.com', active: false, last_login_at: null, created_at: '2026-01-01T00:00:00Z' };
 const adminsPage = (items: CompanyAdmin[]) => apiOk({ items, total: items.length, page: 1, size: 10 });
 
@@ -52,19 +61,21 @@ function renderFrom(path: string, route: string, page: ReactElement) {
 }
 /** Envío del formulario sin pasar por el botón (Enter de un gestor de contraseñas, requestSubmit...). */
 const forceSubmit = (button: HTMLElement) => fireEvent.submit(button.closest('form') as HTMLFormElement);
-const sent = (calls: MockCall[], method: string) => calls.filter((c) => c.init.method === method);
+/** Lo que se envió a la empresa (sin las vistas previas del cobro, que se piden solas mientras se escribe). */
+const sent = (calls: MockCall[], method: string) => calls.filter((c) => c.init.method === method && !c.url.endsWith('/billing/preview'));
 
 describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
   async function fillCompany() {
     await userEvent.type(screen.getByLabelText('Nombre comercial'), 'Panificadora');
     await userEvent.type(screen.getByLabelText('Razón social'), 'Panificadora del Norte SA de CV');
-    await userEvent.type(screen.getByLabelText('RFC de la empresa'), 'PNO120315AB1');
+    await userEvent.type(screen.getByLabelText('Identificador fiscal'), 'PNO120315AB1');
     await userEvent.type(screen.getByLabelText('Teléfono'), '6621234567');
     await userEvent.type(screen.getByLabelText('Correo del administrador'), 'Admin@Pan.com');
     await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Empresa1234');
     await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa1234');
+    await userEvent.type(screen.getByLabelText('Precio por empleado activo'), '120');
   }
-  const server = (create: () => Response) => mockFetch((call) => (call.url.includes('/validation') ? liveCheck() : create()));
+  const server = (create: () => Response) => mockFetch((call) => (call.url.includes('/validation') ? liveCheck() : (billingReply(call) ?? create())));
   /** Pide registrar y devuelve la confirmación (lo que se registrará, sin la contraseña). */
   async function askToCreate() {
     const submit = screen.getByRole('button', { name: 'Registrar empresa' });
@@ -90,10 +101,20 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     expect(within(within(dialog).getByRole('region', { name: 'Se registrará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Nombre comercialPanificadora',
       'Razón socialPanificadora del Norte SA de CV',
-      'RFCPNO120315AB1',
+      'Identificador fiscalRFC · PNO120315AB1 · México',
       'Teléfono+52 662 123 4567',
+      'Límite de validadoresSin validadores (módulo apagado)',
       'Correo del administradoradmin@pan.com',
       'Integraciones (API)No',
+      'Modalidad de cobroPor empleado activo',
+      'MonedaMXN · Peso mexicano',
+      'Precio (sin IVA)$120.00\u00a0MXN por mes',
+      'CargoCada mes',
+      `Inicio del cobro${formatDate(businessToday())}`,
+      'Demo sin cobroSin demo',
+      'DescuentoSin descuento',
+      'IVA16 %',
+      'Días de gracia10 días',
     ]);
     expect(dialog).not.toHaveTextContent('Empresa1234');
     expect(dialog).toHaveTextContent('Comparte la contraseña inicial por un medio seguro.');
@@ -108,9 +129,20 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     expect(popup).toHaveTextContent('Panificadora ya puede usar Employee Time Clock.');
     expect(popup).toHaveTextContent('Su administrador inicia sesión con admin@pan.com.');
     expect(popup).toHaveTextContent('Sin acceso a Integraciones (API); puedes dárselo desde su ficha.');
+    expect(popup).toHaveTextContent('Sin validadores; puedes darle lugares al editar la empresa.');
     const [post] = sent(calls, 'POST');
     expect(post.url).toBe('/api/admin/companies');
-    expect(JSON.parse(post.init.body as string)).toMatchObject({ name: 'Panificadora', rfc: 'PNO120315AB1', max_employees: null, api_enabled: false, admin_password: 'Empresa1234' });
+    expect(JSON.parse(post.init.body as string)).toMatchObject({
+      name: 'Panificadora',
+      tax_country: 'MX',
+      tax_id_type: 'MX_RFC',
+      tax_id: 'PNO120315AB1',
+      max_employees: null,
+      max_validators: 0,
+      api_enabled: false,
+      admin_password: 'Empresa1234',
+      billing: { pricing_mode: 'PER_USER', unit_price: '120.00', price_period: 'MONTH', interval_months: 1, starts_on: businessToday(), trial_days: 0, discount: null, tax_rate: '16.00', grace_days: 10 },
+    });
   });
 
   it('el ADMIN puede darle Integraciones (API) y un límite desde el alta (por omisión no los tiene)', async () => {
@@ -131,14 +163,14 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     expect(JSON.parse(sent(calls, 'POST')[0].init.body as string)).toMatchObject({ api_enabled: true, max_employees: 25 });
   });
 
-  it('un RFC ya registrado se marca en su campo y se avisa en popup; la pantalla sigue disponible', async () => {
-    server(() => apiFail(409, 'COMPANY_RFC_TAKEN', 'El RFC ya está registrado'));
+  it('un identificador fiscal ya registrado se marca en su campo y se avisa en popup; la pantalla sigue disponible', async () => {
+    server(() => apiFail(409, 'COMPANY_TAX_ID_TAKEN', 'Ya existe una empresa con ese identificador fiscal'));
     renderFrom('/admin/companies/new', '/admin/companies/new', <CompanyCreatePage />);
     await fillCompany();
     await confirmCreate();
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo registrar la empresa' });
-    expect(popup).toHaveTextContent('El RFC ya está registrado');
-    expect(screen.getByLabelText('RFC de la empresa')).toHaveAccessibleDescription(/El RFC ya está registrado/);
+    expect(popup).toHaveTextContent('Ya existe una empresa con ese identificador fiscal');
+    expect(screen.getByLabelText('Identificador fiscal')).toHaveAccessibleDescription(/Ya existe una empresa con ese identificador fiscal/);
     expect(screen.queryByText('Detalle de empresa')).toBeNull();
   });
 
@@ -157,6 +189,8 @@ describe('CompanyEditPage (solo se envía lo que cambió)', () => {
   const server = (...loads: Response[]) =>
     mockFetch((call) => {
       if (call.url.includes('/validation')) return liveCheck();
+      const billing = billingReply(call);
+      if (billing) return billing;
       if (call.init.method === 'PUT') return apiOk({ ...company, max_employees: 80 });
       return loads.length > 1 ? (loads.shift() as Response) : loads[0];
     });
@@ -218,7 +252,7 @@ describe('CompanyEditPage (solo se envía lo que cambió)', () => {
     const { calls } = server(apiOk(bare));
     renderFrom('/admin/companies/:id/edit', '/admin/companies/4/edit', <CompanyEditPage />);
     expect(await screen.findByLabelText('Razón social')).toHaveValue('');
-    expect(screen.getByLabelText('RFC de la empresa')).toHaveValue('');
+    expect(screen.getByLabelText('Identificador fiscal')).toHaveValue('');
     expect(screen.getByLabelText('Límite de empleados')).toHaveValue('');
     const save = screen.getByRole('button', { name: 'Guardar cambios' });
     expect(save).toHaveAttribute('title', 'Completa correctamente todos los campos obligatorios');
@@ -245,6 +279,8 @@ describe('CompanyEditPage (solo se envía lo que cambió)', () => {
 describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => {
   function renderDetail(detail: CompanyDetail, admins: () => Response | Promise<Response> = () => adminsPage([])) {
     const mock = mockFetch((call) => {
+      const billing = billingReply(call);
+      if (billing) return billing;
       if (call.url.includes('/admins')) return call.init.method === 'PATCH' ? apiOk(detail) : admins();
       if (call.init.method === 'PATCH') return apiOk({ ...detail, active: JSON.parse(call.init.body as string).active as boolean });
       if (call.init.method === 'PUT') return apiOk({ ...detail, ...(JSON.parse(call.init.body as string) as Partial<CompanyDetail>) });
@@ -257,12 +293,13 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
   it('desactivada y sin datos opcionales: "Sin capturar", sin límite; activarla también se confirma', async () => {
     const calls = renderDetail({ ...bare, active: false });
     expect(await screen.findByRole('heading', { name: 'Panificadora' })).toBeInTheDocument();
-    expect(screen.getAllByText('Sin capturar')).toHaveLength(3); // razón social, RFC y teléfono
-    expect(screen.getByText(/Sin RFC · desde/)).toBeInTheDocument();
+    expect(screen.getAllByText('Sin capturar')).toHaveLength(3); // razón social, identificador fiscal y teléfono
+    expect(screen.getByText(/Sin identificador fiscal · desde/)).toBeInTheDocument();
     expect(screen.getByText('empleados · sin límite')).toBeInTheDocument();
     expect(screen.queryByRole('meter')).toBeNull();
+    expect(screen.getByText('Sin el módulo: la pantalla no aparece en el menú de la empresa.')).toBeInTheDocument(); // validadores en 0
     expect(screen.getByText('Desactivada: su personal no puede iniciar sesión')).toBeInTheDocument();
-    expect(await screen.findByText('No hay administradores registrados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin administradores')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Activar' }));
     let dialog = await screen.findByRole('dialog', { name: '¿Activar Panificadora?' });
@@ -282,11 +319,15 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
   });
 
   it('desactivar pide confirmación: cancelar no envía nada; confirmar la desactiva', async () => {
-    const calls = renderDetail({ ...company, employee_count: 46 });
+    const calls = renderDetail({ ...company, employee_count: 46, max_validators: 4, active_validators: 4 });
     const meter = await screen.findByRole('meter', { name: 'Uso del límite de empleados' });
     expect(meter).toHaveAttribute('aria-valuenow', '92');
     expect(meter).toHaveClass('is-high'); // cerca del límite
     expect(screen.getByText('de 50 empleados')).toBeInTheDocument();
+    // Sus validadores frente a su límite (se cobran como empleados).
+    expect(screen.getByText('4 de 4 activos')).toBeInTheDocument();
+    expect(screen.getByText(/Cada validador activo se cobra como un empleado/)).toBeInTheDocument();
+    expect(screen.getByRole('meter', { name: 'Uso del límite de validadores' })).toHaveAttribute('aria-valuenow', '100');
 
     await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
     const dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar Panificadora?' });
@@ -367,6 +408,7 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
     let attempts = 0;
     mockFetch((call) => {
       if (call.url.includes('/admins')) return adminsPage([]);
+      if (call.url.includes('/admin/billing/')) return billingReply(call) as Response;
       return attempts++ === 0 ? apiFail(500, 'INTERNAL_ERROR', 'Falló el servidor') : apiOk(company);
     });
     renderFrom('/admin/companies/:id', '/admin/companies/4', <CompanyDetailPage />);
@@ -393,5 +435,65 @@ describe('CompanyAdminFormPage (estados de carga y envío)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(await screen.findByText('Detalle de empresa')).toBeInTheDocument();
     expect(sent(calls, 'POST')).toHaveLength(0);
+  });
+});
+
+describe('consola de empresas en inglés (en-US)', () => {
+  it('agregar un administrador: formulario y confirmación en inglés; la confirmación abierta cambia de idioma en caliente', async () => {
+    await setLocale('en-US');
+    const { calls } = mockFetch((call) => (call.url.includes('/validation') ? liveCheck() : apiOk(company)));
+    renderFrom('/admin/companies/:id/admins/new', '/admin/companies/4/admins/new', <CompanyAdminFormPage />);
+    const add = await screen.findByRole('button', { name: 'Add' });
+    expect(screen.getByRole('heading', { name: 'Add admin' })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Admin email'), 'rh@pan.com');
+    await userEvent.type(screen.getByLabelText('Initial password'), 'Recursos123');
+    await userEvent.type(screen.getByLabelText(/Confirm password/), 'Recursos123');
+    await waitFor(() => expect(add).toBeEnabled());
+    await userEvent.click(add);
+    const dialog = await screen.findByRole('dialog', { name: 'Add rh@pan.com as an admin?' });
+    expect(dialog).toHaveTextContent('Share the initial password through a secure channel.');
+    expect(within(dialog).getByRole('region', { name: 'To be registered' })).toHaveTextContent('Emailrh@pan.comCompanyPanificadora');
+    // Cambiar el idioma con la confirmación abierta la vuelve a armar en español.
+    await act(() => setLocale('es-MX'));
+    const spanish = await screen.findByRole('dialog', { name: '¿Agregar a rh@pan.com como administrador?' });
+    expect(within(spanish).getByRole('region', { name: 'Se registrará' })).toHaveTextContent('Correorh@pan.comEmpresaPanificadora');
+    await act(() => setLocale('en-US'));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Add rh@pan.com as an admin?' })).getByRole('button', { name: 'Add admin' }));
+    expect(await screen.findByText('Admin added')).toBeInTheDocument();
+    expect(screen.getByText('rh@pan.com can now sign in.')).toBeInTheDocument();
+    expect(sent(calls, 'POST').at(-1)?.url).toBe('/api/admin/companies/4/admins');
+  });
+
+  it('restablecer la contraseña en inglés: aviso de seguridad y popup de éxito', async () => {
+    await setLocale('en-US');
+    const admin9 = { ...admin, active: true };
+    mockFetch((call) => apiOk(call.url.endsWith('/admins/9') ? admin9 : company));
+    renderFrom('/admin/companies/:id/admins/:adminId/password', '/admin/companies/4/admins/9/password', <CompanyAdminFormPage />);
+    expect(await screen.findByRole('heading', { name: 'Reset password' })).toBeInTheDocument();
+    expect(screen.getByText('Assign a new password and share it through a secure channel. Their open sessions will end.')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('New password'), 'Nueva12345');
+    await userEvent.type(screen.getByLabelText(/Confirm password/), 'Nueva12345');
+    await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Reset the password for admin@pan.com?' });
+    expect(dialog).toHaveTextContent('Account security');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reset password' }));
+    expect(await screen.findByText('Password reset')).toBeInTheDocument();
+  });
+
+  it('detalle de la empresa en inglés: datos, uso del plan y la confirmación de desactivar', async () => {
+    await setLocale('en-US');
+    mockFetch((call) => (call.url.includes('/admins') ? adminsPage([{ ...admin, active: true }]) : (billingReply(call) ?? apiOk(company))));
+    renderFrom('/admin/companies/:id', '/admin/companies/4', <CompanyDetailPage />);
+    expect(await screen.findByRole('heading', { name: 'Panificadora' })).toBeInTheDocument();
+    // El tipo y el país, como los manda el backend (los catálogos de prueba vienen en español).
+    expect(screen.getByText(/RFC · PNO120315AB1 · México · since/)).toBeInTheDocument();
+    expect(screen.getByText('of 50 employees')).toBeInTheDocument();
+    expect(screen.getByText('Operating')).toBeInTheDocument();
+    expect(await screen.findByText("Hasn't signed in yet")).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Deactivate' })[0]);
+    const dialog = await screen.findByRole('alertdialog', { name: 'Deactivate Panificadora?' });
+    expect(within(dialog).getByRole('region', { name: 'Changes' })).toHaveTextContent(/Status.*Active.*Inactive/);
+    expect(dialog).toHaveTextContent('Affected staff');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   });
 });

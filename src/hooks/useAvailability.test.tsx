@@ -1,6 +1,7 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EmployeeFormFields } from '../components/EmployeeForm';
+import { setLocale } from '../i18n/core';
 import { emptyEmployeeForm } from '../utils/formRules';
 import * as availabilityService from '../services/availabilityService';
 import { WithCatalogs } from '../test/render';
@@ -107,5 +108,11 @@ describe('lectura del estado en vivo (única regla para formularios y campos)', 
     expect(liveFeedback({ status: 'taken', message: 'Ya registrado' })).toEqual({ error: 'Ya registrado' });
     expect(liveFeedback({ status: 'idle' })).toEqual({});
     expect(liveFeedback(undefined)).toEqual({});
+  });
+
+  it('en inglés: "Checking availability…" (el texto se pide al dibujar; el del servidor llega traducido)', async () => {
+    await setLocale('en-US');
+    expect(liveFeedback({ status: 'checking' }).status).toEqual({ tone: 'checking', text: 'Checking availability…' });
+    expect(liveFeedback({ status: 'available', message: 'Available' }).status).toEqual({ tone: 'success', text: 'Available' });
   });
 });

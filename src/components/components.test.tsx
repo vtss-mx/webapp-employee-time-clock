@@ -18,13 +18,14 @@ import { emptyEmployeeForm } from '../utils/formRules';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FaceRequirements } from './FaceRequirements';
 import { GlobalErrorHandler } from './GlobalErrorHandler';
-import { challengeActions, detectionMode, flowStatus, introFor, scannerView } from './liveFaceView';
+import { captureDetail, challengeActions, detectionMode, flowStatus, introFor, scannerView } from './liveFaceView';
 import { ConfirmDialog, Modal } from './Modal';
 import { OfflineBanner } from './OfflineBanner';
 import { PageHeader } from './PageHeader';
 import { QrCodePanel } from './QrCodePanel';
 import { describeDevice } from '../utils/userAgent';
 import { PageLoader } from './Spinner';
+import { AppErrorScreen } from './AppErrorScreen';
 import { EnrollmentBadge, FaceStatusBadge, StatusBadge } from './StatusBadge';
 import { Button } from './ui/Button';
 import { SkeletonCard, SkeletonRows } from './ui/Skeleton';
@@ -35,7 +36,7 @@ import { VerificationResultCard } from './VerificationResultCard';
 const verified: VerificationResult = {
   verified: true,
   method: 'FACE',
-  message: 'Identificación exitosa',
+  message: 'Identidad confirmada',
   employee_id: 1,
   employee_number: 'EMP-1',
   name: 'Ana Ruiz',
@@ -76,6 +77,26 @@ describe('componentes de presentación', () => {
     expect(screen.getByText('Tu rostro real, sin fotos')).toBeInTheDocument();
     expect(screen.getByText('Cargando datos')).toBeInTheDocument();
     expect(screen.getByText('acción')).toBeInTheDocument();
+  });
+
+  it('la carga muestra el ícono animado y "Cargando…": en el área de trabajo o a pantalla completa', () => {
+    const { container, rerender } = render(<PageLoader />);
+    const inline = screen.getByRole('status');
+    expect(inline).toHaveClass('page-loader');
+    expect(inline).toHaveTextContent('Cargando…');
+    expect(container.querySelector('.brand-mark__tint')).not.toBeNull();
+    rerender(<PageLoader fullscreen />);
+    expect(screen.getByRole('status')).toHaveClass('app-splash');
+  });
+
+  it('la pantalla de error de la app se personaliza: título, explicación y botón', async () => {
+    const onRetry = vi.fn();
+    render(<AppErrorScreen onRetry={onRetry} title="Sin servidor" message="Vuelve en un momento" retryLabel="Intentar" />);
+    const screenError = screen.getByRole('alert');
+    expect(screenError).toHaveTextContent('Sin servidor');
+    expect(screenError).toHaveTextContent('Vuelve en un momento');
+    await userEvent.click(screen.getByRole('button', { name: 'Intentar' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it('estados del registro facial y de las solicitudes: nombre y tono del catálogo', () => {
@@ -185,7 +206,7 @@ describe('verificación', () => {
   it('VerificationResultCard muestra éxito y fallo', () => {
     const onRetry = vi.fn();
     const { rerender } = render(<VerificationResultCard result={verified} failureTitle="No" onRetry={onRetry} onBack={vi.fn()} />);
-    expect(screen.getByText('Identificación exitosa')).toBeInTheDocument();
+    expect(screen.getByText('Identidad confirmada')).toBeInTheDocument();
     expect(screen.getByText('Ana Ruiz')).toBeInTheDocument();
     rerender(<VerificationResultCard result={null} error="Sin red" failureTitle="No fue posible" onRetry={onRetry} onBack={vi.fn()} />);
     expect(screen.getByText('No fue posible')).toBeInTheDocument();
@@ -209,19 +230,23 @@ describe('verificación', () => {
   it('flowStatus describe cada fase', () => {
     const base = { guidance: 'off_center' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false };
     expect(flowStatus({ ...base, phase: 'checking' }).tone).toBe('busy');
-    expect(flowStatus({ ...base, phase: 'checking', capture: { current: 2, total: 5 } }).message).toBe('Capturando 2 de 5...');
+    // Mientras se toman las fotos la indicación no cambia; la cuenta va aparte.
+    expect(flowStatus({ ...base, phase: 'checking', capture: { current: 2, total: 5 } }).message).toBe('Mantente quieto');
+    expect(flowStatus({ ...base, phase: 'checking' }).message).toBe('Analizando…');
+    expect(captureDetail({ current: 2, total: 5 })).toBe('Foto 2 de 5');
+    expect(captureDetail(null)).toBeNull();
     expect(flowStatus({ ...base, phase: 'submitting' }).message).toBe('Enviando');
     expect(flowStatus({ ...base, phase: 'blocked', blockedMessage: 'Quita lentes' })).toEqual({ message: 'Quita lentes', tone: 'warn' });
     expect(flowStatus({ ...base, phase: 'flash' })).toEqual({ message: 'Mantén tu rostro frente a la pantalla', tone: 'busy' });
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'hold_still' }).tone).toBe('ok');
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha' }).message).toBe('Gira a la derecha');
     // A medio movimiento se anima a terminarlo.
-    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha', moveProgress: 0.6 }).message).toBe('Un poco más...');
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha', moveProgress: 0.6 }).message).toBe('Un poco más');
     expect(flowStatus({ ...base, phase: 'frontal', detectorFailed: true }).message).toMatch(/Capturar/);
     expect(flowStatus({ ...base, phase: 'frontal', detectorReady: false }).message).toBeTruthy();
     // Entre dos movimientos: de vuelta al frente.
     expect(flowStatus({ ...base, phase: 'recenter' })).toEqual({ message: 'Vuelve a mirar al frente', tone: 'idle' });
-    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'ready' })).toEqual({ message: '¡Bien! Prepárate para el siguiente paso...', tone: 'ok' });
+    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'ready' })).toEqual({ message: 'Listo para el siguiente paso', tone: 'ok' });
   });
 
   it('reto de varios movimientos: orden, título por paso, destello y cámara virtual', () => {
@@ -242,21 +267,31 @@ describe('verificación', () => {
     expect(challengeActions(challenge)).toEqual(['LOOK_UP', 'TURN_RIGHT', 'MOVE_CLOSER']);
     expect(challengeActions(null)).toEqual([]);
 
-    const base = { guidance: 'move' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false, progress: 0.3, moveProgress: 0.7, challenge, virtualCamera: false };
+    const base = { guidance: 'move' as const, submittingMessage: 'Enviando', detectorReady: true, detectorFailed: false, moveProgress: 0.7, challenge, virtualCamera: false };
     const second = scannerView({ ...base, phase: 'challenge', step: 1 });
-    expect(second.message).toBe('Un poco más...');
-    expect(second.intro).toEqual({ title: 'Prueba de vida · paso 2 de 3', text: 'Gira a tu derecha' });
-    expect(second.ringProgress).toBe(0.7);
+    expect(second.message).toBe('Un poco más');
+    expect(second.detail).toBeNull();
+    expect(second.intro).toEqual({ title: 'Prueba de vida · paso 2 de 3', text: 'Gira a tu derecha', label: 'Prueba de vida · paso 2 de 3' });
     expect(scannerView({ ...base, phase: 'flash', step: 0 }).intro).toEqual({
       title: 'Prueba de vida · destello',
       text: 'Mantén tu rostro frente a la pantalla mientras cambia de color.',
+      label: 'Prueba de vida · destello',
     });
-    expect(scannerView({ ...base, phase: 'recenter', step: 1 }).intro.text).toBe('Vuelve a mirar al frente para el siguiente paso.');
-    expect(scannerView({ ...base, phase: 'frontal', step: 0, guidance: 'ready' }).ringProgress).toBe(0.3);
+    expect(scannerView({ ...base, phase: 'recenter', step: 1 }).intro).toMatchObject({ text: 'Vuelve a mirar al frente para el siguiente paso.', label: 'Prueba de vida · paso 2 de 3' });
+    // Fuera de la prueba de vida, el rótulo es el nombre de la etapa (la indicación grande va bajo el círculo).
+    expect(scannerView({ ...base, phase: 'checking', step: 0, capture: { current: 3, total: 36 } })).toMatchObject({
+      message: 'Mantente quieto',
+      detail: 'Foto 3 de 36',
+      intro: { title: 'Mantente quieto', label: 'Escaneo' },
+    });
+    expect(scannerView({ ...base, phase: 'submitting', step: 0 }).intro).toMatchObject({ title: 'Enviando', label: 'Confirmación' });
+    expect(scannerView({ ...base, phase: 'blocked', step: 0, blockedMessage: 'Hay poca luz' }).intro).toMatchObject({ title: 'Intenta de nuevo', label: 'Intenta de nuevo' });
+    expect(scannerView({ ...base, phase: 'frontal', step: 0, guidance: 'ready' }).tone).toBe('ok');
     expect(scannerView({ ...base, phase: 'frontal', step: 0, virtualCamera: true })).toMatchObject({ tone: 'warn', message: expect.stringMatching(/Cámara virtual/) as string });
     expect(introFor({ phase: 'challenge', stage: 'liveness', instruction: null, submittingMessage: '', step: { current: 1, total: 1 } })).toEqual({
       title: 'Prueba de vida',
       text: 'Mueve la cabeza como se indique; la pantalla puede cambiar de color un instante.',
+      label: 'Prueba de vida',
     });
   });
 
@@ -329,7 +364,7 @@ describe('manejo global de errores', () => {
       return <span>recuperado</span>;
     }
     render(<ErrorBoundary><Bomb /></ErrorBoundary>);
-    expect(screen.getByRole('alert')).toHaveTextContent('Algo no salió como esperábamos');
+    expect(screen.getByRole('alert')).toHaveTextContent('Error en esta pantalla');
     explode = false;
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(screen.getByText('recuperado')).toBeInTheDocument();

@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -113,7 +113,11 @@
 <a name='L48'></a><a href='#L48'>48</a>
 <a name='L49'></a><a href='#L49'>49</a>
 <a name='L50'></a><a href='#L50'>50</a>
-<a name='L51'></a><a href='#L51'>51</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -127,26 +131,30 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">42x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">42x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">93x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">93x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -174,34 +182,38 @@ import { WorkdaysTab } from '../../../components/calendar/WorkdaysTab';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { TabPanel, Tabs, type TabItem } from '../../../components/ui/Tabs';
 import { useResource } from '../../../hooks/useResource';
+import { t, useT } from '../../../i18n';
 import { calendarService } from '../../../services/calendarService';
+&nbsp;
+const pendingError = () =&gt; t('calendar.page.pendingError');
 &nbsp;
 /**
  * Calendario (COMPANY): qué días se trabaja y cuáles no. Pestañas en la URL (`?tab=`, se puede
- * compartir y sobrevive a recargar): días festivos (con los oficiales de un botón), ausencias de uno o
- * varios empleados, las solicitudes de vacaciones o permisos por decidir (con su contador) y los días
- * laborables especiales por persona.
+ * compartir y sobrevive a recargar): días festivos (el mes con su barra de periodo y el día elegido en
+ * `?date=`, con los oficiales de un botón), ausencias de uno o varios empleados, las solicitudes de
+ * vacaciones o permisos por decidir (con su contador) y los días laborables especiales por persona.
  */
 export function CalendarPage() {
+  const t = useT();
   const idBase = useId();
   const [params, setParams] = useSearchParams();
   const tab = tabFrom(params.get('tab'));
   // Contador de la pestaña "Solicitudes": una consulta al abrir; la pestaña lo actualiza al cargar.
-  const pending = useResource((signal) =&gt; calendarService.pendingAbsences(signal), 'pending-absences', 'No se pudieron contar las solicitudes pendientes');
+  const pending = useResource((signal) =&gt; calendarService.pendingAbsences(signal), 'pending-absences', pendingError);
 &nbsp;
   const tabs: Array&lt;TabItem&lt;CalendarTab&gt;&gt; = [
-    { key: 'holidays', label: 'Días festivos', icon: &lt;CalendarHeart size={16} /&gt; },
-    { key: 'absences', label: 'Ausencias', icon: &lt;Plane size={16} /&gt; },
-    { key: 'requests', label: 'Solicitudes', icon: &lt;Inbox size={16} /&gt;, count: pending.data, countLabel: 'por decidir' },
-    { key: 'workdays', label: 'Días laborables', icon: &lt;BriefcaseBusiness size={16} /&gt; },
+    { key: 'holidays', label: t('calendar.page.tabs.holidays'), icon: &lt;CalendarHeart size={16} /&gt; },
+    { key: 'absences', label: t('calendar.page.tabs.absences'), icon: &lt;Plane size={16} /&gt; },
+    { key: 'requests', label: t('calendar.page.tabs.requests'), icon: &lt;Inbox size={16} /&gt;, count: pending.data, countLabel: t('calendar.page.toDecide') },
+    { key: 'workdays', label: t('calendar.page.tabs.workdays'), icon: &lt;BriefcaseBusiness size={16} /&gt; },
   ];
 &nbsp;
   return (
     &lt;div className="page"&gt;
-      &lt;Panel&gt;
-        &lt;PanelHeader title="Calendario" subtitle="Días festivos, vacaciones, permisos y excepciones: qué días tiene que checar cada persona." /&gt;
+      &lt;Panel className="cal-page"&gt;
+        &lt;PanelHeader title={t('calendar.page.title')} subtitle={t('calendar.page.subtitle')} /&gt;
         &lt;PanelSection&gt;
-          &lt;Tabs items={tabs} value={tab} onChange={(next) =&gt; setParams(next === 'holidays' ? {} : { tab: next }, { replace: true })} label="Secciones del calendario" idBase={idBase} className="cal-tabs" /&gt;
+          &lt;Tabs items={tabs} value={tab} onChange={(next) =&gt; setParams(next === 'holidays' ? {} : { tab: next }, { replace: true })} label={t('calendar.page.sections')} idBase={idBase} className="cal-tabs" /&gt;
           &lt;TabPanel idBase={idBase} tab={tab}&gt;
             {tab === 'holidays' &amp;&amp; &lt;HolidaysTab /&gt;}
             {tab === 'absences' &amp;&amp; &lt;AbsencesTab onChanged={pending.retry} /&gt;}
@@ -220,7 +232,7 @@ export function CalendarPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

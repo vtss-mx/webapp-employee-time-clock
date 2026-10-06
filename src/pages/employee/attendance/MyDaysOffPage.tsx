@@ -1,6 +1,6 @@
-import { CalendarX, PartyPopper, Plus, TreePalm } from 'lucide-react';
+import { PartyPopper, Plus, TreePalm } from 'lucide-react';
 import { AbsenceItem } from '../../../components/attendance/employee/AbsenceItem';
-import { AttendanceList } from '../../../components/attendance/employee/AttendanceItem';
+import { AttendanceList, cancelRequestConfirm } from '../../../components/attendance/employee/AttendanceItem';
 import { HolidayList } from '../../../components/attendance/employee/HolidayList';
 import { absenceFacts } from '../../../components/calendar/calendarRules';
 import { ButtonLink } from '../../../components/ui/Button';
@@ -9,12 +9,29 @@ import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { useAction } from '../../../hooks/useAction';
 import { useCatalogs } from '../../../hooks/useCatalogs';
 import { usePagedList } from '../../../hooks/usePagedList';
+import { t, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { calendarService } from '../../../services/calendarService';
 import type { Absence } from '../../../types';
+import type { ConfirmInput } from '../../../types/confirm';
 
 /** Festivos por página: es un vistazo de lo que viene (la lista completa se pagina igual). */
 const HOLIDAYS_PAGE = 5;
+
+// Títulos de los popups (se arman al dibujarse: siguen al idioma activo).
+const absencesError = () => t('myAttendance.daysOff.absencesError');
+const holidaysError = () => t('myAttendance.daysOff.holidaysError');
+const cancelError = () => t('myAttendance.cancelRequest.error');
+
+/** Cancelar unas vacaciones o un permiso pendientes: el tipo (nombre del catálogo), sus fechas y su nota. */
+function absenceCancelConfirm(absence: Absence, typeName: string): ConfirmInput {
+  return cancelRequestConfirm({
+    title: t('myAttendance.daysOff.cancel.title', { type: typeName.toLowerCase() }),
+    message: t('myAttendance.daysOff.cancel.message'),
+    // Es suya: no hace falta decir de quién es.
+    details: absenceFacts({ ...absence, employee: undefined }, typeName),
+  });
+}
 
 /**
  * Mis días libres (/employee/attendance/days-off): mis vacaciones y permisos (los que pedí y los que
@@ -23,56 +40,44 @@ const HOLIDAYS_PAGE = 5;
  * vacaciones o permiso" abre su formulario.
  */
 export function MyDaysOffPage() {
-  const absences = usePagedList((page, signal) => calendarService.myAbsences(page, signal), { errorTitle: 'No se pudieron cargar tus vacaciones y permisos' });
-  const holidays = usePagedList((page, signal) => calendarService.myHolidays(page, signal), { errorTitle: 'No se pudieron cargar los días festivos', pageSize: HOLIDAYS_PAGE });
+  const t = useT();
+  const absences = usePagedList((page, signal) => calendarService.myAbsences(page, signal), { errorTitle: absencesError });
+  const holidays = usePagedList((page, signal) => calendarService.myHolidays(page, signal), { errorTitle: holidaysError, pageSize: HOLIDAYS_PAGE });
   const { busy, run } = useAction<number>();
   const { nameOf } = useCatalogs();
 
-  const cancel = (absence: Absence) => {
-    const kind = nameOf('day_off_types', absence.type);
+  const cancel = (absence: Absence) =>
     void run(() => calendarService.cancelMyAbsence(absence.id), {
       busy: absence.id,
-      confirm: {
-        kind: 'delete',
-        icon: <CalendarX size={30} />,
-        eyebrow: 'Tu solicitud',
-        title: `¿Cancelar tu solicitud de ${kind.toLowerCase()}?`,
-        message: 'Se retirará y tu empresa ya no la revisará. Si la necesitas, puedes pedirla de nuevo.',
-        // Es suya: no hace falta decir de quién es.
-        details: absenceFacts({ ...absence, employee: undefined }, kind),
-        confirmLabel: 'Cancelar solicitud',
-        confirmIcon: <CalendarX size={18} />,
-        cancelLabel: 'Conservarla',
-      },
-      errorTitle: 'No se pudo cancelar la solicitud',
+      confirm: () => absenceCancelConfirm(absence, nameOf('day_off_types', absence.type)),
+      errorTitle: cancelError,
       onSuccess: absences.retry,
     });
-  };
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Mis días libres"
-          subtitle="Tus vacaciones y permisos, y los próximos días festivos de tu empresa."
+          title={t('myAttendance.home.daysOff')}
+          subtitle={t('myAttendance.daysOff.subtitle')}
           backTo={paths.employee.attendance}
-          backLabel="Mi asistencia"
+          backLabel={t('myAttendance.home.eyebrow')}
           actions={
             <ButtonLink to={paths.employee.newAbsenceRequest} variant="primary" size="lg" icon={<Plus size={20} />}>
-              Solicitar vacaciones o permiso
+              {t('myAttendance.daysOff.request')}
             </ButtonLink>
           }
         />
-        <PanelSection title="Mis vacaciones y permisos" icon={<TreePalm size={20} />}>
+        <PanelSection title={t('myAttendance.daysOff.absences')} icon={<TreePalm size={20} />}>
           <PagedItems
             list={absences}
             skeletonRows={3}
             empty={{
               icon: <TreePalm />,
-              title: 'Aún no tienes vacaciones ni permisos',
-              description: 'Cuando pidas días libres (o tu empresa te los registre), aquí verás sus fechas y si se aprobaron.',
+              title: t('myAttendance.daysOff.absencesEmpty.title'),
+              description: t('myAttendance.daysOff.absencesEmpty.description'),
             }}
-            pager={{ noun: { one: 'ausencia', other: 'ausencias' } }}
+            pager={{ noun: { one: t('myAttendance.daysOff.absencesNoun.one'), other: t('myAttendance.daysOff.absencesNoun.other') } }}
           >
             {(items) => (
               <AttendanceList loading={absences.loading}>
@@ -83,17 +88,17 @@ export function MyDaysOffPage() {
             )}
           </PagedItems>
         </PanelSection>
-        <PanelSection title="Próximos días festivos" icon={<PartyPopper size={20} />}>
+        <PanelSection title={t('myAttendance.daysOff.holidays')} icon={<PartyPopper size={20} />}>
           <PagedItems
             list={holidays}
             skeletonRows={2}
             empty={{
               icon: <PartyPopper />,
               compact: true,
-              title: 'Sin días festivos próximos',
-              description: 'Los días festivos que registre tu empresa aparecerán aquí: esos días no se trabaja.',
+              title: t('myAttendance.daysOff.holidaysEmpty.title'),
+              description: t('myAttendance.daysOff.holidaysEmpty.description'),
             }}
-            pager={{ noun: { one: 'día festivo', other: 'días festivos' }, variant: 'compact', sizes: [HOLIDAYS_PAGE, 10, 20] }}
+            pager={{ noun: { one: t('myAttendance.daysOff.holidaysNoun.one'), other: t('myAttendance.daysOff.holidaysNoun.other') }, variant: 'compact', sizes: [HOLIDAYS_PAGE, 10, 20] }}
           >
             {(items) => <HolidayList holidays={items} loading={holidays.loading} />}
           </PagedItems>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DeviceKeyError, deviceKeyPair, deviceProof } from './deviceKey';
+import { DeviceKeyError, deviceKeyPair, deviceProof, devicePublicKey, requestSignature, signMessage } from './deviceKey';
 
 /** IndexedDB mínima en memoria (jsdom no la trae): guarda objetos tal cual, como el navegador. */
 function fakeIndexedDB() {
@@ -38,6 +38,22 @@ describe('llave del dispositivo', () => {
     expect(signature).toHaveLength(64); // r||s, como lo verifica el backend
     const valid = await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pair.publicKey, signature, new TextEncoder().encode('reto-123'));
     expect(valid).toBe(true);
+  });
+
+  it('firma cualquier mensaje con la misma llave (peticiones del validador y kioscos) y entrega su llave pública', async () => {
+    const pair = await deviceKeyPair();
+    const fromBase64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+    const verify = (signature: string, message: string) => crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pair.publicKey, fromBase64(signature), new TextEncoder().encode(message));
+
+    const signed = await signMessage('reto.kiosk.9');
+    expect(await verify(signed.signature, 'reto.kiosk.9')).toBe(true);
+    expect(await devicePublicKey()).toBe(signed.publicKey); // SPKI en base64: la misma de la firma
+    const spki = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
+    expect(fromBase64(signed.publicKey)).toEqual(spki);
+
+    const request = await requestSignature('n1', 'n1.qr.abc');
+    expect(request).toMatchObject({ signature_key: signed.publicKey, signature_nonce: 'n1' });
+    expect(await verify(request.signature, 'n1.qr.abc')).toBe(true);
   });
 
   it('sin IndexedDB o sin WebCrypto no se puede registrar el dispositivo', async () => {

@@ -1,0 +1,98 @@
+/** Textos de Mi perfil: cuenta, idioma, contraseña y sesiones (es-MX). */
+export default {
+  title: 'Mi perfil',
+  subtitle: 'Tu cuenta, contraseña y sesiones activas',
+  refreshFailed: 'No se pudo actualizar tu información',
+  account: {
+    title: 'Cuenta',
+    lastLogin: 'Último inicio de sesión',
+    createdAt: 'Cuenta creada',
+  },
+  language: {
+    title: 'Idioma',
+  },
+  photo: {
+    title: 'Foto de perfil',
+    description: 'Te identifica en el menú, en tu perfil y en las listas de tu empresa. Se guarda cifrada y sin la ubicación ni los datos de la cámara.',
+    saveAsk: {
+      eyebrow: 'Tu foto de perfil',
+      titleNew: '¿Guardar esta foto de perfil?',
+      titleReplace: '¿Cambiar tu foto de perfil?',
+      message: 'Así se verá en tu perfil, en el menú y en las listas de tu empresa.',
+      file: 'Archivo',
+      note: 'Antes de guardarla se quitan la ubicación y los datos de la cámara.',
+      replaceNote: 'Tu foto anterior se elimina. Antes de guardar la nueva se quitan la ubicación y los datos de la cámara.',
+      confirm: 'Guardar foto',
+    },
+    removeAsk: {
+      eyebrow: 'Tu foto de perfil',
+      title: '¿Quitar tu foto de perfil?',
+      message: 'En su lugar se mostrarán tus iniciales.',
+      note: 'La foto se elimina y no se puede recuperar.',
+      confirm: 'Quitar foto',
+    },
+    saveFailed: 'No se pudo guardar tu foto',
+    removeFailed: 'No se pudo quitar tu foto',
+  },
+  password: {
+    title: 'Cambiar contraseña',
+    current: 'Contraseña actual',
+    new: 'Nueva contraseña',
+    confirm: 'Confirmar nueva contraseña',
+    submit: 'Actualizar contraseña',
+    submitDisabled: 'Completa correctamente todos los campos obligatorios',
+    currentRequired: 'Escribe tu contraseña actual',
+    mustDiffer: 'Debe ser distinta de la actual',
+    failed: 'No se pudo cambiar la contraseña',
+    changed: 'Contraseña actualizada',
+    /** Cuántas sesiones de otros dispositivos se cerraron al cambiarla. */
+    revoked_zero: 'Tu sesión actual sigue activa.',
+    revoked_one: 'Se cerró la sesión en {count} dispositivo más.',
+    revoked_other: 'Se cerró la sesión en {count} dispositivos más.',
+    ask: {
+      eyebrow: 'Seguridad de tu cuenta',
+      title: '¿Cambiar tu contraseña?',
+      message: 'A partir de ahora entrarás con la nueva contraseña.',
+      otherDevices: 'Se cerrará tu sesión en tus otros dispositivos.',
+      thisDevice: 'Este dispositivo seguirá con la sesión iniciada.',
+      confirm: 'Cambiar contraseña',
+    },
+  },
+  sessions: {
+    title: 'Sesiones activas',
+    loadFailed: 'No se pudieron cargar tus sesiones',
+    empty: {
+      title: 'Sin sesiones abiertas',
+      description: 'Aquí verás los dispositivos con tu sesión abierta.',
+    },
+    /** Palabra del paginador ("Mostrando 1–2 de 2 sesiones"). */
+    noun: {
+      one: 'sesión',
+      other: 'sesiones',
+    },
+    thisDevice: 'Este dispositivo',
+    unknownIp: 'IP desconocida',
+    /** "10.0.0.1 · Activa hace 5 min · Inició 1 oct 2026, 10:00". */
+    activity: '{ip} · Activa {ago} · Inició {started}',
+    hint: '¿No reconoces un dispositivo? Ciérralo y cambia tu contraseña.',
+    revokeAll: 'Cerrar sesión en todos los dispositivos',
+    revoke: {
+      eyebrow: 'Sesión activa',
+      title: '¿Cerrar la sesión de {device}?',
+      message: 'Ese dispositivo deberá iniciar sesión de nuevo para usar tu cuenta.',
+      ip: 'IP',
+      unknown: 'Desconocida',
+      started: 'Inició',
+      failed: 'No se pudo cerrar la sesión',
+      done: 'Sesión cerrada',
+      doneText: 'Ese dispositivo deberá iniciar sesión de nuevo.',
+    },
+    revokeAllAsk: {
+      eyebrow: 'Todas tus sesiones',
+      title: '¿Cerrar la sesión en todos tus dispositivos?',
+      message: 'Incluye este dispositivo: tendrás que iniciar sesión de nuevo.',
+      confirm: 'Cerrar todas',
+      failed: 'No se pudo cerrar sesión en todos los dispositivos',
+    },
+  },
+} as const;

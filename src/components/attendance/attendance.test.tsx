@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import type { WorkSession } from '../../types';
 import { MinutesBadge } from './MinutesBadge';
-import { breaksUsed, clockOn, exceededMinutes, formatDistance, mapsUrl, scheduleRange } from './sessionFacts';
+import { formatDistance } from '../../utils/numbers';
+import { breaksUsed, clockOn, exceededMinutes, mapsUrl, scheduleRange } from './sessionFacts';
 import { SessionSummary } from './SessionSummary';
 import { SessionTimeline } from './SessionTimeline';
 

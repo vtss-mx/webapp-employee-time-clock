@@ -1,4 +1,4 @@
-import { MapPin, MapPinHouse, MapPinPlus, Radar, Ruler, Save } from 'lucide-react';
+import { MapPin, MapPinHouse, MapPinPlus, QrCode, Radar, Ruler, Save } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FormField } from '../../../components/FormField';
@@ -8,49 +8,62 @@ import { LocationPicker } from '../../../components/location/LocationPicker';
 import { QuickChoices } from '../../../components/shifts/formFields';
 import { RecordLoader } from '../../../components/shifts/PageStates';
 import { RecordStatus, type RecordStatusTexts } from '../../../components/shifts/RecordStatus';
+import { DeletedSite } from '../../../components/shifts/RecordTrash';
 import { metersText, SITE_NAME_MAX } from '../../../components/shifts/shiftRules';
 import { useSiteForm, type SiteForm } from '../../../components/shifts/useSiteForm';
 import { NumberField } from '../../../components/ui/NumberField';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
+import { Switch } from '../../../components/ui/Switch';
 import { useFeedback } from '../../../hooks/useFeedback';
-import { RADIUS_MAX_M, RADIUS_MIN_M } from '../../../hooks/useValidatorForm';
+import { RADIUS_MAX_M, RADIUS_MIN_M, radiusLimits } from '../../../hooks/useValidatorForm';
+import { t as translate, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { siteService } from '../../../services/siteService';
 import type { WorkSite } from '../../../types';
 import { pickAddress } from '../../../utils/address';
 
 /** Radios sugeridos (m): de una oficina a una planta o un predio grande. */
-const RADIUS_CHOICES = [50, 100, 200, 300, 500, 1000].map((meters) => ({ value: String(meters), text: metersText(meters) }));
+const RADIUS_SUGGESTIONS = [50, 100, 200, 300, 500, 1000];
 
-const STATUS_TEXTS: RecordStatusTexts = {
-  title: 'Estado del sitio',
-  subject: 'El sitio',
-  activeMeaning: 'Tu personal puede checar aquí y se puede elegir en las asignaciones de turno.',
-  inactiveMeaning: 'Nadie puede checar en este sitio y no se puede elegir en las asignaciones.',
-  deactivateWarning: 'Nadie podrá checar en este sitio ni elegirlo en una asignación hasta que lo actives. Lo ya registrado se conserva.',
-  removeWarning: 'Solo se puede eliminar un sitio que no está en ninguna asignación de turno. Si ya se usó, desactívalo para conservar su historial.',
-  inUseCode: 'SITE_IN_USE',
-};
+/** Textos del estado de un sitio (activar, desactivar, eliminar), en el idioma activo. */
+const statusTexts = (name: string): RecordStatusTexts => ({
+  title: translate('sites.status.title'),
+  activeMeaning: translate('sites.status.activeMeaning'),
+  inactiveMeaning: translate('sites.status.inactiveMeaning'),
+  deactivateWarning: translate('sites.status.deactivateWarning'),
+  removeWarning: translate('sites.status.removeWarning'),
+  activateQuestion: translate('sites.status.activateQuestion', { name }),
+  deactivateQuestion: translate('sites.status.deactivateQuestion', { name }),
+  removeQuestion: translate('sites.status.removeQuestion', { name }),
+  activated: translate('sites.status.activated'),
+  deactivated: translate('sites.status.deactivated'),
+  removed: translate('sites.status.removed'),
+  inUse: translate('sites.status.inUse'),
+  inUseCodes: ['SITE_IN_USE', 'SITE_HAS_RECORDS'],
+});
 
 /**
  * Alta (/company/sites/new) o edición (/company/sites/:id/edit) de un sitio de trabajo: su nombre,
  * su domicilio con el punto en el mapa y el radio desde ese punto en que se puede checar "en sitio".
+ * Un sitio en «Eliminados» no se edita: solo su aviso con «Restaurar».
  */
 export function SiteFormPage() {
+  const t = useT();
   const { id } = useParams();
   return (
     <RecordLoader
       id={id ? Number(id) : null}
       load={(siteId, signal) => siteService.get(siteId, signal)}
-      errorTitle="No se pudo cargar el sitio"
-      failed={{ title: 'Editar sitio', backTo: paths.company.sites, backLabel: 'Sitios de trabajo' }}
+      errorTitle={() => translate('sites.form.loadError')}
+      failed={{ title: t('sites.form.editTitle'), backTo: paths.company.sites, backLabel: t('sites.list.title') }}
     >
-      {(site) => <SiteFormView key={site?.id ?? 'new'} original={site} />}
+      {(site, replace) => (site?.deleted_at ? <DeletedSite record={site} onRestored={replace} /> : <SiteFormView key={site?.id ?? 'new'} original={site} />)}
     </RecordLoader>
   );
 }
 
 function SiteFormView({ original }: { original: WorkSite | null }) {
+  const t = useT();
   const navigate = useNavigate();
   const feedback = useFeedback();
   const form = useSiteForm(original);
@@ -60,8 +73,11 @@ function SiteFormView({ original }: { original: WorkSite | null }) {
   const onSubmit = (event: SubmitEvent) => {
     event.preventDefault();
     void form.save((saved) => {
-      const rule = `Se puede checar en sitio a no más de ${metersText(saved.radius_m)} del punto marcado.`;
-      void feedback.success(original ? 'Sitio actualizado' : 'Sitio creado', original ? `${saved.name} quedó actualizado. ${rule}` : `${saved.name} ya se puede elegir al asignar turnos. ${rule}`);
+      const notice = original ? 'updated' : 'created';
+      void feedback.success(
+        () => translate(`sites.form.${notice}.title`),
+        () => translate(`sites.form.${notice}.text`, { name: saved.name, rule: translate('sites.form.rule', { distance: metersText(saved.radius_m) }) }),
+      );
       back();
     });
   };
@@ -70,10 +86,10 @@ function SiteFormView({ original }: { original: WorkSite | null }) {
     <div className="page">
       <Panel onSubmit={onSubmit}>
         <PanelHeader
-          title={original ? 'Editar sitio' : 'Nuevo sitio'}
-          subtitle={original?.name ?? 'Un lugar donde tu personal checa en persona: planta, sucursal, oficina...'}
+          title={original ? t('sites.form.editTitle') : t('sites.form.newTitle')}
+          subtitle={original?.name ?? t('sites.form.newSubtitle')}
           backTo={paths.company.sites}
-          backLabel="Sitios de trabajo"
+          backLabel={t('sites.list.title')}
         />
         <SiteSection form={form} />
         <LocationSection form={form} />
@@ -81,14 +97,14 @@ function SiteFormView({ original }: { original: WorkSite | null }) {
           <RecordStatus
             name={original.name}
             active={active}
-            texts={STATUS_TEXTS}
+            texts={() => statusTexts(original.name)}
             setStatus={(next) => siteService.setStatus(original.id, next)}
             remove={() => siteService.remove(original.id)}
             onStatus={setActive}
             onRemoved={() => void navigate(paths.company.sites, { replace: true })}
           />
         )}
-        <FormFooter submitLabel={original ? 'Guardar cambios' : 'Crear sitio'} submitIcon={original ? <Save size={20} /> : <MapPinPlus size={20} />} saving={form.saving} onCancel={back} />
+        <FormFooter submitLabel={original ? t('common.actions.saveChanges') : t('sites.form.create')} submitIcon={original ? <Save size={20} /> : <MapPinPlus size={20} />} saving={form.saving} onCancel={back} />
       </Panel>
     </div>
   );
@@ -96,25 +112,26 @@ function SiteFormView({ original }: { original: WorkSite | null }) {
 
 /** Nombre del sitio y radio de la geocerca (con radios sugeridos). */
 function SiteSection({ form }: { form: SiteForm }) {
+  const t = useT();
   const { values, errors, set, touch, saving } = form;
   return (
-    <PanelSection title="Sitio" icon={<MapPin size={20} />}>
+    <PanelSection title={t('sites.form.sections.site')} icon={<MapPin size={20} />}>
       <div className="form-grid">
         <FormField
-          label="Nombre del sitio"
+          label={t('sites.form.name')}
           icon={<MapPin size={18} />}
           required
           maxLength={SITE_NAME_MAX}
           disabled={saving}
           value={values.name}
           error={errors.name}
-          hint="Único en tu empresa: p. ej. “Planta Hermosillo”"
+          hint={t('sites.form.nameHint')}
           onBlur={() => touch('name')}
           onChange={(e) => set('name', e.target.value)}
         />
         <div className="field-stack">
           <NumberField
-            label="Radio para checar (metros)"
+            label={t('sites.form.radius')}
             icon={<Ruler size={18} />}
             unit="m"
             step={10}
@@ -124,28 +141,43 @@ function SiteSection({ form }: { form: SiteForm }) {
             disabled={saving}
             value={values.radius}
             error={errors.radius}
-            hint={`Entre ${RADIUS_MIN_M} y ${RADIUS_MAX_M.toLocaleString('es-MX')} m: el tamaño del lugar más el margen del GPS.`}
+            hint={t('sites.form.radiusHint', radiusLimits())}
             onBlur={() => touch('radius')}
             onChange={(value) => set('radius', value)}
           />
-          <QuickChoices label="Radios sugeridos" value={values.radius} choices={RADIUS_CHOICES} disabled={saving} onPick={(value) => set('radius', value)} />
+          <QuickChoices
+            label={t('sites.form.suggestedRadii')}
+            value={values.radius}
+            choices={RADIUS_SUGGESTIONS.map((meters) => ({ value: String(meters), text: metersText(meters) }))}
+            disabled={saving}
+            onPick={(value) => set('radius', value)}
+          />
         </div>
       </div>
       <p className="small muted inline-note">
-        <Radar size={16} aria-hidden /> Checar “en sitio” es hacerlo con el rostro y la ubicación del teléfono a no más de este radio del punto del mapa.
+        <Radar size={16} aria-hidden /> {t('sites.form.onSiteNote')}
       </p>
+      <Switch
+        icon={<QrCode size={20} />}
+        label={t('sites.presence.label')}
+        description={t('sites.presence.hint')}
+        checked={form.presenceCode}
+        disabled={saving}
+        onChange={form.setPresenceCode}
+      />
     </PanelSection>
   );
 }
 
 /** Domicilio y punto del sitio: el círculo del mapa muestra el radio en vivo. */
 function LocationSection({ form }: { form: SiteForm }) {
+  const t = useT();
   const { values, errors, set, touch, saving, point, radius, pointError, setPoint, applyAddress } = form;
   const address = pickAddress(values);
   return (
-    <PanelSection title="Ubicación" icon={<MapPinHouse size={20} />}>
-      <p className="muted small">Busca el lugar o toca el mapa: el círculo muestra hasta dónde se puede checar en sitio.</p>
-      <LocationPicker address={address} point={point} radius={radius} error={pointError} onPoint={setPoint} onAddress={applyAddress} disabled={saving} pointOf="del sitio" />
+    <PanelSection title={t('sites.form.sections.location')} icon={<MapPinHouse size={20} />}>
+      <p className="muted small">{t('sites.form.locationIntro')}</p>
+      <LocationPicker address={address} point={point} radius={radius} error={pointError} onPoint={setPoint} onAddress={applyAddress} disabled={saving} pointOf="site" />
       <AddressFields values={address} errors={errors} disabled={saving} onChange={set} onTouch={touch} />
     </PanelSection>
   );

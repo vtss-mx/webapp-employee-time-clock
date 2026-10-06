@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../../i18n/core';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../../test/http';
 import { renderWithProviders } from '../../../test/render';
 import type { WorkSite } from '../../../types';
@@ -15,7 +16,7 @@ vi.mock('../../../utils/config', async (importOriginal) => {
   const actual = await importOriginal<typeof ConfigModule>();
   return { config: { ...actual.config, maps: { apiKey: 'clave-de-prueba', places: false, geocoding: true, geolocation: false } } };
 });
-const maps = vi.hoisted(() => ({ reverseGeocode: vi.fn(), geocodeAddress: vi.fn(), approximateLocation: vi.fn() }));
+const maps = vi.hoisted(() => ({ reverseGeocode: vi.fn(), geocodeAddress: vi.fn(), approximateLocation: vi.fn(), searchSource: vi.fn(), searchPlaces: vi.fn(), resolvePlace: vi.fn() }));
 vi.mock('../../../services/maps/googleMaps', async (importOriginal) => ({ ...(await importOriginal<object>()), mapsService: maps }));
 vi.mock('../../../components/location/MapCanvas', () => ({
   MapCanvas: ({ point, radius, onPick }: { point: GeoPoint | null; radius: number | null; onPick: (p: GeoPoint) => void }) => (
@@ -27,7 +28,7 @@ vi.mock('../../../components/location/MapCanvas', () => ({
   ),
 }));
 
-const FOUND = { street: 'Blvd. Kino', exterior_number: '100', postal_code: '83150', country_code: 'MX', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo' };
+const FOUND = { street: 'Blvd. Kino', exterior_number: '100', postal_code: '83150', country_code: 'MX', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo', neighborhood: 'Centro' };
 
 const plant: WorkSite = {
   id: 3,
@@ -35,6 +36,8 @@ const plant: WorkSite = {
   radius_m: 100,
   active: true,
   employees: 12,
+  presence_code: false,
+  kiosks: 0,
   created_at: '2026-10-01T00:00:00Z',
   address: { ...FOUND, interior_number: 'B', latitude: 29.1, longitude: -110.9 },
 };
@@ -77,7 +80,7 @@ describe('Sitios: listado', () => {
     );
     const row = (await screen.findByText('Planta Norte')).closest('tr') as HTMLElement;
     expect(within(row).getByText('Hermosillo')).toBeInTheDocument();
-    expect(within(row).getByText('Blvd. Kino 100 Int. B, 83150 Hermosillo, Sonora')).toBeInTheDocument();
+    expect(within(row).getByText('Blvd. Kino 100 Int. B, Centro, 83150 Hermosillo, Sonora')).toBeInTheDocument();
     expect(within(row).getByText('100 m')).toBeInTheDocument();
     expect(within(row).getByText('12')).toBeInTheDocument();
     expect(within(row).getByText('Activo')).toBeInTheDocument();
@@ -100,11 +103,11 @@ describe('Sitios: listado', () => {
   it('sin sitios invita a crear el primero; con búsqueda dice que nada coincide', async () => {
     mockFetch(apiOk(page([])));
     renderWithProviders(<SitesPage />, { route: '/company/sites' });
-    expect(await screen.findByText('Aún no hay sitios de trabajo')).toBeInTheDocument();
+    expect(await screen.findByText('Sin sitios de trabajo')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Nuevo sitio' })[1]).toHaveAttribute('href', '/company/sites/new');
     expect(screen.getByText(/0 sitios/)).toBeInTheDocument();
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar sitios' }), 'zzz');
-    expect(await screen.findByText('Ningún sitio coincide con la búsqueda')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 
   it('un solo sitio se cuenta en singular', async () => {
@@ -131,24 +134,59 @@ describe('Sitios: alta', () => {
     await userEvent.click(screen.getByRole('button', { name: '200 m' }));
 
     await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
-    await waitFor(() => expect(screen.getByLabelText('Calle')).toHaveValue('Blvd. Kino'));
+    await waitFor(() => expect(screen.getByLabelText('Calle o vialidad')).toHaveValue('Blvd. Kino'));
     expect(map()).toHaveAttribute('data-point', '29.1,-110.9');
     await userEvent.click(screen.getByRole('button', { name: 'Crear sitio' }));
 
     // Antes de enviar se confirma lo que se creará: nombre, domicilio, punto y radio.
     const confirm = await screen.findByRole('dialog', { name: '¿Crear el sitio Planta Norte?' });
-    expect(confirm).toHaveTextContent('Tu personal podrá checar aquí y elegirlo en las asignaciones de turno.');
-    expect(rows(confirm, 'Se creará')).toEqual(['NombrePlanta Norte', 'DomicilioBlvd. Kino 100, 83150 Hermosillo, Sonora', 'Punto en el mapa29.10000, -110.90000', 'Radio para checar200 m']);
+    expect(confirm).toHaveTextContent('Se podrá agregar a tus turnos; quien los tenga checará aquí.');
+    expect(rows(confirm, 'Se creará')).toEqual([
+      'NombrePlanta Norte',
+      'DomicilioBlvd. Kino 100, Centro, 83150 Hermosillo, Sonora',
+      'Punto en el mapa29.10000, -110.90000',
+      'Radio para checar200 m',
+      'Código de sitioSin código', // antifraude 2b: por omisión el sitio no pide el código del kiosco
+    ]);
     expect(calls.filter(isWrite)).toHaveLength(0);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Crear sitio' }));
 
     expect(await screen.findByText('Lista de sitios')).toBeInTheDocument();
-    expect(await screen.findByRole('dialog', { name: 'Sitio creado' })).toHaveTextContent('Planta Norte ya se puede elegir al asignar turnos. Se puede checar en sitio a no más de 200 m del punto marcado.');
+    expect(await screen.findByRole('dialog', { name: 'Sitio creado' })).toHaveTextContent('Planta Norte ya se puede agregar a tus turnos. Radio para checar: 200 m.');
     expect(bodyOf(calls.find((c) => c.init.method === 'POST'))).toEqual({
       name: 'Planta Norte',
       radius_m: 200,
-      address: { ...FOUND, interior_number: null, latitude: 29.1, longitude: -110.9 },
+      presence_code: false,
+      address: { ...FOUND, interior_number: null, reference_notes: null, latitude: 29.1, longitude: -110.9 },
     });
+  });
+
+  it('el resultado elegido del buscador (aun sin Places, con la geocodificación) llena todo el domicilio; las referencias se escriben y se confirman', async () => {
+    const { calls } = mockFetch(apiOk(plant, { status: 201 }));
+    maps.searchSource.mockReturnValue('geocoding');
+    const point = { lat: 29.1, lng: -110.9 };
+    const label = 'Blvd. Kino 100, Centro, 83150 Hermosillo, Son., México';
+    maps.searchPlaces.mockResolvedValue([{ source: 'geocoding', id: 'g1', primary: 'Blvd. Kino 100', secondary: 'Centro, 83150 Hermosillo, Son., México', distanceMeters: null, point, parts: [], label }]);
+    maps.resolvePlace.mockResolvedValue({ point, address: FOUND, label });
+    renderForm('/company/sites/new');
+    await userEvent.type(screen.getByLabelText(/Nombre del sitio/), 'Planta Norte');
+    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' }), 'Kino 100');
+    await userEvent.click(await screen.findByRole('option', { name: /Blvd\. Kino 100/ }));
+    await waitFor(() => expect(screen.getByLabelText('Colonia o barrio')).toHaveValue('Centro'));
+    for (const [label, value] of [['Estado o provincia', 'Sonora'], ['Municipio o alcaldía', 'Hermosillo'], ['Ciudad o localidad', 'Hermosillo'], ['Código postal', '83150'], ['Calle o vialidad', 'Blvd. Kino'], ['Número exterior', '100']]) {
+      expect(screen.getByLabelText(label), label).toHaveValue(value);
+    }
+    expect(screen.getByLabelText('Referencias')).toHaveValue(''); // Google nunca las llena
+    expect(map()).toHaveAttribute('data-point', '29.1,-110.9');
+    expect(maps.reverseGeocode).not.toHaveBeenCalled(); // el resultado ya trae su domicilio
+
+    await userEvent.type(screen.getByLabelText('Referencias'), 'Entre Reforma y Kino');
+    await userEvent.click(screen.getByRole('button', { name: 'Crear sitio' }));
+    const confirm = await screen.findByRole('dialog', { name: '¿Crear el sitio Planta Norte?' });
+    expect(rows(confirm, 'Se creará')).toContain('ReferenciasEntre Reforma y Kino');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Crear sitio' }));
+    expect(await screen.findByText('Lista de sitios')).toBeInTheDocument();
+    expect(bodyOf(calls.find((c) => c.init.method === 'POST'))).toMatchObject({ address: { ...FOUND, reference_notes: 'Entre Reforma y Kino' } });
   });
 
   it('cancelar la confirmación del alta no envía nada y deja lo capturado', async () => {
@@ -156,14 +194,14 @@ describe('Sitios: alta', () => {
     renderForm('/company/sites/new');
     await userEvent.type(screen.getByLabelText(/Nombre del sitio/), 'Planta Norte');
     await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
-    await waitFor(() => expect(screen.getByLabelText('Calle')).toHaveValue('Blvd. Kino'));
+    await waitFor(() => expect(screen.getByLabelText('Calle o vialidad')).toHaveValue('Blvd. Kino'));
     await userEvent.click(screen.getByRole('button', { name: 'Crear sitio' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Crear el sitio Planta Norte?' })).getByRole('button', { name: 'Cancelar' }));
 
     expect(screen.queryByRole('dialog', { name: '¿Crear el sitio Planta Norte?' })).toBeNull();
     expect(calls.filter(isWrite)).toHaveLength(0);
     expect(screen.getByLabelText(/Nombre del sitio/)).toHaveValue('Planta Norte');
-    expect(screen.getByLabelText('Calle')).toHaveValue('Blvd. Kino');
+    expect(screen.getByLabelText('Calle o vialidad')).toHaveValue('Blvd. Kino');
     expect(map()).toHaveAttribute('data-point', '29.1,-110.9');
     expect(screen.getByRole('button', { name: 'Crear sitio' })).toBeEnabled(); // no quedó "Guardando…"
     expect(screen.queryByText('Lista de sitios')).toBeNull();
@@ -173,7 +211,7 @@ describe('Sitios: alta', () => {
     const { calls } = mockFetch(apiOk(plant));
     renderForm('/company/sites/new');
     await userEvent.click(screen.getByRole('button', { name: 'Crear sitio' }));
-    const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
+    const popup = await screen.findByRole('alertdialog', { name: 'Revisa los datos' });
     expect(popup).toHaveTextContent('Marca en el mapa el punto del sitio');
     expect(popup).toHaveTextContent('Escribe un nombre');
     await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
@@ -205,7 +243,7 @@ describe('Sitios: edición', () => {
 
     // Sin cambios: se avisa y no se envía nada.
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No modificaste ningún dato');
+    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No hay nada que guardar');
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     expect(calls.filter(isWrite)).toHaveLength(0);
 
@@ -234,7 +272,7 @@ describe('Sitios: edición', () => {
     await userEvent.type(name, 'Planta Sur');
     await save();
     expect(await screen.findByText('Lista de sitios')).toBeInTheDocument();
-    expect(await screen.findByRole('dialog', { name: 'Sitio actualizado' })).toHaveTextContent('Planta Sur quedó actualizado.');
+    expect(await screen.findByRole('dialog', { name: 'Sitio actualizado' })).toHaveTextContent('Planta Sur · Radio para checar');
     expect(calls.filter((c) => c.init.method === 'PUT').map((c) => c.url)).toEqual(['/api/sites/3', '/api/sites/3']);
   });
 
@@ -244,7 +282,7 @@ describe('Sitios: edición', () => {
     expect(await screen.findByLabelText(/Nombre del sitio/)).toHaveValue('Planta Norte');
     expect(map()).toHaveAttribute('data-point', '');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-    expect(await screen.findByRole('alertdialog', { name: 'Revisa la información' })).toHaveTextContent('Marca en el mapa el punto del sitio');
+    expect(await screen.findByRole('alertdialog', { name: 'Revisa los datos' })).toHaveTextContent('Marca en el mapa el punto del sitio');
   });
 
   it('si no carga ofrece volver a cargar', async () => {
@@ -281,10 +319,10 @@ describe('Sitios: edición', () => {
 
     await userEvent.click(within(section).getByRole('button', { name: 'Desactivar' }));
     const confirm = await screen.findByRole('alertdialog', { name: '¿Desactivar el sitio Planta Norte?' });
-    expect(confirm).toHaveTextContent('Nadie podrá checar en este sitio');
+    expect(confirm).toHaveTextContent('Nadie podrá checar aquí');
     expect(rows(confirm, 'Cambios')).toEqual(['EstadoAntes: ActivoDespués: Inactivo']);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Desactivar' }));
-    await userEvent.click(within(await screen.findByRole('dialog', { name: 'El sitio quedó inactivo' })).getByRole('button', { name: 'Entendido' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Sitio desactivado' })).getByRole('button', { name: 'Entendido' }));
     expect(within(section).getByText('Inactivo')).toBeInTheDocument();
 
     const activate = async () => {
@@ -296,24 +334,25 @@ describe('Sitios: edición', () => {
     await activate();
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'No se pudo activar Planta Norte' })).getByRole('button', { name: 'Entendido' }));
     await activate();
-    expect(await screen.findByRole('dialog', { name: 'El sitio quedó activo' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Sitio activado' })).toBeInTheDocument();
     expect(calls.filter((c) => c.init.method === 'PATCH').map(bodyOf)).toEqual([{ active: false }, { active: true }, { active: true }]);
   });
 
-  it('eliminar se confirma (cancelar no envía nada); si está en uso sugiere desactivarlo; si no, vuelve al listado', async () => {
+  it('eliminar se confirma (cancelar no envía nada); si un turno lo usa o ya se checó ahí lo explica el servidor; si no, vuelve al listado', async () => {
     let deletes = 0;
     const { calls } = mockFetch((call) => {
       if (call.init.method !== 'DELETE') return apiOk(plant);
       deletes += 1;
-      if (deletes === 1) return apiFail(409, 'SITE_IN_USE', 'El sitio está en asignaciones de turno: desactívalo en lugar de eliminarlo');
-      if (deletes === 2) return apiFail(500, 'INTERNAL_ERROR', 'Falla inesperada');
+      if (deletes === 1) return apiFail(409, 'SITE_IN_USE', 'El sitio está en los turnos Matutino y Nocturno: quítalo de esos turnos o desactívalo en lugar de eliminarlo');
+      if (deletes === 2) return apiFail(409, 'SITE_HAS_RECORDS', 'Ya se checó en este sitio: desactívalo en lugar de eliminarlo para conservar su historial');
+      if (deletes === 3) return apiFail(500, 'INTERNAL_ERROR', 'Falla inesperada');
       return apiOk(null);
     });
     renderForm('/company/sites/3/edit');
     await userEvent.click(await screen.findByRole('button', { name: 'Eliminar' }));
     const cancelled = await screen.findByRole('alertdialog', { name: '¿Eliminar el sitio Planta Norte?' });
-    expect(cancelled).toHaveTextContent('Solo se puede eliminar un sitio que no está en ninguna asignación de turno.');
-    expect(cancelled.querySelector('.confirm-note')).toHaveTextContent('Esta acción no se puede deshacer.');
+    expect(cancelled).toHaveTextContent('Solo se puede eliminar si ningún turno lo usa y nadie ha checado ahí.');
+    expect(cancelled.querySelector('.confirm-note')).toHaveTextContent('Pasará a «Eliminados»: podrás restaurarlo durante 1 año.');
     await userEvent.click(within(cancelled).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false);
     expect(screen.getByLabelText(/Nombre del sitio/)).toHaveValue('Planta Norte');
@@ -324,13 +363,59 @@ describe('Sitios: edición', () => {
       await userEvent.click(within(confirm).getByRole('button', { name: 'Eliminar' }));
     };
     await remove();
+    // El popup dice qué turnos lo usan (el mensaje del servidor).
     const inUse = await screen.findByRole('alertdialog', { name: 'El sitio está en uso: desactívalo' });
-    expect(inUse).toHaveTextContent('desactívalo en lugar de eliminarlo');
+    expect(inUse).toHaveTextContent('El sitio está en los turnos Matutino y Nocturno: quítalo de esos turnos o desactívalo en lugar de eliminarlo');
     await userEvent.click(within(inUse).getByRole('button', { name: 'Entendido' }));
+    await remove();
+    const records = await screen.findByRole('alertdialog', { name: 'El sitio está en uso: desactívalo' });
+    expect(records).toHaveTextContent('Ya se checó en este sitio');
+    await userEvent.click(within(records).getByRole('button', { name: 'Entendido' }));
     await remove();
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'No se pudo eliminar Planta Norte' })).getByRole('button', { name: 'Entendido' }));
     await remove();
     expect(await screen.findByText('Lista de sitios')).toBeInTheDocument();
-    expect(await screen.findByRole('dialog', { name: 'El sitio se eliminó' })).toHaveTextContent('Planta Norte ya no aparece en tu empresa.');
+    expect(await screen.findByRole('dialog', { name: 'Sitio eliminado' })).toBeInTheDocument();
+  });
+});
+
+describe('Sitios en inglés (en-US)', () => {
+  it('listado: si no carga lo dice y se reintenta; radio, empleados y columnas en inglés', async () => {
+    await setLocale('en-US');
+    let attempts = 0;
+    mockFetch(() => (++attempts === 1 ? apiFail(500, 'INTERNAL_ERROR', 'Unexpected failure') : apiOk(page([plant, { ...plant, id: 4, name: 'Oficina centro', radius_m: 1500, employees: 1200 }]))));
+    renderWithProviders(<SitesPage />, { route: '/company/sites' });
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: "Couldn't load the sites" })).getByRole('button', { name: 'Retry' }));
+    const row = (await screen.findByText('Oficina centro')).closest('tr') as HTMLElement;
+    expect(within(row).getByText('1.5 km')).toBeInTheDocument();
+    expect(within(row).getByText('1,200')).toBeInTheDocument();
+    expect(screen.getByText('2 sites · where to check in person and within what radius')).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Site', 'Address', 'Radius', 'Employees today', 'Code', 'Status']);
+  });
+
+  it('alta: confirma en inglés lo que se crea; si falla lo explica y se vuelve a enviar', async () => {
+    await setLocale('en-US');
+    let posts = 0;
+    mockFetch((call) => (call.init.method === 'POST' && ++posts === 1 ? apiFail(500, 'INTERNAL_ERROR', 'Unexpected failure') : apiOk(plant, { status: 201 })));
+    renderForm('/company/sites/new');
+    expect(screen.getByRole('heading', { name: 'New site' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Check-in radius/)).toHaveAccessibleDescription('Between 10 and 10,000 m: the size of the place plus the GPS margin.');
+    expect(screen.getByRole('button', { name: '1 km' })).toBeInTheDocument(); // radio sugerido de 1000 m
+    await userEvent.type(screen.getByLabelText(/Site name/), 'Planta Norte');
+    await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
+    await screen.findByDisplayValue('Blvd. Kino');
+    const ask = async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Create site' }));
+      return screen.findByRole('dialog', { name: 'Create site Planta Norte?' });
+    };
+    const confirm = await ask();
+    expect(confirm).toHaveTextContent('It can be added to your shifts; anyone with those shifts will check in here.');
+    const created = rows(confirm, 'Will be created');
+    expect([created[0], created[2], created[3]]).toEqual(['NamePlanta Norte', 'Point on the map29.10000, -110.90000', 'Check-in radius100 m']);
+    expect(created[1]).toMatch(/^AddressBlvd\. Kino 100/);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Create site' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: "Couldn't create the site" })).getByRole('button', { name: 'Got it' }));
+    await userEvent.click(within(await ask()).getByRole('button', { name: 'Create site' }));
+    expect(await screen.findByRole('dialog', { name: 'Site created' })).toHaveTextContent('Planta Norte can now be added to your shifts. Check-in radius: 100 m.');
   });
 });

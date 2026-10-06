@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { ConfirmInput } from '../types/confirm';
+import type { ConfirmSource } from '../types/confirm';
 import { useConfirm } from './useConfirm';
 import { useFeedback } from './useFeedback';
 import { useMountedRef } from './useMountedRef';
@@ -7,14 +7,20 @@ import { useMountedRef } from './useMountedRef';
 /** Popup de éxito: título y detalle opcional. */
 export type SuccessNotice = readonly [title: string, detail?: string];
 
-/** Título del popup si falla (el motivo lo explica el error); puede depender del error. */
+/**
+ * Título del popup si falla (el motivo lo explica el error); puede depender del error. Con una
+ * función (`() => t('…')`) se calcula al dibujarse: el popup abierto sigue al idioma activo.
+ */
 export type ErrorTitle = string | ((error: unknown) => string);
 
 export interface ActionOptions<R, K> {
   errorTitle: ErrorTitle;
   /** Qué se está procesando (p. ej. el id de la fila): `busy` lo indica mientras dura. Por omisión, `true`. */
   busy?: K;
-  /** Popup de éxito; puede depender del resultado (p. ej. el nombre que devolvió el servidor). */
+  /**
+   * Popup de éxito; puede depender del resultado (p. ej. el nombre que devolvió el servidor). Con una
+   * función se arma al dibujarse: el popup abierto sigue al idioma activo.
+   */
   success?: SuccessNotice | ((result: R) => SuccessNotice);
   /** Al salir bien, antes del aviso: aplicar el resultado, recargar la lista, navegar... */
   onSuccess?: (result: R) => void;
@@ -34,7 +40,7 @@ export interface ActionOptions<R, K> {
    * corre acciones que no cambian datos (consultar un estado, elegir los empleados de un filtro);
    * toda acción que crea, cambia o borra la lleva.
    */
-  confirm?: ConfirmInput;
+  confirm?: ConfirmSource;
 }
 
 /**
@@ -58,12 +64,16 @@ export function useAction<K = true>() {
       try {
         const result = await task();
         onSuccess?.(result);
-        const notice = typeof success === 'function' ? success(result) : success;
-        if (notice) void feedback.success(...notice);
+        if (success) {
+          void feedback.show(() => {
+            const [title, text] = typeof success === 'function' ? success(result) : success;
+            return { variant: 'success', title, text };
+          });
+        }
         ok = true;
       } catch (error) {
         onError?.(error);
-        void feedback.fromError(error, { title: typeof errorTitle === 'function' ? errorTitle(error) : errorTitle });
+        void feedback.fromError(error, { title: () => (typeof errorTitle === 'function' ? errorTitle(error) : errorTitle) });
       } finally {
         // Una pantalla que ya se cerró (navegó tras guardar) no se toca.
         if (mounted.current && !(ok && keepBusy)) setBusy(null);
@@ -83,7 +93,7 @@ export interface SubmitOptions {
    * Pregunta ANTES de enviar (obligatoria: todo formulario crea o cambia datos). Si se cancela, nada
    * se envía y el formulario sigue como estaba.
    */
-  confirm: ConfirmInput;
+  confirm: ConfirmSource;
   /** Al fallar, antes del popup (p. ej. marcar el campo con el error del servidor). */
   onError?: (error: unknown) => void;
 }

@@ -39,6 +39,7 @@ export function cameraModule() {
       switchCamera: () => undefined,
       selectCamera: () => undefined,
       captureFrame: camera.capture,
+      videoTrack: () => null,
     }),
   };
 }
@@ -64,7 +65,8 @@ export const detection = (() => {
   let reading: Reading = STILL;
   return {
     detector: null as object | null,
-    error: null as string | null,
+    /** La detección automática no cargó (la pantalla ofrece "Capturar"). */
+    failed: false,
     options: null as AutoCaptureOptions | null,
     read: () => reading,
     see(next: Partial<Reading>) {
@@ -84,7 +86,7 @@ export const detection = (() => {
 export function detectionModule(original: Record<string, unknown>) {
   return {
     ...original,
-    useFaceDetector: () => ({ detector: detection.detector, error: detection.error, loading: !detection.detector && !detection.error }),
+    useFaceDetector: () => ({ detector: detection.detector, failed: detection.failed, loading: !detection.detector && !detection.failed }),
     useFaceAutoCapture: (options: AutoCaptureOptions) => {
       detection.options = options;
       return useSyncExternalStore(detection.subscribe, detection.read);

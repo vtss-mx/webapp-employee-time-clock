@@ -1,8 +1,10 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { t, type LazyText } from '../i18n';
 import { ApiError, configureApiClient, retryDelay } from '../services/apiClient';
 import { authService, type LoginProofs } from '../services/authService';
 import { meService } from '../services/meService';
 import type { AuthTokenResponse, Session, User, UserPreferences } from '../types';
+import { clearAvatarCache } from '../utils/avatarCache';
 import { deviceProof } from '../utils/deviceKey';
 import { setBusinessTimeZone } from '../utils/format';
 import { currentLocation } from '../utils/geolocation';
@@ -35,8 +37,11 @@ async function loginWithProofs(email: string, password: string, remember: boolea
   }
 }
 
-/** Indicador NO sensible: solo dice que vale la pena intentar restaurar la sesión al recargar. */
-const EXPIRED_MESSAGE = 'Tu sesión ha expirado. Inicia sesión nuevamente.';
+/**
+ * Motivo del cierre cuando vence la sesión. Se guarda la función (no el texto): el aviso del inicio de
+ * sesión lo traduce al dibujarse y sigue al idioma activo.
+ */
+const expiredReason: LazyText = () => t('auth.session.expired');
 /** Separación mínima entre verificaciones de la sesión al volver a la pestaña. */
 const SESSION_CHECK_GAP_MS = 15_000;
 /** Reintentos al restaurar la sesión si el servidor no responde (espera creciente: ~12 s en total). */
@@ -58,25 +63,41 @@ export function deviceBlockFrom(error: Pick<ApiError, 'message'>): DeviceBlock {
   return { message: error.message };
 }
 
+/**
+ * Empresa suspendida en la plataforma (cobranza): nadie de ella entra ni opera. Lleva el mensaje del
+ * servidor; la app lo muestra a pantalla completa (`SuspensionGate`).
+ */
+export type CompanySuspension = DeviceBlock;
+
 export interface AuthContextValue {
   user: User | null;
   status: AuthStatus;
   isAuthenticated: boolean;
-  /** Mensaje mostrado en el login tras un cierre de sesión forzado (p. ej. expiración). */
-  logoutReason: string | null;
+  /**
+   * Mensaje mostrado en el login tras un cierre de sesión forzado: el del servidor (ya traducido) o
+   * uno de la app como función que se traduce al dibujarse (p. ej. expiración). Se muestra con
+   * `resolveLazy`.
+   */
+  logoutReason: LazyText | null;
   /** Validador en una computadora: la app muestra "continúa desde una tableta o un teléfono". */
   deviceBlock: DeviceBlock | null;
   /** Sale de esa pantalla: cierra la sesión (si la hay) y vuelve al inicio de sesión. */
   dismissDeviceBlock: () => Promise<void>;
+  /** Su empresa está suspendida (401 o 403 COMPANY_SUSPENDED): "Tu empresa está suspendida". */
+  suspension: CompanySuspension | null;
+  /** Sale de esa pantalla: cierra la sesión local (de mejor esfuerzo en el servidor) sin otro aviso. */
+  dismissSuspension: () => Promise<void>;
   /** `onLocating`: el backend pidió la ubicación del dispositivo y se está obteniendo. */
   login: (email: string, password: string, remember?: boolean, options?: { onLocating?: () => void }) => Promise<User>;
-  logout: (reason?: string) => Promise<void>;
+  logout: (reason?: LazyText) => Promise<void>;
   logoutEverywhere: () => Promise<void>;
   refreshUser: () => Promise<void>;
   /** EMPLOYEE en varias empresas: entra a una (o cambia de empresa sin cerrar sesión). */
   selectCompany: (companyId: number) => Promise<User>;
   /** Guarda preferencias en la BD; se aplican al instante y se revierten si el servidor falla. */
   updatePreferences: (changes: Partial<UserPreferences>) => Promise<void>;
+  /** Su foto de perfil cambió (ya guardada en el servidor): la ruta nueva o null (sin foto). */
+  updateAvatar: (avatar: string | null) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,8 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Siempre se empieza preguntando al backend si hay sesión (la cookie HttpOnly es la única fuente: el
   // navegador no guarda nada propio para saberlo).
   const [status, setStatus] = useState<AuthStatus>('restoring');
-  const [logoutReason, setLogoutReason] = useState<string | null>(null);
+  const [logoutReason, setLogoutReason] = useState<LazyText | null>(null);
   const [deviceBlock, setDeviceBlock] = useState<DeviceBlock | null>(null);
+  const [suspension, setSuspension] = useState<CompanySuspension | null>(null);
   const sessionRef = useRef<Session | null>(null);
   /** Renovación en curso (compartida); se resuelve con el error, o null si se renovó. */
   const refreshing = useRef<Promise<unknown> | null>(null);
@@ -115,11 +137,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLogoutReason(null);
   }, []);
 
-  const clear = useCallback((reason?: string) => {
+  const clear = useCallback((reason?: LazyText) => {
     sessionRef.current = null;
     setSession(null);
     setStatus('anonymous');
-    setLogoutReason(reason ?? null);
+    clearAvatarCache(); // nada de la persona queda en la página (las fotos descargadas viven en memoria)
+    // Una función se guarda tal cual (no se llama: `setState` la tomaría como actualizador).
+    setLogoutReason(() => reason ?? null);
   }, []);
 
   /** Renueva el access token con la cookie (un único refresh en curso). Se resuelve con el error, o null si se renovó. */
@@ -132,8 +156,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         // 401 = sesión revocada/expirada; errores de red no cierran la sesión.
-        if (error instanceof ApiError && error.status === 401) clear(sessionRef.current ? EXPIRED_MESSAGE : undefined);
-        return error ?? new Error('No se pudo renovar la sesión');
+        if (error instanceof ApiError && error.status === 401) clear(sessionRef.current ? expiredReason : undefined);
+        // Un rechazo sin motivo no debe tomarse como éxito (null). Nunca se muestra: solo se compara.
+        return error ?? new Error('SESSION_RENEW_FAILED');
       })
       .finally(() => {
         refreshing.current = null;
@@ -151,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       getToken: () => sessionRef.current?.token ?? null,
       onUnauthorized: (message) => clear(message),
       onDeviceNotAllowed: (error) => setDeviceBlock(deviceBlockFrom(error)),
+      onCompanySuspended: (error) => setSuspension(deviceBlockFrom(error)),
       refreshSession,
     });
     apiConfigured.current = true;
@@ -211,6 +237,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [setUser],
   );
 
+  const updateAvatar = useCallback((avatar: string | null) => setUser((user) => ({ ...user, avatar })), [setUser]);
+
   const selectCompany = useCallback(
     async (companyId: number) => {
       const user = await authService.selectCompany(companyId);
@@ -235,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session) return;
     const expireIfDue = () => {
       if (Date.now() < session.expiresAt) return false;
-      clear(EXPIRED_MESSAGE);
+      clear(expiredReason);
       return true;
     };
     const timer = window.setTimeout(expireIfDue, Math.max(0, Math.min(session.expiresAt - Date.now(), 2 ** 31 - 1)));
@@ -265,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(
-    async (reason?: string) => {
+    async (reason?: LazyText) => {
       try {
         await authService.logout(); // revoca la sesión en el servidor y borra la cookie
       } catch {
@@ -280,6 +308,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (sessionRef.current) await logout();
     setDeviceBlock(null);
   }, [logout]);
+
+  // La sesión se cierra (o ya la cerró el 401) sin motivo: la pantalla de suspensión ya lo explicó y
+  // el inicio de sesión no repite el aviso.
+  const dismissSuspension = useCallback(async () => {
+    if (sessionRef.current) await logout();
+    else clear();
+    setSuspension(null);
+  }, [logout, clear]);
 
   const logoutEverywhere = useCallback(async () => {
     await authService.logoutAll();
@@ -296,14 +332,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logoutReason,
       deviceBlock,
       dismissDeviceBlock,
+      suspension,
+      dismissSuspension,
       login,
       logout,
       logoutEverywhere,
       refreshUser,
       selectCompany,
       updatePreferences,
+      updateAvatar,
     }),
-    [session, status, logoutReason, deviceBlock, dismissDeviceBlock, login, logout, logoutEverywhere, refreshUser, selectCompany, updatePreferences],
+    [session, status, logoutReason, deviceBlock, dismissDeviceBlock, suspension, dismissSuspension, login, logout, logoutEverywhere, refreshUser, selectCompany, updatePreferences, updateAvatar],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

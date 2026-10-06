@@ -16,6 +16,10 @@ const defaultPageSize = pageSizes.includes(wantedPageSize) ? wantedPageSize : pa
 
 export const config = {
   appName: envString(env, 'VITE_APP_NAME', 'Employee Time Clock'),
+  /**
+   * Lema del HTML inicial (`index.html`, antes de que cargue la app). La interfaz usa el del idioma activo
+   * (`app.tagline` en los diccionarios es-MX y en-US), que también reemplaza el título de la pestaña.
+   */
   appTagline: envString(env, 'VITE_APP_TAGLINE', 'Control de asistencia y jornada laboral.'),
   /** Compilación en ejecución y dónde consultar la publicada (detección de versiones nuevas). */
   buildId: __APP_BUILD_ID__,
@@ -45,10 +49,33 @@ export const config = {
   pendingErrorsPollMs: seconds('VITE_POLL_PENDING_ERRORS_SECONDS', 60, 10, 3600),
   pendingShiftRequestsPollMs: seconds('VITE_POLL_PENDING_SHIFT_REQUESTS_SECONDS', 60, 10, 3600),
   pendingAbsenceRequestsPollMs: seconds('VITE_POLL_PENDING_ABSENCE_REQUESTS_SECONDS', 60, 10, 3600),
+  /** Casos de fraude por revisar (contador del menú del ADMIN). */
+  pendingFraudCasesPollMs: seconds('VITE_POLL_PENDING_FRAUD_CASES_SECONDS', 60, 10, 3600),
+  /** Registros de asistencia "en revisión" que la empresa confirma o rechaza (contador del menú). */
+  pendingAttendanceReviewsPollMs: seconds('VITE_POLL_PENDING_ATTENDANCE_REVIEWS_SECONDS', 60, 10, 3600),
   validationStatusPollMs: seconds('VITE_POLL_VALIDATION_STATUS_SECONDS', 30, 10, 3600),
+  /** Cobranza y consumo (ADMIN): indicadores y listas se actualizan solos mientras la pantalla se ve. */
+  businessRefreshMs: seconds('VITE_POLL_BUSINESS_SECONDS', 60, 15, 3600),
+  /** Rendimiento (ADMIN): resumen, listas y alertas se actualizan solos mientras la pantalla se ve. */
+  performanceRefreshMs: seconds('VITE_POLL_PERFORMANCE_SECONDS', 30, 15, 3600),
+  /**
+   * Alertas de peticiones lentas (ADMIN, regla 18): UNA consulta del resumen alimenta el contador del menú y
+   * el aviso en vivo de una alerta nueva o reabierta.
+   */
+  slowAlertsPollMs: seconds('VITE_POLL_SLOW_ALERTS_SECONDS', 30, 10, 3600),
+  /** Pausa tras el último cambio del plan antes de pedir su vista previa del cobro (la calcula el backend). */
+  billingPreviewDebounceMs: envNumber(env, 'VITE_BILLING_PREVIEW_DEBOUNCE_MS', 450, 150, 3000),
 
   // --- Reconocimiento facial ---
-  enrollmentFrames: envNumber(env, 'VITE_FACE_ENROLLMENT_FRAMES', 5, 1, 5),
+  /**
+   * Registro facial (decisión del dueño, 2026-10-06: «por lo menos 36» fotos): fotos completas que se toman mientras la
+   * persona mira a la cámara, el lado mayor de cada una (px) y la pausa mínima entre una y otra (cada foto espera además
+   * un cuadro NUEVO del video). El servidor las analiza todas, elige las mejores como referencia y descarta las demás
+   * (acepta hasta `FACE_ENROLL_MAX_PHOTOS`). Con 640 px cada foto pesa ≈ 0.05 MB: las 36, ≈ 1.8 MB.
+   */
+  enrollmentFrames: envNumber(env, 'VITE_FACE_ENROLLMENT_FRAMES', 36, 1, 36),
+  enrollmentPhotoPx: envNumber(env, 'VITE_FACE_ENROLLMENT_PHOTO_PX', 640, 480, 1280),
+  enrollmentPhotoGapMs: envNumber(env, 'VITE_FACE_ENROLLMENT_PHOTO_GAP_MS', 100, 40, 1000),
   verificationFrames: envNumber(env, 'VITE_FACE_VERIFICATION_FRAMES', 3, 1, 3),
   faceFrameGapMs: envNumber(env, 'VITE_FACE_FRAME_GAP_MS', 380, 100, 2000),
   faceResumeAfterBlockMs: seconds('VITE_FACE_RESUME_AFTER_BLOCK_SECONDS', 3, 1, 30),
@@ -83,6 +110,37 @@ export const config = {
   ),
   /** Permitir el respaldo remoto del modelo si el local no carga. */
   faceModelFallbackEnabled: envBoolean(env, 'VITE_FACE_MODEL_FALLBACK_ENABLED', true),
+  /**
+   * Antifraude (telemetría de la toma): intervalos entre cuadros del video que se miden durante el escaneo
+   * (`requestVideoFrameCallback`): una cámara real varía; una virtual o un video, no. Solo números.
+   */
+  faceFrameRhythmSamples: envNumber(env, 'VITE_FACE_FRAME_RHYTHM_SAMPLES', 90, 10, 600),
+  /**
+   * Antifraude 2a (ráfaga de recortes del rostro): cuadros por segundo con que se recorta el rostro mientras aún no
+   * se sabe lo que pide el reto (después, los del servidor), lado de cada recorte guardado en memoria y cuánto más
+   * grande que el rostro es la zona (al armar la hoja se reducen al lado y al margen del servidor), cuántos se guardan
+   * como máximo y cuánto se espera, como mucho, a completar el tramo quieto antes del destello.
+   */
+  faceBurstFps: envNumber(env, 'VITE_FACE_BURST_FPS', 10, 4, 30),
+  faceBurstStagingPx: envNumber(env, 'VITE_FACE_BURST_STAGING_PX', 200, 96, 256),
+  faceBurstStagingMargin: envNumber(env, 'VITE_FACE_BURST_STAGING_MARGIN', 2, 1.2, 3),
+  faceBurstMaxFrames: envNumber(env, 'VITE_FACE_BURST_MAX_FRAMES', 96, 10, 120),
+  faceBurstHoldWaitMs: envNumber(env, 'VITE_FACE_BURST_HOLD_WAIT_MS', 1200, 0, 5000),
+
+  // --- Registro de asistencia (ubicación) ---
+  /**
+   * Lecturas de la ubicación por registro: la más precisa decide (geocerca) y todas viajan para que el servidor
+   * detecte una ubicación congelada o con la misma precisión siempre (simulador). La primera basta: las demás se
+   * toman dentro de `locationSampleWindowMs`.
+   */
+  locationSamples: envNumber(env, 'VITE_LOCATION_SAMPLES', 3, 1, 10),
+  locationSampleWindowMs: envNumber(env, 'VITE_LOCATION_SAMPLE_WINDOW_MS', 3000, 0, 15000),
+  /**
+   * "Mi ubicación" del mapa: si la lectura precisa falla (una computadora sin GPS), se pide una vez la de la red Wi-Fi,
+   * aceptando una de hasta `locationNetworkMaxAgeMs` y esperando hasta `locationNetworkTimeoutMs`. Nunca en un registro.
+   */
+  locationNetworkMaxAgeMs: envNumber(env, 'VITE_LOCATION_NETWORK_MAX_AGE_MS', 300_000, 0, 3_600_000),
+  locationNetworkTimeoutMs: envNumber(env, 'VITE_LOCATION_NETWORK_TIMEOUT_MS', 10_000, 1000, 30_000),
 
   // --- QR ---
   /**
@@ -97,6 +155,24 @@ export const config = {
   // --- Punto de control (validador en tableta o teléfono) ---
   /** Segundos que el resultado queda en pantalla antes de volver a esperar a la siguiente persona. */
   checkpointResultSeconds: envNumber(env, 'VITE_CHECKPOINT_RESULT_SECONDS', 6, 2, 60),
+  /**
+   * Antifraude 2b (firma por petición): si al identificar el reto vence en menos de este margen (o aún no hay), se pide
+   * uno nuevo antes (`GET /checkpoint/me`); así la firma no llega vencida al servidor.
+   */
+  checkpointNonceMarginMs: seconds('VITE_CHECKPOINT_NONCE_MARGIN_SECONDS', 60, 10, 300),
+  /**
+   * Antifraude 2b (ubicación en cada identificación): la pantalla mantiene la ubicación "caliente"; una lectura sirve
+   * mientras no tenga más de `checkpointLocationMaxAgeMs` y, sin una reciente, se espera la siguiente hasta
+   * `checkpointLocationWaitMs` (después se identifica sin ella: decide el servidor).
+   */
+  checkpointLocationMaxAgeMs: seconds('VITE_CHECKPOINT_LOCATION_MAX_AGE_SECONDS', 30, 5, 300),
+  checkpointLocationWaitMs: seconds('VITE_CHECKPOINT_LOCATION_WAIT_SECONDS', 8, 1, 30),
+
+  // --- Kiosco del sitio (pantalla pública `/kiosk`: muestra el código que el empleado escanea o escribe) ---
+  /** Sin conexión (o con el servidor fallando), los reintentos esperan cada vez el doble, hasta este tope. */
+  kioskRetryMaxMs: seconds('VITE_KIOSK_RETRY_MAX_SECONDS', 60, 5, 600),
+  /** El sitio desactivó su código (o el sitio no está activo): se vuelve a preguntar con esta calma. */
+  kioskDisabledRetryMs: seconds('VITE_KIOSK_DISABLED_RETRY_SECONDS', 120, 15, 3600),
 
   // --- Google Maps (domicilio y ubicación de los validadores) ---
   maps: {
@@ -110,8 +186,55 @@ export const config = {
     geolocation: envBoolean(env, 'VITE_GOOGLE_GEOLOCATION', false),
   },
 
+  // --- Analítica de uso (Firebase / Google Analytics 4) con candados de privacidad ---
+  // Excepción documentada a la regla 13 (decisión del dueño del producto): solo pantallas como
+  // plantilla y eventos sin datos de personas ni empresas. Por omisión solo en producción.
+  analytics: {
+    enabled: envBoolean(env, 'VITE_ANALYTICS_ENABLED', import.meta.env.PROD),
+    firebase: {
+      apiKey: envString(env, 'VITE_FIREBASE_API_KEY', ''),
+      authDomain: envString(env, 'VITE_FIREBASE_AUTH_DOMAIN', ''),
+      projectId: envString(env, 'VITE_FIREBASE_PROJECT_ID', ''),
+      storageBucket: envString(env, 'VITE_FIREBASE_STORAGE_BUCKET', ''),
+      messagingSenderId: envString(env, 'VITE_FIREBASE_MESSAGING_SENDER_ID', ''),
+      appId: envString(env, 'VITE_FIREBASE_APP_ID', ''),
+      measurementId: envString(env, 'VITE_FIREBASE_MEASUREMENT_ID', ''),
+    },
+  },
+
+  // --- Rendimiento visto desde el navegador (services/perf: Web Vitals, tareas largas y latencia de la API) ---
+  // Solo plantillas de pantallas y de rutas con sus tiempos (sin ids, query ni datos de personas), al backend
+  // propio (`POST /api/telemetry/web`); nunca a terceros.
+  perf: {
+    enabled: envBoolean(env, 'VITE_PERF_ENABLED', true),
+    /** Parte de las cargas de la página que miden (0 = ninguna, 1 = todas): se decide una vez por carga. */
+    sampleRate: envNumber(env, 'VITE_PERF_SAMPLE_RATE', 1, 0, 1),
+    /** Cada cuánto se envía lo medido (además, al ocultarse o cerrarse la página). */
+    flushMs: seconds('VITE_PERF_FLUSH_SECONDS', 30, 5, 300),
+    /** Tope de muestras en memoria entre envíos (lo que sobra se descarta; el backend acepta hasta 500). */
+    maxSamples: Math.floor(envNumber(env, 'VITE_PERF_MAX_SAMPLES', 300, 10, 500)),
+    /** Tiempo límite de cada envío (sin reintentos: un lote que no llega se descarta). */
+    timeoutMs: seconds('VITE_PERF_TIMEOUT_SECONDS', 5, 1, 30),
+  },
+
   // --- Formularios y listados ---
   minEmployeeAge: envNumber(env, 'VITE_MIN_EMPLOYEE_AGE', 16, 14, 100),
+  /**
+   * Foto de perfil: tamaño máximo (MB) que se acepta antes de subirla. Solo ayuda a la persona (no espera una
+   * subida que el servidor rechazará): el backend valida con su `AVATAR_MAX_MB`, que debe ser el mismo.
+   */
+  avatarMaxMb: envNumber(env, 'VITE_AVATAR_MAX_MB', 5, 1, 20),
+  /** Lado mínimo (px) del recorte de la foto: el mismo `AVATAR_MIN_SIDE_PX` del backend (menos, lo rechaza). */
+  avatarMinSidePx: envNumber(env, 'VITE_AVATAR_MIN_SIDE_PX', 128, 64, 512),
+  /** Cuánto se puede acercar la foto al recortarla (veces el cuadrado más grande que cabe). */
+  avatarMaxZoom: envNumber(env, 'VITE_AVATAR_MAX_ZOOM', 5, 1, 10),
+  /** Fotos de perfil que la página conserva en memoria sin mostrarse (las que se ven nunca se descartan). */
+  avatarCacheEntries: envNumber(env, 'VITE_AVATAR_CACHE_ENTRIES', 200, 20, 2000),
+  /**
+   * Documentos de una empresa: tamaño máximo (MB) que se acepta antes de subirlo. Solo ayuda a la persona (no espera
+   * una subida que el servidor rechazará): el backend valida con su `COMPANY_DOCUMENT_MAX_MB`, que debe ser el mismo.
+   */
+  companyDocumentMaxMb: envNumber(env, 'VITE_COMPANY_DOCUMENT_MAX_MB', 20, 1, 25),
   /** Opciones de "por página" de todos los listados (el backend acepta hasta 50). */
   pageSizes,
   /** Elementos por página al abrir cualquier listado (una de las opciones). */

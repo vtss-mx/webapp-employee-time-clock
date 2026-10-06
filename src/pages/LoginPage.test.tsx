@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -6,10 +6,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from '../context/AuthContext';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import { useAuth } from '../hooks/useAuth';
+import { t } from '../i18n';
+import { currentLocale, setLocale } from '../i18n/core';
 import { apiFail, apiOk, envelope, jsonResponse, mockFetch, type MockCall } from '../test/http';
 import { WithCatalogs, renderWithProviders, sampleUser, tokenResponse } from '../test/render';
 import { withScreens } from '../test/screens';
 import { DeviceKeyError } from '../utils/deviceKey';
+import { deviceStore } from '../utils/deviceStore';
 import { LoginPage } from './LoginPage';
 
 const deviceKey = vi.hoisted(() => ({ deviceProof: vi.fn() }));
@@ -270,7 +273,7 @@ describe('LoginPage: al llegar y al enviar', () => {
     const { calls } = server();
     renderWithProviders(<LoginPage />, { auth: true });
     fireEvent.submit(screen.getByRole('button', { name: 'Iniciar sesión' }).closest('form') as HTMLFormElement);
-    const popup = await screen.findByRole('alertdialog', { name: 'Revisa la información' });
+    const popup = await screen.findByRole('alertdialog', { name: 'Revisa los datos' });
     expect(popup).toHaveTextContent('La contraseña es obligatoria');
     const password = screen.getByLabelText('Contraseña', { selector: 'input' });
     expect(password).toHaveAccessibleDescription('La contraseña es obligatoria');
@@ -308,5 +311,71 @@ describe('LoginPage: al llegar y al enviar', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Usar otra cuenta' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo cambiar de cuenta' })).toHaveTextContent('Falló el servidor');
     expect(screen.getByLabelText('Correo electrónico')).toHaveValue('ana@empresa.com');
+  });
+});
+
+describe('LoginPage en inglés (en-US) y cambio de idioma en caliente', () => {
+  const companyUser = withScreens({ ...sampleUser, role: 'COMPANY' as const, employee: null });
+
+  it('todo en inglés: marca, tarjeta, campos, casilla, botón y pie', async () => {
+    mockFetch(apiOk(null));
+    await setLocale('en-US');
+    renderWithProviders(<LoginPage />, { auth: true });
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByText('Use your Employee Time Clock work account')).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toHaveTextContent('Attendance and work-hours tracking.');
+    expect(screen.getByLabelText('Email')).toHaveAttribute('placeholder', 'you@company.com');
+    expect(screen.getByRole('checkbox', { name: 'Remember my account' })).toHaveAccessibleDescription(/Do not use it on shared computers/);
+    expect(screen.getByRole('button', { name: 'Sign in' })).toHaveAttribute('title', 'Enter your email and password');
+    expect(screen.getByRole('contentinfo')).toHaveTextContent(`© ${new Date().getFullYear()} Employee Time Clock. All rights reserved.`);
+    fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form') as HTMLFormElement);
+    expect(await screen.findByRole('alertdialog', { name: 'Check the details' })).toHaveTextContent('Password is required');
+  });
+
+  it('el selector de la barra cambia el idioma al instante sin perder lo escrito', async () => {
+    mockFetch(apiOk(null));
+    vi.spyOn(deviceStore, 'set').mockResolvedValue();
+    renderWithProviders(<LoginPage />, { auth: true });
+    await userEvent.type(screen.getByLabelText('Correo electrónico'), 'ana@empresa.com');
+    await userEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: /Idioma/ }));
+    await userEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: /English/ }));
+    await waitFor(() => expect(currentLocale()).toBe('en-US'));
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toHaveValue('ana@empresa.com');
+  });
+
+  it('popups abiertos siguen al idioma: motivo del cierre de la app y aviso del dispositivo', async () => {
+    mockFetch(apiOk(null));
+    function EndSession() {
+      const { logout } = useAuth();
+      useEffect(() => void logout(() => t('auth.session.expired')), [logout]);
+      return null;
+    }
+    renderWithProviders(
+      <>
+        <EndSession />
+        <LoginPage />
+      </>,
+      { auth: true },
+    );
+    expect(await screen.findByRole('dialog', { name: 'Tu sesión terminó' })).toHaveTextContent('Tu sesión expiró. Inicia sesión de nuevo.');
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('dialog', { name: 'Your session ended' })).toHaveTextContent('Your session expired. Sign in again.');
+  });
+
+  it('el aviso de un dispositivo por autorizar se traduce con el popup abierto', async () => {
+    deviceKey.deviceProof.mockResolvedValue({ public_key: 'PUB', nonce: 'reto-1', signature: 'FIRMA', name: 'Safari · iOS' });
+    const pending = (code: string) => jsonResponse(envelope(null, { status: 403, code, message: 'Mensaje del servidor', errors: [{ code, message: 'm', field: null, details: { nonce: 'reto-1' } }] }), 403);
+    const answers = [pending('DEVICE_PROOF_REQUIRED'), pending('DEVICE_PENDING_APPROVAL')];
+    mockFetch((call) => (call.url.endsWith('/auth/login') ? (answers.shift() ?? apiOk(tokenResponse(companyUser))) : jsonResponse({})));
+    renderWithProviders(<LoginPage />, { auth: true });
+    await userEvent.type(screen.getByLabelText('Correo electrónico'), 'recepcion@empresa.com');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Valida1234');
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+    await screen.findByRole('dialog', { name: 'Dispositivo por autorizar' });
+    await act(() => setLocale('en-US'));
+    const popup = screen.getByRole('dialog', { name: 'Device pending approval' });
+    expect(within(popup).getByText(/Validators › Devices/)).toBeInTheDocument();
+    expect(popup).toHaveTextContent('Mensaje del servidor'); // el texto del servidor no se traduce en la app
   });
 });

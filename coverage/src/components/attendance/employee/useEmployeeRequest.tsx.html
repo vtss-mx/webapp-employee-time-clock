@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>4/4</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
@@ -115,7 +115,15 @@
 <a name='L50'></a><a href='#L50'>50</a>
 <a name='L51'></a><a href='#L51'>51</a>
 <a name='L52'></a><a href='#L52'>52</a>
-<a name='L53'></a><a href='#L53'>53</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -140,20 +148,28 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">227x</span>
-<span class="cline-any cline-yes">227x</span>
-<span class="cline-any cline-yes">227x</span>
-<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">301x</span>
+<span class="cline-any cline-yes">301x</span>
+<span class="cline-any cline-yes">301x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">20x</span>
+<span class="cline-any cline-yes">20x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -170,14 +186,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFeedback } from '../../../hooks/useFeedback';
+import { t, type Lazy } from '../../../i18n';
 import type { ConfirmDetail, ConfirmInput } from '../../../types/confirm';
+&nbsp;
+/** Errores de lo capturado (o la función que los calcula: el resumen abierto sigue al idioma activo). */
+type RequestErrors = Lazy&lt;Record&lt;string, string | undefined&gt;&gt;;
 &nbsp;
 /** Lo que usa del formulario (`useFormState`): enviar si es válido, tras confirmar. */
 interface RequestForm {
-  saveIfValid: (errors: Record&lt;string, string | undefined&gt;, action: () =&gt; Promise&lt;void&gt;, title: string, confirm: () =&gt; ConfirmInput) =&gt; void;
+  saveIfValid: (errors: RequestErrors, action: () =&gt; Promise&lt;void&gt;, title: () =&gt; string, confirm: () =&gt; ConfirmInput) =&gt; void;
 }
 &nbsp;
-/** Qué se pide: la pregunta, lo que se enviará y el aviso al salir bien. */
+/** Qué se pide: la pregunta, lo que se enviará y el aviso al salir bien (en el idioma activo). */
 interface EmployeeRequest {
   /** "¿Pedir vacaciones?". */
   title: string;
@@ -189,31 +209,35 @@ interface EmployeeRequest {
 /**
  * Enviar una solicitud del empleado a su empresa (cambio de turno, vacaciones o permiso): si lo
  * capturado es válido, confirma lo que se enviará; al salir bien avisa y vuelve a su lista (`list`).
- * Si algo falta, se marcan los campos y nada se envía.
+ * Si algo falta, se marcan los campos y nada se envía. `request` se llama al dibujar la confirmación
+ * y el aviso: abiertos, siguen al idioma activo.
  */
 export function useEmployeeRequest(form: RequestForm, list: string) {
   const feedback = useFeedback();
   const navigate = useNavigate();
-  return (errors: Record&lt;string, string | undefined&gt;, send: () =&gt; Promise&lt;unknown&gt;, request: () =&gt; EmployeeRequest) =&gt;
+  return (errors: RequestErrors, send: () =&gt; Promise&lt;unknown&gt;, request: () =&gt; EmployeeRequest) =&gt;
     form.saveIfValid(
       errors,
       async () =&gt; {
         await send();
-        void feedback.success('Solicitud enviada a tu empresa', request().done);
+        void feedback.success(
+          () =&gt; t('myAttendance.request.sent'),
+          () =&gt; request().done,
+        );
         void navigate(list, { replace: true });
       },
-      'No se pudo enviar tu solicitud',
+      () =&gt; t('myAttendance.request.error'),
       () =&gt; {
         const { title, details } = request();
         return {
           kind: 'create',
           icon: &lt;Send size={30} /&gt;,
-          eyebrow: 'Solicitud a tu empresa',
+          eyebrow: t('myAttendance.request.eyebrow'),
           title,
-          message: 'Tu empresa la revisará y aquí verás si la aprueba; mientras esté pendiente la puedes cancelar.',
-          detailsTitle: 'Se enviará',
+          message: t('myAttendance.request.message'),
+          detailsTitle: t('myAttendance.request.detailsTitle'),
           details,
-          confirmLabel: 'Enviar solicitud',
+          confirmLabel: t('myAttendance.request.send'),
           confirmIcon: &lt;Send size={18} /&gt;,
         };
       },
@@ -226,7 +250,7 @@ export function useEmployeeRequest(form: RequestForm, list: string) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

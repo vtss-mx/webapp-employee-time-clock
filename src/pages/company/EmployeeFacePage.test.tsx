@@ -9,11 +9,14 @@ import { identifiedResult, samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import type { Employee } from '../../types';
+import { config } from '../../utils/config';
 import { EmployeeFacePage } from './EmployeeFacePage';
 
 interface FlowProps {
   title: string;
   facing: string;
+  frontalFrames: number;
+  frontalPhoto?: { maxSide: number; gapMs: number };
   allowHeadwear: boolean;
   submittingMessage: string;
   onSubmit: (captured: CapturedFace) => Promise<void>;
@@ -23,8 +26,8 @@ interface FlowProps {
 
 // La cámara se prueba en navegador real; aquí, qué hace la pantalla con lo que entrega el flujo facial.
 vi.mock('../../components/LiveFaceFlow', () => ({
-  LiveFaceFlow: ({ title, facing, allowHeadwear, submittingMessage, onSubmit, onFatal, onCancel }: FlowProps) => (
-    <div data-testid="flow" data-facing={facing} data-headwear={String(allowHeadwear)}>
+  LiveFaceFlow: ({ title, facing, frontalFrames, frontalPhoto, allowHeadwear, submittingMessage, onSubmit, onFatal, onCancel }: FlowProps) => (
+    <div data-testid="flow" data-facing={facing} data-headwear={String(allowHeadwear)} data-frames={frontalFrames} data-photo={frontalPhoto?.maxSide ?? 'normal'}>
       <h1>{title}</h1>
       <p>{submittingMessage}</p>
       <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false })}>capturar rostro</button>
@@ -73,7 +76,10 @@ describe('EmployeeFacePage: registro en persona', () => {
     expect(await screen.findByRole('heading', { name: 'Registrar el rostro de Ana Ruiz' })).toBeInTheDocument();
     expect(screen.getByTestId('flow')).toHaveAttribute('data-facing', 'environment');
     expect(screen.getByTestId('flow')).toHaveAttribute('data-headwear', 'true'); // exento de prenda de cabeza
-    expect(screen.getByText('Registrando rostro...')).toBeInTheDocument();
+    // El registro en persona toma las 36 fotos completas del registro facial (las elige el servidor).
+    expect(screen.getByTestId('flow')).toHaveAttribute('data-frames', String(config.enrollmentFrames));
+    expect(screen.getByTestId('flow')).toHaveAttribute('data-photo', String(config.enrollmentPhotoPx));
+    expect(screen.getByText('Registrando rostro…')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
 
     expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
@@ -118,10 +124,12 @@ describe('EmployeeFacePage: verificación en persona', () => {
     const { calls } = serve(() => apiOk(identifiedResult));
     renderFace('verify');
     expect(await screen.findByRole('heading', { name: 'Verificar a Ana Ruiz' })).toBeInTheDocument();
-    expect(screen.getByText('Verificando identidad...')).toBeInTheDocument();
+    expect(screen.getByText('Verificando identidad…')).toBeInTheDocument();
+    expect(screen.getByTestId('flow')).toHaveAttribute('data-frames', String(config.verificationFrames)); // las de siempre
+    expect(screen.getByTestId('flow')).toHaveAttribute('data-photo', 'normal');
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
 
-    const result = await screen.findByRole('dialog', { name: 'Identificación exitosa' }); // el resultado es un popup
+    const result = await screen.findByRole('dialog', { name: 'Identidad confirmada' }); // el resultado es un popup
     expect(calls.find((c) => c.init.method === 'POST')?.url).toBe('/api/employees/7/face/verify');
     await userEvent.click(within(result).getByRole('button', { name: 'Finalizar' }));
     expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();

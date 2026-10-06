@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useFormState } from '../../hooks/useFormState';
 import { DEFAULT_RADIUS_M, validateRadius } from '../../hooks/useValidatorForm';
+import { t } from '../../i18n';
 import { fieldErrorsFrom } from '../../services/apiClient';
 import { siteService } from '../../services/siteService';
 import type { WorkSite, WorkSitePayload } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
-import { ADDRESS_FIELDS, addressForPoint, addressLine, formatPoint, pickAddress, validateAddress, type AddressValues, type GeoPoint } from '../../utils/address';
+import { ADDRESS_FIELDS, addressForPoint, addressLine, addressPayload, formatPoint, pickAddress, validateAddress, type AddressValues, type GeoPoint } from '../../utils/address';
 import { describeChanges, describeValues, type FieldLabels } from '../../utils/changes';
 import { metersText, SITE_NAME_MAX, validateName } from './shiftRules';
 
@@ -24,52 +25,65 @@ const RENAME: Partial<Record<string, keyof SiteFormValues>> = {
 
 const serverErrors = (err: unknown) => fieldErrorsFrom<SiteFormValues>(err, RENAME);
 
-/** Lo que se guarda: nombre, domicilio con su punto y radio. */
-export function sitePayload(values: SiteFormValues, point: GeoPoint): WorkSitePayload {
-  const address = pickAddress(values, { trim: true });
-  return {
-    name: values.name.trim(),
-    address: { ...address, interior_number: address.interior_number || null, latitude: point.lat, longitude: point.lng },
-    radius_m: Number(values.radius),
-  };
+/** Lo que se guarda: nombre, domicilio con su punto, radio y si pide el código del kiosco (antifraude 2b). */
+export function sitePayload(values: SiteFormValues, point: GeoPoint, presenceCode: boolean): WorkSitePayload {
+  return { name: values.name.trim(), address: addressPayload(values, point), radius_m: Number(values.radius), presence_code: presenceCode };
 }
 
-/** Lo que se confirma de un sitio: su nombre, su domicilio, su punto en el mapa y el radio. */
+/** Lo que se confirma de un sitio: su nombre, su domicilio, sus referencias, su punto en el mapa, el radio y el código. */
 interface SiteFacts {
   name: string;
   address: string;
+  references: string;
   point: string;
   radius: number;
+  presenceCode: boolean;
 }
 
-const SITE_LABELS: FieldLabels<SiteFacts> = { name: 'Nombre', address: 'Domicilio', point: 'Punto en el mapa', radius: { label: 'Radio para checar', format: metersText } };
+/** Nombres de los datos del sitio en el idioma activo. */
+const siteLabels = (): FieldLabels<SiteFacts> => ({
+  name: t('common.fields.name'),
+  address: t('sites.fields.address'),
+  references: t('sites.fields.references'),
+  point: t('sites.fields.point'),
+  radius: { label: t('sites.fields.radius'), format: metersText },
+  presenceCode: { label: t('sites.presence.label'), format: (on) => t(on ? 'sites.presence.on' : 'sites.presence.off') },
+});
 
-const siteFacts = ({ name, address, radius_m }: WorkSitePayload): SiteFacts => ({
+const siteFacts = ({ name, address, radius_m, presence_code }: WorkSitePayload): SiteFacts => ({
   name,
   address: addressLine(address),
+  // Aparte de la línea del domicilio: cambiar solo las referencias también es un cambio que se confirma.
+  references: address.reference_notes ?? '',
   // El punto siempre existe al guardar (es obligatorio) y el backend lo devuelve con el sitio.
   point: formatPoint({ lat: Number(address.latitude), lng: Number(address.longitude) }),
   radius: radius_m,
+  presenceCode: presence_code,
 });
 
-/** Crear: lo que se registra. Editar: solo lo que cambia ("antes → después"). */
+/** Crear: lo que se registra. Editar: solo lo que cambia ("antes → después"). Se arma al dibujarse (en el idioma activo). */
 export function siteConfirm(original: WorkSite | null, payload: WorkSitePayload): ConfirmInput {
   if (!original) {
     return {
       kind: 'create',
-      title: `¿Crear el sitio ${payload.name}?`,
-      message: 'Tu personal podrá checar aquí y elegirlo en las asignaciones de turno.',
-      detailsTitle: 'Se creará',
-      details: describeValues(siteFacts(payload), SITE_LABELS),
-      confirmLabel: 'Crear sitio',
+      title: t('sites.confirm.createTitle', { name: payload.name }),
+      message: t('sites.confirm.createMessage'),
+      detailsTitle: t('sites.confirm.willCreate'),
+      details: describeValues(siteFacts(payload), siteLabels()),
+      confirmLabel: t('sites.form.create'),
     };
   }
   return {
     kind: 'edit',
-    title: `¿Guardar los cambios del sitio ${original.name}?`,
-    changes: describeChanges(siteFacts(original), siteFacts(payload), SITE_LABELS),
+    title: t('sites.confirm.editTitle', { name: original.name }),
+    changes: describeChanges(siteFacts(original), siteFacts(payload), siteLabels()),
   };
 }
+
+/** Errores de lo capturado (solo UX: el backend vuelve a validar todo), en el idioma activo. */
+const siteErrors = (values: SiteFormValues) => ({ ...validateAddress(values), name: validateName(values.name, SITE_NAME_MAX, t('sites.form.nameExample')), radius: validateRadius(values.radius) });
+
+const pointErrorOf = (point: GeoPoint | null) => (point ? undefined : t('sites.form.pointRequired'));
 
 /**
  * Estado del alta o la edición de un sitio de trabajo: nombre, radio de la geocerca, domicilio y su
@@ -84,6 +98,7 @@ export function useSiteForm(original: WorkSite | null) {
   const saved = original?.address;
   const [point, setPoint] = useState<GeoPoint | null>(saved?.latitude != null && saved.longitude != null ? { lat: saved.latitude, lng: saved.longitude } : null);
   const [submitted, setSubmitted] = useState(false);
+  const [presenceCode, setPresenceCode] = useState(original?.presence_code ?? false);
   const { values } = form;
   // El domicilio que Google encuentra llega después de una consulta: se aplica sobre lo escrito hasta entonces.
   const current = useRef(values);
@@ -91,23 +106,24 @@ export function useSiteForm(original: WorkSite | null) {
     current.current = values;
   });
 
-  const clientErrors = { ...validateAddress(values), name: validateName(values.name, SITE_NAME_MAX, 'Planta Hermosillo'), radius: validateRadius(values.radius) };
-  const pointError = point ? undefined : 'Marca en el mapa el punto del sitio: desde ahí se mide el radio para checar';
+  const clientErrors = siteErrors(values);
+  const pointError = pointErrorOf(point);
 
   const save = (onSaved: (site: WorkSite) => void): Promise<void> => {
     form.touchAll();
     setSubmitted(true);
     if (!point || Object.values(clientErrors).some(Boolean)) {
-      void form.feedback.invalidForm({ ...clientErrors, point: pointError });
+      // El resumen se vuelve a calcular al dibujarse: abierto, sigue al idioma activo.
+      void form.feedback.invalidForm(() => ({ ...siteErrors(values), point: pointErrorOf(point) }));
       return Promise.resolve();
     }
-    const payload = sitePayload(values, point);
+    const payload = sitePayload(values, point, presenceCode);
     return form.save(
       async () => {
         onSaved(original ? await siteService.update(original.id, payload) : await siteService.create(payload));
       },
-      original ? 'No se pudo guardar el sitio' : 'No se pudo crear el sitio',
-      siteConfirm(original, payload),
+      () => t(original ? 'sites.form.saveError' : 'sites.form.createError'),
+      () => siteConfirm(original, payload),
     );
   };
 
@@ -119,6 +135,9 @@ export function useSiteForm(original: WorkSite | null) {
     point,
     setPoint,
     pointError: submitted ? pointError : undefined,
+    /** La entrada y la salida piden el código del kiosco del sitio (antifraude 2b). */
+    presenceCode,
+    setPresenceCode,
     /** Domicilio que Google encontró para el punto: reemplaza al escrito (y se valida de inmediato). */
     applyAddress: (found: Partial<AddressValues>) => {
       form.setValues({ ...current.current, ...addressForPoint(current.current, found) });

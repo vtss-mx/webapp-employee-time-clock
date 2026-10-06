@@ -1,6 +1,7 @@
 import type { Detection } from '@mediapipe/tasks-vision';
 import type { LivenessAction } from '../types';
 import { config } from './config';
+import type { FaceBox } from './faceBurst';
 
 /**
  * Pose de la cabeza con los puntos de MediaPipe (BlazeFace: ojo derecho, ojo izquierdo, punta de la
@@ -24,6 +25,8 @@ export interface FaceBaseline {
   pitch: number | null;
   /** Ancho del rostro en píxeles del video. */
   width: number;
+  /** Caja del rostro en reposo (px del video): la zona que recorta la ráfaga del antifraude 2a. */
+  box?: FaceBox;
 }
 
 /** Un movimiento del reto: qué se pide, el mínimo del servidor y el rostro en reposo. */
@@ -65,15 +68,19 @@ export function pitchRatio(detection: Detection, video: HTMLVideoElement): numbe
 }
 
 /** Lo que se guarda de un cuadro de frente (con la caja del rostro) para medir después. */
-export function faceSample(detection: Detection, box: { width: number }, video: HTMLVideoElement): FaceBaseline {
-  return { pitch: pitchRatio(detection, video), width: box.width };
+export function faceSample(detection: Detection, box: { originX: number; originY: number; width: number; height: number }, video: HTMLVideoElement): FaceBaseline {
+  return { pitch: pitchRatio(detection, video), width: box.width, box: { x: box.originX, y: box.originY, width: box.width, height: box.height } };
 }
 
 /** Promedio de los cuadros estables de frente (undefined si no hubo ninguno). */
 export function averageSample(samples: FaceBaseline[]): FaceBaseline | undefined {
   if (samples.length === 0) return undefined;
   const pitches = samples.map((s) => s.pitch).filter((p): p is number => p !== null);
-  return { pitch: pitches.length ? mean(pitches) : null, width: mean(samples.map((s) => s.width)) };
+  const boxes = samples.map((s) => s.box).filter((b): b is FaceBox => b !== undefined);
+  const box = boxes.length
+    ? { x: mean(boxes.map((b) => b.x)), y: mean(boxes.map((b) => b.y)), width: mean(boxes.map((b) => b.width)), height: mean(boxes.map((b) => b.height)) }
+    : undefined;
+  return { pitch: pitches.length ? mean(pitches) : null, width: mean(samples.map((s) => s.width)), ...(box ? { box } : {}) };
 }
 
 /** Cambio del pitch respecto al de frente en el sentido pedido (arriba = baja el valor). */

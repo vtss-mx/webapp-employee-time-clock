@@ -53,7 +53,7 @@ describe('useDynamicQr', () => {
     statuses[2] = 'USED';
     await tick(3_000); // la consulta lo ve usado
     expect(result.current.phase).toBe('used');
-    await tick(1_800); // "¡Listo!" y el siguiente
+    await tick(1_800); // "Código usado" y el siguiente
     expect(result.current).toMatchObject({ phase: 'ready' });
     expect(result.current.qr?.id).toBe(3);
     expect(issued(calls)).toBe(3);

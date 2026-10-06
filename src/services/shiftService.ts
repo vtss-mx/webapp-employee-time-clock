@@ -3,6 +3,7 @@ import type {
   BulkAssignmentPayload,
   BulkResult,
   PageQuery,
+  Restored,
   Shift,
   ShiftAssignment,
   ShiftAssignmentList,
@@ -15,9 +16,10 @@ import type {
 } from '../types';
 import { hasKeys, isNothing, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
+import { restoreRecord } from './http/restore';
 
-export const isShift = hasKeys<Shift>('id', 'name', 'start_time', 'end_time', 'weekdays', 'active');
-export const isAssignment = hasKeys<ShiftAssignment>('id', 'shift', 'valid_from', 'state', 'sites');
+export const isShift = hasKeys<Shift>('id', 'name', 'start_time', 'end_time', 'weekdays', 'remote_weekdays', 'sites', 'active');
+export const isAssignment = hasKeys<ShiftAssignment>('id', 'shift', 'valid_from', 'state');
 export const isShiftRequest = hasKeys<ShiftRequest>('id', 'employee', 'shift', 'valid_from', 'status');
 /** Resultado de una operación para varios empleados (asignar un turno, registrar una ausencia). */
 export const isBulkResult = hasKeys<BulkResult>('done', 'unchanged', 'skipped', 'results');
@@ -25,11 +27,14 @@ export const isBulkResult = hasKeys<BulkResult>('done', 'unchanged', 'skipped', 
 export interface ShiftListQuery extends PageQuery {
   search?: string;
   active?: boolean;
+  /** Solo los de «Eliminados» (sin `active`). */
+  deleted?: boolean;
 }
 
 /**
- * Turnos de la empresa (rol COMPANY, pantalla "Turnos"): el catálogo de turnos, su asignación a cada
- * empleado (con un día de anticipación si ya tiene uno) y las solicitudes de cambio de sus empleados.
+ * Turnos de la empresa (rol COMPANY, pantalla "Turnos"): el catálogo de turnos (cada uno dice dónde y
+ * cuándo se checa: horario, sitios y días remotos), su asignación a cada empleado (solo el turno y
+ * desde cuándo; con un día de anticipación si ya tiene uno) y las solicitudes de cambio.
  */
 export const shiftService = {
   list(query: ShiftListQuery, signal?: AbortSignal): Promise<ShiftList> {
@@ -44,7 +49,7 @@ export const shiftService = {
     return apiRequest<Shift>('/shifts', { method: 'POST', body: payload, validate: isShift });
   },
 
-  /** Aplica a las jornadas que aún no empiezan; lo ya registrado conserva su turno. */
+  /** Aplica desde ahora a todos los que lo tienen asignado; lo ya registrado conserva su turno. */
   update(id: number, payload: ShiftPayload): Promise<Shift> {
     return apiRequest<Shift>(`/shifts/${id}`, { method: 'PUT', body: payload, validate: isShift });
   },
@@ -53,15 +58,19 @@ export const shiftService = {
     return apiRequest<Shift>(`/shifts/${id}/status`, { method: 'PATCH', body: { active }, validate: isShift });
   },
 
-  /** Solo si nadie lo tiene asignado (si no, 409 SHIFT_IN_USE: se desactiva). */
+  /** Solo si nadie lo tiene asignado (si no, 409 SHIFT_IN_USE: se desactiva); va a «Eliminados». */
   async remove(id: number): Promise<void> {
     await apiRequest<null | undefined>(`/shifts/${id}`, { method: 'DELETE', validate: isNothing });
   },
 
+  restore(id: number): Promise<Restored<Shift>> {
+    return restoreRecord(`/shifts/${id}`, isShift);
+  },
+
   // ---------- Asignaciones ----------
 
-  /** Turnos del empleado: vigente, programados y anteriores (el más reciente primero). */
-  assignments(employeeId: number, query: PageQuery, signal?: AbortSignal): Promise<ShiftAssignmentList> {
+  /** Turnos del empleado: vigente, programados y anteriores (el más reciente primero); `deleted`: los cambios cancelados. */
+  assignments(employeeId: number, query: PageQuery & { deleted?: boolean }, signal?: AbortSignal): Promise<ShiftAssignmentList> {
     return apiRequest<ShiftAssignmentList>(`/employees/${employeeId}/shift-assignments`, { query: { ...query }, signal, validate: isPage(isAssignment) });
   },
 
@@ -78,9 +87,14 @@ export const shiftService = {
     return apiRequest<BulkResult>('/shift-assignments/bulk', { method: 'POST', body: payload, validate: isBulkResult });
   },
 
-  /** Cancela un cambio programado (aún no empieza): la asignación anterior vuelve a regir. */
+  /** Cancela un cambio programado (aún no empieza): la asignación anterior vuelve a regir; va a «Eliminados». */
   async cancelAssignment(id: number): Promise<void> {
     await apiRequest<null | undefined>(`/shift-assignments/${id}`, { method: 'DELETE', validate: isNothing });
+  },
+
+  /** Vuelve a programar un cambio cancelado (con las reglas de asignar: fecha, anticipación, turno activo). */
+  restoreAssignment(id: number): Promise<Restored<ShiftAssignment>> {
+    return restoreRecord(`/shift-assignments/${id}`, isAssignment);
   },
 
   // ---------- Solicitudes de cambio ----------

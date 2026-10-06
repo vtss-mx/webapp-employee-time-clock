@@ -1,0 +1,96 @@
+# Palabras propias revisadas SOLO del español de México (ortografía de los diccionarios es-MX, regla 16).
+# El diccionario de español de cspell no trae los mexicanismos de la app ni los imperativos con
+# pronombre (enclíticos), que son correctos. Antes de agregar una se confirma que está bien escrita.
+
+# Mexicanismos (checar = registrar la entrada o la salida en el reloj checador)
+checar
+checa
+checan
+checado
+checador
+checará
+checarás
+checarla
+checó
+cubrebocas
+laptops
+# Imperativos y formas con pronombre enclítico
+actívalo
+acércala
+actualízala
+ajústalo
+asígnale
+asígnalo
+asígnalos
+cancélala
+cancélalo
+captúralo
+configúrala
+configurarlo
+descartarlo
+confírmalo
+cópialo
+desactívala
+desactívalo
+edítalo
+escanéalo
+escríbelo
+márcalo
+muéstralo
+quítalo
+quítalos
+recházalo
+restáuralo
+restáuralos
+revócala
+rotarla
+rótala
+# Términos válidos que el diccionario no trae (monto: cantidad de dinero; prom.: abreviatura de promedio;
+# telemetría: medición a distancia, en el DLE)
+monto
+montos
+prom
+autocalibración
+biométrico
+telemetría
+biométricos
+paginación
+recalcula
+recalcular
+recalculan
+recalculados
+reintentando
+# Préstamos técnicos (anti-spoofing: detección de suplantación del rostro)
+spoofing
+# Antifraude (prefijo anti- unido, como lo escribe la RAE) y puntaje (calificación en puntos, uso de América)
+antifraude
+puntaje
+# Máscara de fecha del RFC y la CURP (año, mes y día con dos dígitos)
+aammdd
+# Backend: países y territorios con su nombre en español (catálogo countries)
+Aland
+Chequia
+Esuatini
+Feroe
+Guernesey
+Miquelón
+Sáhara
+Taiwán
+Tristán
+# Backend: términos válidos que el diccionario no trae (RAE: biometría, perceptual, sobreexpuesto, megapíxel;
+# geocerca: zona delimitada en un mapa, de uso común en México)
+biometría
+geocerca
+megapíxeles
+perceptual
+sobreexpuesta
+# Backend: préstamos técnicos (embedding: el vector del rostro; morphing: un rostro que combina el de dos personas)
+embedding
+morphing
+# Backend: imperativos y formas con pronombre enclítico
+céntralo
+identifícate
+inclinarla
+reasígnalos
+regístralo
+suspéndela

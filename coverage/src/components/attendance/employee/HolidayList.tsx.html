@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -100,25 +100,31 @@
 <a name='L35'></a><a href='#L35'>35</a>
 <a name='L36'></a><a href='#L36'>36</a>
 <a name='L37'></a><a href='#L37'>37</a>
-<a name='L38'></a><a href='#L38'>38</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -137,12 +143,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { Holiday } from '../../../types';
-import { formatDate } from '../../../utils/format';
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useT } from '../../../i18n';
+import type { Holiday } from '../../../types';
+import { formatDate, localeDateFormat } from '../../../utils/format';
 &nbsp;
-// Partes de una fecha del calendario ("YYYY-MM-DD"): no es un instante, no cambia con la zona.
-const MONTH = new Intl.DateTimeFormat('es-MX', { month: 'short', timeZone: 'UTC' });
-const WEEKDAY = new Intl.DateTimeFormat('es-MX', { weekday: 'long', timeZone: 'UTC' });
+// Partes de una fecha del calendario ("YYYY-MM-DD"): no es un instante, no cambia con la zona. El
+// formato se pide al dibujar (en el idioma activo), no se guarda en una constante del módulo.
+const month = (day: Date) =&gt; localeDateFormat({ month: 'short', timeZone: 'UTC' }).format(day).replace('.', '');
+const weekday = (day: Date) =&gt; localeDateFormat({ weekday: 'long', timeZone: 'UTC' }).format(day);
 &nbsp;
 const dayOf = (date: string) =&gt; new Date(`${date}T00:00:00Z`);
 &nbsp;
@@ -151,6 +159,7 @@ const dayOf = (date: string) =&gt; new Date(`${date}T00:00:00Z`);
  * día de la semana con la fecha y si es oficial (Ley Federal del Trabajo) o propio de la empresa.
  */
 export function HolidayList({ holidays, loading }: { holidays: Holiday[]; loading: boolean }) {
+  const t = useT();
   return (
     &lt;ul className={`holiday-list ${loading ? 'is-loading' : ''}`.trim()}&gt;
       {holidays.map((holiday) =&gt; {
@@ -158,16 +167,16 @@ export function HolidayList({ holidays, loading }: { holidays: Holiday[]; loadin
         return (
           &lt;li key={holiday.id} className="holiday-list__item"&gt;
             &lt;span className="holiday-list__sheet" aria-hidden&gt;
-              &lt;small&gt;{MONTH.format(day).replace('.', '')}&lt;/small&gt;
+              &lt;small&gt;{month(day)}&lt;/small&gt;
               &lt;strong&gt;{day.getUTCDate()}&lt;/strong&gt;
             &lt;/span&gt;
             &lt;span className="holiday-list__text"&gt;
               &lt;strong&gt;{holiday.name}&lt;/strong&gt;
               &lt;small&gt;
-                &lt;span className="holiday-list__weekday"&gt;{WEEKDAY.format(day)}&lt;/span&gt; · {formatDate(holiday.holiday_date)}
+                &lt;span className="holiday-list__weekday"&gt;{weekday(day)}&lt;/span&gt; · {formatDate(holiday.holiday_date)}
               &lt;/small&gt;
             &lt;/span&gt;
-            &lt;span className={`badge badge--plain ${holiday.official ? 'badge--info' : 'badge--muted'}`}&gt;{holiday.official ? 'Oficial' : 'De tu empresa'}&lt;/span&gt;
+            &lt;span className={`badge badge--plain ${holiday.official ? 'badge--info' : 'badge--muted'}`}&gt;{t(holiday.official ? 'myAttendance.items.official' : 'myAttendance.items.companyHoliday')}&lt;/span&gt;
           &lt;/li&gt;
         );
       })}
@@ -181,7 +190,7 @@ export function HolidayList({ holidays, loading }: { holidays: Holiday[]; loadin
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

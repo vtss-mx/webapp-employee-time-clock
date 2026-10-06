@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
 import type { CameraController, CameraStatus, UseCameraOptions } from '../hooks/useCamera';
+import { setLocale } from '../i18n/core';
 import { QrScanPanel } from './QrScanPanel';
 
 // La cámara (getUserMedia) y la lectura con jsQR tienen sus propias pruebas; aquí, qué hace el panel
@@ -57,7 +58,7 @@ describe('QrScanPanel', () => {
 
     await detect('TCQR2:abc');
     expect(onScan).toHaveBeenCalledWith('TCQR2:abc');
-    expect(message()).toHaveTextContent('QR detectado. Verificando...');
+    expect(message()).toHaveTextContent('QR detectado. Verificando…');
     expect(message()).toHaveClass('camera__message--busy');
     expect(scanner.enabled).toBe(false); // no se lee otro mientras tanto
 
@@ -112,5 +113,25 @@ describe('QrScanPanel', () => {
     invalid.unmount();
     await act(() => vi.advanceTimersByTimeAsync(2_000));
     expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe('QrScanPanel en inglés (en-US) y cambio de idioma en caliente', () => {
+  it('el visor cambia de idioma mientras lee sin detener la lectura ni reabrir la cámara', async () => {
+    const { onScan, finish } = pendingScan();
+    renderPanel({ onScan });
+    expect(message()).toHaveTextContent('Apunta la cámara al código QR');
+    await act(() => setLocale('en-US'));
+    expect(message()).toHaveTextContent('Point the camera at the QR code');
+    expect(screen.getByText('The code contains no personal data.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(scanner.enabled).toBe(true);
+    expect(new Set(camera.requested.map((options) => options.facing))).toEqual(new Set(['environment']));
+
+    await detect('TCQR2:abc');
+    expect(message()).toHaveTextContent('QR detected. Verifying…');
+    await finish();
+    await detect('OTRO');
+    expect(message()).toHaveTextContent('Invalid QR. Use the code generated for your account');
   });
 });

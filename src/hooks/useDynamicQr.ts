@@ -16,7 +16,7 @@ import { usePolling } from './usePolling';
  */
 export type DynamicQrPhase = 'loading' | 'ready' | 'used' | 'replaced' | 'paused' | 'error';
 
-/** Tiempo que se muestra "¡Listo!" tras usarse, antes del código nuevo. */
+/** Tiempo que se muestra "Código usado" tras usarse, antes del código nuevo. */
 const USED_PAUSE_MS = 1800;
 
 /**
@@ -71,7 +71,7 @@ export function useDynamicQr() {
     return () => window.clearTimeout(timer);
   }, [phase, deadline, renew]);
 
-  // Recién usado: "¡Listo!" un instante y el siguiente.
+  // Recién usado: "Código usado" un instante y el siguiente.
   useEffect(() => {
     if (phase !== 'used') return undefined;
     const timer = window.setTimeout(() => void renew(), USED_PAUSE_MS);
@@ -111,8 +111,8 @@ export function useDynamicQr() {
   };
 }
 
-/** Mantiene la pantalla encendida mientras se muestra el código (Wake Lock; sin soporte, nada). */
-function useScreenAwake() {
+/** Mantiene la pantalla encendida mientras se muestra el código (Wake Lock; sin soporte, nada); también el kiosco. */
+export function useScreenAwake() {
   useEffect(() => {
     if (!('wakeLock' in navigator)) return undefined;
     let lock: WakeLockSentinel | null = null;

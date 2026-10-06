@@ -1,21 +1,15 @@
 import { Outlet } from 'react-router-dom';
 import { PageLoader } from '../components/Spinner';
-import { RetryState } from '../components/ui/RetryState';
+import { AppErrorScreen } from '../components/AppErrorScreen';
 import { useCatalogState } from '../hooks/useCatalogs';
 
 /**
  * Las pantallas con sesión esperan los catálogos (se cargan una vez por sesión). Si fallan, el
- * motivo ya se avisó en el popup y aquí solo queda volver a intentarlo.
+ * motivo técnico ya se avisó en el popup; aquí queda la pantalla de error de la app con "Reintentar".
  */
 export function CatalogGate() {
   const state = useCatalogState();
   if (state.status === 'ready') return <Outlet />;
-  if (state.status === 'error') {
-    return (
-      <div className="page page--narrow">
-        <RetryState onRetry={state.retry} />
-      </div>
-    );
-  }
-  return <PageLoader text="Preparando tu espacio de trabajo..." />;
+  if (state.status === 'error') return <AppErrorScreen onRetry={state.retry} />;
+  return <PageLoader fullscreen />;
 }

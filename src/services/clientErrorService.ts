@@ -1,3 +1,4 @@
+import { t } from '../i18n/core';
 import { CameraNotReadyError, errorKind } from '../utils/cameraDiagnostics';
 import { config } from '../utils/config';
 import { DeviceKeyError } from '../utils/deviceKey';
@@ -57,9 +58,10 @@ function textOf(value: unknown): string {
   }
 }
 
+/** Una falla sin texto se reporta como "(sin mensaje)" en el idioma de quien la tuvo. */
 function describeError(error: unknown): { message: string; stack: string | null } {
-  if (error instanceof Error) return { message: `${error.name || 'Error'}: ${error.message || '(sin mensaje)'}`, stack: error.stack ?? null };
-  return { message: textOf(error) || '(sin mensaje)', stack: null };
+  if (error instanceof Error) return { message: `${error.name || 'Error'}: ${error.message || t('services.clientErrors.noMessage')}`, stack: error.stack ?? null };
+  return { message: textOf(error) || t('services.clientErrors.noMessage'), stack: null };
 }
 
 const clip = (text: string | null | undefined, limit: number): string | null => (text ? text.slice(0, limit) : null);

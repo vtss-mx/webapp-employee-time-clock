@@ -125,7 +125,7 @@ describe('pantallas de carga diferida', () => {
         </Suspense>
       </ErrorBoundary>,
     );
-    expect(await screen.findByRole('alert')).toHaveTextContent('Algo no salió como esperábamos');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Error en esta pantalla');
     expect(reload).not.toHaveBeenCalled(); // sin versión nueva: no recarga (podría no haber red)
     expect(load).toHaveBeenCalledOnce(); // tras fallar no vuelve a descargar solo (sin ciclos)
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));

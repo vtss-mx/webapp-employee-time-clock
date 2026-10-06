@@ -2,19 +2,23 @@
  * Diagnóstico de la cámara: identifica POR QUÉ no se puede usar y da los pasos exactos para el
  * sistema operativo y navegador del usuario (en vez de un mensaje genérico).
  */
+import { t } from '../i18n/core';
+
 export type CameraProblemKind = 'insecure' | 'unsupported' | 'denied' | 'not-found' | 'busy' | 'unknown';
 
 /**
  * La cámara no da imagen al capturar: aún se está abriendo o se cortó (llamada o Siri en iOS, permiso
  * retirado, cámara desconectada). Es pasajero: el flujo facial espera y continúa al volver la imagen
- * en lugar de abandonar el proceso.
+ * en lugar de abandonar el proceso. Su texto se lee en el idioma activo (se muestra sobre la cámara).
  */
 export class CameraNotReadyError extends Error {
   constructor() {
-    super('La cámara aún no está lista');
+    super();
     this.name = 'CameraNotReadyError';
+    Object.defineProperty(this, 'message', { get: () => t('face.camera.notReady'), configurable: true, enumerable: false });
   }
 }
+
 type Os = 'macos' | 'windows' | 'ios' | 'android' | 'linux' | 'other';
 type Browser = 'safari' | 'chrome' | 'edge' | 'firefox' | 'other';
 
@@ -23,16 +27,27 @@ export interface Platform {
   browser: Browser;
 }
 
+/**
+ * Qué impide usar la cámara y dónde (sin textos: se escriben al mostrarse, en el idioma activo, con
+ * `cameraProblemText`). Así un problema guardado en el estado sigue al idioma si este cambia.
+ */
 export interface CameraProblem {
   kind: CameraProblemKind;
-  title: string;
-  message: string;
-  steps: string[];
+  /** Sistema operativo y navegador: los pasos se escriben para ellos. */
+  platform: Platform;
   /** Dirección HTTPS equivalente cuando se entró por http:// (la cámara exige conexión segura). */
   secureUrl?: string;
 }
 
-const BROWSER_NAMES: Record<Browser, string> = { safari: 'Safari', chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox', other: 'tu navegador' };
+/** Los textos de un problema de la cámara: título, causa y pasos para resolverlo. */
+export interface CameraProblemText {
+  title: string;
+  message: string;
+  steps: string[];
+}
+
+const BROWSER_NAMES: Record<Exclude<Browser, 'other'>, string> = { safari: 'Safari', chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox' };
+const browserName = (browser: Browser) => (browser === 'other' ? t('face.cameraHelp.yourBrowser') : BROWSER_NAMES[browser]);
 /** Puerto HTTPS publicado por docker compose (8443 → 443 del contenedor de Nginx). */
 const HTTPS_PORT = '8443';
 
@@ -78,105 +93,82 @@ export function secureUrlFor(location: Pick<Location, 'protocol' | 'hostname' | 
   return `https://${location.hostname}:${HTTPS_PORT}${location.pathname}${location.search}`;
 }
 
-function permissionSteps({ os, browser }: Platform): string[] {
-  const name = BROWSER_NAMES[browser];
-  const site: Record<Browser, string> = {
-    chrome: 'En la barra de direcciones haz clic en el ícono de cámara o del candado → Cámara → "Permitir".',
-    edge: 'En la barra de direcciones haz clic en el candado → Permisos de este sitio → Cámara → "Permitir".',
-    firefox: 'Haz clic en el ícono de cámara tachada junto a la dirección y quita el bloqueo.',
-    safari:
-      os === 'ios'
-        ? 'Toca "aA" en la barra de direcciones → Ajustes del sitio web → Cámara → "Permitir".'
-        : 'En Safari: menú Safari → Ajustes → Sitios web → Cámara → elige "Permitir" para este sitio.',
-    other: 'Abre los permisos del sitio (ícono junto a la dirección) y permite la cámara.',
-  };
-  const system: Partial<Record<Os, string>> = {
-    macos: `En la Mac: menú Apple  → Ajustes del Sistema → Privacidad y seguridad → Cámara → activa ${name}. Después cierra y vuelve a abrir ${name}.`,
-    windows: 'En Windows: Configuración → Privacidad y seguridad → Cámara → activa "Acceso a la cámara" y "Permitir que las aplicaciones de escritorio accedan a la cámara".',
-    ios: `En el iPhone/iPad: Ajustes → ${browser === 'safari' ? 'Safari' : name} → Cámara → "Permitir".`,
-    android: `En Android: Ajustes → Aplicaciones → ${name} → Permisos → Cámara → "Permitir".`,
-  };
-  return [site[browser], ...(system[os] ? [system[os]] : []), 'Pulsa "Reintentar".'];
+/** Cómo se pide el permiso en el sitio (barra de direcciones) según el navegador. */
+function siteStep({ os, browser }: Platform): string {
+  if (browser === 'safari') return os === 'ios' ? t('face.cameraHelp.site.safariIos') : t('face.cameraHelp.site.safariMac');
+  return t(`face.cameraHelp.site.${browser}`);
 }
+
+/** Dónde se da el permiso en el sistema operativo (null si el sistema no lo pide). */
+function systemStep({ os, browser }: Platform): string | null {
+  if (os === 'linux' || os === 'other') return null;
+  return t(`face.cameraHelp.system.${os}`, { browser: browserName(browser) });
+}
+
+function permissionSteps(platform: Platform): string[] {
+  const system = systemStep(platform);
+  return [siteStep(platform), ...(system ? [system] : []), t('face.cameraHelp.pressRetry')];
+}
+
+/** "Si tu equipo…" a media oración: "…: si tu equipo…". */
+const lowerFirst = (text: string) => `${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 
 function notFoundSteps({ os }: Platform): string[] {
-  const antivirus =
-    'Si tu equipo tiene antivirus o control corporativo (p. ej. Kaspersky → "Protección de cámara web"), puede estar bloqueando la cámara: desactívalo o agrega tu navegador como excepción.';
+  const antivirus = t('face.cameraHelp.notFound.antivirus');
   if (os === 'macos') {
     return [
-      'Verifica que la Mac detecte la cámara: menú Apple  → Acerca de esta Mac → Más información → Informe del sistema → Cámara.',
-      `Si no aparece ninguna cámara: ${antivirus.charAt(0).toLowerCase()}${antivirus.slice(1)}`,
-      'En Mac mini, Mac Studio o una MacBook con la tapa cerrada no hay cámara integrada disponible: conecta una cámara USB o usa la cámara de Continuidad del iPhone.',
+      t('face.cameraHelp.notFound.macCheck'),
+      t('face.cameraHelp.notFound.noCameraListed', { antivirus: lowerFirst(antivirus) }),
+      t('face.cameraHelp.notFound.macNoBuiltIn'),
     ];
   }
-  if (os === 'windows') {
-    return [
-      'Revisa el Administrador de dispositivos → Cámaras (debe aparecer sin errores).',
-      'Algunas laptops tienen un interruptor o una tecla (F8, F10 o con ícono de cámara) que la apaga.',
-      antivirus,
-    ];
-  }
-  return ['Verifica que el dispositivo tenga una cámara conectada y habilitada.', antivirus];
+  if (os === 'windows') return [t('face.cameraHelp.notFound.windowsDevices'), t('face.cameraHelp.notFound.windowsSwitch'), antivirus];
+  return [t('face.cameraHelp.notFound.generic'), antivirus];
 }
 
+/** Qué impide usar la cámara: el tipo, el sistema y navegador del usuario y, sin conexión segura, la dirección HTTPS. */
 export function describeCameraProblem(
   kind: CameraProblemKind,
   platform: Platform = detectPlatform(),
   location: Pick<Location, 'protocol' | 'hostname' | 'pathname' | 'search'> = window.location,
 ): CameraProblem {
+  return kind === 'insecure' ? { kind, platform, secureUrl: secureUrlFor(location) } : { kind, platform };
+}
+
+/** Título, causa y pasos de un problema de la cámara, en el idioma activo (se piden al mostrarse). */
+export function cameraProblemText({ kind, platform, secureUrl }: CameraProblem): CameraProblemText {
   switch (kind) {
-    case 'insecure': {
-      const secureUrl = secureUrlFor(location);
+    case 'insecure':
       return {
-        kind,
-        title: 'La cámara necesita una conexión segura',
-        message: 'Los navegadores solo permiten usar la cámara en páginas HTTPS (o en localhost).',
-        steps: secureUrl
-          ? ['Abre la versión segura con el botón de abajo.', 'Si aparece un aviso de certificado (red local), elige "Avanzado" → "Continuar".']
-          : ['Entra a la aplicación con una dirección https://.'],
-        secureUrl,
+        title: t('face.cameraHelp.insecure.title'),
+        message: t('face.cameraHelp.insecure.message'),
+        steps: secureUrl ? [t('face.cameraHelp.insecure.openSecure'), t('face.cameraHelp.insecure.certificate')] : [t('face.cameraHelp.insecure.useHttps')],
       };
-    }
     case 'unsupported':
-      return {
-        kind,
-        title: 'Tu navegador no permite usar la cámara',
-        message: 'Usa la versión más reciente de Chrome, Edge, Safari o Firefox.',
-        steps: ['Actualiza tu navegador o abre la aplicación en otro.'],
-      };
+      return { title: t('face.cameraHelp.unsupported.title'), message: t('face.cameraHelp.unsupported.message'), steps: [t('face.cameraHelp.unsupported.update')] };
     case 'denied':
       return {
-        kind,
-        title: 'El permiso de cámara está bloqueado',
-        message: `${BROWSER_NAMES[platform.browser]} o el sistema no permiten que esta página use la cámara.`,
+        title: t('face.cameraHelp.denied.title'),
+        message: t('face.cameraHelp.denied.message', { browser: browserName(platform.browser) }),
         steps: permissionSteps(platform),
       };
     case 'not-found':
-      return {
-        kind,
-        title: 'No se detectó ninguna cámara',
-        message: 'El sistema no reporta una cámara disponible para el navegador.',
-        steps: notFoundSteps(platform),
-      };
+      return { title: t('face.cameraHelp.notFound.title'), message: t('face.cameraHelp.notFound.message'), steps: notFoundSteps(platform) };
     case 'busy':
       return {
-        kind,
-        title: 'La cámara no se pudo iniciar',
-        message: 'Otra aplicación la está usando o algo la bloquea.',
+        title: t('face.cameraHelp.busy.title'),
+        message: t('face.cameraHelp.busy.message'),
         steps: [
-          'Cierra Zoom, Teams, Meet, FaceTime u otra pestaña que esté usando la cámara.',
-          ...(platform.os === 'macos' || platform.os === 'windows'
-            ? ['Si persiste, un antivirus puede estar bloqueándola (p. ej. Kaspersky → "Protección de cámara web").']
-            : []),
-          'Pulsa "Reintentar".',
+          t('face.cameraHelp.busy.closeApps'),
+          ...(platform.os === 'macos' || platform.os === 'windows' ? [t('face.cameraHelp.busy.antivirus')] : []),
+          t('face.cameraHelp.pressRetry'),
         ],
       };
     default:
       return {
-        kind: 'unknown',
-        title: 'No fue posible iniciar la cámara',
-        message: 'Ocurrió un problema inesperado al abrir la cámara.',
-        steps: ['Recarga la página y pulsa "Reintentar".', 'Si continúa, prueba con otro navegador.'],
+        title: t('face.cameraHelp.unknown.title'),
+        message: t('face.cameraHelp.unknown.message'),
+        steps: [t('face.cameraHelp.unknown.reload'), t('face.cameraHelp.unknown.otherBrowser')],
       };
   }
 }

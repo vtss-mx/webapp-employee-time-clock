@@ -1,4 +1,4 @@
-import type { CheckpointProfile, Validator, VerificationPolicy, VerificationResult } from '../types';
+import type { AdminVerificationPolicy, CheckpointProfile, RiskSignalSetting, Validator, VerificationPolicy, VerificationResult } from '../types';
 import { STRICT_RULES } from '../hooks/useVerificationPolicy';
 
 export const sampleValidator: Validator = {
@@ -19,6 +19,8 @@ export const sampleValidator: Validator = {
     state: 'Sonora',
     municipality: 'Hermosillo',
     city: 'Hermosillo',
+    neighborhood: 'Centro',
+    reference_notes: null,
     latitude: 29.0729,
     longitude: -110.9559,
   },
@@ -35,6 +37,8 @@ export const sampleCheckpoint: CheckpointProfile = {
   company: { id: 1, name: 'Mi empresa', active: true },
   liveness_required: true,
   qr_enabled: true,
+  device_nonce: null,
+  location_required: false,
 };
 
 export const identifiedResult: VerificationResult = {
@@ -60,6 +64,55 @@ export const samplePolicy: VerificationPolicy = {
   max_travel_kmh: 200,
   liveness_timeout_seconds: 60,
   flash_liveness: 'OBSERVE',
+  qr_only_attendance: false,
   updated_at: null,
   updated_by: null,
+};
+
+/** Una señal del motor de riesgo como la ve el ADMIN (la de la plataforma, la vigente y su línea base). */
+export function riskSignal(code: string, extra: Partial<RiskSignalSetting> = {}): RiskSignalSetting {
+  return {
+    code,
+    name: `Señal ${code}`,
+    description: null,
+    kind: 'PRESENTATION',
+    hard: false,
+    client: false,
+    default_points: 20,
+    default_mode: 'OBSERVE',
+    points: 20,
+    mode: 'OBSERVE',
+    confirmed: 0,
+    false_positive: 0,
+    ...extra,
+  };
+}
+
+/** La política completa que lee el ADMIN (GET /api/admin/companies/{id}/verification-policy). */
+export const sampleAdminPolicy: AdminVerificationPolicy = {
+  ...samplePolicy,
+  duplicate_confidence: 0.99,
+  employee_device_mode: 'OBSERVE',
+  preset: 'STANDARD',
+  risk_engine: true,
+  risk_medium_score: 30,
+  risk_high_score: 60,
+  risk_critical_score: 80,
+  risk_medium_action: 'STEP_UP',
+  risk_high_action: 'REVIEW',
+  risk_critical_action: 'DENY',
+  risk_fallback_action: 'ALERT',
+  fraud_evidence: true,
+  flash_paced: true,
+  capture_burst: true,
+  validator_signing: 'OBSERVE',
+  validator_location: 'OBSERVE',
+  site_codes: 'OBSERVE',
+  risk_signals: [
+    riskSignal('SPOOF_PROB_LOW', { name: 'Probabilidad de rostro real baja', mode: 'ENFORCE', default_mode: 'ENFORCE', confirmed: 2, false_positive: 1 }),
+    riskSignal('REPLAY_PERCEPTUAL', { name: 'Reenvío perceptual', kind: 'REPLAY', hard: true, points: 60, default_points: 60 }),
+    riskSignal('CAMERA_LABEL_MISSING', { name: 'Cámara sin nombre', kind: 'INJECTION', client: true }),
+  ],
+  pending_changes: 0,
+  two_person_rule: true,
 };

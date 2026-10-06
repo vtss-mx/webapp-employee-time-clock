@@ -27,13 +27,19 @@ const company: CompanyDetail = {
   id: 4,
   name: 'Panificadora',
   legal_name: 'Panificadora del Norte SA de CV',
-  rfc: 'PNO120315AB1',
+  tax_country: 'MX',
+  tax_id_type: 'MX_RFC',
+  tax_id: 'PNO120315AB1',
   phone: '+526621234567',
   active: true,
   max_employees: 50,
   api_enabled: false,
+  max_validators: 0,
+  active_validators: 0,
   employee_count: 3,
   admin_count: 1,
+  billing_status: 'ACTIVE',
+  suspension_reason: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };
@@ -145,7 +151,7 @@ describe('solicitar nueva verificación a todos (pantalla)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cambio importante de apariencia' }));
     await userEvent.click(screen.getByRole('button', { name: 'Solicitar a todos' }));
     const again = await screen.findByRole('alertdialog', { name: '¿Solicitar nueva verificación a todos?' });
-    expect(again).toHaveTextContent('Esta acción no se puede deshacer.');
+    expect(again).toHaveTextContent('No se puede deshacer.');
     expect(again).toHaveTextContent('Cambio importante de apariencia');
     await userEvent.click(within(again).getByRole('button', { name: 'Sí, solicitar a todos' }));
     expect(await screen.findByText('12 empleados deberán registrar su rostro de nuevo en su próximo acceso.')).toBeInTheDocument();
@@ -172,7 +178,7 @@ describe('rechazar un registro facial (pantalla)', () => {
     renderAt('/company/validations/:id/reject', '/company/validations/5/reject', <RejectEnrollmentPage />, '/company/validations');
     const reject = await screen.findByRole('button', { name: 'Rechazar' });
     await userEvent.click(reject);
-    expect(screen.getByText('Escribe o elige el motivo del rechazo')).toBeInTheDocument();
+    expect(screen.getByText('Escribe o elige un motivo')).toBeInTheDocument();
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
     await userEvent.type(screen.getByLabelText(/Motivo/), 'La foto está borrosa');
     await userEvent.click(reject);

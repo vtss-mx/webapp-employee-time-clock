@@ -1,11 +1,13 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { MessageInput } from '../components/MessageDialog';
+import type { MessageInput, MessageSource } from '../components/MessageDialog';
 import { ConfirmDialog } from '../components/Modal';
-import type { ConfirmInput } from '../types/confirm';
+import { t, useLocale } from '../i18n';
+import { resolveLazy } from '../i18n/lazy';
+import type { ConfirmSource } from '../types/confirm';
 
 export interface ConfirmApi {
   /** Abre (o pone en cola) la confirmación; `done` se resuelve true al confirmar y false al cancelar. */
-  ask: (input: ConfirmInput) => { id: number; done: Promise<boolean> };
+  ask: (input: ConfirmSource) => { id: number; done: Promise<boolean> };
   /** Retira esa confirmación (la pantalla que preguntó se cerró): se resuelve false. */
   cancel: (id: number) => void;
 }
@@ -14,25 +16,28 @@ export const ConfirmContext = createContext<ConfirmApi | null>(null);
 
 interface PendingConfirm {
   id: number;
-  input: ConfirmInput;
+  /** Se arma al dibujarse (sigue al idioma activo). */
+  input: ConfirmSource;
   resolve: (confirmed: boolean) => void;
 }
 
 /** Edición sin cambios: no hay nada que confirmar ni que enviar. */
-export const NO_CHANGES_MESSAGE: MessageInput = {
+export const noChangesMessage = (): MessageInput => ({
   variant: 'info',
-  title: 'Sin cambios',
-  text: 'No modificaste ningún dato, así que no hay nada que guardar.',
+  title: t('feedback.noChanges.title'),
+  text: t('feedback.noChanges.text'),
   key: 'confirm-no-changes',
-};
+});
 
 /**
  * Único lugar donde se abren las confirmaciones de crear, editar y eliminar (decisión del dueño del
  * producto: nada se crea, cambia ni borra por accidente). Una a la vez y en orden; cada una se
  * resuelve una sola vez. Lo monta `FeedbackProvider` (junto a los mensajes): toda la app y toda
- * prueba con mensajes tiene confirmaciones. `notify` muestra el aviso "Sin cambios".
+ * prueba con mensajes tiene confirmaciones. `notify` muestra el aviso "Sin cambios". Al cambiar el
+ * idioma se vuelve a dibujar: la confirmación abierta se arma de nuevo con su `input`.
  */
-export function ConfirmProvider({ children, notify }: { children: ReactNode; notify: (message: MessageInput) => unknown }) {
+export function ConfirmProvider({ children, notify }: { children: ReactNode; notify: (message: MessageSource) => unknown }) {
+  useLocale();
   const [queue, setQueue] = useState<PendingConfirm[]>([]);
   const queueRef = useRef<PendingConfirm[]>([]);
   const nextId = useRef(1);
@@ -46,10 +51,10 @@ export function ConfirmProvider({ children, notify }: { children: ReactNode; not
   }, []);
 
   const ask = useCallback(
-    (input: ConfirmInput) => {
+    (input: ConfirmSource) => {
       const id = nextId.current++;
-      if (input.changes?.length === 0) {
-        void notify(NO_CHANGES_MESSAGE);
+      if (resolveLazy(input).changes?.length === 0) {
+        void notify(noChangesMessage);
         return { id, done: Promise.resolve(false) };
       }
       // El ejecutor de la promesa corre de inmediato: `resolve` queda asignada antes de usarse.
@@ -79,7 +84,7 @@ export function ConfirmProvider({ children, notify }: { children: ReactNode; not
         <ConfirmDialog
           key={current.id} // cada confirmación se monta de nuevo: foco en su botón principal
           open
-          {...current.input}
+          {...resolveLazy(current.input)}
           onConfirm={() => settle(current.id, true)}
           onCancel={() => settle(current.id, false)}
         />

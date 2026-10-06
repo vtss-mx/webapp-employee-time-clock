@@ -1,9 +1,10 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { attendanceToday, companyShift, pageOf, shiftRequest } from '../../../components/attendance/employee/testData';
 import { toIso } from '../../../components/ui/DateField';
+import { setLocale } from '../../../i18n/core';
 import { paths } from '../../../routes/paths';
 import { apiFail, apiOk, jsonResponse, envelope, mockFetch, type MockCall } from '../../../test/http';
 import { renderWithProviders } from '../../../test/render';
@@ -61,11 +62,11 @@ describe('MyShiftRequestsPage (mis solicitudes de cambio de turno)', () => {
     expect(item.getByText('Matutino')).toBeInTheDocument();
     expect(item.getByText('Entro a la escuela por las mañanas')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pedir cambio de turno' })).toBeDisabled();
-    expect(screen.getByText(/Solo puedes tener una solicitud pendiente a la vez/)).toBeInTheDocument();
+    expect(screen.getByText(/Solo puedes tener una solicitud pendiente/)).toBeInTheDocument();
 
     await userEvent.click(item.getByRole('button', { name: 'Cancelar solicitud' }));
     const ask = await cancelDialog();
-    expect(ask).toHaveTextContent('Se retirará y tu empresa ya no la revisará.');
+    expect(ask).toHaveTextContent('Tu empresa ya no la revisará.');
     const facts = within(ask).getByRole('region', { name: 'Detalles' });
     expect(within(facts).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Turno que pedisteVespertino · 14:00 – 22:00 · Lun a vie', 'Desde12 oct 2026']);
     expect(within(ask).getByRole('button', { name: 'Conservarla' })).toHaveFocus(); // lo seguro primero
@@ -118,7 +119,12 @@ describe('MyShiftRequestsPage (mis solicitudes de cambio de turno)', () => {
 
   it('sin solicitudes: estado vacío', async () => {
     renderAt(paths.employee.shiftRequests);
-    expect(await screen.findByText('Aún no has pedido cambios de turno')).toBeInTheDocument();
+    expect(await screen.findByText('Sin solicitudes')).toBeInTheDocument();
+  });
+
+  it('si no cargan lo dice en su popup', async () => {
+    renderAt(paths.employee.shiftRequests, { 'GET /api/me/shift-requests': () => apiFail(500, 'INTERNAL_ERROR', 'Falló el servidor') });
+    expect(await screen.findByText('No se pudieron cargar tus solicitudes')).toBeInTheDocument();
   });
 });
 
@@ -152,14 +158,14 @@ describe('ShiftRequestFormPage (pedir cambio de turno)', () => {
     await userEvent.keyboard('{Escape}');
 
     await send();
-    expect(await screen.findByText('Revisa la información')).toBeInTheDocument();
+    expect(await screen.findByText('Revisa los datos')).toBeInTheDocument();
     expect(screen.getAllByText('Elige el turno que quieres').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Elige desde cuándo quieres el cambio').length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
     await fillForm({ date: typed(day(0)), reason: 'abc' });
-    expect(screen.getByText('Elige desde mañana: el cambio se pide con al menos un día de anticipación')).toBeInTheDocument();
-    expect(screen.getByText('Explica brevemente el motivo (al menos 5 caracteres)')).toBeInTheDocument();
+    expect(screen.getByText('Elige mañana o una fecha posterior')).toBeInTheDocument();
+    expect(screen.getByText('Explica el motivo (al menos 5 caracteres)')).toBeInTheDocument();
     await fillForm({ date: '31022030' });
     expect(screen.getByText('Escribe una fecha válida (dd/mm/aaaa)')).toBeInTheDocument();
 
@@ -167,7 +173,7 @@ describe('ShiftRequestFormPage (pedir cambio de turno)', () => {
     // Antes de enviar pregunta con lo que se enviará; "Cancelar" no envía nada y deja el formulario como estaba.
     await send();
     const ask = await askDialog();
-    expect(ask).toHaveTextContent('Tu empresa la revisará y aquí verás si la aprueba');
+    expect(ask).toHaveTextContent('Tu empresa la revisará. Mientras esté pendiente, puedes cancelarla.');
     const facts = within(ask).getByRole('region', { name: 'Se enviará' });
     expect(within(facts).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Turno que pidesVespertino · 14:00 – 22:00 · Lun a vie',
@@ -177,12 +183,12 @@ describe('ShiftRequestFormPage (pedir cambio de turno)', () => {
     await userEvent.click(within(ask).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
-    expect(screen.queryByText('Solicitud enviada a tu empresa')).toBeNull();
+    expect(screen.queryByText('Solicitud enviada')).toBeNull();
     expect(screen.getByLabelText('¿Por qué pides el cambio?')).toHaveValue('Entro a la escuela por las mañanas');
     expect(screen.getByRole('button', { name: 'Enviar solicitud' })).toBeEnabled();
 
     await sendConfirmed();
-    expect(await screen.findByText('Solicitud enviada a tu empresa')).toBeInTheDocument();
+    expect(await screen.findByText('Solicitud enviada')).toBeInTheDocument();
     const post = calls.find((c) => c.init.method === 'POST');
     expect(JSON.parse(post?.init.body as string)).toEqual({ shift_id: 9, valid_from: toIso(day(7)), reason: 'Entro a la escuela por las mañanas' });
     expect(await screen.findByRole('heading', { name: 'Cambio de turno' })).toBeInTheDocument();
@@ -228,7 +234,7 @@ describe('ShiftRequestFormPage (pedir cambio de turno)', () => {
 
   it('sin turnos en la empresa: lo explica y ofrece volver', async () => {
     renderAt(paths.employee.newShiftRequest, { 'GET /api/me/shifts': () => apiOk(pageOf([])) });
-    expect(await screen.findByText('Tu empresa no tiene turnos disponibles')).toBeInTheDocument();
+    expect(await screen.findByText('Sin turnos disponibles')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Volver' })).toHaveAttribute('href', paths.employee.shiftRequests);
   });
 
@@ -238,5 +244,41 @@ describe('ShiftRequestFormPage (pedir cambio de turno)', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Cerrar' })[0]);
     await userEvent.click(screen.getByRole('button', { name: 'Volver a cargar' }));
     expect(await screen.findByRole('button', { name: /^Turno/ })).toBeInTheDocument();
+  });
+});
+
+describe('Cambio de turno en inglés (en-US)', () => {
+  it('la lista en inglés; la confirmación para cancelar, abierta, sigue al idioma', async () => {
+    renderAt(paths.employee.shiftRequests, { 'GET /api/me/shift-requests': () => apiOk(pageOf([shiftRequest({ current_shift: null })])) });
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancelar solicitud' }));
+    await cancelDialog();
+    await act(() => setLocale('en-US'));
+    const dialog = screen.getByRole('alertdialog', { name: 'Cancel your shift change request?' });
+    expect(dialog).toHaveTextContent('Shift you requested');
+    expect(within(dialog).getByRole('button', { name: 'Cancel request' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Shift change' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Request shift change' })).toBeDisabled();
+    expect(screen.getByText(/You can only have one pending request/)).toBeInTheDocument();
+    expect(screen.getByText('Previous shift').nextSibling).toHaveTextContent('No shift');
+  });
+
+  it('el formulario en inglés: su turno actual, los errores y la confirmación con lo capturado en español', async () => {
+    renderAt(paths.employee.newShiftRequest);
+    await screen.findByRole('button', { name: /^Turno/ });
+    await fillForm({ reason: 'abc' });
+    await userEvent.tab(); // salir del motivo lo marca
+    expect(screen.getByText('Explica el motivo (al menos 5 caracteres)')).toBeInTheDocument();
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('heading', { name: 'Request shift change' })).toBeInTheDocument();
+    expect(screen.getByText('Explain why (at least 5 characters)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Why are you requesting the change?')).toHaveValue('abc');
+    await userEvent.type(screen.getByLabelText('Why are you requesting the change?'), 'de la escuela');
+    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Request the shift change?' });
+    expect(dialog).toHaveTextContent("Shift you're requesting");
+    expect(dialog).toHaveTextContent('Vespertino · 2:00 PM – 10:00 PM');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Shift/ }));
+    expect(screen.getByRole('option', { name: /Matutino/ })).toHaveTextContent('Your current shift');
   });
 });

@@ -1,12 +1,18 @@
 import { ArrowLeft, LocateFixed, MapPinOff, RefreshCw, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
-import { currentLocation, type DeviceLocation } from '../../../utils/geolocation';
+import { useT } from '../../../i18n';
+import type { DeviceLocation } from '../../../utils/geolocation';
+import { sampleLocation } from '../../../utils/locationSampling';
 import { Button } from '../../ui/Button';
 import { Panel, PanelFooter, PanelHero } from '../../ui/Panel';
 
-/** Ubicación leída para un registro y cuándo se leyó (reloj del teléfono: solo para saber su edad). */
+/**
+ * Ubicación leída para un registro (la más precisa de la toma), todas sus lecturas (el servidor detecta una ubicación
+ * simulada) y cuándo se leyó (reloj del teléfono: solo para saber su edad).
+ */
 export interface LocationFix extends DeviceLocation {
   readAt: number;
+  samples: DeviceLocation[];
 }
 
 /** Una ubicación sirve para registrar mientras es reciente; más vieja, se vuelve a leer. */
@@ -16,9 +22,10 @@ export function isFresh(fix: LocationFix | null): fix is LocationFix {
   return fix !== null && Date.now() - fix.readAt < LOCATION_MAX_AGE_MS;
 }
 
-/** Lectura nueva de la ubicación (aviso nativo del navegador la primera vez). */
+/** Lectura nueva de la ubicación (aviso nativo del navegador la primera vez), con las de más de su ventana corta. */
 export async function readLocation(): Promise<LocationFix> {
-  return { ...(await currentLocation()), readAt: Date.now() };
+  const { best, samples } = await sampleLocation();
+  return { ...best, samples, readAt: Date.now() };
 }
 
 interface RecordPanelProps {
@@ -57,6 +64,7 @@ interface LocatingProps {
  * previo). Se lee al abrir; el rostro se pide después. Al salir, lo que responda tarde se ignora.
  */
 export function LocatingPanel({ actionTitle, onLocated, onFailed, onCancel }: LocatingProps) {
+  const t = useT();
   const latest = useRef({ onLocated, onFailed });
   useLayoutEffect(() => {
     latest.current = { onLocated, onFailed };
@@ -77,7 +85,7 @@ export function LocatingPanel({ actionTitle, onLocated, onFailed, onCancel }: Lo
   return (
     <RecordPanel
       eyebrow={actionTitle}
-      title="Obteniendo tu ubicación..."
+      title={t('myAttendance.record.locating.title')}
       mark={
         <div className="status-mark status-mark--pending" aria-hidden>
           <div className="status-mark__core">
@@ -87,12 +95,12 @@ export function LocatingPanel({ actionTitle, onLocated, onFailed, onCancel }: Lo
       }
       footer={
         <Button variant="ghost" size="lg" icon={<X size={20} />} onClick={onCancel}>
-          Cancelar
+          {t('common.actions.cancel')}
         </Button>
       }
     >
       <p className="muted" role="status">
-        Tu registro lleva tu ubicación y tu rostro. Si el navegador te lo pregunta, permite el acceso a tu ubicación.
+        {t('myAttendance.record.locating.text')}
       </p>
     </RecordPanel>
   );
@@ -100,10 +108,11 @@ export function LocatingPanel({ actionTitle, onLocated, onFailed, onCancel }: Lo
 
 /** Algo impidió registrar (ya explicado en el popup): solo quedan "Reintentar" y volver. */
 export function ProblemPanel({ actionTitle, onRetry, onCancel }: { actionTitle: string; onRetry: () => void; onCancel: () => void }) {
+  const t = useT();
   return (
     <RecordPanel
       eyebrow={actionTitle}
-      title="No se registró tu asistencia"
+      title={t('myAttendance.record.problem.title')}
       mark={
         <span className="icon-tile icon-tile--warning icon-tile--lg" aria-hidden>
           <MapPinOff size={30} />
@@ -112,15 +121,15 @@ export function ProblemPanel({ actionTitle, onRetry, onCancel }: { actionTitle: 
       footer={
         <>
           <Button variant="ghost" size="lg" icon={<ArrowLeft size={20} />} onClick={onCancel}>
-            Volver a mi asistencia
+            {t('myAttendance.record.problem.back')}
           </Button>
           <Button variant="primary" size="lg" icon={<RefreshCw size={20} />} onClick={onRetry}>
-            Reintentar
+            {t('common.actions.retry')}
           </Button>
         </>
       }
     >
-      <p className="muted">Nada quedó registrado. Corrige lo indicado y vuelve a intentarlo.</p>
+      <p className="muted">{t('myAttendance.record.problem.text')}</p>
     </RecordPanel>
   );
 }

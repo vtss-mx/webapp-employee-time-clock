@@ -7,13 +7,15 @@ import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../hooks/useAuth';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useFeedback } from '../../hooks/useFeedback';
+import { t, Trans, useT } from '../../i18n';
 import { homeForUser } from '../../routes/paths';
 import type { UserMembership } from '../../types';
 import { useConfirmLogout } from '../../components/auth/logoutConfirm';
 
+/** Por qué no se puede entrar a una empresa (en el idioma activo); null: se puede. */
 function unavailableReason(membership: UserMembership): string | null {
-  if (!membership.company.active) return 'Empresa desactivada';
-  return membership.active ? null : 'Tu acceso está desactivado';
+  if (!membership.company.active) return t('auth.companySelect.companyInactive');
+  return membership.active ? null : t('auth.companySelect.accessInactive');
 }
 
 const initialsOf = (name: string) =>
@@ -26,6 +28,8 @@ const initialsOf = (name: string) =>
 
 /** Empleado que trabaja en varias empresas: elige a cuál entrar (o cambia de empresa). */
 export function CompanySelectPage() {
+  // Redibuja al cambiar el idioma; los textos salen de `t` (también el del popup, que se arma al dibujarse).
+  useT();
   const { user, selectCompany } = useAuth();
   const confirmLogout = useConfirmLogout();
   const { byCode } = useCatalogs();
@@ -42,7 +46,7 @@ export function CompanySelectPage() {
       void navigate(homeForUser(updated), { replace: true });
     } catch (err) {
       setEntering(null);
-      void feedback.fromError(err, { title: `No se pudo entrar a ${membership.company.name}` });
+      void feedback.fromError(err, { title: () => t('auth.companySelect.enterFailed', { company: membership.company.name }) });
     }
   };
 
@@ -51,9 +55,9 @@ export function CompanySelectPage() {
       <div className="auth-card company-select">
         <div className="auth-card__head">
           <BrandLogo size={64} />
-          <h1>Elige tu empresa</h1>
+          <h1>{t('auth.companySelect.title')}</h1>
           <p className="muted">
-            Trabajas en {memberships.length} empresas con la cuenta <strong>{user.email}</strong>.
+            <Trans k="auth.companySelect.intro" values={{ count: memberships.length, email: <strong>{user.email}</strong> }} />
           </p>
         </div>
 
@@ -77,10 +81,10 @@ export function CompanySelectPage() {
                   </span>
                   <span className="company-select__info">
                     <strong>{membership.company.name}</strong>
-                    <small>{reason ?? (current ? `Empresa actual · ${faceNote}` : faceNote)}</small>
+                    <small>{reason ?? (current ? t('auth.companySelect.current', { note: faceNote }) : faceNote)}</small>
                   </span>
                   {entering === membership.company.id ? (
-                    <Loader2 size={20} className="spin" aria-label="Entrando" />
+                    <Loader2 size={20} className="spin" aria-label={t('auth.companySelect.entering')} />
                   ) : (
                     <ChevronRight size={20} aria-hidden />
                   )}
@@ -91,7 +95,7 @@ export function CompanySelectPage() {
         </ul>
 
         <Button variant="ghost" icon={<LogOut size={18} />} onClick={() => void confirmLogout()} disabled={entering !== null}>
-          Cerrar sesión
+          {t('common.actions.logout')}
         </Button>
       </div>
     </AuthLayout>

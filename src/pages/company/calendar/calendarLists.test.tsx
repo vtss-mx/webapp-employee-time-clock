@@ -29,8 +29,11 @@ const renderAt = (tab: string) =>
     { route: `/company/calendar?tab=${tab}` },
   );
 
-/** Una respuesta que tarda un poco (para ver la lista atenuada mientras se recarga). */
-const later = (response: Response) => new Promise<Response>((resolve) => window.setTimeout(() => resolve(response), 60));
+/**
+ * Una respuesta que tarda un poco (para ver la lista atenuada mientras se recarga). Medio segundo:
+ * con el equipo muy ocupado, cerrar el popup anterior puede tardar más que una espera corta.
+ */
+const later = (response: Response) => new Promise<Response>((resolve) => window.setTimeout(() => resolve(response), 500));
 const count = (calls: MockCall[], prefix: string) => calls.filter((call) => call.url.startsWith(prefix)).length;
 const lastUrl = (calls: MockCall[]) => calls.filter((call) => call.url.startsWith('/api/calendar/absences?')).at(-1)?.url;
 const close = async (name: string, role: 'dialog' | 'alertdialog' = 'alertdialog') => userEvent.click(within(await screen.findByRole(role, { name })).getByRole('button', { name: 'Entendido' }));
@@ -101,11 +104,12 @@ describe('Calendario: ausencias', () => {
   it('sin ausencias invita a registrar; con filtros dice que nada coincide', async () => {
     calendarServer((call) => (call.url.startsWith('/api/calendar/absences?') ? apiOk(page([])) : null));
     renderAt('absences');
-    expect(await screen.findByText('Aún no hay ausencias')).toBeInTheDocument();
+    expect(await screen.findByText('Sin ausencias')).toBeInTheDocument();
+    expect(screen.getByText('Registra vacaciones, permisos o incapacidades.')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Registrar ausencia' })[1]).toHaveAttribute('href', '/company/calendar/absences/new');
     await userEvent.click(screen.getByRole('button', { name: /^Estado/ }));
     await userEvent.click(screen.getByRole('option', { name: 'Cancelada' }));
-    expect(await screen.findByText('Ninguna ausencia coincide con los filtros')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 
   it('cancela una vigente (recarga la lista y los contadores); si ya no estaba vigente también recarga', async () => {
@@ -188,7 +192,7 @@ describe('Calendario: solicitudes', () => {
     expect(await screen.findByRole('dialog', { name: 'Solicitud aprobada' })).toHaveTextContent(`Ana Ruiz no tiene que checar: ${formatDate(first)}.`);
     expect(calls.find((call) => call.init.method === 'POST')?.url).toBe('/api/calendar/absences/11/approve');
     expect(changes).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('Nada pendiente')).toBeInTheDocument();
+    expect(await screen.findByText('Todo al día')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Solicitudes' })).toBeInTheDocument();
   });
 
@@ -278,6 +282,7 @@ describe('Calendario: días laborables', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Días festivos' }));
     await userEvent.click(screen.getByRole('tab', { name: 'Días laborables' }));
     expect(await screen.findByText('Sin días laborables especiales')).toBeInTheDocument();
+    expect(screen.getByText('Marca un día libre como laborable para alguien.')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Agregar día laborable' })[1]).toHaveAttribute('href', '/company/calendar/workdays/new');
   });
 });

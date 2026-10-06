@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DynamicQrCode, QrCountdown } from '../../components/DynamicQrCode';
 import { FeedbackProvider } from '../../context/FeedbackContext';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
+import { setLocale } from '../../i18n/core';
 import { samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch } from '../../test/http';
 import { renderWithProviders, sampleUser } from '../../test/render';
@@ -61,8 +62,8 @@ describe('MyQrPage (QR dinámico)', () => {
 
 describe('DynamicQrCode', () => {
   it.each([
-    ['used', '¡Listo!', null],
-    ['replaced', 'Este código se reemplazó', 'Mostrar un código nuevo'],
+    ['used', 'Código usado', null],
+    ['replaced', 'Código reemplazado', 'Mostrar un código nuevo'],
     ['paused', 'En pausa', 'Mostrar código'],
   ] as const)('estado %s', async (phase, title, action) => {
     const onRenew = vi.fn();
@@ -97,5 +98,43 @@ describe('DynamicQrCode', () => {
     await act(() => vi.advanceTimersByTimeAsync(5_000)); // ya no programa más
     expect(vi.getTimerCount()).toBe(0);
     vi.useRealTimers();
+  });
+});
+
+describe('Mi código QR en inglés (en-US) y cambio de idioma en caliente', () => {
+  it('la credencial, su cuenta regresiva y la vista ampliada cambian de idioma sin generar otro código', async () => {
+    const { calls } = mockFetch((call) => {
+      if (call.url.includes('/settings/')) return apiOk(samplePolicy);
+      if (call.init.method === 'POST') return apiOk(qr(1));
+      return apiOk({ id: 1, status: 'ACTIVE', expires_at: null, used_at: null });
+    });
+    renderWithProviders(<MyQrPage />);
+    expect(await screen.findByAltText('Código QR de Ana Ruiz')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar en grande' }));
+
+    await act(() => setLocale('en-US'));
+    const dialog = screen.getByRole('dialog', { name: 'Ana Ruiz' });
+    expect(dialog).toHaveTextContent('My QR code');
+    expect(dialog).toHaveTextContent('Turn up the brightness so it scans instantly.');
+    expect(within(dialog).getByText(/Renews in/)).toHaveTextContent(/30 s|29 s/);
+    await userEvent.click(within(dialog).getAllByRole('button', { name: 'Close' })[0]);
+    expect(screen.getAllByAltText('QR code for Ana Ruiz')[0]).toHaveAttribute('src', 'data:image/png;base64,TCQR2:token-1');
+    expect(screen.getByText(/It changes every 30 s and works only once/)).toBeInTheDocument();
+    expect(screen.getByText('Identity validated')).toBeInTheDocument();
+    expect(screen.getByText('Employee no. EMP-7')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enlarge QR code' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generate another' })).toBeInTheDocument();
+    expect(calls.filter((c) => c.init.method === 'POST')).toHaveLength(1); // el mismo código: no se renovó
+  });
+
+  it.each([
+    ['used', 'Code used', null],
+    ['replaced', 'Code replaced', 'Show a new code'],
+    ['paused', 'Paused', 'Show code'],
+  ] as const)('estado %s del código, en inglés', async (phase, title, action) => {
+    await setLocale('en-US');
+    renderWithProviders(<DynamicQrCode qr={qr(1)} phase={phase} deadline={0} alt="QR" onRenew={vi.fn()} />);
+    expect(screen.getByText(title)).toBeInTheDocument();
+    if (action) expect(screen.getByRole('button', { name: action })).toBeInTheDocument();
   });
 });

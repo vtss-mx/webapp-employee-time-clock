@@ -1,3 +1,4 @@
+import { t } from '../../../i18n';
 import { formatMinutes } from '../../../utils/format';
 
 /**
@@ -43,10 +44,10 @@ export function countdownText(ms: number): string {
   const days = Math.floor(seconds / 86_400);
   if (days) {
     const hours = Math.floor((seconds % 86_400) / 3600);
-    return hours ? `${days} d ${hours} h` : `${days} d`;
+    return hours ? t('myAttendance.clock.left.daysHours', { days, hours }) : t('myAttendance.clock.left.days', { days });
   }
   if (seconds >= 3600) return formatMinutes(Math.floor(seconds / 60));
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
-  return minutes ? `${minutes} min ${String(rest).padStart(2, '0')} s` : `${rest} s`;
+  return minutes ? t('myAttendance.clock.left.minutesSeconds', { minutes, seconds: String(rest).padStart(2, '0') }) : t('myAttendance.clock.left.seconds', { seconds: rest });
 }

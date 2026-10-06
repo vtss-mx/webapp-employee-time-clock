@@ -1,8 +1,9 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '../../context/AuthContext';
+import { setLocale } from '../../i18n/core';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders, sampleUser } from '../../test/render';
 import { withScreens } from '../../test/screens';
@@ -39,7 +40,7 @@ function serve(current: () => Employee, handle?: (call: MockCall) => Response | 
     const custom = handle?.(call);
     if (custom) return custom;
     if (call.url.includes('/qr')) return apiOk({ live: false, live_until: null, last_issued_at: null, last_used_at: null });
-    if (call.url.includes('/verifications')) return apiOk({ items: [], total: 0, page: 1, size: 10 });
+    if (call.url.includes('/verifications') || call.url.includes('/devices')) return apiOk({ items: [], total: 0, page: 1, size: 10 });
     return apiOk(current());
   });
 }
@@ -56,12 +57,15 @@ function session(user: User | null): AuthContextValue {
     logoutReason: null,
     deviceBlock: null,
     dismissDeviceBlock: vi.fn(),
+    suspension: null,
+    dismissSuspension: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
     logoutEverywhere: vi.fn(),
     refreshUser: vi.fn(),
     selectCompany: vi.fn(),
     updatePreferences: vi.fn(),
+    updateAvatar: vi.fn(),
   };
 }
 
@@ -79,6 +83,23 @@ function renderDetail(user: User | null = companyUser) {
 }
 
 describe('EmployeeDetailPage: sin aprendizaje automático', () => {
+  it('sus dispositivos: desde dónde checa, para aprobarlos o revocarlos (antifraude 1b)', async () => {
+    const phone = { id: 5, name: 'iPhone · Safari', status: 'PENDING', first_seen_at: '2026-10-01T15:00:00Z', last_seen_at: '2026-10-01T15:00:00Z', uses: 1, stepped_up_at: null, reviewed_at: null, reviewed_by: null };
+    const { calls } = serve(
+      () => employee,
+      (call) => {
+        if (call.init.method === 'PATCH') return apiOk({ ...phone, status: 'APPROVED' });
+        return call.url.includes('/devices') ? apiOk({ items: [phone], total: 1, page: 1, size: 10 }) : undefined;
+      },
+    );
+    renderDetail();
+    expect(await screen.findByRole('heading', { name: 'Dispositivos' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Aprobar: iPhone · Safari' }));
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Aprobar' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprobar: iPhone · Safari' })).toBeNull());
+    expect(calls.find((c) => c.init.method === 'PATCH')?.url).toBe('/api/employees/7/devices/5/status');
+  });
+
   it('la empresa no ve ni administra lo que aprende el reconocimiento (lo hace el ADMIN)', async () => {
     serve(() => employee);
     renderDetail();
@@ -178,16 +199,17 @@ describe('EmployeeDetailPage: expediente', () => {
     renderDetail();
     /** Pide eliminar y escribe su número de empleado para habilitar el botón. */
     const confirmDelete = async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Eliminar empleado' }));
       const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar a Ana Ruiz?' });
-      const button = within(dialog).getByRole('button', { name: 'Eliminar definitivamente' });
+      const button = within(dialog).getByRole('button', { name: 'Eliminar empleado' });
       expect(button).toBeDisabled();
       await userEvent.type(within(dialog).getByLabelText('Escribe «EMP-7» para confirmar'), 'EMP-7');
       return { dialog, button };
     };
     await screen.findByRole('heading', { name: 'Ana Ruiz' });
     const first = await confirmDelete();
-    expect(first.dialog).toHaveTextContent('Esta acción no se puede deshacer');
+    // Va a «Eliminados», pero su rostro y sus fotos se borran para siempre.
+    expect(first.dialog).toHaveTextContent('Pasará a «Eliminados»: podrás restaurarlo durante 1 año. Sus datos faciales y fotos se borran para siempre.');
     expect(first.dialog).toHaveTextContent('Correoana@empresa.com');
     await userEvent.click(within(first.dialog).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false); // cancelar no envía nada
@@ -267,5 +289,35 @@ describe('EmployeeDetailPage: turnos', () => {
     renderDetail(null);
     expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Turnos' })).toBeNull();
+  });
+});
+
+describe('EmployeeDetailPage: fallas e inglés', () => {
+  it('si cambiar el estado falla lo explica con su título', async () => {
+    serve(
+      () => employee,
+      (call) => (call.init.method === 'PATCH' ? apiFail(409, 'EMPLOYEE_BUSY', 'No se puede ahora') : undefined),
+    );
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Desactivar empleado' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Desactivar a Ana Ruiz?' })).getByRole('button', { name: 'Desactivar' }));
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo completar la acción' })).toHaveTextContent('No se puede ahora');
+  });
+
+  it('en inglés: datos, registro facial y eliminar; la confirmación abierta sigue al idioma', async () => {
+    await setLocale('en-US');
+    serve(() => employee);
+    renderDetail();
+    expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
+    expect(screen.getByText('First names')).toBeInTheDocument();
+    expect(screen.getByText('Verification log')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Verify identity' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enroll again in person' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete employee' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete Ana Ruiz?' });
+    expect(dialog).toHaveTextContent('If you only want to block their access, use Deactivate.');
+    expect(dialog).toHaveTextContent('It moves to Deleted: you can restore it for 1 year. Their face data and photos are erased permanently.');
+    await act(() => setLocale('es-MX'));
+    expect(screen.getByRole('alertdialog', { name: '¿Eliminar a Ana Ruiz?' })).toHaveTextContent('Si solo deseas bloquear su acceso, usa Desactivar.');
   });
 });

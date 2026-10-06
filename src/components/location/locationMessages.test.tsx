@@ -2,7 +2,7 @@ import { LocateOff } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../services/apiClient';
-import { LOCATION_MESSAGES, LocationError, type LocationProblem } from '../../utils/geolocation';
+import { locationProblemCopy, LocationError, type LocationProblem } from '../../utils/geolocation';
 import { locationProblemMessage, loginLocationMessage } from './locationMessages';
 
 const iconOf = (message: { icon?: unknown }) => (message.icon as ReactElement).type;
@@ -16,8 +16,8 @@ describe('locationProblemMessage', () => {
     ['timeout', 'error'],
   ])('%s: popup de %s con el título, la explicación y los pasos del problema', (problem, variant) => {
     const message = locationProblemMessage(problem);
-    const { title, text, steps } = LOCATION_MESSAGES[problem];
-    expect(message).toMatchObject({ variant, eyebrow: 'Ubicación', title, text, details: steps, detailsStyle: 'steps', key: `location-${problem}` });
+    const { title, text } = locationProblemCopy(problem);
+    expect(message).toMatchObject({ variant, eyebrow: 'Ubicación', title, text, details: undefined, detailsStyle: 'steps', key: `location-${problem}` });
     expect(iconOf(message)).toBe(LocateOff);
   });
 

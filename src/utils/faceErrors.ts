@@ -1,4 +1,6 @@
 import { ApiError } from '../services/apiClient';
+import type { FaceChallenge } from '../types';
+import { isRecord } from './guards';
 import { CameraNotReadyError } from './cameraDiagnostics';
 import type { CatalogApi } from './catalogs';
 import { config } from './config';
@@ -51,4 +53,14 @@ export function detectedAccessories(error: unknown): string[] {
   if (!(error instanceof ApiError) || error.code !== 'ACCESSORIES_DETECTED') return [];
   const list = (error.details as { accessories?: unknown } | null)?.accessories;
   return Array.isArray(list) ? list.filter((code): code is string => typeof code === 'string') : [];
+}
+
+/**
+ * El reto de "un paso más" que pidió el motor de riesgo (riesgo medio): 422 `STEP_UP_REQUIRED` con el reto nuevo en
+ * `details.challenge` (más movimientos y el destello obligatorio). null si el error es otro o no trae un reto válido.
+ */
+export function stepUpChallenge(error: unknown): FaceChallenge | null {
+  if (!(error instanceof ApiError) || error.code !== 'STEP_UP_REQUIRED') return null;
+  const challenge = error.details?.challenge;
+  return isRecord(challenge) && typeof challenge.challenge_id === 'string' && Array.isArray(challenge.actions) ? (challenge as unknown as FaceChallenge) : null;
 }

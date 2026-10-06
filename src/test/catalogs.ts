@@ -1,5 +1,6 @@
 import type { AntispoofLevelItem, CatalogItem, Catalogs, ConfidenceLevelItem, CountryItem, FaceErrorItem, ReasonItem } from '../types';
 import { createCatalogApi, type CatalogApi } from '../utils/catalogs';
+import { TAX_ID_TYPES } from './taxIdTypes';
 
 /**
  * Catálogos de prueba: los mismos registros que GET /api/catalogs (backend, alembic/seed/catalogs.json),
@@ -77,15 +78,16 @@ const FACE_ERROR_CODES = [
   'CHALLENGE_INVALID', 'LIVENESS_FAILED', 'LIVENESS_MISMATCH', 'FACE_NOT_REGISTERED', 'FACE_SERVICE_BUSY',
   'FACE_SERVICE_UNAVAILABLE', 'FACE_PROCESSING_ERROR', 'IMAGE_NOT_FROM_CAMERA', 'STATIC_CAPTURE', 'REPLAY_DETECTED',
   'CAPTURE_INCONSISTENT', 'VIRTUAL_CAMERA', 'CHALLENGE_TOO_FAST', 'FACE_ALREADY_REGISTERED', 'FACE_LOCKED',
+  'FLASH_FLAT', 'REPLAY_PERCEPTUAL', 'KNOWN_ATTACK', 'RISK_DENIED', 'STEP_UP_REQUIRED',
 ];
 const NOT_RETRYABLE = new Set(['FACE_NOT_REGISTERED', 'FACE_SERVICE_UNAVAILABLE', 'FACE_ALREADY_REGISTERED', 'FACE_LOCKED']);
 
 export const catalogsFixture: Catalogs = {
   roles: rows([
-    ['ADMIN', 'Admin', 'Administrador de la plataforma.'],
-    ['COMPANY', 'Company', 'Administrador de una empresa.'],
-    ['EMPLOYEE', 'Employee', 'Empleado.'],
-    ['VALIDATOR', 'Validator', 'Validador de identidad.'],
+    ['ADMIN', 'Administrador', 'Administrador de la plataforma: da de alta y administra empresas (no ve sus empleados).'],
+    ['COMPANY', 'Empresa', 'Administrador de una empresa: gestiona sus empleados, validadores y política de verificación.'],
+    ['EMPLOYEE', 'Empleado', 'Empleado: registra su rostro y se identifica con rostro o con su código QR.'],
+    ['VALIDATOR', 'Validador', 'Validador de identidad: tableta o teléfono que identifica a los empleados de su empresa.'],
   ]),
   verification_methods: rows([
     ['FACE', 'Rostro', 'La persona mira a la cámara; se busca entre todo el personal'],
@@ -185,7 +187,7 @@ export const catalogsFixture: Catalogs = {
   error_severities: rows([
     ['CRITICAL', 'Crítico', 'Falla no controlada (500) o en un proceso en segundo plano.', { tone: 'danger' }],
     ['ERROR', 'Error', 'Servicio no disponible u ocupado (5xx controlado).', { tone: 'warning' }],
-    ['WARNING', 'Advertencia', 'Solicitud rechazada: validación, permisos o reglas de negocio (4xx).', { tone: 'info' }],
+    ['WARNING', 'Advertencia', 'Solo historial: solicitudes rechazadas (4xx) registradas antes. Ya no se registran.', { tone: 'info' }],
   ]),
   verification_reasons: reasons([
     ['NO_MATCH', 'Rostro no coincide', 'Rostro no reconocido'],
@@ -215,6 +217,7 @@ export const catalogsFixture: Catalogs = {
     ['HEADWEAR', 'Gorra', null, { phrase: 'la gorra o sombrero' }],
     ['MASK', 'Cubrebocas', null, { phrase: 'el cubrebocas' }],
   ]),
+  tax_id_types: TAX_ID_TYPES,
   countries: COUNTRIES.map(([code, name, dial_code, featured], index): CountryItem => ({
     code,
     name,
@@ -280,6 +283,154 @@ export const catalogsFixture: Catalogs = {
     ['MASK', 'Posible cubrebocas', 'El sistema detectó un posible cubrebocas y el empleado indicó que no lo usa.'],
     ['SPOOF', 'Posible foto o pantalla', 'El anti-spoofing sugiere que las capturas podrían ser de una foto o una pantalla.'],
     ['DUPLICATE_FACE', 'Rostro ya registrado en otro empleado', 'El rostro se parece al registro aprobado de otro empleado de la empresa.'],
+    ['POSSIBLE_DUPLICATE', 'Parecido con otro empleado', 'El rostro se parece al de otro empleado aprobado: revisa a los más parecidos antes de aprobar.'],
+  ]),
+  pricing_modes: rows([
+    ['PER_USER', 'Por empleado activo', 'Cada empleado activo, día por día: quien entra o sale a mitad del periodo paga solo sus días.'],
+    ['FLAT', 'Monto fijo', 'Un monto fijo por empresa, prorrateado por los días cobrables del periodo.'],
+  ]),
+  price_periods: rows([
+    ['DAY', 'Por día', 'El precio es de un día.'],
+    ['MONTH', 'Por mes', 'El precio es de un mes: cada día cuesta la parte que le toca de su mes.'],
+    ['YEAR', 'Por año', 'El precio es de un año: cada día cuesta la parte que le toca de su año.'],
+  ]),
+  discount_types: rows([
+    ['PERCENT', 'Porcentaje', 'Porcentaje del subtotal (hasta 100 %).'],
+    ['AMOUNT', 'Monto fijo', 'Monto fijo por cargo (nunca mayor que el subtotal).'],
+  ]),
+  discount_recurrences: rows([
+    ['ALWAYS', 'En todos los cargos', 'El descuento se aplica en cada cargo.'],
+    ['FIRST', 'Solo en los primeros cargos', 'Se aplica en los primeros N cargos de la empresa.'],
+    ['EVERY', 'Cada cierto número de cargos', 'Se aplica cada N cargos (el N-ésimo, el 2N-ésimo...).'],
+  ]),
+  billing_statuses: rows([
+    ['ACTIVE', 'Activa', 'La empresa opera con normalidad.', { tone: 'success' }],
+    ['SUSPENDED', 'Suspendida', 'Nadie de la empresa puede iniciar sesión ni operar hasta que se reactive.', { tone: 'danger' }],
+  ]),
+  suspension_reasons: rows([
+    ['NON_PAYMENT', 'Falta de pago', 'Automática: un cargo siguió sin pagarse después de los días de gracia.'],
+    ['MANUAL', 'Suspensión manual', 'La decidió el administrador de la plataforma, con su motivo.'],
+  ]),
+  charge_statuses: rows([
+    ['OPEN', 'Por pagar', 'Tiene saldo pendiente.', { tone: 'warning' }],
+    ['PAID', 'Pagado', 'Los pagos registrados cubren su total.', { tone: 'success' }],
+    ['VOID', 'Anulado', 'Se anuló con su motivo: no se cobra y lo que se le había aplicado queda a favor.', { tone: 'muted' }],
+  ]),
+  payment_statuses: rows([
+    ['CONFIRMED', 'Confirmado', 'El pago se registró y se aplicó a los cargos abiertos (lo que sobra queda a favor).', { tone: 'success' }],
+    ['VOID', 'Anulado', 'Se anuló con su motivo: los cargos que cubría vuelven a quedar por pagar.', { tone: 'muted' }],
+  ]),
+  payment_methods: rows([
+    ['TRANSFER', 'Transferencia', null],
+    ['DEPOSIT', 'Depósito bancario', null],
+    ['CASH', 'Efectivo', null],
+    ['CARD', 'Tarjeta', null],
+    ['CHECK', 'Cheque', null],
+    ['OTHER', 'Otro', null],
+  ]),
+  currencies: rows([
+    ['MXN', 'Peso mexicano', 'Pesos mexicanos (MXN). La moneda por omisión de la plataforma.', { symbol: '$', decimals: 2 }],
+    ['USD', 'Dólar estadounidense', 'Dólares de Estados Unidos (USD). Para clientes del extranjero, el IVA suele ser 0 %.', { symbol: '$', decimals: 2 }],
+    ['EUR', 'Euro', 'Euros (EUR). Para clientes del extranjero, el IVA suele ser 0 %.', { symbol: '€', decimals: 2 }],
+  ]),
+  storage_categories: rows([
+    ['PEOPLE', 'Personal', 'Empleados, departamentos, validadores y sus dispositivos.'],
+    ['BIOMETRICS', 'Biometría', 'Plantillas faciales cifradas, registros faciales y huellas de capturas.'],
+    ['ATTENDANCE', 'Asistencia', 'Jornadas, descansos, registros, ausencias y la bitácora de identificaciones.'],
+    ['SECURITY', 'Sesiones y seguridad', 'Sesiones de acceso y métricas de los intentos faciales.'],
+    ['BILLING', 'Cobranza', 'Cargos, pagos y comprobantes.'],
+  ]),
+  slow_alert_statuses: rows([
+    ['OPEN', 'Abierta', 'Nadie la ha atendido todavía (o volvió a ocurrir después de resolverse).', { tone: 'danger' }],
+    ['ACKNOWLEDGED', 'En atención', 'Alguien ya la está revisando; si vuelve a ocurrir, sigue en atención.', { tone: 'warning' }],
+    ['RESOLVED', 'Resuelta', 'Corregida. Si la ruta vuelve a tardar más del umbral, se reabre sola.', { tone: 'success' }],
+  ]),
+  // Antifraude (backend, migración 0062).
+  fraud_kinds: rows([
+    ['PRESENTATION', 'Presentación (foto, pantalla o máscara)', 'Una foto, una pantalla o una máscara frente a la cámara.'],
+    ['INJECTION', 'Inyección (cámara virtual o programa)', 'Imágenes que no salen de la cámara.'],
+    ['REPLAY', 'Reenvío de capturas', 'Capturas ya usadas o artefactos de un ataque conocido.'],
+    ['LOCATION', 'Ubicación falsa', 'Ubicación simulada o poco creíble.'],
+    ['BUDDY_PUNCHING', 'Suplantación entre compañeros', 'Una persona registra por otra.'],
+    ['INTERNAL', 'Fraude interno', 'Abuso desde la empresa o un validador.'],
+    ['MORPH', 'Rostro combinado (morphing)', 'Un registro facial que mezcla los rasgos de dos personas.'],
+    ['OTHER', 'Otro', 'Riesgo alto sin un tipo claro.'],
+  ]),
+  signal_modes: rows([
+    ['OFF', 'Apagada', 'La señal no se mide ni se registra.'],
+    ['OBSERVE', 'Solo medir', 'Se mide y se registra con sus puntos, sin cambiar la decisión.'],
+    ['ENFORCE', 'Obligatoria', 'Sus puntos cuentan para la decisión; si es una regla dura, niega el intento.'],
+  ]),
+  review_reasons: rows([
+    ['CAPTURE', 'Captura poco confiable', 'La captura del rostro tuvo indicios de foto, pantalla o video.'],
+    ['REPLAY', 'Captura repetida', 'La captura se parece demasiado a otra ya recibida.'],
+    ['KNOWN_ATTACK', 'Coincide con un fraude conocido', 'La captura coincide con un intento de fraude ya confirmado.'],
+    ['IDENTITY', 'Identidad poco clara', 'El rostro coincidió con poca holgura.'],
+    ['CAMERA', 'Cámara poco confiable', 'La captura no informó de qué cámara venía.'],
+    ['LOCATION', 'Ubicación poco confiable', 'La ubicación parece simulada o quedó en el límite del sitio.'],
+    ['ACTIVITY', 'Actividad inusual en la empresa', 'La empresa recibe varios intentos sospechosos en este momento.'],
+    // Antifraude 2b (backend, migración 0070): el registro no traía el código vigente del sitio.
+    ['PRESENCE', 'Presencia sin confirmar', 'El registro no traía el código vigente del sitio.'],
+  ]),
+  risk_tiers: rows([
+    ['LOW', 'Bajo', 'Sin señales que pesen.', { tone: 'success' }],
+    ['MEDIUM', 'Medio', 'Algunas señales.', { tone: 'warning' }],
+    ['HIGH', 'Alto', 'Señales fuertes.', { tone: 'danger' }],
+    ['CRITICAL', 'Crítico', 'Señales muy fuertes.', { tone: 'danger' }],
+  ]),
+  risk_actions: rows([
+    ['ALLOW', 'Permitir', 'El intento sigue normalmente.'],
+    ['ALERT', 'Permitir y avisar', 'El intento sigue, pero se abre un caso.'],
+    ['STEP_UP', 'Un paso más', 'Se pide un reto más exigente.'],
+    ['REVIEW', 'En revisión', 'Se registra pendiente de la empresa.'],
+    ['DENY', 'Negar', 'Se rechaza el intento.'],
+  ]),
+  attendance_review_statuses: rows([
+    ['PENDING', 'En revisión', 'El registro se guardó, pero la empresa debe confirmarlo o rechazarlo.', { tone: 'warning' }],
+    ['CONFIRMED', 'Confirmado', 'La empresa confirmó que el registro es válido.', { tone: 'success' }],
+    ['REJECTED', 'Rechazado', 'La empresa rechazó el registro.', { tone: 'danger' }],
+  ]),
+  employee_device_modes: rows([
+    ['OFF', 'Apagado', 'No se vincula el dispositivo del empleado.'],
+    ['OBSERVE', 'Solo medir', 'Se registra desde qué dispositivo checa cada empleado.'],
+    ['STEP_UP', 'Un paso más en un dispositivo nuevo', 'Un dispositivo nuevo pide un reto más exigente.'],
+    ['APPROVAL', 'Aprobación de la empresa', 'Cada dispositivo nuevo lo debe aprobar la empresa.'],
+  ]),
+  policy_presets: rows([
+    ['STANDARD', 'Estándar', 'Para la mayoría.'],
+    ['HIGH', 'Alto', 'Más exigente.'],
+    ['MAXIMUM', 'Máximo', 'Para sitios con fraude confirmado.'],
+  ]),
+  policy_change_statuses: rows([
+    ['APPLIED', 'Aplicado', 'El cambio ya rige.', { tone: 'success' }],
+    ['PENDING', 'Por aprobar', 'Relaja la seguridad: espera la aprobación de otro administrador.', { tone: 'warning' }],
+    ['REJECTED', 'Rechazado', 'Otro administrador lo rechazó.', { tone: 'danger' }],
+    ['CANCELLED', 'Cancelado', 'Quien lo pidió lo retiró, o venció.', { tone: 'muted' }],
+  ]),
+  fraud_case_statuses: rows([
+    ['OPEN', 'Abierto', 'Nadie lo ha revisado todavía.', { tone: 'warning' }],
+    ['IN_REVIEW', 'En revisión', 'Un administrador lo está revisando.', { tone: 'info' }],
+    ['CONFIRMED', 'Fraude confirmado', 'Se confirmó el fraude.', { tone: 'danger' }],
+    ['FALSE_POSITIVE', 'Falso positivo', 'No era fraude.', { tone: 'success' }],
+    ['INCONCLUSIVE', 'No concluyente', 'No hay elementos para decidir.', { tone: 'muted' }],
+  ]),
+  fraud_case_event_kinds: rows([
+    ['OPENED', 'Caso abierto', 'El sistema abrió el caso.'],
+    ['STATUS_CHANGED', 'Cambio de estado', 'Un administrador cambió el estado del caso.'],
+    ['NOTE', 'Nota', 'Un administrador agregó una nota.'],
+    ['EVIDENCE_VIEWED', 'Evidencia consultada', 'Un administrador vio los fotogramas de evidencia.'],
+    ['SIGNATURES_BLOCKED', 'Huellas bloqueadas', 'Las huellas del ataque pasaron a la lista de bloqueo.'],
+    ['SIGNATURES_RELEASED', 'Huellas liberadas', 'Las huellas del caso salieron de la lista de bloqueo.'],
+    ['LEARNING_FORGOTTEN', 'Aprendizaje olvidado', 'Se olvidó lo aprendido del empleado desde el intento.'],
+  ]),
+  // Documentos de una empresa (para su facturación).
+  company_document_types: rows([
+    ['TAX_CERTIFICATE', 'Constancia de situación fiscal', 'Constancia del SAT con el RFC, el régimen y el domicilio fiscal.'],
+    ['INCORPORATION', 'Acta constitutiva', 'Escritura pública con la que se constituyó la empresa.'],
+    ['PROOF_OF_ADDRESS', 'Comprobante de domicilio', 'Recibo reciente de luz, agua o teléfono.'],
+    ['REPRESENTATIVE_ID', 'Identificación del representante legal', 'Credencial para votar, pasaporte o cédula de quien firma por la empresa.'],
+    ['CONTRACT', 'Contrato', 'Contrato de servicio con la plataforma u otro acuerdo firmado.'],
+    ['OTHER', 'Otro', 'Cualquier otro documento de la empresa.'],
   ]),
 };
 

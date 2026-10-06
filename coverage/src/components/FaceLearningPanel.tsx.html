@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
@@ -125,10 +125,7 @@
 <a name='L60'></a><a href='#L60'>60</a>
 <a name='L61'></a><a href='#L61'>61</a>
 <a name='L62'></a><a href='#L62'>62</a>
-<a name='L63'></a><a href='#L63'>63</a>
-<a name='L64'></a><a href='#L64'>64</a>
-<a name='L65'></a><a href='#L65'>65</a>
-<a name='L66'></a><a href='#L66'>66</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L63'></a><a href='#L63'>63</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -143,28 +140,25 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">66x</span>
-<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">134x</span>
+<span class="cline-any cline-yes">134x</span>
+<span class="cline-any cline-yes">48x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">134x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">66x</span>
+<span class="cline-any cline-yes">134x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">66x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">66x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">134x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -195,8 +189,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { BrainCircuit, ScanFace, Sparkles, Users } from 'lucide-react';
 import { useResource } from '../hooks/useResource';
+import { t, useLocale } from '../i18n';
 import { adminService } from '../services/adminService';
 import { timeAgo } from '../utils/format';
+import { formatCount } from '../utils/numbers';
 import { KpiGrid, type Kpi } from './ui/KpiCard';
 import { PanelSection } from './ui/Panel';
 import { RetryState } from './ui/RetryState';
@@ -208,27 +204,25 @@ import { RetryState } from './ui/RetryState';
  * esto. `enabled` es el interruptor de la política: al cambiarlo se vuelve a pedir.
  */
 export function FaceLearningPanel({ companyId, enabled }: { companyId: number; enabled: boolean }) {
+  useLocale(); // textos con `t` al dibujarse: un cambio de idioma los traduce
   const { data, error, retry } = useResource(
     (signal) =&gt; adminService.faceLearning(companyId, signal),
     `${companyId}:${enabled}`,
-    'No se pudo cargar la evolución del reconocimiento',
+    () =&gt; t('face.learning.errorTitle'),
   );
 &nbsp;
   const kpis: Kpi[] = [
-    { key: 'employees', label: 'Empleados que ya aprenden', icon: Users, value: data?.employees_learning, tile: 'icon-tile--success' },
-    { key: 'samples', label: 'Muestras aprendidas', icon: Sparkles, value: data?.learned_samples, tile: '' },
-    { key: 'resolved', label: 'Identificaciones resueltas por lo aprendido', icon: ScanFace, value: data?.learned_identifications, tile: '' },
+    { key: 'employees', label: t('face.learning.employees'), icon: Users, value: data?.employees_learning, tile: 'icon-tile--success' },
+    { key: 'samples', label: t('face.learning.samples'), icon: Sparkles, value: data?.learned_samples, tile: '' },
+    { key: 'resolved', label: t('face.learning.resolved'), icon: ScanFace, value: data?.learned_identifications, tile: '' },
   ];
   const status = data &amp;&amp; (
-    &lt;span className={`badge ${data.enabled ? 'badge--success' : 'badge--warning'}`}&gt;{data.enabled ? 'Aprendiendo' : 'En pausa'}&lt;/span&gt;
+    &lt;span className={`badge ${data.enabled ? 'badge--success' : 'badge--warning'}`}&gt;{data.enabled ? t('face.learning.learning') : t('face.learning.paused')}&lt;/span&gt;
   );
 &nbsp;
   return (
-    &lt;PanelSection title="Reconocimiento facial evolutivo" icon={&lt;BrainCircuit size={20} /&gt;} aside={status}&gt;
-      &lt;p className="muted small"&gt;
-        Cada identificación segura (con prueba de vida y confianza holgada) enseña al sistema cómo luce hoy cada empleado; lo
-        aprendido que deja de servir se reemplaza solo. Las muestras que validó la empresa nunca se reemplazan.
-      &lt;/p&gt;
+    &lt;PanelSection title={t('face.learning.title')} icon={&lt;BrainCircuit size={20} /&gt;} aside={status}&gt;
+      &lt;p className="muted small"&gt;{t('face.learning.intro')}&lt;/p&gt;
       {Boolean(error) &amp;&amp; !data ? (
         &lt;RetryState onRetry={retry} /&gt;
       ) : (
@@ -237,8 +231,8 @@ export function FaceLearningPanel({ companyId, enabled }: { companyId: number; e
       {data &amp;&amp; (
         &lt;p className="small muted"&gt;
           {data.last_learned_at
-            ? `Último aprendizaje ${timeAgo(data.last_learned_at)} · ${data.employees_learning} de ${data.approved_employees} empleados con rostro aprobado.`
-            : 'Aún no aprende: lo hará con las primeras identificaciones seguras de sus empleados.'}
+            ? t('face.learning.last', { ago: timeAgo(data.last_learned_at), learning: formatCount(data.employees_learning), approved: formatCount(data.approved_employees) })
+            : t('face.learning.never')}
         &lt;/p&gt;
       )}
       {data &amp;&amp; !data.enabled &amp;&amp; (
@@ -247,11 +241,8 @@ export function FaceLearningPanel({ companyId, enabled }: { companyId: number; e
             &lt;BrainCircuit size={22} /&gt;
           &lt;/span&gt;
           &lt;div className="callout__body"&gt;
-            &lt;strong&gt;El aprendizaje continuo está en pausa&lt;/strong&gt;
-            &lt;p className="muted small"&gt;
-              Sus empleados se comparan solo con su registro aprobado. Activa «Aprendizaje continuo» en esta política para que el reconocimiento mejore
-              con el uso.
-            &lt;/p&gt;
+            &lt;strong&gt;{t('face.learning.pausedTitle')}&lt;/strong&gt;
+            &lt;p className="muted small"&gt;{t('face.learning.pausedText')}&lt;/p&gt;
           &lt;/div&gt;
         &lt;/div&gt;
       )}
@@ -265,7 +256,7 @@ export function FaceLearningPanel({ companyId, enabled }: { companyId: number; e
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

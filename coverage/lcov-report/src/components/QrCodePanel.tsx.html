@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/11</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>5/5</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
@@ -138,8 +138,7 @@
 <a name='L73'></a><a href='#L73'>73</a>
 <a name='L74'></a><a href='#L74'>74</a>
 <a name='L75'></a><a href='#L75'>75</a>
-<a name='L76'></a><a href='#L76'>76</a>
-<a name='L77'></a><a href='#L77'>77</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L76'></a><a href='#L76'>76</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -155,30 +154,31 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">33x</span>
-<span class="cline-any cline-yes">33x</span>
-<span class="cline-any cline-yes">33x</span>
-<span class="cline-any cline-yes">33x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">33x</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">33x</span>
-<span class="cline-any cline-yes">33x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-yes">51x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -206,9 +206,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -219,6 +217,7 @@
 import { useAction } from '../hooks/useAction';
 import { useResource } from '../hooks/useResource';
 import { useVerificationPolicy } from '../hooks/useVerificationPolicy';
+import { t, useLocale } from '../i18n';
 import { employeeService } from '../services/employeeService';
 import { formatDateTime, timeAgo } from '../utils/format';
 import { Button } from './ui/Button';
@@ -231,61 +230,59 @@ import { RetryState } from './ui/RetryState';
  * imprime. Aquí ve su actividad y puede invalidar el vigente (su teléfono muestra otro).
  */
 export function QrCodePanel({ employeeId }: { employeeId: number }) {
+  useLocale(); // textos con `t` al dibujarse; los popups reciben funciones y siguen al idioma abiertos
   const { policy } = useVerificationPolicy();
-  const { data: summary, setData, error, retry } = useResource((signal) =&gt; employeeService.qrSummary(employeeId, signal), employeeId, 'No se pudo cargar la actividad del QR');
+  const { data: summary, setData, error, retry } = useResource((signal) =&gt; employeeService.qrSummary(employeeId, signal), employeeId, () =&gt; t('qr.panel.errorTitle'));
   const action = useAction();
   const busy = action.busy !== null;
 &nbsp;
   const revoke = () =&gt;
     action.run(() =&gt; employeeService.revokeQr(employeeId), {
-      confirm: {
+      confirm: () =&gt; ({
         kind: 'delete',
         icon: &lt;Ban size={30} /&gt;,
-        eyebrow: 'Código QR',
-        title: '¿Invalidar el código vigente?',
-        message: 'El código que el empleado tiene en pantalla dejará de servir de inmediato; en su teléfono podrá mostrar uno nuevo.',
-        confirmLabel: 'Invalidar',
+        eyebrow: t('qr.panel.revoke.eyebrow'),
+        title: t('qr.panel.revoke.title'),
+        message: t('qr.panel.revoke.message'),
+        confirmLabel: t('qr.panel.revoke.confirm'),
         confirmIcon: &lt;Ban size={18} /&gt;,
-      },
-      errorTitle: 'No se pudo invalidar el código',
-      success: ['Código invalidado', 'El código que tenía en pantalla ya no sirve; en su teléfono podrá mostrar uno nuevo.'],
+      }),
+      errorTitle: () =&gt; t('qr.panel.revoke.error'),
+      success: () =&gt; [t('qr.panel.revoke.done'), t('qr.panel.revoke.doneText')],
       onSuccess: setData,
     });
 &nbsp;
   const live = summary?.live ?? false;
   return (
     &lt;PanelSection
-      title="Código QR dinámico"
+      title={t('qr.panel.title')}
       icon={&lt;QrCode size={20} /&gt;}
-      aside={summary &amp;&amp; &lt;span className={`badge ${live ? 'badge--success badge--live' : 'badge--muted'}`}&gt;{live ? 'En pantalla' : 'Sin código vigente'}&lt;/span&gt;}
+      aside={summary &amp;&amp; &lt;span className={`badge ${live ? 'badge--success badge--live' : 'badge--muted'}`}&gt;{live ? t('qr.panel.live') : t('qr.panel.none')}&lt;/span&gt;}
     &gt;
-      &lt;p className="muted"&gt;
-        El empleado lo genera en su teléfono (Mi código QR). Cambia cada {policy.qr_lifetime_seconds} s y sirve una sola vez: no se
-        descarga ni se imprime.
-      &lt;/p&gt;
+      &lt;p className="muted"&gt;{t('qr.panel.intro', { seconds: policy.qr_lifetime_seconds })}&lt;/p&gt;
       {!summary &amp;&amp; error ? &lt;RetryState onRetry={retry} /&gt; : null}
       {summary &amp;&amp; (
         &lt;dl className="details"&gt;
           &lt;div&gt;
-            &lt;dt&gt;Vigente hasta&lt;/dt&gt;
+            &lt;dt&gt;{t('qr.panel.liveUntil')}&lt;/dt&gt;
             &lt;dd&gt;{summary.live_until ? formatDateTime(summary.live_until) : '—'}&lt;/dd&gt;
           &lt;/div&gt;
           &lt;div&gt;
-            &lt;dt&gt;Último generado&lt;/dt&gt;
-            &lt;dd title={summary.last_issued_at ? formatDateTime(summary.last_issued_at) : undefined}&gt;{summary.last_issued_at ? timeAgo(summary.last_issued_at) : 'Nunca'}&lt;/dd&gt;
+            &lt;dt&gt;{t('qr.panel.lastIssued')}&lt;/dt&gt;
+            &lt;dd title={summary.last_issued_at ? formatDateTime(summary.last_issued_at) : undefined}&gt;{summary.last_issued_at ? timeAgo(summary.last_issued_at) : t('qr.panel.never')}&lt;/dd&gt;
           &lt;/div&gt;
           &lt;div&gt;
-            &lt;dt&gt;Último uso&lt;/dt&gt;
-            &lt;dd title={summary.last_used_at ? formatDateTime(summary.last_used_at) : undefined}&gt;{summary.last_used_at ? timeAgo(summary.last_used_at) : 'Nunca'}&lt;/dd&gt;
+            &lt;dt&gt;{t('qr.panel.lastUsed')}&lt;/dt&gt;
+            &lt;dd title={summary.last_used_at ? formatDateTime(summary.last_used_at) : undefined}&gt;{summary.last_used_at ? timeAgo(summary.last_used_at) : t('qr.panel.never')}&lt;/dd&gt;
           &lt;/div&gt;
         &lt;/dl&gt;
       )}
       &lt;div className="button-row"&gt;
         &lt;Button variant="secondary" icon={&lt;RefreshCw size={18} /&gt;} disabled={busy} onClick={retry}&gt;
-          Actualizar
+          {t('common.actions.refresh')}
         &lt;/Button&gt;
         &lt;Button variant="danger-outline" icon={&lt;Ban size={18} /&gt;} loading={busy} disabled={!live} onClick={() =&gt; void revoke()}&gt;
-          Invalidar código vigente
+          {t('qr.panel.revoke.action')}
         &lt;/Button&gt;
       &lt;/div&gt;
     &lt;/PanelSection&gt;
@@ -298,7 +295,7 @@ export function QrCodePanel({ employeeId }: { employeeId: number }) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

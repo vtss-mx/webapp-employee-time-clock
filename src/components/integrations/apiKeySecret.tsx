@@ -1,29 +1,25 @@
 import { KeyRound } from 'lucide-react';
+import { t } from '../../i18n';
 import type { ApiKeyCreated } from '../../types';
 import type { MessageInput } from '../MessageDialog';
 import { CopyField } from '../ui/CopyField';
 
 /**
  * Popup con el secreto de una llave recién creada o rotada. Es la ÚNICA vez que se muestra (en la
- * BD solo queda su hash), así que solo se cierra confirmando que ya se guardó.
+ * BD solo queda su hash), así que solo se cierra confirmando que ya se guardó. Se pasa como función
+ * (`feedback.show(() => apiKeySecretMessage(key))`) para que el popup abierto siga al idioma activo.
  */
 export function apiKeySecretMessage(key: ApiKeyCreated, rotated = false): MessageInput {
   return {
     variant: 'success',
     icon: <KeyRound size={30} />,
-    eyebrow: rotated ? 'Llave rotada' : 'Llave creada',
-    title: `Copia la llave de «${key.name}»`,
-    text: rotated
-      ? 'Esta es la llave nueva; la anterior ya no funciona. Actualízala en el sistema que se conecta.'
-      : 'Configúrala en el sistema que se conectará. Por seguridad no se volverá a mostrar.',
-    body: <CopyField value={key.secret} label="Copiar llave" />,
-    details: [
-      'Envíala en la cabecera X-API-Key de cada petición.',
-      'Guárdala en el gestor de secretos del sistema, no en correos ni chats.',
-      'Si se pierde o se filtra, rótala o revócala desde Integraciones.',
-    ],
+    eyebrow: t(rotated ? 'apiKeys.secret.rotated' : 'apiKeys.secret.created'),
+    title: t('apiKeys.secret.title', { name: key.name }),
+    text: t(rotated ? 'apiKeys.secret.rotatedText' : 'apiKeys.secret.createdText'),
+    body: <CopyField value={key.secret} label={t('apiKeys.secret.copy')} />,
+    details: [t('apiKeys.secret.header'), t('apiKeys.secret.store'), t('apiKeys.secret.lost')],
     detailsStyle: 'checks',
-    actions: [{ id: 'saved', label: 'Ya la guardé', variant: 'primary' }],
+    actions: [{ id: 'saved', label: t('apiKeys.secret.saved'), variant: 'primary' }],
     dismissible: false,
     key: `api-key-secret-${key.id}`,
   };

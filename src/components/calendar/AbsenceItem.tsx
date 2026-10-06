@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCatalogs } from '../../hooks/useCatalogs';
+import { useT } from '../../i18n';
 import type { Absence } from '../../types';
 import { timeAgo } from '../../utils/format';
 import { CatalogStatusBadge } from '../StatusBadge';
@@ -18,6 +19,7 @@ export function DayOffTypeBadge({ code }: { code: string }) {
  * empresa o la pidió el empleado), sus notas y las acciones que apliquen (cancelar, aprobar, rechazar).
  */
 export function AbsenceItem({ absence, actions }: { absence: Absence; actions?: ReactNode }) {
+  const t = useT();
   return (
     <EmployeeCard
       employee={absence.employee}
@@ -32,9 +34,9 @@ export function AbsenceItem({ absence, actions }: { absence: Absence; actions?: 
       <small>
         {rangeText(absence.starts_on, absence.ends_on)} · <strong>{daysText(absence.days)}</strong>
       </small>
-      <small className="muted">{absence.requested_by_employee ? `La pidió el empleado ${timeAgo(absence.created_at)}` : 'Registrada por la empresa'}</small>
+      <small className="muted">{absence.requested_by_employee ? t('calendar.absence.requested', { when: timeAgo(absence.created_at) }) : t('calendar.absence.byCompany')}</small>
       {absence.note && <small className="shift-item__quote">“{absence.note}”</small>}
-      {absence.decision_note && <small className="muted">Nota de la empresa: “{absence.decision_note}”</small>}
+      {absence.decision_note && <small className="muted">{t('calendar.absence.decisionNote', { note: absence.decision_note })}</small>}
     </EmployeeCard>
   );
 }

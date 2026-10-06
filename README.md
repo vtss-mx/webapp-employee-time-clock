@@ -6,7 +6,8 @@ Portal web responsive de Employee Time Clock. La documentación general está en
 
 ```bash
 npm install          # postinstall: copia MediaPipe WASM y descarga el modelo a public/mediapipe
-# TODA la configuración (VITE_*) vive en frontend/.env; se valida en src/utils/config.ts
+# TODA la configuración (VITE_*) vive en .env, completa; se valida en src/utils/config.ts
+node scripts/generate-env.mjs > .env   # instalación nueva: el .env completo (luego las claves de Google)
 npm run dev          # http://localhost:5173
 npm run build        # verifica tipos y genera dist/
 npm test             # pruebas unitarias (Vitest + Testing Library)

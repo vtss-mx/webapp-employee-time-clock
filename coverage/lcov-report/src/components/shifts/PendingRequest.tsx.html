@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>31/31</span>
+                <span class='fraction'>35/35</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>22/22</span>
+                <span class='fraction'>25/25</span>
             </div>
         
             
@@ -193,7 +193,18 @@
 <a name='L128'></a><a href='#L128'>128</a>
 <a name='L129'></a><a href='#L129'>129</a>
 <a name='L130'></a><a href='#L130'>130</a>
-<a name='L131'></a><a href='#L131'>131</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -212,9 +223,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -260,6 +273,7 @@
 <span class="cline-any cline-yes">17x</span>
 <span class="cline-any cline-yes">17x</span>
 <span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">17x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">17x</span>
 <span class="cline-any cline-yes">7x</span>
@@ -285,22 +299,30 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">148x</span>
+<span class="cline-any cline-yes">180x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">74x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">90x</span>
+<span class="cline-any cline-yes">90x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -328,6 +350,7 @@ import type { ReactNode } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { notifyShiftRequestsChanged } from '../../hooks/usePendingShiftRequests';
 import { useResource } from '../../hooks/useResource';
+import { t as translate, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { ApiError } from '../../services/apiClient';
 import { isShiftRequest, shiftService } from '../../services/shiftService';
@@ -336,6 +359,7 @@ import { formatDate, timeAgo } from '../../utils/format';
 import { isRecord } from '../../utils/guards';
 import { shiftSchedule } from '../../utils/shifts';
 import { ButtonLink } from '../ui/Button';
+import { DeletedMark } from '../ui/DeletedMark';
 import { EmptyState } from '../ui/EmptyState';
 import { Panel, PanelHeader, PanelSection } from '../ui/Panel';
 import { SkeletonCard } from '../ui/Skeleton';
@@ -389,22 +413,23 @@ export function PendingRequest({ title, children }: PendingRequestProps) {
   // La bandeja pasa la solicitud al abrir "Aprobar" o "Rechazar" (`state: { request }`).
   const state: unknown = useLocation().state;
   const passed = isRecord(state) &amp;&amp; isShiftRequest(state.request) ? state.request : null;
-  const { data, error, retry } = useResource(async (signal) =&gt; ({ request: await findPendingRequest(requestId, passed, signal) }), requestId, 'No se pudo cargar la solicitud');
+  const t = useT();
+  const { data, error, retry } = useResource(async (signal) =&gt; ({ request: await findPendingRequest(requestId, passed, signal) }), requestId, () =&gt; translate('shifts.requests.closed.loadError'));
 &nbsp;
-  if (!data) return error ? &lt;LoadFailed title={title} backTo={paths.company.shiftRequests} backLabel="Solicitudes" onRetry={retry} /&gt; : &lt;SkeletonCard lines={6} /&gt;;
+  if (!data) return error ? &lt;LoadFailed title={title} backTo={paths.company.shiftRequests} backLabel={t('shifts.requests.backLabel')} onRetry={retry} /&gt; : &lt;SkeletonCard lines={6} /&gt;;
   if (data.request) return children(data.request);
   return (
     &lt;div className="page"&gt;
       &lt;Panel&gt;
-        &lt;PanelHeader title={title} backTo={paths.company.shiftRequests} backLabel="Solicitudes" /&gt;
+        &lt;PanelHeader title={title} backTo={paths.company.shiftRequests} backLabel={t('shifts.requests.backLabel')} /&gt;
         &lt;PanelSection&gt;
           &lt;EmptyState
             icon={&lt;Inbox /&gt;}
-            title="Esta solicitud ya no está pendiente"
-            description="Ya se aprobó, se rechazó o el empleado la canceló. Su estado aparece en la bandeja de solicitudes."
+            title={t('shifts.requests.closed.title')}
+            description={t('shifts.requests.closed.description')}
             action={
               &lt;ButtonLink to={paths.company.shiftRequests} variant="primary" icon={&lt;Inbox size={18} /&gt;}&gt;
-                Ver solicitudes
+                {t('shifts.requests.closed.action')}
               &lt;/ButtonLink&gt;
             }
           /&gt;
@@ -415,39 +440,47 @@ export function PendingRequest({ title, children }: PendingRequestProps) {
 }
 &nbsp;
 /** "Matutino (08:00 – 16:00)" o "Sin turno". */
-const shiftName = (shift: ShiftRef | null) =&gt; (shift ? `${shift.name} (${shiftSchedule(shift)})` : 'Sin turno');
+const shiftName = (shift: ShiftRef | null) =&gt; (shift ? `${shift.name} (${shiftSchedule(shift)})` : translate('shifts.requests.summary.noShift'));
 &nbsp;
-/** El cambio pedido: turno actual → turno pedido. */
+/** El cambio pedido: turno actual → turno pedido (cada uno con su marca si ya está en «Eliminados»). */
 export function ShiftChange({ request }: { request: ShiftRequest }) {
+  const t = useT();
   return (
     &lt;span className="shift-change"&gt;
-      &lt;span&gt;{shiftName(request.current_shift)}&lt;/span&gt;
-      &lt;ArrowRight size={16} role="img" aria-label="cambia a" /&gt;
-      &lt;strong&gt;{shiftName(request.shift)}&lt;/strong&gt;
+      &lt;span&gt;
+        {shiftName(request.current_shift)}
+        &lt;DeletedMark deleted={request.current_shift?.deleted} /&gt;
+      &lt;/span&gt;
+      &lt;ArrowRight size={16} role="img" aria-label={t('shifts.requests.summary.changesTo')} /&gt;
+      &lt;strong&gt;
+        {shiftName(request.shift)}
+        &lt;DeletedMark deleted={request.shift.deleted} /&gt;
+      &lt;/strong&gt;
     &lt;/span&gt;
   );
 }
 &nbsp;
 /** Lo que pidió el empleado (para decidir): el cambio, desde cuándo, el motivo y cuándo lo pidió. */
 export function RequestSummary({ request }: { request: ShiftRequest }) {
+  const t = useT();
   return (
     &lt;dl className="details"&gt;
       &lt;div&gt;
-        &lt;dt&gt;Cambio&lt;/dt&gt;
+        &lt;dt&gt;{t('shifts.requests.summary.change')}&lt;/dt&gt;
         &lt;dd&gt;
           &lt;ShiftChange request={request} /&gt;
         &lt;/dd&gt;
       &lt;/div&gt;
       &lt;div&gt;
-        &lt;dt&gt;Desde&lt;/dt&gt;
+        &lt;dt&gt;{t('shifts.requests.summary.from')}&lt;/dt&gt;
         &lt;dd&gt;{formatDate(request.valid_from)}&lt;/dd&gt;
       &lt;/div&gt;
       &lt;div&gt;
-        &lt;dt&gt;Motivo&lt;/dt&gt;
+        &lt;dt&gt;{t('common.fields.reason')}&lt;/dt&gt;
         &lt;dd&gt;“{request.reason}”&lt;/dd&gt;
       &lt;/div&gt;
       &lt;div&gt;
-        &lt;dt&gt;Pedida&lt;/dt&gt;
+        &lt;dt&gt;{t('shifts.requests.summary.requested')}&lt;/dt&gt;
         &lt;dd&gt;{timeAgo(request.created_at)}&lt;/dd&gt;
       &lt;/div&gt;
     &lt;/dl&gt;
@@ -460,7 +493,7 @@ export function RequestSummary({ request }: { request: ShiftRequest }) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDynamicQr } from '../../hooks/useDynamicQr';
 import { useErrorPopup } from '../../hooks/useFeedback';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
+import { t, useLocale } from '../../i18n';
 
 /**
  * Credencial digital del empleado: un QR DINÁMICO que se renueva solo (vigencia de la política de
@@ -15,11 +16,12 @@ import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
  * una foto o captura de pantalla no sirve para identificarse después.
  */
 export function MyQrPage() {
+  useLocale(); // textos con `t` al dibujarse: un cambio de idioma los traduce sin cambiar el código
   const { user } = useAuth();
   const { policy } = useVerificationPolicy();
   const code = useDynamicQr();
   const [fullscreen, setFullscreen] = useState(false);
-  useErrorPopup(code.error, { title: 'No se pudo generar tu código QR', retry: () => void code.renew() });
+  useErrorPopup(code.error, { title: () => t('employee.myQr.errorTitle'), retry: () => void code.renew() });
 
   const fullName = user?.employee?.full_name ?? user?.email ?? '';
   const lifetime = code.qr?.lifetime_seconds ?? policy.qr_lifetime_seconds;
@@ -28,7 +30,7 @@ export function MyQrPage() {
     qr: code.qr,
     phase: code.phase,
     deadline: code.deadline,
-    alt: `Código QR de ${fullName}`,
+    alt: t('employee.myQr.alt', { name: fullName }),
     onRenew: () => void code.renew(),
   };
   const countdown = code.phase === 'ready' ? <QrCountdown key={code.deadline} deadline={code.deadline} /> : null;
@@ -36,8 +38,8 @@ export function MyQrPage() {
   return (
     <div className="page page-transition">
       <Panel>
-        <PanelHero eyebrow="Credencial digital" title="Mi código QR">
-          <p className="muted">Muéstralo al validador para identificarte. Cambia cada {lifetime} s y sirve una sola vez.</p>
+        <PanelHero eyebrow={t('employee.myQr.eyebrow')} title={t('employee.myQr.title')}>
+          <p className="muted">{t('employee.myQr.intro', { seconds: lifetime })}</p>
         </PanelHero>
 
         <PanelSection className="my-qr">
@@ -47,16 +49,16 @@ export function MyQrPage() {
             <div className="my-qr__identity">
               <strong>{fullName}</strong>
               <span className="badge badge--success">
-                <BadgeCheck size={14} /> Identidad validada
+                <BadgeCheck size={14} /> {t('employee.myQr.validated')}
               </span>
-              {code.qr && <span className="muted small">No. de empleado {code.qr.employee_number}</span>}
+              {code.qr && <span className="muted small">{t('employee.myQr.employeeNumber', { number: code.qr.employee_number })}</span>}
             </div>
             <div className="button-row my-qr__actions">
               <Button variant="primary" icon={<Maximize2 size={18} />} disabled={!code.qr} onClick={() => setFullscreen(true)}>
-                Mostrar en grande
+                {t('employee.myQr.enlarge')}
               </Button>
               <Button variant="secondary" icon={<RefreshCw size={18} />} loading={renewing} onClick={() => void code.renew()}>
-                Generar otro
+                {t('employee.myQr.another')}
               </Button>
             </div>
           </div>
@@ -65,11 +67,10 @@ export function MyQrPage() {
         <PanelFooter align="center">
           <ul className="my-qr__tips small muted">
             <li>
-              <Sun size={16} /> Sube el brillo de tu pantalla para que el lector lo detecte más rápido.
+              <Sun size={16} /> {t('employee.myQr.brightness')}
             </li>
             <li>
-              <ShieldCheck size={16} color="var(--success)" /> Cada código sirve una sola vez y vence en segundos: una foto o
-              captura de pantalla no sirve. No contiene tus datos personales ni biométricos.
+              <ShieldCheck size={16} color="var(--success)" /> {t('employee.myQr.singleUse')}
             </li>
           </ul>
         </PanelFooter>
@@ -79,11 +80,11 @@ export function MyQrPage() {
         open={fullscreen}
         title={fullName}
         icon={<QrCode size={30} />}
-        eyebrow="Mi código QR"
+        eyebrow={t('employee.myQr.title')}
         onClose={() => setFullscreen(false)}
         footer={
           <Button variant="primary" size="lg" icon={<X size={20} />} onClick={() => setFullscreen(false)}>
-            Cerrar
+            {t('common.actions.close')}
           </Button>
         }
       >
@@ -91,7 +92,7 @@ export function MyQrPage() {
           <DynamicQrCode {...shared} large />
           {countdown}
           {code.qr && <strong>{code.qr.employee_number}</strong>}
-          <span className="muted small">Sube el brillo de tu pantalla para que se lea al instante.</span>
+          <span className="muted small">{t('employee.myQr.brightnessLarge')}</span>
         </div>
       </Modal>
     </div>

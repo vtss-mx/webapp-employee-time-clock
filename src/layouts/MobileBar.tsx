@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { Button } from '../components/ui/Button';
+import { useT } from '../i18n';
 import type { MobileMenuConfig } from './mobileMenu';
 import type { NavEntry } from './navigation';
 import { lockScroll } from '../utils/scrollLock';
@@ -50,6 +51,7 @@ export function currentEntry(nav: NavEntry[], pathname: string): NavEntry | unde
  * En escritorio no se muestra: ahí el menú lateral está siempre visible.
  */
 export function MobileBar({ nav, home, open, onToggle, config }: MobileBarProps) {
+  const t = useT();
   const { pathname } = useLocation();
   const pending = nav.reduce((sum, entry) => sum + (entry.badge ?? 0), 0);
   const entry = config.showTitle ? currentEntry(nav, pathname) : undefined;
@@ -60,7 +62,7 @@ export function MobileBar({ nav, home, open, onToggle, config }: MobileBarProps)
         iconOnly
         variant="ghost"
         className="mobilebar__toggle"
-        aria-label="Abrir menú"
+        aria-label={t('layout.menu.open')}
         aria-controls="app-sidebar"
         aria-expanded={open}
         onClick={onToggle}
@@ -69,7 +71,7 @@ export function MobileBar({ nav, home, open, onToggle, config }: MobileBarProps)
         {config.badgeOnToggle && pending > 0 && !open ? <span className="mobilebar__badge">{pending}</span> : null}
       </Button>
       {config.showBrand && (
-        <Link to={home} className="mobilebar__brand" aria-label="Inicio">
+        <Link to={home} className="mobilebar__brand" aria-label={t('layout.home')}>
           <BrandLogo size={28} />
         </Link>
       )}

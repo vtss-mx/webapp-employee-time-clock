@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FeedbackProvider } from '../context/FeedbackContext';
+import { setLocale } from '../i18n/core';
 import * as versionService from '../services/versionService';
 import { deployedBuild, isOutdated } from '../services/versionService';
 import { jsonResponse, mockFetch } from '../test/http';
@@ -80,7 +81,7 @@ describe('VersionWatcher', () => {
   it('en otras pantallas pregunta; "Actualizar ahora" recarga', async () => {
     mockFetch(jsonResponse({ build: 'nueva' }));
     renderAt('/company/employees');
-    const popup = await screen.findByRole('dialog', { name: 'Hay una nueva versión de la aplicación' });
+    const popup = await screen.findByRole('dialog', { name: 'Nueva versión disponible' });
     expect(reload).not.toHaveBeenCalled();
     await userEvent.click(within(popup).getByRole('button', { name: 'Actualizar ahora' }));
     expect(reload).toHaveBeenCalledOnce();
@@ -106,7 +107,7 @@ describe('VersionWatcher', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     hidden = false;
     act(() => void document.dispatchEvent(new Event('visibilitychange')));
-    const popup = await screen.findByRole('dialog', { name: 'Hay una nueva versión de la aplicación' });
+    const popup = await screen.findByRole('dialog', { name: 'Nueva versión disponible' });
     expect(calls).toHaveLength(1); // ya se sabía: no vuelve a consultar
     expect(reload).not.toHaveBeenCalled();
     await userEvent.click(within(popup).getByRole('button', { name: 'Actualizar ahora' }));
@@ -118,6 +119,17 @@ describe('VersionWatcher', () => {
     mockFetch(jsonResponse({ build: 'nueva' }));
     renderAt('/login');
     await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+  });
+
+  it('el aviso abierto sigue al idioma al cambiarlo en caliente', async () => {
+    mockFetch(jsonResponse({ build: 'nueva' }));
+    renderAt('/company/employees');
+    await screen.findByRole('dialog', { name: 'Nueva versión disponible' });
+    await act(() => setLocale('en-US'));
+    const popup = screen.getByRole('dialog', { name: 'New version available' });
+    expect(within(popup).getByRole('button', { name: 'Later' })).toBeInTheDocument();
+    await userEvent.click(within(popup).getByRole('button', { name: 'Update now' }));
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it('misma versión: no hace nada', async () => {

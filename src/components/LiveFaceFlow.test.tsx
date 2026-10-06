@@ -32,11 +32,11 @@ vi.mock('../hooks/useCamera', () => ({
 }));
 vi.mock('../hooks/useFaceDetection', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useFaceDetector: () => ({ detector: null, error: 'Detección automática no disponible', loading: false }),
+  useFaceDetector: () => ({ detector: null, failed: true, loading: false }),
   useFaceAutoCapture: () => ({ guidance: 'ready', progress: 0, moveProgress: 0 }),
 }));
 
-const BLOCKED = 'Intentemos de nuevo';
+const BLOCKED = 'Intenta de nuevo';
 let onFatal: Mock<(error: unknown) => void>;
 
 function renderFlow(check: (call: MockCall) => Response | Promise<Response>) {

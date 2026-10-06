@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ShiftRef, SiteRef } from '../../types';
+import { setLocale } from '../../i18n/core';
+import { morning, plantRef, weekend } from '../../test/shifts';
 import { businessToday, formatDate } from '../../utils/format';
 import {
   breaksText,
@@ -11,13 +12,17 @@ import {
   momentText,
   periodText,
   placeText,
+  remoteText,
+  shiftFacts,
   shiftTimeline,
+  sitesText,
   sortedDays,
   validateMinutes,
   validateName,
 } from './shiftRules';
-import { needsSite, placementErrors, remoteWithin } from './usePlacement';
-import { shiftPayload, timelineOf, validateShiftForm, type ShiftFormValues } from './useShiftForm';
+import { assignmentErrors } from './useAssignment';
+import { affectsText, shiftPayload, timelineOf, validateShiftForm, type ShiftFormValues } from './useShiftForm';
+import { needsSite, placeErrors } from './useShiftPlace';
 import { sitePayload, type SiteFormValues } from './useSiteForm';
 
 const base: ShiftFormValues = {
@@ -32,8 +37,7 @@ const base: ShiftFormValues = {
   late_check_out_minutes: '60',
 };
 
-const shift: ShiftRef = { id: 1, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', overnight: false, weekdays: [0, 1, 2, 3, 4] };
-const site: SiteRef = { id: 4, name: 'Planta Norte', latitude: 29, longitude: -110, radius_m: 100 };
+const nowhere = { siteIds: [], remote: [] };
 
 describe('reglas de horas', () => {
   it('lee "HH:MM" y "HH:MM:SS"; lo incompleto o fuera de rango no es una hora', () => {
@@ -85,6 +89,7 @@ describe('reglas de horas', () => {
     expect(sortedDays([4, 0, 4, 2])).toEqual([0, 2, 4]);
     expect(metersText(100)).toBe('100 m');
     expect(metersText(1500)).toBe('1.5 km');
+    expect(metersText(1234)).toBe('1.234 km'); // hasta 3 decimales en km
     expect(breaksText(0, 0)).toBe('Sin descansos');
     expect(breaksText(2, 15)).toBe('2 × 15 min');
   });
@@ -94,11 +99,58 @@ describe('reglas de horas', () => {
     expect(businessTomorrow() > businessToday()).toBe(true);
   });
 
-  it('vigencia y lugar de una asignación', () => {
+  it('vigencia de una asignación', () => {
     expect(periodText({ valid_from: '2026-10-05', valid_to: null })).toBe(`Desde el ${formatDate('2026-10-05')}`);
     expect(periodText({ valid_from: '2026-09-01', valid_to: '2026-10-04' })).toBe(`Del ${formatDate('2026-09-01')} al ${formatDate('2026-10-04')}`);
-    expect(placeText({ remote_weekdays: [], sites: [site] })).toBe('Solo en sitio: Planta Norte');
-    expect(placeText({ remote_weekdays: [0, 2], sites: [] })).toBe('Remoto: Lun y mié · En sitio: ningún sitio');
+  });
+
+  it('dónde se checa con un turno: sus sitios y sus días remotos', () => {
+    expect(placeText(morning)).toBe('Solo en sitio: Planta Norte');
+    expect(placeText(weekend)).toBe('Remoto todos sus días');
+    expect(placeText({ ...morning, remote_weekdays: [0, 2] })).toBe('Remoto: Lun y mié · En sitio: Planta Norte');
+    expect(placeText({ ...morning, remote_weekdays: [0, 2], sites: [] })).toBe('Remoto: Lun y mié · En sitio: ningún sitio'); // datos inconsistentes: se dice igual
+    expect(sitesText([plantRef, { ...plantRef, name: 'Planta Sur' }])).toBe('Planta Norte, Planta Sur');
+    expect(sitesText([])).toBe('Ninguno: todos sus días son remotos');
+    expect(remoteText([5, 6])).toBe('Sáb y dom');
+    expect(remoteText([])).toBe('Ninguno');
+    expect(shiftFacts(morning)).toEqual([
+      { label: 'Horario', value: '08:00 – 16:00 · Lun a vie' },
+      { label: 'Sitios donde checa', value: 'Planta Norte' },
+      { label: 'Días remotos', value: 'Ninguno' },
+    ]);
+  });
+});
+
+describe('reglas en inglés (en-US)', () => {
+  it('horas, validaciones, descansos, vigencia, lugar, datos del turno y fechas de una asignación', async () => {
+    await setLocale('en-US');
+    expect(momentText({ clock: '23:45', day: -1 })).toBe('11:45 PM the day before');
+    expect(momentText({ clock: '01:00', day: 1 })).toBe('1:00 AM the next day');
+    expect(validateMinutes('', 0, 240)).toBe('Enter the minutes');
+    expect(validateMinutes('1.5', 0, 240)).toBe('Enter whole minutes');
+    expect(validateMinutes('300', 0, 240)).toBe('Between 0 and 240 min');
+    expect(validateName('a', 80, 'Morning')).toBe('Enter a name (e.g., "Morning")');
+    expect(validateName('x'.repeat(81), 80, 'Morning')).toBe('Up to 80 characters');
+    expect(metersText(12_500)).toBe('12.5 km');
+    expect(breaksText(0, 0)).toBe('No breaks');
+    expect(periodText({ valid_from: '2026-10-05', valid_to: null })).toBe('From Oct 5, 2026');
+    expect(periodText({ valid_from: '2026-09-01', valid_to: '2026-10-04' })).toBe('From Sep 1, 2026 to Oct 4, 2026');
+    expect(placeText(morning)).toBe('On site only: Planta Norte');
+    expect(placeText(weekend)).toBe('Remote every day');
+    expect(placeText({ ...morning, remote_weekdays: [0, 2], sites: [] })).toBe('Remote: Mon and Wed · On site: no site');
+    expect(sitesText([])).toBe('None: all its days are remote');
+    expect(shiftFacts(weekend)).toEqual([
+      { label: 'Schedule', value: '10:00 PM – 6:00 AM (next day) · Sat and Sun' },
+      { label: 'Check-in sites', value: 'None: all its days are remote' },
+      { label: 'Remote days', value: 'Sat and Sun' },
+    ]);
+    expect(affectsText(1)).toBe('Affects 1 assigned employee');
+    expect(affectsText(1200)).toBe('Affects 1,200 assigned employees');
+    expect(validateShiftForm({ ...base, name: '', end_time: '08:00' })).toMatchObject({ name: 'Enter a name (e.g., "Morning")', end_time: 'The end time must be different from the start time' });
+    expect(placeErrors([0], [], [])).toEqual({ site_ids: "Choose at least one site for non-remote days" });
+    expect(assignmentErrors('', { shift: null, minDate: '2026-10-05', minMessage: () => 'Tomorrow or later' })).toEqual({ shift_id: 'Choose the shift', valid_from: 'Choose the date it takes effect' });
+    expect(assignmentErrors('2026-10-04', { shift: morning, minDate: '2026-10-05', minMessage: () => 'Tomorrow or later' }).valid_from).toBe('Tomorrow or later');
+    expect(assignmentErrors('04/10/2026', { shift: morning, minDate: '2026-10-05', minMessage: 'x' }).valid_from).toBe('Enter a valid date (mm/dd/yyyy)');
   });
 });
 
@@ -106,7 +158,7 @@ describe('formulario de turno', () => {
   it('sin errores con un turno válido; la vista previa y lo que se envía', () => {
     expect(Object.values(validateShiftForm(base)).filter(Boolean)).toEqual([]);
     expect(timelineOf(base)?.duration).toBe(480);
-    expect(shiftPayload({ ...base, name: ' Matutino ' }, [4, 0])).toEqual({
+    expect(shiftPayload({ ...base, name: ' Matutino ' }, [4, 0], { siteIds: [9, 3], remote: [4] })).toEqual({
       name: 'Matutino',
       start_time: '08:00',
       end_time: '16:00',
@@ -117,8 +169,12 @@ describe('formulario de turno', () => {
       late_tolerance_minutes: 10,
       early_check_out_minutes: 0,
       late_check_out_minutes: 60,
+      site_ids: [3, 9],
+      remote_weekdays: [4],
     });
-    expect(shiftPayload({ ...base, breaks_count: '0' }, [0]).break_minutes).toBe(0);
+    expect(shiftPayload({ ...base, breaks_count: '0' }, [0], nowhere).break_minutes).toBe(0);
+    expect(affectsText(1)).toBe('Afecta a 1 empleado asignado');
+    expect(affectsText(0)).toBe('Afecta a 0 empleados asignados');
   });
 
   it('marca horas faltantes o iguales, descansos que no caben y una ventana de 24 h', () => {
@@ -137,33 +193,29 @@ describe('formulario de turno', () => {
   });
 });
 
-describe('asignación: días remotos y sitios', () => {
-  const rules = { shift, minDate: '2026-10-05', minMessage: 'Desde mañana', withPlace: true };
-
-  it('los días remotos se limitan a los del turno; sin días en sitio no hacen falta sitios', () => {
-    expect(remoteWithin([0, 5, 6], shift)).toEqual([0]);
-    expect(remoteWithin([0], null)).toEqual([]);
-    expect(needsSite(shift, [0, 1, 2, 3])).toBe(true);
-    expect(needsSite(shift, [0, 1, 2, 3, 4])).toBe(false);
-    expect(needsSite(null, [])).toBe(false);
+describe('lugar del turno', () => {
+  it('sin días en sitio no hacen falta sitios; si alguno es en sitio, se pide al menos uno', () => {
+    expect(needsSite([0, 1, 2, 3, 4], [0, 1, 2, 3])).toBe(true);
+    expect(needsSite([0, 1, 2, 3, 4], [0, 1, 2, 3, 4])).toBe(false);
+    expect(placeErrors([0, 1], [], [])).toEqual({ site_ids: 'Elige al menos un sitio para los días no remotos' });
+    expect(placeErrors([0, 1], [], [3])).toEqual({ site_ids: undefined });
+    expect(placeErrors([0, 1], [0, 1], [])).toEqual({ site_ids: undefined });
   });
+});
 
-  it('fecha, turno y sitios', () => {
-    expect(placementErrors({ validFrom: '', remote: [], siteIds: [] }, { ...rules, shift: null })).toEqual({
-      shift_id: 'Elige el turno',
-      valid_from: 'Elige la fecha desde la que aplica',
-      site_ids: undefined,
-    });
-    expect(placementErrors({ validFrom: '31/02/2026', remote: [], siteIds: [4] }, rules).valid_from).toBe('Escribe una fecha válida (dd/mm/aaaa)');
-    expect(placementErrors({ validFrom: '2026-10-04', remote: [], siteIds: [4] }, rules).valid_from).toBe('Desde mañana');
-    expect(placementErrors({ validFrom: '2026-10-05', remote: [], siteIds: [] }, rules).site_ids).toBe('Elige al menos un sitio donde checar los días que no son remotos');
-    expect(placementErrors({ validFrom: '2026-10-05', remote: [], siteIds: [] }, { ...rules, withPlace: false }).site_ids).toBeUndefined();
-    expect(placementErrors({ validFrom: '2026-10-05', remote: [0, 1, 2, 3, 4], siteIds: [] }, rules)).toEqual({ shift_id: undefined, valid_from: undefined, site_ids: undefined });
+describe('asignación: turno y fecha', () => {
+  const rules = { shift: morning, minDate: '2026-10-05', minMessage: 'Desde mañana' };
+
+  it('pide el turno y una fecha válida desde la mínima', () => {
+    expect(assignmentErrors('', { ...rules, shift: null })).toEqual({ shift_id: 'Elige el turno', valid_from: 'Elige la fecha desde la que aplica' });
+    expect(assignmentErrors('31/02/2026', rules).valid_from).toBe('Escribe una fecha válida (dd/mm/aaaa)');
+    expect(assignmentErrors('2026-10-04', rules).valid_from).toBe('Desde mañana');
+    expect(assignmentErrors('2026-10-05', rules)).toEqual({ shift_id: undefined, valid_from: undefined });
   });
 });
 
 describe('formulario de sitio', () => {
-  it('envía el domicilio con su punto (interior vacío = null) y el radio', () => {
+  it('envía el domicilio con su punto (interior y referencias vacíos = null) y el radio', () => {
     const values: SiteFormValues = {
       name: ' Planta Norte ',
       radius: '150',
@@ -175,11 +227,27 @@ describe('formulario de sitio', () => {
       state: 'Sonora',
       municipality: 'Hermosillo',
       city: 'Hermosillo',
+      neighborhood: ' Centro ',
+      reference_notes: ' ',
     };
-    expect(sitePayload(values, { lat: 29.1, lng: -110.9 })).toEqual({
+    expect(sitePayload(values, { lat: 29.1, lng: -110.9 }, true)).toEqual({
       name: 'Planta Norte',
       radius_m: 150,
-      address: { street: 'Calle 1', exterior_number: '10', interior_number: null, postal_code: '83000', country_code: 'MX', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo', latitude: 29.1, longitude: -110.9 },
+      presence_code: true,
+      address: {
+        street: 'Calle 1',
+        exterior_number: '10',
+        interior_number: null,
+        postal_code: '83000',
+        country_code: 'MX',
+        state: 'Sonora',
+        municipality: 'Hermosillo',
+        city: 'Hermosillo',
+        neighborhood: 'Centro',
+        reference_notes: null,
+        latitude: 29.1,
+        longitude: -110.9,
+      },
     });
   });
 });

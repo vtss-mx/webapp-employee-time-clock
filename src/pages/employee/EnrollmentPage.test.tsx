@@ -1,9 +1,10 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CapturedFace } from '../../components/LiveFaceFlow';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
+import { setLocale } from '../../i18n/core';
 import { paths } from '../../routes/paths';
 import { ApiError } from '../../services/apiClient';
 import { samplePolicy } from '../../test/fixtures';
@@ -26,13 +27,15 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => session }));
 // flujo facial recibe el error si `onSubmit` lo lanza (y entonces reintentaría o lo mostraría).
 interface FlowProps {
   title: string;
+  frontalFrames: number;
+  frontalPhoto?: { maxSide: number; gapMs: number };
   onSubmit: (captured: CapturedFace) => Promise<void>;
   onFatal: (error: unknown) => void;
   onCancel: () => void;
 }
 vi.mock('../../components/LiveFaceFlow', () => ({
-  LiveFaceFlow: ({ title, onSubmit, onFatal, onCancel }: FlowProps) => (
-    <div>
+  LiveFaceFlow: ({ title, frontalFrames, frontalPhoto, onSubmit, onFatal, onCancel }: FlowProps) => (
+    <div data-testid="flow" data-frames={frontalFrames} data-photo={frontalPhoto?.maxSide}>
       <h1>{title}</h1>
       <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false }).catch((error: unknown) => session.flowErrors.push(error))}>
         capturar rostro
@@ -79,9 +82,13 @@ describe('EnrollmentPage: envío del registro facial', () => {
   it('registro guardado aunque releer el usuario falle: no se reenvía ni salta a una pantalla que aún no tiene', async () => {
     session.refreshUser.mockRejectedValue(new ApiError({ statusCode: 0, code: 'NETWORK_ERROR', message: 'Sin red' }));
     const submissions = renderEnrollment(() => apiOk({ enrollment_id: 3, face_status: 'PENDING_REVIEW' }));
-    await captureAndSubmit();
+    await start();
+    // Las 36 fotos completas del registro facial (de la configuración).
+    expect(screen.getByTestId('flow')).toHaveAttribute('data-frames', '36');
+    expect(screen.getByTestId('flow')).toHaveAttribute('data-photo', '640');
+    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
     const dialog = await screen.findByRole('dialog', { name: 'Registro enviado' });
-    expect(dialog).toHaveTextContent('Tu pantalla se actualizará en cuanto vuelva la conexión');
+    expect(dialog).toHaveTextContent('La pantalla se actualizará al volver la conexión');
     expect(session.refreshUser).toHaveBeenCalledTimes(3);
     expect(session.waits).toEqual([1000, 2000, 4000]);
     expect(screen.queryByText('Registro en validación')).toBeNull(); // el usuario viejo rebotaría al registro
@@ -144,16 +151,16 @@ describe('EnrollmentPage: bienvenida y avisos al entrar', () => {
     const popup = await screen.findByRole('alertdialog', { name: 'Tu registro anterior fue rechazado' });
     expect(popup).toHaveTextContent(text);
     expect(popup).toHaveTextContent('Ubícate en un lugar bien iluminado.');
-    expect(screen.getByRole('heading', { name: 'Registra tu rostro nuevamente' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Registra tu rostro de nuevo' })).toBeInTheDocument();
   });
 
   it('la empresa pidió verificar de nuevo la identidad: popup con su motivo', async () => {
     withEmployee({ face_status: 'NOT_ENROLLED', face_rejection_reason: 'Cambio importante de apariencia' });
     renderEnrollment(() => apiOk(null));
-    const popup = await screen.findByRole('dialog', { name: 'Verifica nuevamente tu identidad' });
+    const popup = await screen.findByRole('dialog', { name: 'Verifica de nuevo tu identidad' });
     expect(popup).toHaveTextContent('Solicitud de tu empresa');
     expect(popup).toHaveTextContent('Cambio importante de apariencia');
-    expect(screen.getByRole('heading', { name: 'Registra tu rostro nuevamente' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Registra tu rostro de nuevo' })).toBeInTheDocument();
   });
 
   it('se confirma antes de abrir la cámara: cancelar se queda en la bienvenida', async () => {
@@ -183,5 +190,42 @@ describe('EnrollmentPage: bienvenida y avisos al entrar', () => {
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo completar el registro' });
     expect(popup).toHaveTextContent('La cámara dejó de responder');
     expect(screen.getByRole('button', { name: /Comenzar registro/ })).toBeInTheDocument();
+  });
+});
+
+describe('EnrollmentPage en inglés (en-US) y con cambio de idioma en caliente', () => {
+  it('el popup de rechazo y la confirmación abiertos cambian de idioma sin cerrarse', async () => {
+    session.user = { ...sampleUser, employee: sampleUser.employee && { ...sampleUser.employee, face_status: 'REJECTED', face_rejection_reason: 'Borrosa' } };
+    renderEnrollment(() => apiOk(null));
+    expect(await screen.findByRole('alertdialog', { name: 'Tu registro anterior fue rechazado' })).toBeInTheDocument();
+
+    await act(() => setLocale('en-US'));
+    const popup = screen.getByRole('alertdialog', { name: 'Your previous enrollment was rejected' });
+    expect(popup).toHaveTextContent('Reason: “Borrosa”.');
+    expect(popup).toHaveTextContent('Find a well-lit place.');
+    expect(screen.getByRole('heading', { name: 'Enroll your face again' })).toBeInTheDocument();
+    expect(screen.getByText('5 steps · 1 minute')).toBeInTheDocument();
+    expect(screen.getByText('Before you start:')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Capture requirements' })).toHaveTextContent('Good lighting');
+    await userEvent.click(within(popup).getAllByRole('button').at(-1)!);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Start enrollment/ }));
+    const confirm = await screen.findByRole('dialog', { name: 'Enroll your face?' });
+    expect(confirm).toHaveTextContent('Your previous enrollment will be replaced by this one.');
+    await act(() => setLocale('es-MX'));
+    const spanish = screen.getByRole('dialog', { name: '¿Registrar tu rostro?' });
+    await userEvent.click(within(spanish).getByRole('button', { name: 'Abrir cámara' }));
+    expect(screen.getByRole('heading', { name: 'Registro facial' })).toBeInTheDocument();
+  });
+
+  it('el aviso de registro enviado, en inglés', async () => {
+    await setLocale('en-US');
+    renderEnrollment(() => apiOk({ enrollment_id: 3, face_status: 'PENDING_REVIEW' }));
+    expect(screen.getByRole('heading', { name: 'Welcome, Ana' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: /Start enrollment/ }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Enroll your face?' })).getByRole('button', { name: 'Open camera' }));
+    expect(screen.getByRole('heading', { name: 'Face enrollment' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
+    expect(await screen.findByRole('dialog', { name: 'Enrollment sent' })).toHaveTextContent('Your company will validate your identity shortly.');
   });
 });

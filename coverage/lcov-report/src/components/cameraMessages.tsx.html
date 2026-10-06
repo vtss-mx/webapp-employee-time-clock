@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
@@ -90,21 +90,15 @@
 <a name='L25'></a><a href='#L25'>25</a>
 <a name='L26'></a><a href='#L26'>26</a>
 <a name='L27'></a><a href='#L27'>27</a>
-<a name='L28'></a><a href='#L28'>28</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -114,36 +108,66 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-yes">18x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { CameraOff, Lock, RefreshCw } from 'lucide-react';
-import type { CameraProblem } from '../utils/cameraDiagnostics';
+import { t } from '../i18n';
+import { cameraProblemText, type CameraProblem } from '../utils/cameraDiagnostics';
 import type { MessageInput } from './MessageDialog';
 &nbsp;
-/** Por qué no se pudo abrir la cámara y los pasos para resolverlo (sistema y navegador). */
+/**
+ * Por qué no se pudo abrir la cámara y los pasos para resolverlo (sistema y navegador), en el idioma
+ * activo: el popup lo pide al dibujarse (`feedback.show(() =&gt; cameraProblemMessage(problem))`).
+ */
 export function cameraProblemMessage(problem: CameraProblem): MessageInput {
+  const { title, message, steps } = cameraProblemText(problem);
   return {
     // Permiso bloqueado o conexión no segura los resuelve el usuario: advertencia; lo demás, error.
     variant: problem.kind === 'denied' || problem.kind === 'insecure' ? 'warning' : 'error',
     icon: &lt;CameraOff size={30} /&gt;,
-    eyebrow: 'Cámara',
-    title: problem.title,
-    text: problem.message,
-    details: problem.steps,
+    eyebrow: t('face.camera.name'),
+    title,
+    text: message,
+    details: steps,
     detailsStyle: 'steps',
     actions: problem.secureUrl
       ? [
-          { id: 'retry', label: 'Reintentar', variant: 'ghost' },
-          { id: 'secure', label: 'Abrir versión segura', icon: &lt;Lock size={18} /&gt; },
+          { id: 'retry', label: t('common.actions.retry'), variant: 'ghost' },
+          { id: 'secure', label: t('face.camera.openSecure'), icon: &lt;Lock size={18} /&gt; },
         ]
       : [
-          { id: 'close', label: 'Cerrar', variant: 'ghost' },
-          { id: 'retry', label: 'Reintentar', icon: &lt;RefreshCw size={18} /&gt; },
+          { id: 'close', label: t('common.actions.close'), variant: 'ghost' },
+          { id: 'retry', label: t('common.actions.retry'), icon: &lt;RefreshCw size={18} /&gt; },
         ],
-    key: `camera-problem-${problem.kind}`,
+    key: cameraProblemKey(problem),
   };
 }
+&nbsp;
+/** Clave del popup de un problema: con ella se retira si la cámara se recupera. */
+export const cameraProblemKey = (problem: CameraProblem) =&gt; `camera-problem-${problem.kind}`;
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -151,7 +175,7 @@ export function cameraProblemMessage(problem: CameraProblem): MessageInput {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

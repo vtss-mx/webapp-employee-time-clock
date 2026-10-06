@@ -1,21 +1,26 @@
 import { History, SearchX } from 'lucide-react';
 import { useId, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MinutesBadge } from '../../../components/attendance/MinutesBadge';
 import { usePlaceLabel } from '../../../components/attendance/SessionTimeline';
 import { clockOn, scheduleRange } from '../../../components/attendance/sessionFacts';
+import { ReviewBadge } from '../../../components/attendance/ReviewParts';
 import { CatalogStatusBadge } from '../../../components/StatusBadge';
+import { Checkbox } from '../../../components/ui/Checkbox';
 import { DateField, parseIso } from '../../../components/ui/DateField';
 import { ListResults } from '../../../components/ui/ListResults';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { Select } from '../../../components/ui/Select';
 import { useCatalogs } from '../../../hooks/useCatalogs';
 import { usePagedList } from '../../../hooks/usePagedList';
+import { t, useT, type MessageKey } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { attendanceService } from '../../../services/attendanceService';
 import type { CompanySession, WorkSessionStatus } from '../../../types';
-import { businessToday, formatDate, formatMinutes, initials } from '../../../utils/format';
+import { businessToday, formatDate, formatMinutes } from '../../../utils/format';
 import { quickRanges } from '../../../utils/dateRanges';
+import { Avatar } from '../../../components/ui/Avatar';
+import { DeletedMark } from '../../../components/ui/DeletedMark';
 
 type StatusChoice = WorkSessionStatus | 'all';
 
@@ -29,24 +34,42 @@ const ALL_DATES: Range = { start: '', end: '' };
 
 /** Una fecha escrita a medias no filtra; una que no existe (31/02) se marca y tampoco filtra. */
 const applied = (value: string) => (parseIso(value) ? value : undefined);
-const invalid = (value: string) => (value && !parseIso(value) ? 'Escribe una fecha válida' : undefined);
+const invalid = (value: string) => (value && !parseIso(value) ? t('attendance.history.invalidDate') : undefined);
+
+/** Columnas de la tabla (y la etiqueta de cada dato en las tarjetas del teléfono). */
+const COLUMNS = [
+  'common.fields.employee',
+  'common.fields.date',
+  'attendance.fields.shift',
+  'attendance.fields.checkIn',
+  'attendance.fields.checkOut',
+  'attendance.fields.worked',
+  'common.fields.status',
+] as const satisfies readonly MessageKey[];
+
+/** Título del popup si el historial no carga (se arma al dibujarse: sigue al idioma activo). */
+const historyLoadError = () => t('attendance.history.loadError');
 
 interface FiltersProps {
   range: Range;
   onRange: (range: Range) => void;
   status: StatusChoice;
   onStatus: (status: StatusChoice) => void;
+  /** Solo las jornadas "en revisión" que esperan la decisión de la empresa. */
+  inReview: boolean;
+  onInReview: (value: boolean) => void;
 }
 
-/** Filtros del historial: rangos de un clic, las dos fechas a mano y el estado. */
-function HistoryFilters({ range, onRange, status, onStatus }: FiltersProps) {
+/** Filtros del historial: rangos de un clic, las dos fechas a mano, el estado y "solo en revisión". */
+function HistoryFilters({ range, onRange, status, onStatus, inReview, onInReview }: FiltersProps) {
+  const t = useT();
   const { active } = useCatalogs();
   const statusId = useId();
   const today = businessToday();
-  const options = [{ key: 'all', label: 'Todas las fechas', ...ALL_DATES }, ...quickRanges()];
+  const options = [{ key: 'all', label: t('attendance.history.allDates'), ...ALL_DATES }, ...quickRanges()];
   return (
     <div className="att-filters">
-      <div className="chips" role="group" aria-label="Rangos rápidos">
+      <div className="chips" role="group" aria-label={t('attendance.history.quickRanges')}>
         {options.map((option) => {
           const selected = option.start === range.start && option.end === range.end;
           return (
@@ -57,47 +80,52 @@ function HistoryFilters({ range, onRange, status, onStatus }: FiltersProps) {
         })}
       </div>
       <div className="att-fields">
-        <DateField label="Desde" name="start" value={range.start} max={today} error={invalid(range.start)} onChange={(start) => onRange({ ...range, start })} />
-        <DateField label="Hasta" name="end" value={range.end} min={applied(range.start)} max={today} error={invalid(range.end)} onChange={(end) => onRange({ ...range, end })} />
+        <DateField label={t('attendance.history.from')} name="start" value={range.start} max={today} error={invalid(range.start)} onChange={(start) => onRange({ ...range, start })} />
+        <DateField label={t('attendance.history.to')} name="end" value={range.end} min={applied(range.start)} max={today} error={invalid(range.end)} onChange={(end) => onRange({ ...range, end })} />
         <div className="field">
           <label id={`${statusId}-label`} htmlFor={statusId}>
-            Estado
+            {t('common.fields.status')}
           </label>
           <Select<StatusChoice>
             id={statusId}
             aria-labelledby={`${statusId}-label`}
             value={status}
             onChange={onStatus}
-            options={[{ value: 'all', label: 'Todas' }, ...active('work_session_statuses').map((item) => ({ value: item.code, label: item.name }))]}
+            options={[{ value: 'all', label: t('attendance.history.allStatuses') }, ...active('work_session_statuses').map((item) => ({ value: item.code, label: item.name }))]}
           />
         </div>
       </div>
+      <Checkbox checked={inReview} onChange={onInReview} label={t('attendance.review.onlyPending')} description={t('attendance.review.onlyPendingHint')} />
     </div>
   );
 }
 
 function SessionCells({ session }: { session: CompanySession }) {
+  const t = useT();
   const place = usePlaceLabel();
   const { employee } = session;
   return (
     <>
       <td className="table__primary">
         <span className="person">
-          <span className="avatar">{initials(employee.full_name)}</span>
+          <Avatar name={employee.full_name} decorative />
           <span className="person__info">
             <strong className="truncate">{employee.full_name}</strong>
-            <small>{employee.employee_number}</small>
+            <small>
+              {employee.employee_number}
+              <DeletedMark deleted={employee.deleted} />
+            </small>
           </span>
         </span>
       </td>
-      <td data-label="Fecha">{formatDate(session.work_date)}</td>
-      <td data-label="Turno">
+      <td data-label={t('common.fields.date')}>{formatDate(session.work_date)}</td>
+      <td data-label={t('attendance.fields.shift')}>
         <span className="att-cell">
           <strong>{session.shift_name}</strong>
           <small>{scheduleRange(session.scheduled_start, session.scheduled_end)}</small>
         </span>
       </td>
-      <td data-label="Entrada">
+      <td data-label={t('attendance.fields.checkIn')}>
         <span className="att-cell">
           <span className="att-cell__value">
             {clockOn(session.check_in_at, session.work_date)} <MinutesBadge kind="late" minutes={session.late_minutes} />
@@ -105,7 +133,7 @@ function SessionCells({ session }: { session: CompanySession }) {
           <small>{place(session.check_in_mode, session.check_in_site)}</small>
         </span>
       </td>
-      <td data-label="Salida">
+      <td data-label={t('attendance.fields.checkOut')}>
         {session.check_out_at ? (
           <span className="att-cell">
             <span className="att-cell__value">
@@ -117,9 +145,12 @@ function SessionCells({ session }: { session: CompanySession }) {
           '—'
         )}
       </td>
-      <td data-label="Trabajado">{formatMinutes(session.worked_minutes)}</td>
-      <td data-label="Estado">
-        <CatalogStatusBadge catalog="work_session_statuses" code={session.status} />
+      <td data-label={t('attendance.fields.worked')}>{formatMinutes(session.worked_minutes)}</td>
+      <td data-label={t('common.fields.status')}>
+        <span className="badge-row">
+          <CatalogStatusBadge catalog="work_session_statuses" code={session.status} />
+          <ReviewBadge session={session} />
+        </span>
       </td>
     </>
   );
@@ -132,43 +163,43 @@ function SessionCells({ session }: { session: CompanySession }) {
  * su rechazo se explica en el popup. Cada fila abre la jornada con su evidencia.
  */
 export function AttendanceHistoryPage() {
+  const t = useT();
   const navigate = useNavigate();
   const [range, setRange] = useState<Range>(ALL_DATES);
   const [status, setStatus] = useState<StatusChoice>('all');
+  // `?review` (el enlace del tablero): abre ya filtrado en lo que espera la decisión de la empresa.
+  const { search } = useLocation();
+  const [inReview, setInReview] = useState(() => new URLSearchParams(search).has('review'));
   const start = applied(range.start);
   const end = applied(range.end);
   const list = usePagedList(
-    (page, signal) => attendanceService.sessions({ ...page, start, end, status: status === 'all' ? undefined : status }, signal),
-    { errorTitle: 'No se pudo cargar el historial de asistencia', filterKey: `${start}|${end}|${status}` },
+    (page, signal) => attendanceService.sessions({ ...page, start, end, status: status === 'all' ? undefined : status, in_review: inReview || undefined }, signal),
+    { errorTitle: historyLoadError, filterKey: `${start}|${end}|${status}|${inReview}` },
   );
-  const filtered = Boolean(start ?? end) || status !== 'all';
+  const filtered = Boolean(start ?? end) || status !== 'all' || inReview;
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Historial de asistencia"
-          subtitle={list.data ? `${list.data.total.toLocaleString('es-MX')} ${list.data.total === 1 ? 'jornada' : 'jornadas'}` : 'Cargando...'}
+          title={t('attendance.nav.history')}
+          subtitle={list.data ? t('attendance.history.count', { count: list.data.total }) : t('common.states.loading')}
           backTo={paths.company.attendance}
-          backLabel="Asistencia del día"
+          backLabel={t('attendance.nav.dayBoard')}
         />
         <PanelSection>
-          <HistoryFilters range={range} onRange={setRange} status={status} onStatus={setStatus} />
+          <HistoryFilters range={range} onRange={setRange} status={status} onStatus={setStatus} inReview={inReview} onInReview={setInReview} />
           <ListResults
             // Si el backend rechaza los filtros (p. ej. un rango al revés), no se muestran las jornadas
             // de los filtros anteriores como si fueran de los nuevos: queda "Volver a cargar".
             list={list.error ? { ...list, data: null } : list}
-            pager={{ noun: { one: 'jornada', other: 'jornadas' } }}
-            columns={['Empleado', 'Fecha', 'Turno', 'Entrada', 'Salida', 'Trabajado', 'Estado']}
+            pager={{ noun: { one: t('attendance.history.noun.one'), other: t('attendance.history.noun.other') } }}
+            columns={COLUMNS.map((column) => t(column))}
             onOpen={(session) => void navigate(paths.company.attendanceSession(session.id), { state: { from: 'history' } })}
             empty={
               filtered
-                ? { icon: <SearchX />, title: 'Ninguna jornada coincide con los filtros', description: 'Cambia las fechas o el estado.' }
-                : {
-                    icon: <History />,
-                    title: 'Aún no hay jornadas registradas',
-                    description: 'Cada vez que un empleado checa su entrada se abre una jornada; aquí verás todas, con la evidencia de cada registro.',
-                  }
+                ? { icon: <SearchX />, title: t('attendance.history.emptyFiltered.title'), description: t('attendance.history.emptyFiltered.description') }
+                : { icon: <History />, title: t('attendance.history.empty.title'), description: t('attendance.history.empty.description') }
             }
             renderCells={(session) => <SessionCells session={session} />}
           />

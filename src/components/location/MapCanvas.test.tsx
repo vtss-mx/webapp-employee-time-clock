@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../i18n/core';
 import type * as GoogleMaps from '../../services/maps/googleMaps';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MapsApiError, POINT_ZOOM } from '../../services/maps/googleMaps';
 import type { GeoPoint } from '../../utils/address';
@@ -20,7 +21,7 @@ vi.mock('../../services/maps/googleMaps', async (importOriginal) => ({
 
 const PALIZA: GeoPoint = { lat: 29.0729, lng: -110.9559 };
 const ZOCALO: GeoPoint = { lat: 19.4326, lng: -99.1332 };
-const LOADING = 'Cargando el mapa...';
+const LOADING = 'Cargando el mapa…';
 const FAILED = 'El mapa no está disponible. Escribe el domicilio a mano.';
 
 // --- Mapa y círculo simulados de google.maps ---
@@ -136,7 +137,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('MapCanvas: carga', () => {
-  it('mientras Google responde muestra "Cargando el mapa..." sobre el área del mapa', () => {
+  it('mientras Google responde muestra "Cargando el mapa…" sobre el área del mapa', () => {
     sdk.load.mockReturnValue(new Promise<void>(() => undefined));
     const { container } = renderMap(PALIZA, 100);
     expect(screen.getByText(LOADING)).toBeInTheDocument();
@@ -417,5 +418,25 @@ describe('MapCanvas: contenedor redondeado sin el marco de foco de Google', () =
     expect(ring).toContain('inset 0 0 0 2px var(--map-accent)');
     expect(ring).toContain('pointer-events: none;');
     expect(rule('.map-canvas:has(.gm-style div[tabindex]:focus-visible)::after')).toContain('opacity: 1;');
+  });
+});
+
+describe('MapCanvas en inglés (en-US)', () => {
+  it('mientras carga lo dice en inglés', async () => {
+    await setLocale('en-US');
+    sdk.load.mockReturnValue(new Promise<void>(() => undefined));
+    renderMap();
+    expect(screen.getByText('Loading the map…')).toBeInTheDocument();
+    expect(screen.getByRole('application', { name: 'Map: tap to mark the point' })).toBeInTheDocument();
+  });
+
+  it('cambio en caliente: sus textos pasan a inglés sin volver a cargar ni crear el mapa (Google conserva su idioma)', async () => {
+    const { container } = renderMap(PALIZA, 100);
+    await readyMap();
+    await act(() => setLocale('en-US'));
+    expect(pin(container)).toBe(screen.getByRole('img', { name: 'Marked point' }));
+    expect(screen.getByRole('application', { name: 'Map: tap to mark the point' })).toBeInTheDocument();
+    expect(sdk.load).toHaveBeenCalledOnce();
+    expect(maps).toHaveLength(1);
   });
 });

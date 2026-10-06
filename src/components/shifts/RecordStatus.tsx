@@ -1,30 +1,45 @@
 import { Power, PowerOff, ToggleRight, Trash2 } from 'lucide-react';
 import { useAction } from '../../hooks/useAction';
+import { t as translate, useT } from '../../i18n';
 import { ApiError } from '../../services/apiClient';
 import type { ConfirmInput } from '../../types/confirm';
 import { StatusBadge } from '../StatusBadge';
+import { deleteNote } from '../trash/TrashParts';
 import { Button } from '../ui/Button';
 import { PanelSection } from '../ui/Panel';
 
+/** Los textos de la sección según el registro (turno o sitio), ya traducidos y con su nombre puesto. */
 export interface RecordStatusTexts {
   /** Título de la sección ("Estado del turno"). */
   title: string;
-  /** Sustantivo con artículo para los avisos ("El turno", "El sitio"). */
-  subject: string;
   /** Qué significa cada estado (se muestra bajo el título). */
   activeMeaning: string;
   inactiveMeaning: string;
   /** Qué pasará al desactivar y al eliminar (en la confirmación; al activar se dice `activeMeaning`). */
   deactivateWarning: string;
   removeWarning: string;
-  /** Código del backend cuando no se puede eliminar porque está en uso (se sugiere desactivarlo). */
-  inUseCode: string;
+  /** Las preguntas de las confirmaciones ("¿Activar el turno Nocturno?"). */
+  activateQuestion: string;
+  deactivateQuestion: string;
+  removeQuestion: string;
+  /** Los avisos al terminar ("El turno quedó activo", "El turno se eliminó"). */
+  activated: string;
+  deactivated: string;
+  removed: string;
+  /** Título del popup cuando no se puede eliminar porque está en uso ("El turno está en uso: desactívalo"). */
+  inUse: string;
+  /** Códigos del backend cuando no se puede eliminar porque está en uso (se sugiere desactivarlo). */
+  inUseCodes: readonly string[];
 }
 
 interface RecordStatusProps {
   name: string;
   active: boolean;
-  texts: RecordStatusTexts;
+  /**
+   * Los textos, calculados al usarse: las confirmaciones y los avisos abiertos se vuelven a armar
+   * con ella y siguen al idioma activo.
+   */
+  texts: () => RecordStatusTexts;
   setStatus: (active: boolean) => Promise<{ active: boolean }>;
   remove: () => Promise<void>;
   /** Cambió el estado (el backend devuelve el registro actualizado). */
@@ -34,12 +49,13 @@ interface RecordStatusProps {
 }
 
 /** Activar o desactivar: qué cambia ("Estado: Activo → Inactivo") y qué implica. */
-function statusConfirm(name: string, next: boolean, texts: RecordStatusTexts): ConfirmInput {
-  const noun = `${texts.subject.toLowerCase()} ${name}`;
-  const state = { label: 'Estado', before: next ? 'Inactivo' : 'Activo', after: next ? 'Activo' : 'Inactivo' };
+function statusConfirm(next: boolean, texts: RecordStatusTexts): ConfirmInput {
+  const [active, inactive] = [translate('common.states.active'), translate('common.states.inactive')];
+  const state = { label: translate('common.fields.status'), before: next ? inactive : active, after: next ? active : inactive };
+  const eyebrow = translate('common.actions.changeStatus');
   return next
-    ? { tone: 'success', icon: <Power size={30} />, eyebrow: 'Cambiar estado', title: `¿Activar ${noun}?`, message: texts.activeMeaning, changes: [state], confirmLabel: 'Activar', confirmIcon: <Power size={18} /> }
-    : { tone: 'danger', icon: <PowerOff size={30} />, eyebrow: 'Cambiar estado', title: `¿Desactivar ${noun}?`, message: texts.deactivateWarning, changes: [state], confirmLabel: 'Desactivar', confirmIcon: <PowerOff size={18} /> };
+    ? { tone: 'success', icon: <Power size={30} />, eyebrow, title: texts.activateQuestion, message: texts.activeMeaning, changes: [state], confirmLabel: translate('common.actions.activate'), confirmIcon: <Power size={18} /> }
+    : { tone: 'danger', icon: <PowerOff size={30} />, eyebrow, title: texts.deactivateQuestion, message: texts.deactivateWarning, changes: [state], confirmLabel: translate('common.actions.deactivate'), confirmIcon: <PowerOff size={18} /> };
 }
 
 /**
@@ -47,35 +63,34 @@ function statusConfirm(name: string, next: boolean, texts: RecordStatusTexts): C
  * Si el backend no permite eliminarlo porque está en uso, el popup lo explica y sugiere desactivarlo.
  */
 export function RecordStatus({ name, active, texts, setStatus, remove, onStatus, onRemoved }: RecordStatusProps) {
+  const t = useT();
   const { busy, run } = useAction<'status' | 'remove'>();
+  const current = texts();
 
   const changeStatus = (next: boolean) =>
     run(() => setStatus(next), {
       busy: 'status',
-      confirm: statusConfirm(name, next, texts),
-      errorTitle: next ? `No se pudo activar ${name}` : `No se pudo desactivar ${name}`,
-      success: [next ? `${texts.subject} quedó activo` : `${texts.subject} quedó inactivo`, next ? texts.activeMeaning : texts.inactiveMeaning],
+      confirm: () => statusConfirm(next, texts()),
+      errorTitle: () => translate(next ? 'shifts.recordStatus.activateError' : 'shifts.recordStatus.deactivateError', { name }),
+      success: () => (next ? [texts().activated, texts().activeMeaning] : [texts().deactivated, texts().inactiveMeaning]),
       onSuccess: (saved) => onStatus(saved.active),
     });
 
   const removeRecord = () =>
     run(remove, {
       busy: 'remove',
-      confirm: {
-        kind: 'delete',
-        title: `¿Eliminar ${texts.subject.toLowerCase()} ${name}?`,
-        message: texts.removeWarning,
-        note: 'Esta acción no se puede deshacer.',
-      },
-      errorTitle: (err) => (err instanceof ApiError && err.code === texts.inUseCode ? `${texts.subject} está en uso: desactívalo` : `No se pudo eliminar ${name}`),
-      success: [`${texts.subject} se eliminó`, `${name} ya no aparece en tu empresa.`],
+      // Va a «Eliminados» (se restaura durante 1 año).
+      confirm: () => ({ kind: 'delete', title: texts().removeQuestion, message: texts().removeWarning, note: deleteNote() }),
+      // El motivo lo da el backend (p. ej. qué turnos usan el sitio); el título sugiere qué hacer.
+      errorTitle: (err) => (err instanceof ApiError && texts().inUseCodes.includes(err.code) ? texts().inUse : translate('shifts.recordStatus.removeError', { name })),
+      success: () => [texts().removed],
       onSuccess: onRemoved,
       keepBusy: true,
     });
 
   return (
-    <PanelSection title={texts.title} icon={<ToggleRight size={20} />} aside={<StatusBadge active={active} />}>
-      <p className="muted">{active ? texts.activeMeaning : texts.inactiveMeaning}</p>
+    <PanelSection title={current.title} icon={<ToggleRight size={20} />} aside={<StatusBadge active={active} />}>
+      <p className="muted">{active ? current.activeMeaning : current.inactiveMeaning}</p>
       <div className="button-row">
         <Button
           variant={active ? 'warning' : 'success'}
@@ -84,10 +99,10 @@ export function RecordStatus({ name, active, texts, setStatus, remove, onStatus,
           disabled={busy !== null}
           onClick={() => void changeStatus(!active)}
         >
-          {active ? 'Desactivar' : 'Activar'}
+          {active ? t('common.actions.deactivate') : t('common.actions.activate')}
         </Button>
         <Button variant="danger-outline" icon={<Trash2 size={18} />} loading={busy === 'remove'} disabled={busy !== null} onClick={() => void removeRecord()}>
-          Eliminar
+          {t('common.actions.delete')}
         </Button>
       </div>
     </PanelSection>

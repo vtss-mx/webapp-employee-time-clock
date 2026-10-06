@@ -99,16 +99,16 @@ describe('ManualSessionPage: la empresa registra la asistencia de un empleado', 
     expect(lookup?.url).toContain('search=EMP-9');
     expect(screen.getByLabelText('Día que trabajó')).toHaveValue('02/10/2026');
     expect(screen.getByText('Programada a las 08:00')).toBeInTheDocument();
-    expect(screen.getByText('Programada a las 16:00; si es de madrugada, es la del día siguiente')).toBeInTheDocument();
-    expect(screen.getByText(/Los que tomó, hasta los que permite su turno \(a lo más 6\)/)).toBeInTheDocument();
+    expect(screen.getByText('Programada a las 16:00; de madrugada cuenta como el día siguiente')).toBeInTheDocument();
+    expect(screen.getByText(/Los que tomó, según su turno \(máximo 6\)/)).toBeInTheDocument();
 
     // Sin datos: el popup lo resume y los campos quedan marcados.
     await submit();
-    expect(await screen.findByText('Revisa la información')).toBeInTheDocument();
+    expect(await screen.findByText('Revisa los datos')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     expect(screen.getByText('Indica la hora de entrada')).toBeInTheDocument();
     expect(screen.getByText('Indica la hora de salida o marca «Aún no sale»')).toBeInTheDocument();
-    expect(screen.getByText('Explica brevemente el motivo (al menos 5 caracteres)')).toBeInTheDocument();
+    expect(screen.getByText('Explica el motivo (al menos 5 caracteres)')).toBeInTheDocument();
 
     // La entrada programada, de un toque en el selector; la salida escrita.
     await userEvent.click(within(entry().closest('.field') as HTMLElement).getByRole('button', { name: 'Elegir hora' }));
@@ -120,7 +120,7 @@ describe('ManualSessionPage: la empresa registra la asistencia de un empleado', 
     await userEvent.click(screen.getByRole('button', { name: 'Agregar descanso' }));
     await userEvent.type(screen.getByLabelText('Inicio'), '1200');
     await submit();
-    expect(await screen.findByText('Revisa la información')).toBeInTheDocument();
+    expect(await screen.findByText('Revisa los datos')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     expect(screen.getByText('Indica el inicio y el fin de cada descanso (o quítalo)')).toBeInTheDocument();
     expect(screen.getByText('Indica la hora')).toBeInTheDocument();
@@ -145,7 +145,7 @@ describe('ManualSessionPage: la empresa registra la asistencia de un empleado', 
 
     await submitConfirmed();
     expect(await screen.findByText('Asistencia registrada')).toBeInTheDocument();
-    expect(screen.getByText('La jornada de Carla Díaz del 2 oct 2026 quedó registrada por la empresa.')).toBeInTheDocument();
+    expect(screen.getByText('La jornada de Carla Díaz del 2 oct 2026 quedó registrada.')).toBeInTheDocument();
     expect(posted(calls)).toEqual({
       check_in: '08:00',
       check_out: '16:00',
@@ -215,7 +215,7 @@ describe('ManualSessionPage: la empresa registra la asistencia de un empleado', 
       return apiFail(500, 'INTERNAL_ERROR', 'Falló');
     };
     renderAt(NEW_ROUTE, { 'GET /api/attendance/board': boardFor });
-    expect(await screen.findByText('Consultando su turno de ese día…')).toBeInTheDocument();
+    expect(await screen.findByText('Consultando su turno…')).toBeInTheDocument();
     release();
     expect(await screen.findByText('Turno Matutino: 08:00 – 16:00.')).toBeInTheDocument();
 
@@ -225,19 +225,19 @@ describe('ManualSessionPage: la empresa registra la asistencia de un empleado', 
       await userEvent.type(day, typed);
     };
     await pick('01102026');
-    expect(await screen.findByText('Turno Matutino: 08:00 – 16:00. Ese día es libre (Vacaciones): si sí trabajó, márcalo como laborable en Calendario.')).toBeInTheDocument();
+    expect(await screen.findByText('Turno Matutino: 08:00 – 16:00. Es día libre (Vacaciones). Si trabajó, márcalo como laborable en Calendario.')).toBeInTheDocument();
     await pick('30092026');
-    expect(await screen.findByText('Turno Matutino: 08:00 – 16:00. Ese día es libre: si sí trabajó, márcalo como laborable en Calendario.')).toBeInTheDocument();
+    expect(await screen.findByText('Turno Matutino: 08:00 – 16:00. Es día libre. Si trabajó, márcalo como laborable en Calendario.')).toBeInTheDocument();
     await pick('29092026');
-    expect(await screen.findByText('Turno Matutino: 08:00 – 16:00. Ya tiene su jornada registrada: corrígela en lugar de registrar otra.')).toBeInTheDocument();
+    expect(await screen.findByText('Turno Matutino: 08:00 – 16:00. Ya tiene jornada registrada; corrígela en vez de registrar otra.')).toBeInTheDocument();
     await pick('28092026');
-    expect(await screen.findByText('Ese día no tiene turno asignado: solo se registra un día de su turno.')).toBeInTheDocument();
+    expect(await screen.findByText('No tiene turno ese día; elige un día de su turno.')).toBeInTheDocument();
     // Sin horario no hay sugerencias.
     expect(screen.queryByText(/Programada a las/)).toBeNull();
-    expect(screen.getByText('Si es de madrugada, es la del día siguiente')).toBeInTheDocument();
+    expect(screen.getByText('De madrugada cuenta como el día siguiente')).toBeInTheDocument();
     // Si no se puede consultar, no abre un popup: lo dice bajo el día y se registra igual.
     await pick('27092026');
-    expect(await screen.findByText('No se pudo consultar su turno de ese día: al registrar se revisa igual.')).toBeInTheDocument();
+    expect(await screen.findByText('No se pudo consultar su turno; se validará al registrar.')).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).toBeNull();
     await userEvent.clear(day);
     await userEvent.type(day, '0109');
@@ -260,7 +260,7 @@ describe('ManualSessionPage: la empresa registra la asistencia de un empleado', 
     await userEvent.clear(day);
     await userEvent.type(day, '01012999');
     await submit();
-    expect(await screen.findByText('Revisa la información')).toBeInTheDocument();
+    expect(await screen.findByText('Revisa los datos')).toBeInTheDocument();
     expect(screen.getAllByText('No puede ser un día futuro').length).toBeGreaterThan(0);
   });
 
@@ -320,7 +320,7 @@ describe('ManualSessionPage: la empresa corrige una jornada', () => {
     const confirm = await ask(CORRECT_TITLE, 'Guardar corrección');
     expect(rows(confirm, 'Cambios')).toEqual(['SalidaAntes: Aún no saleDespués: 15:40']);
     expect(rows(confirm, 'Detalles')).toEqual(['Motivo que veráRegistro equivocado de la salida']);
-    expect(within(confirm).getByText('Lo que había se conserva en la bitácora y el empleado verá el motivo en su historial.').closest('.confirm-note')).not.toBeNull();
+    expect(within(confirm).getByText('Lo anterior queda en la bitácora y el empleado verá el motivo.').closest('.confirm-note')).not.toBeNull();
     await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(calls.some((call) => call.init.method === 'PUT')).toBe(false);
@@ -330,7 +330,7 @@ describe('ManualSessionPage: la empresa corrige una jornada', () => {
 
     await submitConfirmed(CORRECT_TITLE, 'Guardar corrección');
     expect(await screen.findByText('Jornada corregida')).toBeInTheDocument();
-    expect(screen.getByText('Lo que había se conserva en la bitácora de Beto López.')).toBeInTheDocument();
+    expect(screen.getByText('Lo anterior queda en la bitácora de Beto López.')).toBeInTheDocument();
     expect(posted(calls, 'PUT')).toEqual({ check_in: '08:25', check_out: '15:40', breaks: [{ start: '12:00', end: '12:30' }], reason: 'Registro equivocado de la salida' });
     expect(await screen.findByText('Detalle de la jornada')).toBeInTheDocument();
   });
@@ -340,7 +340,7 @@ describe('ManualSessionPage: la empresa corrige una jornada', () => {
     await screen.findByRole('heading', { name: 'Corregir jornada' });
     await userEvent.type(reason('¿Por qué la corriges?'), 'Olvidó checar');
     await submit('Guardar corrección');
-    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No modificaste ningún dato');
+    expect(await screen.findByRole('dialog', { name: 'Sin cambios' })).toHaveTextContent('No hay nada que guardar');
     expect(screen.queryByRole('dialog', { name: CORRECT_TITLE })).toBeNull();
     expect(calls.some((call) => call.init.method === 'PUT' || call.init.method === 'POST')).toBe(false);
     expect(screen.queryByText('Jornada corregida')).toBeNull();

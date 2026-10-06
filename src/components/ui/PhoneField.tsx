@@ -4,6 +4,7 @@ import { countryDirectory, foldText, formatNational, joinPhone, type CountryOpti
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
+import { useT } from '../../i18n';
 import type { FieldStatus } from '../../types';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
 import { Floating } from './Floating';
@@ -32,6 +33,7 @@ const MAX_DIGITS = 15;
  * Pegar un número con lada (`+1 415…` o `0034…`) cambia el país automáticamente. Entrega siempre E.164.
  */
 export function PhoneField({ label, value, onChange, onBlur, error, hint, status, required, disabled = false, name }: PhoneFieldProps) {
+  const t = useT();
   const id = useId();
   const { countries } = useCatalogs();
   const directory = useMemo(() => countryDirectory(countries), [countries]);
@@ -77,7 +79,7 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
           className="phone-field__country"
           aria-haspopup="listbox"
           aria-expanded={open}
-          aria-label={`Lada: ${country.name} (${country.dialCode}). Cambiar país`}
+          aria-label={t('ui.phoneField.country', { country: country.name, dialCode: country.dialCode })}
           disabled={disabled}
           onClick={() => setOpen((v) => !v)}
         >
@@ -133,6 +135,7 @@ interface CountryMenuProps {
 
 /** Lista de países con búsqueda (nombre, código ISO o lada) y navegación con teclado. */
 function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuProps) {
+  const t = useT();
   const listId = useId();
   const [query, setQuery] = useState('');
   const options = useMemo(() => {
@@ -170,11 +173,11 @@ function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuP
           className="input"
           type="search"
           role="combobox"
-          aria-label="Buscar país o lada"
+          aria-label={t('ui.phoneField.search')}
           aria-expanded
           aria-controls={listId}
           aria-activedescendant={options.length ? `${listId}-${active}` : undefined}
-          placeholder="País o lada"
+          placeholder={t('ui.phoneField.searchPlaceholder')}
           autoComplete="off"
           // El menú se abre a petición del usuario: el foco va a la búsqueda.
           autoFocus
@@ -186,7 +189,7 @@ function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuP
           onKeyDown={onKeyDown}
         />
       </div>
-      <ul ref={listRef} id={listId} role="listbox" aria-label="Países" className="phone-field__options">
+      <ul ref={listRef} id={listId} role="listbox" aria-label={t('ui.phoneField.countries')} className="phone-field__options">
         {options.map((c: CountryOption, index) => (
           <li
             key={c.code}
@@ -207,7 +210,7 @@ function CountryMenu({ options: all, selected, onSelect, onClose }: CountryMenuP
             </span>
           </li>
         ))}
-        {options.length === 0 && <li className="phone-field__empty">Sin resultados para “{query}”</li>}
+        {options.length === 0 && <li className="phone-field__empty">{t('ui.phoneField.noResults', { query })}</li>}
       </ul>
     </>
   );

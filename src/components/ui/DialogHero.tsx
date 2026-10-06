@@ -1,13 +1,10 @@
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useT } from '../../i18n';
 import type { MessageVariant } from '../../utils/errorPresentation';
 
-const VARIANTS = {
-  error: { icon: XCircle, eyebrow: 'Error' },
-  warning: { icon: AlertTriangle, eyebrow: 'Atención' },
-  info: { icon: Info, eyebrow: 'Información' },
-  success: { icon: CheckCircle2, eyebrow: 'Listo' },
-} as const;
+/** Ícono de cada variante; su etiqueta por omisión es `dialogs.hero.<variante>` (se traduce al dibujarse). */
+const ICONS = { error: XCircle, warning: AlertTriangle, info: Info, success: CheckCircle2 } as const;
 
 interface DialogHeroProps {
   variant: MessageVariant;
@@ -23,20 +20,20 @@ interface DialogHeroProps {
 
 /** Encabezado común de mensajes y confirmaciones: ícono con halo, etiqueta y título. */
 export function DialogHero({ variant, title, titleId, icon, eyebrow, onClose, queue }: DialogHeroProps) {
-  const meta = VARIANTS[variant];
-  const Icon = meta.icon;
+  const t = useT();
+  const Icon = ICONS[variant];
   return (
     <div className="msg__hero">
       {queue && <span className="msg__queue">{queue}</span>}
       {onClose && (
-        <button type="button" className="msg__close" onClick={onClose} aria-label="Cerrar">
+        <button type="button" className="msg__close" onClick={onClose} aria-label={t('common.actions.close')}>
           <X size={18} />
         </button>
       )}
       <span className="msg__icon" aria-hidden>
         {icon ?? <Icon size={30} />}
       </span>
-      <span className="msg__eyebrow">{eyebrow ?? meta.eyebrow}</span>
+      <span className="msg__eyebrow">{eyebrow ?? t(`dialogs.hero.${variant}`)}</span>
       <h2 id={titleId} className="msg__title">
         {title}
       </h2>

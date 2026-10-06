@@ -1,5 +1,6 @@
+import { t } from '../i18n/core';
 import { config } from './config';
-import { businessDate } from './format';
+import { businessDate, localeDateFormat } from './format';
 
 export type FieldErrors<T> = Partial<Record<keyof T, string>>;
 
@@ -10,55 +11,71 @@ const EMPLOYEE_NUMBER_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,29}$/;
 const RFC_RE = /^[A-ZÑ&]{4}(\d{2})(\d{2})(\d{2})[A-Z\d]{2}[\dA]$/;
 const GENERIC_RFCS = new Set(['XAXX010101000', 'XEXX010101000']);
 export const RFC_LENGTH = 13;
+/** RFC y CURP de ejemplo de los mensajes de formato (códigos: no se traducen). */
+const RFC_EXAMPLE = 'PEGJ900515AB1';
+const CURP_EXAMPLE = 'HEGG560427MVZRRL04';
 export const MIN_EMPLOYEE_AGE = config.minEmployeeAge;
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 128;
+const NAME_MAX = 100;
+const COMPANY_NAME_MAX = 200;
+
+/*
+ * Los mensajes se traducen al validar: las reglas corren al dibujar el formulario, así que un error
+ * visible cambia de idioma junto con la pantalla (nunca se guarda el texto ya traducido).
+ */
 
 export function validateEmail(value: string): string | undefined {
-  if (!value.trim()) return 'El correo es obligatorio';
-  if (!EMAIL_RE.test(value.trim())) return 'Ingresa un correo válido';
+  if (!value.trim()) return t('forms.validation.email.required');
+  if (!EMAIL_RE.test(value.trim())) return t('forms.validation.email.invalid');
   return undefined;
 }
 
 export function validatePassword(value: string): string | undefined {
-  if (!value) return 'La contraseña es obligatoria';
-  if (value.length < 8) return 'Mínimo 8 caracteres';
-  if (value.length > 128) return 'Máximo 128 caracteres';
-  if (!/[a-z]/.test(value)) return 'Debe incluir una letra minúscula';
-  if (!/[A-Z]/.test(value)) return 'Debe incluir una letra mayúscula';
-  if (!/\d/.test(value)) return 'Debe incluir un número';
+  if (!value) return t('forms.validation.password.required');
+  if (value.length < PASSWORD_MIN) return t('forms.validation.minChars', { min: PASSWORD_MIN });
+  if (value.length > PASSWORD_MAX) return t('forms.validation.maxChars', { max: PASSWORD_MAX });
+  if (!/[a-z]/.test(value)) return t('forms.validation.password.lowercase');
+  if (!/[A-Z]/.test(value)) return t('forms.validation.password.uppercase');
+  if (!/\d/.test(value)) return t('forms.validation.password.digit');
   return undefined;
 }
 
 /** Repetir la contraseña (toda contraseña que se asigna se confirma: evita errores de dedo). */
 export function validatePasswordConfirm(password: string, confirm: string): string | undefined {
-  if (!confirm) return 'Repite la contraseña';
-  return confirm === password ? undefined : 'Las contraseñas no coinciden';
+  if (!confirm) return t('forms.validation.password.repeat');
+  return confirm === password ? undefined : t('forms.validation.password.mismatch');
 }
 
-export function validateName(value: string, label: string): string | undefined {
+/**
+ * `required`: el aviso completo de campo vacío, ya traducido ("El nombre es obligatorio"): cada campo
+ * da el suyo porque el género y el número cambian ("La razón social es obligatoria").
+ */
+export function validateName(value: string, required: string): string | undefined {
   const v = value.trim();
-  if (!v) return `${label} es obligatorio`;
-  if (v.length > 100) return 'Máximo 100 caracteres';
-  if (!NAME_RE.test(v)) return 'Solo letras, espacios, apóstrofes, puntos y guiones';
+  if (!v) return required;
+  if (v.length > NAME_MAX) return t('forms.validation.maxChars', { max: NAME_MAX });
+  if (!NAME_RE.test(v)) return t('forms.validation.name.characters');
   return undefined;
 }
 
 export function validateBirthDate(value: string): string | undefined {
-  if (!value) return 'La fecha de nacimiento es obligatoria';
+  if (!value) return t('forms.validation.birthDate.required');
   const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return 'Fecha inválida';
+  if (Number.isNaN(date.getTime())) return t('forms.validation.birthDate.invalid');
   const today = businessDate();
-  if (date >= today) return 'Debe ser anterior a hoy';
+  if (date >= today) return t('forms.validation.birthDate.notBeforeToday');
   let age = today.getFullYear() - date.getFullYear();
   const m = today.getMonth() - date.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < date.getDate())) age--;
-  if (age < MIN_EMPLOYEE_AGE) return `El empleado debe tener al menos ${MIN_EMPLOYEE_AGE} años`;
-  if (age > 100) return 'Fecha inválida';
+  if (age < MIN_EMPLOYEE_AGE) return t('forms.validation.birthDate.minAge', { age: MIN_EMPLOYEE_AGE });
+  if (age > 100) return t('forms.validation.birthDate.invalid');
   return undefined;
 }
 
 export function validateEmployeeNumber(value: string): string | undefined {
-  if (!value.trim()) return 'El número de empleado es obligatorio';
-  if (!EMPLOYEE_NUMBER_RE.test(value.trim())) return '1-30 caracteres: letras, números, guion o guion bajo';
+  if (!value.trim()) return t('forms.validation.employeeNumber.required');
+  if (!EMPLOYEE_NUMBER_RE.test(value.trim())) return t('forms.validation.employeeNumber.format');
   return undefined;
 }
 
@@ -75,29 +92,44 @@ function rfcDateIsValid(yy: number, mm: number, dd: number): boolean {
   });
 }
 
-/** Fecha aammdd de un RFC o una CURP como dd/mm/aaaa (con el siglo de la fecha capturada). */
-function documentDate(yymmdd: string, birthIso: string): string {
-  return `${yymmdd.slice(4, 6)}/${yymmdd.slice(2, 4)}/${birthIso.slice(0, 2)}${yymmdd.slice(0, 2)}`;
+/**
+ * Fecha numérica en el orden y con los separadores del idioma activo ("01/09/2003" en es-MX,
+ * "09/01/2003" en en-US). Las partes se ponen tal cual: la fecha de un documento puede no existir
+ * en el siglo de la fecha capturada (29 de febrero) y aun así se muestra como está escrita.
+ */
+function numericDate(year: string, month: string, day: string): string {
+  const parts = { year, month, day } as Partial<Record<Intl.DateTimeFormatPartTypes, string>>;
+  return localeDateFormat({ day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
+    .formatToParts(0)
+    .map((part) => parts[part.type] ?? part.value)
+    .join('');
 }
 
 /** "El RFC indica nacimiento el 01/09/2003, pero la fecha de nacimiento es 03/09/2003" (mismo texto que el backend). */
-function birthDateMismatch(document: 'El RFC' | 'La CURP', yymmdd: string, birthIso: string): string {
+function birthDateMismatch(document: 'rfc' | 'curp', yymmdd: string, birthIso: string): string {
   const [year, month, day] = birthIso.split('-');
-  return `${document} indica nacimiento el ${documentDate(yymmdd, birthIso)}, pero la fecha de nacimiento es ${day}/${month}/${year}`;
+  // La fecha aammdd del documento, con el siglo de la fecha capturada.
+  const documentDate = numericDate(`${birthIso.slice(0, 2)}${yymmdd.slice(0, 2)}`, yymmdd.slice(2, 4), yymmdd.slice(4, 6));
+  return t(`forms.validation.${document}.birthMismatch`, { document: documentDate, birth: numericDate(year, month, day) });
 }
 
-/** Mismas reglas que el backend; con `birthDate` (ISO) verifica también que coincida la fecha. */
+/*
+ * RFC, CURP y NSS del empleado son OPCIONALES (decisión del dueño del producto: la plataforma se abre a otros
+ * países): vacíos no tienen nada que validar; con valor, las mismas reglas que el backend.
+ */
+
+/** Mismas reglas que el backend; con `birthDate` (ISO) verifica también que coincida la fecha. Vacío: opcional. */
 export function validateRfc(value: string, birthDate?: string): string | undefined {
   const rfc = normalizeRfc(value);
-  if (!rfc) return 'El RFC es obligatorio';
-  if (GENERIC_RFCS.has(rfc)) return 'Captura el RFC personal del empleado; el RFC genérico no es válido';
-  if (rfc.length !== RFC_LENGTH) return `El RFC de una persona física tiene ${RFC_LENGTH} caracteres; llevas ${rfc.length}`;
+  if (!rfc) return undefined;
+  if (GENERIC_RFCS.has(rfc)) return t('forms.validation.rfc.generic');
+  if (rfc.length !== RFC_LENGTH) return t('forms.validation.rfc.length', { length: RFC_LENGTH, current: rfc.length });
   const match = RFC_RE.exec(rfc);
-  if (!match) return 'El RFC no tiene un formato válido (p. ej. PEGJ900515AB1)';
-  if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha del RFC (aammdd) no es válida';
+  if (!match) return t('forms.validation.rfc.format', { example: RFC_EXAMPLE });
+  if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return t('forms.validation.rfc.date');
   const birthIso = birthDate ?? '';
   const birth = /^\d{2}(\d{2})-(\d{2})-(\d{2})$/.exec(birthIso);
-  if (birth && rfc.slice(4, 10) !== `${birth[1]}${birth[2]}${birth[3]}`) return birthDateMismatch('El RFC', rfc.slice(4, 10), birthIso);
+  if (birth && rfc.slice(4, 10) !== `${birth[1]}${birth[2]}${birth[3]}`) return birthDateMismatch('rfc', rfc.slice(4, 10), birthIso);
   return undefined;
 }
 
@@ -117,21 +149,20 @@ export function curpCheckDigit(first17: string): string {
   return String((10 - (total % 10)) % 10);
 }
 
+/** Vacía: opcional (sin capturar). */
 export function validateCurp(value: string, birthDate?: string): string | undefined {
   const curp = normalizeCurp(value);
-  if (!curp) return 'La CURP es obligatoria';
-  if (curp.length !== CURP_LENGTH) return `La CURP tiene ${CURP_LENGTH} caracteres; llevas ${curp.length}`;
+  if (!curp) return undefined;
+  if (curp.length !== CURP_LENGTH) return t('forms.validation.curp.length', { length: CURP_LENGTH, current: curp.length });
   const match = CURP_RE.exec(curp);
-  if (!match) return 'La CURP no tiene un formato válido (p. ej. HEGG560427MVZRRL04)';
-  if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha de la CURP (aammdd) no es válida';
-  if (curpCheckDigit(curp.slice(0, 17)) !== curp[17]) return 'La CURP no es válida: el dígito verificador no corresponde';
+  if (!match) return t('forms.validation.curp.format', { example: CURP_EXAMPLE });
+  if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return t('forms.validation.curp.date');
+  if (curpCheckDigit(curp.slice(0, 17)) !== curp[17]) return t('forms.validation.curp.checkDigit');
   const birthIso = birthDate ?? '';
   const birth = /^(\d{2})(\d{2})-(\d{2})-(\d{2})$/.exec(birthIso);
   if (birth) {
-    if (curp.slice(4, 10) !== `${birth[2]}${birth[3]}${birth[4]}`) return birthDateMismatch('La CURP', curp.slice(4, 10), birthIso);
-    if (/\d/.test(curp[16]) !== Number(`${birth[1]}${birth[2]}`) < 2000) {
-      return 'La CURP no corresponde al siglo de la fecha de nacimiento: su carácter 17 es un número para quienes nacieron antes de 2000 y una letra a partir de 2000';
-    }
+    if (curp.slice(4, 10) !== `${birth[2]}${birth[3]}${birth[4]}`) return birthDateMismatch('curp', curp.slice(4, 10), birthIso);
+    if (/\d/.test(curp[16]) !== Number(`${birth[1]}${birth[2]}`) < 2000) return t('forms.validation.curp.century');
   }
   return undefined;
 }
@@ -147,33 +178,38 @@ export function luhnValid(digits: string): boolean {
   return total % 10 === 0;
 }
 
+/** Vacío: opcional (sin capturar). */
 export function validateNss(value: string): string | undefined {
   const nss = value.replace(/\D/g, '');
-  if (!nss) return 'El NSS es obligatorio';
-  if (nss.length !== NSS_LENGTH) return `El NSS tiene ${NSS_LENGTH} dígitos`;
-  if (!luhnValid(nss)) return 'El NSS no es válido: el dígito verificador no corresponde';
+  if (!nss) return undefined;
+  if (nss.length !== NSS_LENGTH) return t('forms.validation.nss.length', { length: NSS_LENGTH });
+  if (!luhnValid(nss)) return t('forms.validation.nss.checkDigit');
   return undefined;
 }
 
 // ---------- Empresas (consola de la plataforma) ----------
 const COMPANY_RFC_RE = /^[A-ZÑ&]{3}(\d{2})(\d{2})(\d{2})[A-Z\d]{2}[\dA]$/;
 
-/** RFC de empresa: persona moral (12) o persona física con actividad empresarial (13). */
+/**
+ * RFC de empresa: persona moral (12) o persona física con actividad empresarial (13). Vacío: opcional (sin capturar),
+ * como los documentos del empleado (decisión del dueño del producto: la plataforma se abre a otros países).
+ */
 export function validateCompanyRfc(value: string): string | undefined {
   const rfc = normalizeRfc(value);
-  if (!rfc) return 'El RFC es obligatorio';
+  if (!rfc) return undefined;
   // 13 caracteres: persona física (validateRfc también rechaza los RFC genéricos, que tienen 13).
   if (rfc.length === RFC_LENGTH) return validateRfc(rfc);
   const match = COMPANY_RFC_RE.exec(rfc);
-  if (!match) return 'El RFC debe tener 12 caracteres (persona moral) o 13 (persona física)';
-  if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return 'La fecha del RFC (aammdd) no es válida';
+  if (!match) return t('forms.validation.rfc.companyLength');
+  if (!rfcDateIsValid(Number(match[1]), Number(match[2]), Number(match[3]))) return t('forms.validation.rfc.date');
   return undefined;
 }
 
-export function validateCompanyName(value: string, label: string): string | undefined {
+/** `required`: el aviso completo de campo vacío, ya traducido ("La razón social es obligatoria"). */
+export function validateCompanyName(value: string, required: string): string | undefined {
   const name = value.trim().replace(/\s+/g, ' ');
-  if (name.length < 2) return `${label} es obligatorio`;
-  if (name.length > 200) return 'Máximo 200 caracteres';
+  if (name.length < 2) return required;
+  if (name.length > COMPANY_NAME_MAX) return t('forms.validation.maxChars', { max: COMPANY_NAME_MAX });
   return undefined;
 }
 
@@ -181,7 +217,7 @@ export function validateCompanyName(value: string, label: string): string | unde
 export function validateMaxEmployees(value: string): string | undefined {
   if (!value.trim()) return undefined;
   const n = Number(value);
-  return Number.isInteger(n) && n >= 1 && n <= 1_000_000 ? undefined : 'Escribe un número entero mayor a 0';
+  return Number.isInteger(n) && n >= 1 && n <= 1_000_000 ? undefined : t('forms.validation.maxEmployees');
 }
 
 /** Fecha máxima (YYYY-MM-DD) para el selector: edad mínima cumplida hoy (en la zona del negocio). */

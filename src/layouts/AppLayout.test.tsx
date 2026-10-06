@@ -10,7 +10,10 @@ import { DashboardPage } from '../pages/company/DashboardPage';
 import { useAuth } from '../hooks/useAuth';
 import { notifyAbsenceRequestsChanged } from '../hooks/usePendingAbsenceRequests';
 import { notifyShiftRequestsChanged } from '../hooks/usePendingShiftRequests';
+import { notifyAttendanceReviewsChanged } from '../hooks/usePendingAttendanceReviews';
+import { notifyFraudCasesChanged } from '../hooks/usePendingFraudCases';
 import { useEffect } from 'react';
+import { setLocale } from '../i18n/core';
 
 function SignIn() {
   const { login } = useAuth();
@@ -40,7 +43,10 @@ function renderLayout(page = <p>contenido</p>, route = '/') {
 function companyServer(pending = 0, extra: (call: MockCall) => Response | null = () => null) {
   return mockFetch((call) => {
     if (call.url.includes('/enrollments')) return apiOk({ items: [], total: pending, page: 1, size: 1 });
-    return extra(call) ?? apiOk(tokenResponse({ ...sampleUser, role: 'COMPANY', employee: null }));
+    const answered = extra(call);
+    if (answered) return answered;
+    if (call.url.endsWith('/attendance/reviews/count')) return apiOk({ pending: 0 });
+    return apiOk(tokenResponse({ ...sampleUser, role: 'COMPANY', employee: null }));
   });
 }
 
@@ -86,7 +92,7 @@ describe('AppLayout: menú lateral contraíble', () => {
   it('muestra el rol con su nombre oficial', async () => {
     companyServer();
     renderLayout();
-    expect(await screen.findByText('Company', { selector: '.sidebar__section' })).toBeInTheDocument();
+    expect(await screen.findByText('Empresa', { selector: '.sidebar__section' })).toBeInTheDocument();
   });
 
   it('teléfonos: el menú hamburguesa abre el menú lateral, se cierra con Escape, con "Cerrar" o al tocar fuera', async () => {
@@ -134,13 +140,18 @@ describe('AppLayout: menú lateral contraíble', () => {
   it('el menú son las pantallas que envía el backend, en menús y submenús (orden, nombres y contadores)', async () => {
     const { calls } = companyServer(4, (call) => {
       if (call.url.endsWith('/shift-requests/summary')) return apiOk({ pending: 2 });
+      if (call.url.endsWith('/attendance/reviews/count')) return apiOk({ pending: 1 });
       return call.url.endsWith('/calendar/absences/summary') ? apiOk({ pending: 3 }) : null;
     });
     renderLayout();
     const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
     // Lo más simple: un módulo con una sola pantalla es una opción directa; con varias, un submenú (cerrado).
     const top = () => [...sidebar.querySelectorAll('.sidebar__nav > * > .nav-item')].map((item) => item.textContent);
-    await waitFor(() => expect(top()).toEqual(['Dashboard', 'Personal4', 'Asistencia5', 'Validadores', 'Integraciones (API)', 'Mi perfil']));
+    await waitFor(() => expect(top()).toEqual(['Panel', 'Personal4', 'Asistencia6', 'Validadores', 'Integraciones (API)', 'Cuenta']));
+    // «Cuenta» reúne los documentos de la empresa y Mi perfil (módulo ACCOUNT del backend).
+    await userEvent.click(within(sidebar).getByRole('button', { name: 'Cuenta' }));
+    expect(within(sidebar).getByRole('link', { name: 'Documentos' })).toHaveAttribute('href', '/company/documents');
+    expect(within(sidebar).getByRole('link', { name: 'Mi perfil' })).toHaveAttribute('href', '/profile');
     const people = within(sidebar).getByRole('button', { name: /Personal/ });
     expect(people).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(people);
@@ -152,6 +163,8 @@ describe('AppLayout: menú lateral contraíble', () => {
     expect(within(sidebar).queryByRole('link', { name: 'Empleados' })).toBeNull();
     expect(within(sidebar).getByRole('link', { name: /Turnos/ })).toHaveTextContent('2');
     expect(within(sidebar).getByRole('link', { name: /Calendario/ })).toHaveTextContent('3');
+    // Registros "en revisión" que la empresa confirma o rechaza (contador del tablero).
+    expect(within(sidebar).getByRole('link', { name: /Tablero del día/ })).toHaveTextContent('1');
     await userEvent.click(within(sidebar).getByRole('button', { name: /Asistencia/ }));
     expect(within(sidebar).queryByRole('link', { name: /Turnos/ })).toBeNull();
     // Solicitudes de cambio de turno pendientes: una consulta periódica, que se repite al avisar un cambio.
@@ -162,6 +175,9 @@ describe('AppLayout: menú lateral contraíble', () => {
     const absences = calls.filter((c) => c.url.endsWith('/calendar/absences/summary')).length;
     act(() => notifyAbsenceRequestsChanged());
     await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/calendar/absences/summary')).length).toBe(absences + 1));
+    const reviews = calls.filter((c) => c.url.endsWith('/attendance/reviews/count')).length;
+    act(() => notifyAttendanceReviewsChanged());
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/attendance/reviews/count')).length).toBe(reviews + 1));
   });
 
   it('el submenú de la pantalla actual se abre solo; con el menú contraído (solo íconos) se ven todas las pantallas', async () => {
@@ -197,12 +213,13 @@ describe('AppLayout: menú lateral contraíble', () => {
     expect(sidebar.querySelector('.nav-menu')).toBeNull();
   });
 
-  it('administrador de la plataforma: panel, empresas, errores del sistema (con pendientes), seguridad facial y perfil', async () => {
-    mockFetch((call) =>
-      call.url.includes('/admin/errors/summary')
-        ? apiOk({ by_status: { PENDING: 3 }, open_by_severity: {}, pending: 3, last_seen_at: null })
-        : apiOk(tokenResponse({ ...sampleUser, role: 'ADMIN', employee: null })),
-    );
+  it('administrador de la plataforma: panel, empresas, errores del sistema (con pendientes), seguridad facial, casos de fraude (por revisar), rendimiento (alertas abiertas) y perfil', async () => {
+    const mocked = mockFetch((call) => {
+      if (call.url.includes('/admin/errors/summary')) return apiOk({ by_status: { PENDING: 3 }, open_by_severity: {}, pending: 3, last_seen_at: null });
+      if (call.url.includes('/admin/performance/alerts/summary')) return apiOk({ open: 2, acknowledged: 0, latest: null });
+      if (call.url.includes('/admin/fraud-cases/count')) return apiOk({ active: 4 });
+      return apiOk(tokenResponse({ ...sampleUser, role: 'ADMIN', employee: null }));
+    });
     renderLayout(<p>contenido</p>, '/admin/dashboard');
     const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
     const labels = () =>
@@ -213,9 +230,14 @@ describe('AppLayout: menú lateral contraíble', () => {
     // "Plataforma" abre su submenú porque la pantalla actual (Panel) es suya.
     await waitFor(() => expect(labels()).toEqual(['Panel', 'Empresas', 'Mi perfil']));
     expect(within(sidebar).getByRole('button', { name: 'Plataforma' })).toHaveAttribute('aria-expanded', 'true');
-    // "Operación" (errores del sistema y seguridad facial) se abre a demanda; un submenú a la vez.
+    // "Operación" (errores del sistema, seguridad facial, casos de fraude y rendimiento) se abre a demanda; un submenú a la vez.
     await userEvent.click(within(sidebar).getByRole('button', { name: /Operación/ }));
-    await waitFor(() => expect(labels()).toEqual(['Errores del sistema3', 'Seguridad facial', 'Mi perfil']));
+    await waitFor(() => expect(labels()).toEqual(['Errores del sistema3', 'Seguridad facial', 'Casos de fraude4', 'Rendimiento2', 'Mi perfil']));
+    // Casos de fraude por revisar: una consulta periódica, que se repite al avisar una revisión.
+    const fraud = () => mocked.calls.filter((c) => c.url.endsWith('/admin/fraud-cases/count')).length;
+    const asked = fraud();
+    act(() => notifyFraudCasesChanged());
+    await waitFor(() => expect(fraud()).toBe(asked + 1));
     // Sin empresa ni empleos (dato del backend, no el rol): la consola de la plataforma.
     expect(within(sidebar).getByText('Consola de la plataforma', { selector: '.brand-name small' })).toBeInTheDocument();
   });
@@ -239,7 +261,7 @@ describe('AppLayout: menú lateral contraíble', () => {
       ['Identificar empleados', '/validator/checkpoint'],
       ['Mi perfil', '/profile'],
     ]);
-    expect(screen.getByText('Validator', { selector: '.sidebar__section' })).toBeInTheDocument();
+    expect(screen.getByText('Validador', { selector: '.sidebar__section' })).toBeInTheDocument();
     expect(within(sidebar).getByText('Mi empresa', { selector: '.brand-name small' })).toBeInTheDocument();
   });
 });
@@ -252,16 +274,58 @@ describe('AppLayout: cerrar sesión', () => {
     const logoutCalls = () => calls.filter((c) => c.url.endsWith('/auth/logout'));
 
     await userEvent.click(within(sidebar).getByRole('button', { name: 'Cerrar sesión' }));
-    expect(screen.getByRole('alertdialog', { name: '¿Estás seguro de que deseas cerrar sesión?' })).toBeInTheDocument();
+    expect(screen.getByRole('alertdialog', { name: '¿Cerrar sesión?' })).toBeInTheDocument();
     await userEvent.keyboard('{Escape}'); // cerrar el popup = seguir en la sesión
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(logoutCalls()).toHaveLength(0);
     expect(screen.getByText('contenido')).toBeInTheDocument();
 
     await userEvent.click(within(sidebar).getByRole('button', { name: 'Cerrar sesión' }));
-    const dialog = screen.getByRole('alertdialog', { name: '¿Estás seguro de que deseas cerrar sesión?' });
+    const dialog = screen.getByRole('alertdialog', { name: '¿Cerrar sesión?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cerrar sesión' }));
     await waitFor(() => expect(logoutCalls()).toHaveLength(1));
     await waitFor(() => expect(screen.queryByText('contenido')).toBeNull()); // sin sesión, sin el área de trabajo
+  });
+});
+
+describe('AppLayout en inglés (en-US)', () => {
+  it('los textos propios del marco en inglés; los nombres del menú son los que envía el backend', async () => {
+    mockFetch((call) =>
+      call.url.includes('/admin/errors/summary')
+        ? apiOk({ by_status: {}, open_by_severity: {}, pending: 0, last_seen_at: null })
+        : apiOk(tokenResponse({ ...sampleUser, role: 'ADMIN', employee: null })),
+    );
+    await setLocale('en-US');
+    renderLayout();
+    const sidebar = await screen.findByRole('complementary', { name: 'Main navigation' });
+    expect(within(sidebar).getByRole('navigation', { name: 'Menu' })).toBeInTheDocument();
+    expect(within(sidebar).getByText('Platform console', { selector: '.brand-name small' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Collapse menu' })).toHaveAttribute('title', 'Collapse menu (Ctrl/⌘ + B)');
+    expect(within(sidebar).getByRole('button', { name: 'Close menu' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('link', { name: 'Mi perfil' })).toBeInTheDocument(); // nombre del backend (sin traducir aquí)
+    const bar = screen.getByRole('banner');
+    expect(within(bar).getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
+    expect(within(bar).getByRole('link', { name: 'Home' })).toBeInTheDocument();
+    act(() => void window.dispatchEvent(new Event('offline')));
+    expect(screen.getByRole('status')).toHaveTextContent('Offline. Retrying automatically.');
+    act(() => void window.dispatchEvent(new Event('online')));
+    // Cerrar sesión: su popup en inglés.
+    await userEvent.click(within(sidebar).getByRole('button', { name: 'Sign out' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Sign out?' });
+    expect(dialog).toHaveTextContent("Your work is saved. You'll need to sign in again to manage the platform.");
+    expect(within(dialog).getByRole('button', { name: 'Stay here' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Sign out of all my devices' })).toBeInTheDocument();
+  });
+
+  it('el menú contraído y su popup de error siguen al idioma al cambiarlo en caliente', async () => {
+    mockFetch((call) =>
+      call.url.endsWith('/users/me/preferences') ? apiFail(503, 'SERVICE_UNAVAILABLE') : apiOk(tokenResponse({ ...sampleUser, preferences: { sidebar_collapsed: true } })),
+    );
+    renderLayout();
+    await userEvent.click(await screen.findByRole('button', { name: 'Expandir menú' }));
+    await screen.findByRole('alertdialog', { name: 'No se pudo guardar la preferencia del menú' });
+    await act(() => setLocale('en-US'));
+    expect(screen.getByRole('alertdialog', { name: "Couldn't save the menu preference" })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand menu' })).toHaveAttribute('title', 'Expand menu (Ctrl/⌘ + B)');
   });
 });

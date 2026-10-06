@@ -1,41 +1,44 @@
 import { MonitorSmartphone, ShieldX } from 'lucide-react';
+import { t } from '../../i18n';
 import { ApiError } from '../../services/apiClient';
 import { DeviceKeyError } from '../../utils/deviceKey';
 import { loginLocationMessage } from '../location/locationMessages';
 import type { MessageInput } from '../MessageDialog';
 
-const DEVICE_TITLES: Record<string, { title: string; steps?: string[]; variant: MessageInput['variant'] }> = {
-  DEVICE_PENDING_APPROVAL: {
-    title: 'Dispositivo por autorizar',
-    variant: 'info',
-    steps: [
-      'Pide a un administrador de tu empresa que entre a Validadores › Dispositivos.',
-      'Que autorice este dispositivo (aparece con el nombre de este navegador).',
-      'Vuelve a iniciar sesión aquí mismo.',
-    ],
-  },
-  DEVICE_REJECTED: { title: 'Dispositivo no autorizado', variant: 'warning' },
-  DEVICE_REVOKED: { title: 'Autorización retirada', variant: 'warning' },
-  DEVICE_PROOF_INVALID: { title: 'No se pudo verificar el dispositivo', variant: 'error' },
-};
+/** Reglas del dispositivo de un validador: variante del aviso y si lleva los pasos para autorizarlo. */
+const DEVICE_RULES = {
+  DEVICE_PENDING_APPROVAL: { variant: 'info', steps: true },
+  DEVICE_REJECTED: { variant: 'warning', steps: false },
+  DEVICE_REVOKED: { variant: 'warning', steps: false },
+  DEVICE_PROOF_INVALID: { variant: 'error', steps: false },
+} as const satisfies Record<string, { variant: MessageInput['variant']; steps: boolean }>;
+
+type DeviceRule = keyof typeof DEVICE_RULES;
+
+const isDeviceRule = (code: string): code is DeviceRule => code in DEVICE_RULES;
+
+/** Qué hacer con un dispositivo por autorizar, en el idioma activo. */
+const pendingSteps = () => [t('auth.device.pendingSteps.ask'), t('auth.device.pendingSteps.authorize'), t('auth.device.pendingSteps.retry')];
 
 /**
  * Aviso del inicio de sesión cuando una regla del validador lo impide: dispositivo por autorizar,
  * rechazado o revocado, navegador sin llave de dispositivo, o la ubicación. null: otro error.
+ * Sus textos salen del idioma activo al llamarse: el inicio de sesión lo pide al dibujar el popup
+ * (`feedback.show(() => …)`), así un cambio de idioma con el aviso abierto lo traduce.
  */
 export function loginRuleMessage(error: unknown): MessageInput | null {
   if (error instanceof DeviceKeyError) {
-    return { variant: 'error', icon: <ShieldX size={30} />, eyebrow: 'Dispositivo', title: 'No se pudo registrar el dispositivo', text: error.message, key: 'login-device-unsupported' };
+    return { variant: 'error', icon: <ShieldX size={30} />, eyebrow: t('auth.device.eyebrow'), title: t('auth.device.unsupported'), text: error.message, key: 'login-device-unsupported' };
   }
-  if (error instanceof ApiError && error.code in DEVICE_TITLES) {
-    const copy = DEVICE_TITLES[error.code];
+  if (error instanceof ApiError && isDeviceRule(error.code)) {
+    const rule = DEVICE_RULES[error.code];
     return {
-      variant: copy.variant,
+      variant: rule.variant,
       icon: <MonitorSmartphone size={30} />,
-      eyebrow: 'Dispositivo',
-      title: copy.title,
+      eyebrow: t('auth.device.eyebrow'),
+      title: t(`auth.device.titles.${error.code}`),
       text: error.message,
-      details: copy.steps,
+      details: rule.steps ? pendingSteps() : undefined,
       detailsStyle: 'steps',
       key: `login-${error.code}`,
     };

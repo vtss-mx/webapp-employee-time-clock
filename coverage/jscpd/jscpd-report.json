@@ -1,56 +1,56 @@
 {
   "duplicates": [],
   "statistics": {
-    "detectionDate": "2026-10-04T17:16:34.075Z",
+    "detectionDate": "2026-10-06T18:00:25.083Z",
     "formats": {
       "css": {
         "clones": 0,
         "duplicatedLines": 0,
         "duplicatedTokens": 0,
-        "lines": 9014,
+        "lines": 11177,
         "newClones": 0,
         "newDuplicatedLines": 0,
         "percentage": 0.0,
         "percentageTokens": 0.0,
         "sources": 1,
-        "tokens": 83568
+        "tokens": 109352
       },
       "tsx": {
         "clones": 0,
         "duplicatedLines": 0,
         "duplicatedTokens": 0,
-        "lines": 22826,
+        "lines": 34355,
         "newClones": 0,
         "newDuplicatedLines": 0,
         "percentage": 0.0,
         "percentageTokens": 0.0,
-        "sources": 207,
-        "tokens": 163414
+        "sources": 301,
+        "tokens": 266776
       },
       "typescript": {
         "clones": 0,
         "duplicatedLines": 0,
         "duplicatedTokens": 0,
-        "lines": 10759,
+        "lines": 30023,
         "newClones": 0,
         "newDuplicatedLines": 0,
         "percentage": 0.0,
         "percentageTokens": 0.0,
-        "sources": 125,
-        "tokens": 70388
+        "sources": 294,
+        "tokens": 160508
       }
     },
     "total": {
       "clones": 0,
       "duplicatedLines": 0,
       "duplicatedTokens": 0,
-      "lines": 42599,
+      "lines": 75555,
       "newClones": 0,
       "newDuplicatedLines": 0,
       "percentage": 0.0,
       "percentageTokens": 0.0,
-      "sources": 333,
-      "tokens": 317370
+      "sources": 596,
+      "tokens": 536636
     }
   }
 }

@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/1</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -107,7 +107,12 @@
 <a name='L42'></a><a href='#L42'>42</a>
 <a name='L43'></a><a href='#L43'>43</a>
 <a name='L44'></a><a href='#L44'>44</a>
-<a name='L45'></a><a href='#L45'>45</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -122,23 +127,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">22x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">13x</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -147,48 +139,65 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">30x</span>
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { MonitorSmartphone, ShieldX } from 'lucide-react';
+import { t } from '../../i18n';
 import { ApiError } from '../../services/apiClient';
 import { DeviceKeyError } from '../../utils/deviceKey';
 import { loginLocationMessage } from '../location/locationMessages';
 import type { MessageInput } from '../MessageDialog';
 &nbsp;
-const DEVICE_TITLES: Record&lt;string, { title: string; steps?: string[]; variant: MessageInput['variant'] }&gt; = {
-  DEVICE_PENDING_APPROVAL: {
-    title: 'Dispositivo por autorizar',
-    variant: 'info',
-    steps: [
-      'Pide a un administrador de tu empresa que entre a Validadores › Dispositivos.',
-      'Que autorice este dispositivo (aparece con el nombre de este navegador).',
-      'Vuelve a iniciar sesión aquí mismo.',
-    ],
-  },
-  DEVICE_REJECTED: { title: 'Dispositivo no autorizado', variant: 'warning' },
-  DEVICE_REVOKED: { title: 'Autorización retirada', variant: 'warning' },
-  DEVICE_PROOF_INVALID: { title: 'No se pudo verificar el dispositivo', variant: 'error' },
-};
+/** Reglas del dispositivo de un validador: variante del aviso y si lleva los pasos para autorizarlo. */
+const DEVICE_RULES = {
+  DEVICE_PENDING_APPROVAL: { variant: 'info', steps: true },
+  DEVICE_REJECTED: { variant: 'warning', steps: false },
+  DEVICE_REVOKED: { variant: 'warning', steps: false },
+  DEVICE_PROOF_INVALID: { variant: 'error', steps: false },
+} as const satisfies Record&lt;string, { variant: MessageInput['variant']; steps: boolean }&gt;;
+&nbsp;
+type DeviceRule = keyof typeof DEVICE_RULES;
+&nbsp;
+const isDeviceRule = (code: string): code is DeviceRule =&gt; code in DEVICE_RULES;
+&nbsp;
+/** Qué hacer con un dispositivo por autorizar, en el idioma activo. */
+const pendingSteps = () =&gt; [t('auth.device.pendingSteps.ask'), t('auth.device.pendingSteps.authorize'), t('auth.device.pendingSteps.retry')];
 &nbsp;
 /**
  * Aviso del inicio de sesión cuando una regla del validador lo impide: dispositivo por autorizar,
  * rechazado o revocado, navegador sin llave de dispositivo, o la ubicación. null: otro error.
+ * Sus textos salen del idioma activo al llamarse: el inicio de sesión lo pide al dibujar el popup
+ * (`feedback.show(() =&gt; …)`), así un cambio de idioma con el aviso abierto lo traduce.
  */
 export function loginRuleMessage(error: unknown): MessageInput | null {
   if (error instanceof DeviceKeyError) {
-    return { variant: 'error', icon: &lt;ShieldX size={30} /&gt;, eyebrow: 'Dispositivo', title: 'No se pudo registrar el dispositivo', text: error.message, key: 'login-device-unsupported' };
+    return { variant: 'error', icon: &lt;ShieldX size={30} /&gt;, eyebrow: t('auth.device.eyebrow'), title: t('auth.device.unsupported'), text: error.message, key: 'login-device-unsupported' };
   }
-  if (error instanceof ApiError &amp;&amp; error.code in DEVICE_TITLES) {
-    const copy = DEVICE_TITLES[error.code];
+  if (error instanceof ApiError &amp;&amp; isDeviceRule(error.code)) {
+    const rule = DEVICE_RULES[error.code];
     return {
-      variant: copy.variant,
+      variant: rule.variant,
       icon: &lt;MonitorSmartphone size={30} /&gt;,
-      eyebrow: 'Dispositivo',
-      title: copy.title,
+      eyebrow: t('auth.device.eyebrow'),
+      title: t(`auth.device.titles.${error.code}`),
       text: error.message,
-      details: copy.steps,
+      details: rule.steps ? pendingSteps() : undefined,
       detailsStyle: 'steps',
       key: `login-${error.code}`,
     };
@@ -202,7 +211,7 @@ export function loginRuleMessage(error: unknown): MessageInput | null {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

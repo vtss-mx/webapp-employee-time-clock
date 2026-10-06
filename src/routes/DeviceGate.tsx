@@ -3,6 +3,7 @@ import { useEffect, type ReactNode } from 'react';
 import { PhoneAccessGuide } from '../components/PhoneAccessGuide';
 import { useAuth } from '../hooks/useAuth';
 import { useFeedback } from '../hooks/useFeedback';
+import { t } from '../i18n';
 
 /**
  * Si el servidor rechaza el dispositivo (un validador en una computadora: su empresa exige tableta o
@@ -15,20 +16,21 @@ export function DeviceGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!deviceBlock) return;
+    // Se arma al dibujarse: con el popup abierto, un cambio de idioma lo traduce (el mensaje es del servidor).
     void feedback
-      .show({
+      .show(() => ({
         variant: 'info',
         icon: <TabletSmartphone size={30} />,
-        eyebrow: 'Estás usando una computadora',
-        title: 'Continúa desde una tableta o un teléfono',
+        eyebrow: t('auth.deviceBlock.eyebrow'),
+        title: t('auth.deviceBlock.title'),
         text: deviceBlock.message,
         body: <PhoneAccessGuide />,
-        footnote: '¿Necesitas ayuda? Comunícate con el administrador de tu empresa.',
-        actions: [{ id: 'exit', label: isAuthenticated ? 'Cerrar sesión' : 'Entendido', icon: <LogOut size={18} /> }],
+        footnote: t('auth.deviceBlock.footnote'),
+        actions: [{ id: 'exit', label: isAuthenticated ? t('common.actions.logout') : t('feedback.understood'), icon: <LogOut size={18} /> }],
         dismissible: false,
         wide: true,
         key: 'device-block',
-      })
+      }))
       .then(() => dismissDeviceBlock());
   }, [deviceBlock, isAuthenticated, feedback, dismissDeviceBlock]);
 

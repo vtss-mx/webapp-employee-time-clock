@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { notifyShiftRequestsChanged } from '../../hooks/usePendingShiftRequests';
 import { useResource } from '../../hooks/useResource';
+import { t as translate, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { ApiError } from '../../services/apiClient';
 import { isShiftRequest, shiftService } from '../../services/shiftService';
@@ -11,6 +12,7 @@ import { formatDate, timeAgo } from '../../utils/format';
 import { isRecord } from '../../utils/guards';
 import { shiftSchedule } from '../../utils/shifts';
 import { ButtonLink } from '../ui/Button';
+import { DeletedMark } from '../ui/DeletedMark';
 import { EmptyState } from '../ui/EmptyState';
 import { Panel, PanelHeader, PanelSection } from '../ui/Panel';
 import { SkeletonCard } from '../ui/Skeleton';
@@ -64,22 +66,23 @@ export function PendingRequest({ title, children }: PendingRequestProps) {
   // La bandeja pasa la solicitud al abrir "Aprobar" o "Rechazar" (`state: { request }`).
   const state: unknown = useLocation().state;
   const passed = isRecord(state) && isShiftRequest(state.request) ? state.request : null;
-  const { data, error, retry } = useResource(async (signal) => ({ request: await findPendingRequest(requestId, passed, signal) }), requestId, 'No se pudo cargar la solicitud');
+  const t = useT();
+  const { data, error, retry } = useResource(async (signal) => ({ request: await findPendingRequest(requestId, passed, signal) }), requestId, () => translate('shifts.requests.closed.loadError'));
 
-  if (!data) return error ? <LoadFailed title={title} backTo={paths.company.shiftRequests} backLabel="Solicitudes" onRetry={retry} /> : <SkeletonCard lines={6} />;
+  if (!data) return error ? <LoadFailed title={title} backTo={paths.company.shiftRequests} backLabel={t('shifts.requests.backLabel')} onRetry={retry} /> : <SkeletonCard lines={6} />;
   if (data.request) return children(data.request);
   return (
     <div className="page">
       <Panel>
-        <PanelHeader title={title} backTo={paths.company.shiftRequests} backLabel="Solicitudes" />
+        <PanelHeader title={title} backTo={paths.company.shiftRequests} backLabel={t('shifts.requests.backLabel')} />
         <PanelSection>
           <EmptyState
             icon={<Inbox />}
-            title="Esta solicitud ya no está pendiente"
-            description="Ya se aprobó, se rechazó o el empleado la canceló. Su estado aparece en la bandeja de solicitudes."
+            title={t('shifts.requests.closed.title')}
+            description={t('shifts.requests.closed.description')}
             action={
               <ButtonLink to={paths.company.shiftRequests} variant="primary" icon={<Inbox size={18} />}>
-                Ver solicitudes
+                {t('shifts.requests.closed.action')}
               </ButtonLink>
             }
           />
@@ -90,39 +93,47 @@ export function PendingRequest({ title, children }: PendingRequestProps) {
 }
 
 /** "Matutino (08:00 – 16:00)" o "Sin turno". */
-const shiftName = (shift: ShiftRef | null) => (shift ? `${shift.name} (${shiftSchedule(shift)})` : 'Sin turno');
+const shiftName = (shift: ShiftRef | null) => (shift ? `${shift.name} (${shiftSchedule(shift)})` : translate('shifts.requests.summary.noShift'));
 
-/** El cambio pedido: turno actual → turno pedido. */
+/** El cambio pedido: turno actual → turno pedido (cada uno con su marca si ya está en «Eliminados»). */
 export function ShiftChange({ request }: { request: ShiftRequest }) {
+  const t = useT();
   return (
     <span className="shift-change">
-      <span>{shiftName(request.current_shift)}</span>
-      <ArrowRight size={16} role="img" aria-label="cambia a" />
-      <strong>{shiftName(request.shift)}</strong>
+      <span>
+        {shiftName(request.current_shift)}
+        <DeletedMark deleted={request.current_shift?.deleted} />
+      </span>
+      <ArrowRight size={16} role="img" aria-label={t('shifts.requests.summary.changesTo')} />
+      <strong>
+        {shiftName(request.shift)}
+        <DeletedMark deleted={request.shift.deleted} />
+      </strong>
     </span>
   );
 }
 
 /** Lo que pidió el empleado (para decidir): el cambio, desde cuándo, el motivo y cuándo lo pidió. */
 export function RequestSummary({ request }: { request: ShiftRequest }) {
+  const t = useT();
   return (
     <dl className="details">
       <div>
-        <dt>Cambio</dt>
+        <dt>{t('shifts.requests.summary.change')}</dt>
         <dd>
           <ShiftChange request={request} />
         </dd>
       </div>
       <div>
-        <dt>Desde</dt>
+        <dt>{t('shifts.requests.summary.from')}</dt>
         <dd>{formatDate(request.valid_from)}</dd>
       </div>
       <div>
-        <dt>Motivo</dt>
+        <dt>{t('common.fields.reason')}</dt>
         <dd>“{request.reason}”</dd>
       </div>
       <div>
-        <dt>Pedida</dt>
+        <dt>{t('shifts.requests.summary.requested')}</dt>
         <dd>{timeAgo(request.created_at)}</dd>
       </div>
     </dl>

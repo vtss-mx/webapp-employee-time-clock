@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
+import i18n from './eslint-rules/i18n.js';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -14,7 +15,7 @@ export default tseslint.config(
       globals: globals.browser,
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
-    plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
+    plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh, i18n },
     rules: {
       // Reglas clásicas de hooks. Las reglas del React Compiler (set-state-in-effect, refs,
       // immutability...) se omiten: el proyecto no usa el compilador y marcarían patrones válidos.
@@ -49,7 +50,21 @@ export default tseslint.config(
       ],
       complexity: ['warn', 20],
       'max-lines': ['warn', { max: 450, skipBlankLines: true, skipComments: true }],
+      // Regla 16: todo texto visible sale de los diccionarios es-MX y en-US (eslint-rules/i18n.js).
+      // `allow`: nombres propios que se escriben igual en todo idioma (navegadores, sistemas y marcas).
+      'i18n/no-hardcoded-text': [
+        'error',
+        // 'IP Geolocation by DB-IP': la atribución que exige la licencia CC BY 4.0 de la base local de IP (decisión D8).
+        { allow: ['Android', 'Chrome', 'Chromium', 'Edge', 'Firefox', 'Google', 'Google Maps', 'iPad', 'iPhone', 'IP Geolocation by DB-IP', 'Linux', 'macOS', 'Opera', 'Safari', 'Samsung Internet', 'Windows'] },
+      ],
+      'i18n/no-module-level-t': 'error',
     },
+  },
+  {
+    // Sin textos de la interfaz: pruebas (verifican los textos), utilidades de prueba y los
+    // diccionarios mismos.
+    files: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/**/testData.ts', 'src/i18n/locales/**'],
+    rules: { 'i18n/no-hardcoded-text': 'off' },
   },
   {
     // Único lugar con Web Storage: borra lo que dejaron versiones anteriores. Las pruebas lo verifican

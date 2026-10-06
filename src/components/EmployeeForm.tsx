@@ -1,7 +1,9 @@
 import { FileBadge, Hash, HeartPulse, IdCard, KeyRound, Mail, ShieldCheck, UserRound } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { liveFeedback } from '../hooks/useAvailability';
+import { useT } from '../i18n';
 import type { EmployeeFormValues, LiveChecks } from '../types';
+import { OPTIONAL_DOCUMENTS } from '../utils/formRules';
 import {
   CURP_LENGTH,
   MIN_EMPLOYEE_AGE,
@@ -36,8 +38,6 @@ interface EmployeeFormFieldsProps {
   accountLocked?: boolean;
 }
 
-const SHARED_ACCOUNT_HINT = 'Cuenta compartida con otra empresa: solo la persona puede cambiarlo';
-
 /** Cómo se escribe cada campo: se normaliza mientras se teclea (mayúsculas, solo dígitos...). */
 const NORMALIZE: Partial<Record<Field, (value: string) => string>> = {
   rfc: (v) => normalizeRfc(v).slice(0, RFC_LENGTH),
@@ -62,6 +62,8 @@ export function EmployeeFormFields({
   linking = false,
   accountLocked = false,
 }: EmployeeFormFieldsProps) {
+  const t = useT();
+  const sharedAccountHint = t('employees.fields.sharedAccount');
   const phoneLive = liveFeedback(live.phone);
   const bind = (name: Field) => {
     const feedback = name in live ? liveFeedback(live[name as keyof LiveChecks]) : {};
@@ -72,7 +74,8 @@ export function EmployeeFormFields({
       error: errors[name] ?? feedback.error,
       status: feedback.status,
       disabled,
-      required: (name !== 'password' && name !== 'password_confirm') || !isEdit,
+      // Opcionales: RFC, CURP y NSS siempre; la contraseña al editar (vacía = no cambiarla).
+      required: !(OPTIONAL_DOCUMENTS as readonly Field[]).includes(name) && (!isEdit || (name !== 'password' && name !== 'password_confirm')),
       onBlur: () => onTouch?.(name),
       onChange: (e: ChangeEvent<HTMLInputElement>) =>
         onChange({ ...values, [name]: normalize ? normalize(e.target.value) : e.target.value }),
@@ -81,10 +84,10 @@ export function EmployeeFormFields({
 
   return (
     <div className="form-grid">
-      <FormField label="Nombres" icon={<UserRound size={18} />} autoComplete="given-name" maxLength={100} {...bind('first_name')} />
-      <FormField label="Apellidos" icon={<UserRound size={18} />} autoComplete="family-name" maxLength={100} {...bind('last_name')} />
+      <FormField label={t('employees.fields.firstName')} icon={<UserRound size={18} />} autoComplete="given-name" maxLength={100} {...bind('first_name')} />
+      <FormField label={t('employees.fields.lastName')} icon={<UserRound size={18} />} autoComplete="family-name" maxLength={100} {...bind('last_name')} />
       <DateField
-        label="Fecha de nacimiento"
+        label={t('employees.fields.birthDate')}
         name="birth_date"
         value={values.birth_date}
         error={errors.birth_date}
@@ -92,7 +95,7 @@ export function EmployeeFormFields({
         min="1920-01-01"
         max={maxBirthDate()}
         openTo={`${new Date().getFullYear() - 30}-01-01`}
-        hint={`Edad mínima: ${MIN_EMPLOYEE_AGE} años`}
+        hint={t('employees.fields.minAge', { age: MIN_EMPLOYEE_AGE })}
         required
         onChange={(birth_date) => {
           onChange({ ...values, birth_date });
@@ -106,7 +109,7 @@ export function EmployeeFormFields({
         autoCapitalize="characters"
         spellCheck={false}
         placeholder="HEGG560427MVZRRL04"
-        hint="18 caracteres. Debe coincidir con la fecha de nacimiento"
+        hint={t('employees.fields.curpHint')}
         {...bind('curp')}
       />
       <FormField
@@ -116,28 +119,28 @@ export function EmployeeFormFields({
         autoCapitalize="characters"
         spellCheck={false}
         placeholder="PEGJ900515AB1"
-        hint="13 caracteres. Debe coincidir con la fecha de nacimiento"
+        hint={t('employees.fields.rfcHint')}
         {...bind('rfc')}
       />
       <FormField
-        label="No. de Seguridad Social (NSS)"
+        label={t('employees.fields.nss')}
         icon={<HeartPulse size={18} />}
         autoComplete="off"
         inputMode="numeric"
-        placeholder="11 dígitos del IMSS"
-        hint="11 dígitos, como aparece en el IMSS"
+        placeholder={t('employees.fields.nssPlaceholder')}
+        hint={t('employees.fields.nssHint')}
         {...bind('nss')}
       />
       <FormField
-        label="No. de empleado"
+        label={t('employees.fields.employeeNumber')}
         icon={<Hash size={18} />}
         maxLength={30}
         autoCapitalize="characters"
-        hint="Único. Letras, números, guion o guion bajo"
+        hint={t('employees.fields.employeeNumberHint')}
         {...bind('employee_number')}
       />
       <PhoneField
-        label="Teléfono celular"
+        label={t('common.fields.mobilePhone')}
         name="phone"
         value={values.phone}
         onChange={(phone) => onChange({ ...values, phone })}
@@ -146,25 +149,25 @@ export function EmployeeFormFields({
         status={phoneLive.status}
         disabled={disabled || accountLocked}
         required
-        hint={accountLocked ? SHARED_ACCOUNT_HINT : 'Elige el país y escribe el número'}
+        hint={accountLocked ? sharedAccountHint : t('employees.fields.phoneHint')}
       />
       <FormField
-        label="Correo electrónico"
+        label={t('common.fields.email')}
         icon={<Mail size={18} />}
         type="email"
         autoComplete="off"
         inputMode="email"
         {...bind('email')}
-        {...(accountLocked ? { disabled: true, hint: SHARED_ACCOUNT_HINT } : {})}
+        {...(accountLocked ? { disabled: true, hint: sharedAccountHint } : {})}
       />
       {/* Persona de otra empresa: entra con su misma contraseña. Cuenta compartida: solo ella la cambia. */}
       {!linking && !accountLocked && (
         <FormField
-          label={isEdit ? 'Nueva contraseña' : 'Contraseña'}
+          label={t(isEdit ? 'employees.fields.newPassword' : 'employees.fields.password')}
           icon={<KeyRound size={18} />}
           type="password"
           autoComplete="new-password"
-          hint={isEdit ? 'Déjala vacía para no cambiarla' : 'Mínimo 8 caracteres, con mayúscula, minúscula y número'}
+          hint={t(isEdit ? 'employees.fields.keepPassword' : 'employees.fields.passwordHint')}
           {...bind('password')}
         />
       )}
@@ -183,14 +186,15 @@ export function HeadwearExemptField({
   onChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   return (
     <Checkbox
       checked={checked}
       onChange={onChange}
       disabled={disabled}
       icon={<ShieldCheck size={16} />}
-      label="Excepción de prenda de cabeza"
-      description="Permite verificar sin retirar prendas usadas por motivos religiosos o médicos. Lentes y cubrebocas se deben retirar siempre."
+      label={t('employees.fields.headwear')}
+      description={t('employees.fields.headwearHint')}
     />
   );
 }

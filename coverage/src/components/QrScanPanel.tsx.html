@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>17/17</span>
+                <span class='fraction'>20/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>21/21</span>
+                <span class='fraction'>25/25</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>15/15</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
@@ -143,7 +143,12 @@
 <a name='L78'></a><a href='#L78'>78</a>
 <a name='L79'></a><a href='#L79'>79</a>
 <a name='L80'></a><a href='#L80'>80</a>
-<a name='L81'></a><a href='#L81'>81</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -175,35 +180,40 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">44x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">44x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -228,6 +238,7 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { useCamera } from '../hooks/useCamera';
 import { useQrScanner } from '../hooks/useQrScanner';
 import { useMountedRef } from '../hooks/useMountedRef';
+import { useT } from '../i18n';
 import { config } from '../utils/config';
 import { CameraCapture } from './CameraCapture';
 import { QrGuide } from './FaceGuide';
@@ -238,35 +249,37 @@ type Phase = 'scanning' | 'invalid' | 'busy';
 interface QrScanPanelProps {
   title: string;
   description: ReactNode;
-  /** Mensaje mientras se procesa el código leído. */
+  /** Mensaje mientras se procesa el código leído (por omisión, "QR detectado. Verificando..."). */
   busyMessage?: string;
+  /** Mensaje con un código que no es de la app (por omisión, usar el código generado para la cuenta). */
   invalidMessage?: string;
   /** Qué hacer con el código leído; mientras se resuelve, la lectura se pausa. */
   onScan: (content: string) =&gt; Promise&lt;void&gt;;
   onCancel: () =&gt; void;
+  /** Texto del botón para salir (por omisión, "Cancelar"). */
   cancelLabel?: string;
+  /** Qué códigos se aceptan (por omisión, los de la app: `config.qrPrefix`); otro se descarta al instante. */
+  accept?: (content: string) =&gt; boolean;
+  /** Más opciones bajo la descripción (p. ej. escribir el código a mano). */
+  children?: ReactNode;
 }
+&nbsp;
+/** Los QR de la app: con su prefijo y de un largo razonable. */
+const appQr = (content: string) =&gt; content.startsWith(config.qrPrefix) &amp;&amp; content.length &lt;= 512;
 &nbsp;
 /**
  * Lectura de un código QR con la cámara (trasera por omisión): credencial impresa o mostrada en
  * otro teléfono. La lectura es automática; el formato se valida localmente y el backend decide.
  */
-export function QrScanPanel({
-  title,
-  description,
-  busyMessage = 'QR detectado. Verificando...',
-  invalidMessage = 'QR inválido. Usa el código generado para tu cuenta',
-  onScan,
-  onCancel,
-  cancelLabel = 'Cancelar',
-}: QrScanPanelProps) {
+export function QrScanPanel({ title, description, busyMessage, invalidMessage, onScan, onCancel, cancelLabel, accept = appQr, children }: QrScanPanelProps) {
+  const t = useT();
   const camera = useCamera({ facing: 'environment' });
   const [phase, setPhase] = useState&lt;Phase&gt;('scanning');
   const mounted = useMountedRef();
 &nbsp;
   const onDetect = useCallback(
     async (content: string) =&gt; {
-      if (!content.startsWith(config.qrPrefix) || content.length &gt; 512) {
+      if (!accept(content)) {
         setPhase('invalid');
         window.setTimeout(() =&gt; mounted.current &amp;&amp; setPhase('scanning'), 2000);
         return;
@@ -275,12 +288,13 @@ export function QrScanPanel({
       await onScan(content);
       if (mounted.current) setPhase('scanning');
     },
-    [mounted, onScan],
+    [accept, mounted, onScan],
   );
 &nbsp;
   useQrScanner({ videoRef: camera.videoRef, enabled: camera.status === 'active' &amp;&amp; phase === 'scanning', onDetect });
 &nbsp;
-  const message = phase === 'busy' ? busyMessage : phase === 'invalid' ? invalidMessage : 'Apunta la cámara al código QR';
+  const message =
+    phase === 'busy' ? (busyMessage ?? t('qr.scan.busy')) : phase === 'invalid' ? (invalidMessage ?? t('qr.scan.invalid')) : t('qr.scan.aim');
   const tone = phase === 'busy' ? 'busy' : phase === 'invalid' ? 'warn' : 'idle';
 &nbsp;
   return (
@@ -294,10 +308,11 @@ export function QrScanPanel({
         &lt;h1&gt;{title}&lt;/h1&gt;
         &lt;p className="muted"&gt;{description}&lt;/p&gt;
         &lt;p className="inline-note small muted"&gt;
-          &lt;ShieldCheck size={16} color="var(--success)" /&gt; El código no contiene datos personales.
+          &lt;ShieldCheck size={16} color="var(--success)" /&gt; {t('qr.scan.noPersonalData')}
         &lt;/p&gt;
+        {children}
         &lt;Button variant="ghost" size="lg" block icon={&lt;X size={20} /&gt;} onClick={onCancel}&gt;
-          {cancelLabel}
+          {cancelLabel ?? t('common.actions.cancel')}
         &lt;/Button&gt;
       &lt;/aside&gt;
     &lt;/div&gt;
@@ -310,7 +325,7 @@ export function QrScanPanel({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -31,9 +31,9 @@ export const errorReportService = {
     return apiRequest<ErrorOccurrenceList>(`/admin/errors/${id}/occurrences`, { query: { ...query }, signal, validate: isPage(hasKeys('id', 'occurred_at')) });
   },
 
-  /** Dependencias con su detalle y la capacidad adaptativa del proceso que responde. */
+  /** Dependencias con su detalle, la capacidad adaptativa del proceso que responde y el bucket de imágenes. */
   server(signal?: AbortSignal): Promise<ServerStatus> {
-    return apiRequest<ServerStatus>('/admin/errors/server', { signal, validate: hasKeys<ServerStatus>('status', 'components', 'admission') });
+    return apiRequest<ServerStatus>('/admin/errors/server', { signal, validate: hasKeys<ServerStatus>('status', 'components', 'admission', 'storage') });
   },
 
   setStatus(id: number, status: ErrorStatus): Promise<ErrorReportDetail> {

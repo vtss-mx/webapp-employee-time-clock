@@ -1,15 +1,21 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { LazyText } from '../i18n/lazy';
 import { paths } from '../routes/paths';
 import type { VerificationResult } from '../types';
 import { VerificationResultCard, type KioskOptions } from './VerificationResultCard';
 
 export interface VerificationOutcome {
   result: VerificationResult | null;
-  error: string | null;
+  /**
+   * Por qué no hubo resultado (p. ej. error de red). Con una función (`() => errorMessage(error)`) se
+   * escribe al dibujarse: el resultado en pantalla sigue al idioma activo.
+   */
+  error: LazyText | null;
 }
 
 interface VerificationAttemptProps {
+  /** Título cuando no se identificó: se pide en cada dibujo (en el idioma activo). */
   failureTitle: (outcome: VerificationOutcome) => string;
   /** Al terminar ("Finalizar" / "Cambiar método"); por omisión, al inicio del empleado. */
   onBack?: () => void;

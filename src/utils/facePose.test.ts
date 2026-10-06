@@ -28,10 +28,18 @@ describe('pose de la cabeza (misma métrica que el backend)', () => {
   });
 
   it('rostro en reposo: pitch y ancho de cada cuadro estable, y su promedio', () => {
-    expect(faceSample(face({ pitch: 0.4 }), { width: 180 }, video)).toEqual({ pitch: expect.closeTo(0.4) as number, width: 180 });
+    const box = { originX: 10, originY: 20, width: 180, height: 200 };
+    expect(faceSample(face({ pitch: 0.4 }), box, video)).toEqual({ pitch: expect.closeTo(0.4) as number, width: 180, box: { x: 10, y: 20, width: 180, height: 200 } });
     expect(averageSample([])).toBeUndefined();
     expect(averageSample([{ pitch: 0.4, width: 180 }, { pitch: null, width: 220 }, { pitch: 0.6, width: 200 }])).toEqual({ pitch: expect.closeTo(0.5) as number, width: 200 });
     expect(averageSample([{ pitch: null, width: 200 }])).toEqual({ pitch: null, width: 200 });
+    // La caja del rostro en reposo (la zona de la ráfaga): el promedio de las que se midieron.
+    const boxed = averageSample([
+      { pitch: 0.5, width: 100, box: { x: 10, y: 10, width: 100, height: 120 } },
+      { pitch: 0.5, width: 120, box: { x: 30, y: 20, width: 120, height: 140 } },
+      { pitch: 0.5, width: 110 },
+    ]);
+    expect(boxed?.box).toEqual({ x: 20, y: 15, width: 110, height: 130 });
   });
 });
 

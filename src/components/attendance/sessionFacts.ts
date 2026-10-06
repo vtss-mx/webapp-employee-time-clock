@@ -1,4 +1,5 @@
 import { Briefcase, Coffee, LogIn, LogOut, type LucideIcon } from 'lucide-react';
+import { t } from '../../i18n';
 import type { AttendanceAction, WorkSession } from '../../types';
 import { businessToday, formatDate, formatTime } from '../../utils/format';
 
@@ -48,14 +49,8 @@ export function exceededMinutes(session: Pick<WorkSession, 'breaks'>): number {
 
 /** Descansos usados de los permitidos: "1/2 descansos" (o "Sin descansos" si el turno no tiene). */
 export function breaksUsed(session: Pick<WorkSession, 'breaks' | 'breaks_allowed'>): string {
-  if (!session.breaks_allowed) return 'Sin descansos';
-  return `${session.breaks.length}/${session.breaks_allowed} descansos`;
-}
-
-/** Distancia legible: "12 m", "1.5 km". */
-export function formatDistance(meters: number): string {
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} km`;
+  if (!session.breaks_allowed) return t('attendance.breaks.noBreaks');
+  return t('attendance.breaks.used', { used: session.breaks.length, allowed: session.breaks_allowed });
 }
 
 /**

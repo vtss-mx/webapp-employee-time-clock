@@ -50,7 +50,7 @@ describe('menú de teléfonos personalizado', () => {
     await userEvent.click(toggle);
     await userEvent.keyboard('{Enter}'); // solo Escape cierra el menú
     expect(sidebar).toHaveClass('is-open');
-    await userEvent.click(within(sidebar).getByRole('link', { name: 'Mi perfil' }));
+    await userEvent.click(within(sidebar).getByRole('link', { name: 'Integraciones (API)' }));
     expect(sidebar).toHaveClass('is-open');
     // Con el menú abierto el contador del botón se oculta: se ve en su opción.
     expect(await within(sidebar).findByText('3')).toBeInTheDocument();

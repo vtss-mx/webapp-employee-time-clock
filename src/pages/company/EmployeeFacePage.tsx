@@ -1,15 +1,32 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { LiveFaceFlow } from '../../components/LiveFaceFlow';
+import { enrollmentCapture } from '../../components/liveFaceView';
+import type { MessageInput } from '../../components/MessageDialog';
 import { VerificationAttempt } from '../../components/VerificationAttempt';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { errorMessage } from '../../services/apiClient';
 import { employeeService } from '../../services/employeeService';
+import type { Employee } from '../../types';
 import { config } from '../../utils/config';
+
+const loadError = () => t('employees.loadError');
+const verifyFailed = (employee: Employee) => () => t('employees.face.verifyFailed', { name: employee.first_name });
+const enrollError = () => t('employees.face.enrollError');
+
+/** Aviso al registrar en persona: queda aprobado al momento y con constancia de quién lo hizo. */
+const enrolledMessage = (employee: Employee): MessageInput => ({
+  variant: 'success',
+  title: t('employees.face.enrolled'),
+  text: t('employees.face.enrolledText', { name: employee.full_name }),
+  details: [t('employees.face.approved'), t('employees.face.loggedBy')],
+  detailsStyle: 'checks',
+});
 
 /**
  * La empresa, con el empleado presente y su propia cámara:
@@ -18,13 +35,14 @@ import { config } from '../../utils/config';
  * La cámara trasera se abre por omisión (en teléfono o tableta se apunta al empleado).
  */
 export function EmployeeFacePage() {
+  const t = useT();
   const params = useParams();
   const employeeId = Number(params.id);
   const verify = params.mode === 'verify';
   const navigate = useNavigate();
   const feedback = useFeedback();
   const { policy } = useVerificationPolicy();
-  const { data: employee, error, retry: load } = useResource((signal) => employeeService.get(employeeId, signal), employeeId, 'No se pudo cargar el empleado');
+  const { data: employee, error, retry: load } = useResource((signal) => employeeService.get(employeeId, signal), employeeId, loadError);
 
   const back = () => void navigate(paths.company.employee(employeeId));
   if (!employee) return error ? <RetryState onRetry={load} /> : <SkeletonCard lines={6} />;
@@ -38,13 +56,13 @@ export function EmployeeFacePage() {
 
   if (verify) {
     return (
-      <VerificationAttempt failureTitle={() => `No se pudo verificar a ${employee.first_name}`} onBack={back}>
+      <VerificationAttempt failureTitle={verifyFailed(employee)} onBack={back}>
         {(finish) => (
           <LiveFaceFlow
             {...shared}
-            title={`Verificar a ${employee.full_name}`}
+            title={t('employees.face.verifyTitle', { name: employee.full_name })}
             frontalFrames={config.verificationFrames}
-            submittingMessage="Verificando identidad..."
+            submittingMessage={t('employees.face.verifying')}
             onSubmit={async (captured) => finish({ result: await employeeService.verifyFaceInPerson(employee.id, captured), error: null })}
             onFatal={(err) => finish({ result: null, error: errorMessage(err) })}
           />
@@ -56,19 +74,16 @@ export function EmployeeFacePage() {
   return (
     <LiveFaceFlow
       {...shared}
-      title={`Registrar el rostro de ${employee.full_name}`}
-      frontalFrames={config.enrollmentFrames}
-      submittingMessage="Registrando rostro..."
+      title={t('employees.face.enrollTitle', { name: employee.full_name })}
+      {...enrollmentCapture()}
+      submittingMessage={t('employees.face.enrolling')}
       onSubmit={async (captured) => {
         await employeeService.enrollFaceInPerson(employee.id, captured);
-        void feedback.success('Rostro registrado', `${employee.full_name} ya puede identificarse con su rostro.`, {
-          details: ['Su identidad quedó aprobada porque la registraste en persona.', 'Queda constancia de quién lo registró.'],
-          detailsStyle: 'checks',
-        });
+        void feedback.show(() => enrolledMessage(employee));
         back();
       }}
       onFatal={(err) => {
-        void feedback.fromError(err, { title: 'No se pudo registrar el rostro' });
+        void feedback.fromError(err, { title: enrollError });
         back();
       }}
     />

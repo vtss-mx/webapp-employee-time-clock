@@ -9,6 +9,7 @@ import type {
   HolidayPayload,
   OfficialHolidaysResult,
   PageQuery,
+  Restored,
   ShiftRequestStatus,
   Workday,
   WorkdayList,
@@ -16,6 +17,7 @@ import type {
 } from '../types';
 import { hasKeys, isNothing, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
+import { restoreRecord } from './http/restore';
 import { isBulkResult } from './shiftService';
 
 export const isHoliday = hasKeys<Holiday>('id', 'holiday_date', 'name', 'official');
@@ -35,6 +37,8 @@ export interface WorkdayQuery extends PageQuery {
   employee_id?: number;
   start?: string;
   end?: string;
+  /** Solo los de «Eliminados». */
+  deleted?: boolean;
 }
 
 /** Quita los espacios de más de una nota; vacía no se envía. */
@@ -49,7 +53,8 @@ const note = (value: string | null | undefined) => value?.trim() || null;
 export const calendarService = {
   // ---------- Festivos ----------
 
-  holidays(query: PageQuery & { year: number }, signal?: AbortSignal): Promise<HolidayList> {
+  /** `deleted`: solo los de «Eliminados». */
+  holidays(query: PageQuery & { year: number; deleted?: boolean }, signal?: AbortSignal): Promise<HolidayList> {
     return apiRequest<HolidayList>('/calendar/holidays', { query: { ...query }, signal, validate: isPage(isHoliday) });
   },
 
@@ -66,8 +71,13 @@ export const calendarService = {
     });
   },
 
+  /** Va a «Eliminados» (se restaura durante 1 año). */
   async removeHoliday(id: number): Promise<void> {
     await apiRequest<null | undefined>(`/calendar/holidays/${id}`, { method: 'DELETE', validate: isNothing });
+  },
+
+  restoreHoliday(id: number): Promise<Restored<Holiday>> {
+    return restoreRecord(`/calendar/holidays/${id}`, isHoliday);
   },
 
   // ---------- Ausencias ----------
@@ -109,8 +119,13 @@ export const calendarService = {
     return apiRequest<Workday>('/calendar/workdays', { method: 'POST', body: { ...payload, note: note(payload.note) }, validate: isWorkday });
   },
 
+  /** Va a «Eliminados» (se restaura durante 1 año). */
   async removeWorkday(id: number): Promise<void> {
     await apiRequest<null | undefined>(`/calendar/workdays/${id}`, { method: 'DELETE', validate: isNothing });
+  },
+
+  restoreWorkday(id: number): Promise<Restored<Workday>> {
+    return restoreRecord(`/calendar/workdays/${id}`, isWorkday);
   },
 
   // ---------- Empleado ----------

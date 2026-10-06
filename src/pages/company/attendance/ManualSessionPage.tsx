@@ -2,7 +2,7 @@ import { CalendarDays, ClipboardPen, Clock, Coffee, MessageSquareText, Save, Use
 import type { SubmitEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BreaksEditor } from '../../../components/attendance/BreaksEditor';
-import { emptyValues, MANUAL_LABELS, manualFacts, manualTimes, normalizeReason, sessionValues, type ManualValues } from '../../../components/attendance/manualSession';
+import { businessClock, clockLabel, emptyValues, manualFacts, manualLabels, manualTimes, normalizeReason, sessionValues, type ManualValues } from '../../../components/attendance/manualSession';
 import { scheduleRange } from '../../../components/attendance/sessionFacts';
 import { useManualSession, type ManualSessionForm } from '../../../components/attendance/useManualSession';
 import { FormFooter } from '../../../components/FormFooter';
@@ -18,13 +18,14 @@ import { SkeletonCard } from '../../../components/ui/Skeleton';
 import { TimeField } from '../../../components/ui/TimeField';
 import { useFeedback } from '../../../hooks/useFeedback';
 import { useResource } from '../../../hooks/useResource';
+import { t, useT, type Translate } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { attendanceService } from '../../../services/attendanceService';
 import { employeeService } from '../../../services/employeeService';
 import type { BoardRow, CompanySessionDetail, EmployeeRef } from '../../../types';
 import type { ConfirmInput } from '../../../types/confirm';
 import { describeChanges, describeValues } from '../../../utils/changes';
-import { businessToday, formatDate, formatTime } from '../../../utils/format';
+import { businessToday, formatDate } from '../../../utils/format';
 
 /** Empleados que puede traer la búsqueda por número en el tablero (la página más grande de la API). */
 const SCHEDULE_LOOKUP = 50;
@@ -65,23 +66,24 @@ function useDayLookup(employee: EmployeeRef, workDate: string): DayLookup {
             .catch(() => ({ day, row: null, failed: true }))
         : Promise.resolve({ day, row: null, failed: false }),
     `${employee.id}|${day}`,
-    'No se pudo consultar su turno',
+    // Nunca se muestra (la consulta no falla: `catch` la vuelve "no se pudo consultar"); se pide igual.
+    t('attendance.manual.dayHint.lookupError'),
   );
   return data?.day === day ? { ...data, loading: false } : { day, row: null, loading: true, failed: false };
 }
 
-/** Lo que se dice bajo el día: su turno y, si aplica, por qué no se puede registrar. */
-function dayHint({ day, row, loading, failed }: DayLookup): string {
-  if (!day) return 'El día de su turno (hasta hoy).';
-  if (loading) return 'Consultando su turno de ese día…';
-  if (failed) return 'No se pudo consultar su turno de ese día: al registrar se revisa igual.';
-  if (!row) return 'Ese día no tiene turno asignado: solo se registra un día de su turno.';
-  const schedule = `Turno ${row.shift_name}: ${scheduleRange(row.scheduled_start, row.scheduled_end)}.`;
+/** Lo que se dice bajo el día: su turno y, si aplica, por qué no se puede registrar (en el idioma de `t`). */
+function dayHint({ day, row, loading, failed }: DayLookup, t: Translate): string {
+  if (!day) return t('attendance.manual.dayHint.pick');
+  if (loading) return t('attendance.manual.dayHint.loading');
+  if (failed) return t('attendance.manual.dayHint.failed');
+  if (!row) return t('attendance.manual.dayHint.noShift');
+  const schedule = t('attendance.manual.dayHint.schedule', { shift: row.shift_name, range: scheduleRange(row.scheduled_start, row.scheduled_end) });
   if (row.state === 'DAY_OFF') {
-    const reason = row.day_off ? ` (${row.day_off.name})` : '';
-    return `${schedule} Ese día es libre${reason}: si sí trabajó, márcalo como laborable en Calendario.`;
+    const dayOff = row.day_off ? t('attendance.manual.dayHint.dayOffReason', { reason: row.day_off.name }) : t('attendance.manual.dayHint.dayOff');
+    return `${schedule} ${dayOff}`;
   }
-  return row.session ? `${schedule} Ya tiene su jornada registrada: corrígela en lugar de registrar otra.` : schedule;
+  return row.session ? `${schedule} ${t('attendance.manual.dayHint.registered')}` : schedule;
 }
 
 /**
@@ -89,66 +91,81 @@ function dayHint({ day, row, loading, failed }: DayLookup): string {
  * ("antes → después") y el motivo; sin cambios, no hay nada que corregir.
  */
 function manualConfirm(target: Target, employee: EmployeeRef, values: ManualValues): ConfirmInput {
-  const reason = { label: 'Motivo que verá', value: normalizeReason(values.reason) };
+  const reason = { label: t('attendance.manual.confirm.reason'), value: normalizeReason(values.reason) };
+  const name = employee.full_name;
   if (target.kind === 'new') {
     return {
       kind: 'create',
       icon: <ClipboardPen size={30} />,
-      eyebrow: 'Registro de la empresa',
-      title: `¿Registrar la asistencia de ${employee.full_name}?`,
-      message: 'Queda registrada por la empresa, sin rostro ni ubicación: la respalda el motivo.',
-      details: [{ label: 'Día', value: formatDate(values.work_date) }, ...describeValues(manualFacts(values), MANUAL_LABELS), reason],
-      confirmLabel: 'Registrar asistencia',
+      eyebrow: t('attendance.manual.confirm.eyebrow'),
+      title: t('attendance.manual.confirm.createTitle', { name }),
+      message: t('attendance.manual.confirm.createMessage'),
+      details: [{ label: t('attendance.fields.day'), value: formatDate(values.work_date) }, ...describeValues(manualFacts(values), manualLabels()), reason],
+      confirmLabel: t('attendance.record'),
       confirmIcon: <ClipboardPen size={18} />,
     };
   }
   return {
     kind: 'edit',
-    title: `¿Corregir la jornada de ${employee.full_name} del ${formatDate(target.session.work_date)}?`,
-    changes: describeChanges(manualFacts(sessionValues(target.session)), manualFacts(values), MANUAL_LABELS),
+    title: t('attendance.manual.confirm.editTitle', { name, date: formatDate(target.session.work_date) }),
+    changes: describeChanges(manualFacts(sessionValues(target.session)), manualFacts(values), manualLabels()),
     details: [reason],
-    note: 'Lo que había se conserva en la bitácora y el empleado verá el motivo en su historial.',
-    confirmLabel: 'Guardar corrección',
+    note: t('attendance.manual.confirm.editNote'),
+    confirmLabel: t('attendance.manual.saveCorrection'),
   };
 }
 
+/** Lo programado como hora de un toque en el selector ("08:00 (programada)"). */
+const scheduledPreset = (clock: string | null, translate: Translate) => (clock ? [{ value: clock, label: translate('attendance.manual.times.preset', { time: clockLabel(clock) }) }] : []);
+
+/** Avisos al guardar (se arman al dibujarse: el popup abierto sigue al idioma activo). */
+const savedTitle = (creating: boolean) => () => t(creating ? 'attendance.manual.success.created' : 'attendance.manual.success.corrected');
+function savedText(creating: boolean, name: string, workDate: string) {
+  return () => (creating ? t('attendance.manual.success.createdText', { name, date: formatDate(workDate) }) : t('attendance.manual.success.correctedText', { name }));
+}
+const saveError = (creating: boolean) => () => t(creating ? 'attendance.manual.errors.create' : 'attendance.manual.errors.correct');
+const sessionLoadError = () => t('attendance.detail.loadError');
+const employeeLoadError = () => t('attendance.manual.errors.employee');
+
 /** Hora de entrada y salida (o "aún no sale"), con el horario programado como sugerencia. */
 function TimesSection({ form, schedule }: { form: ManualSessionForm; schedule: DaySchedule | null }) {
+  const t = useT();
   const { values, errors, set, saving } = form;
-  const start = schedule && formatTime(schedule.scheduled_start);
-  const end = schedule && formatTime(schedule.scheduled_end);
+  // El valor del campo es "HH:MM" (24 h) en todo idioma; lo que se lee, con el formato del idioma.
+  const start = schedule && businessClock(schedule.scheduled_start);
+  const end = schedule && businessClock(schedule.scheduled_end);
   return (
-    <PanelSection title="Entrada y salida" icon={<Clock size={20} />}>
+    <PanelSection title={t('attendance.manual.times.title')} icon={<Clock size={20} />}>
       <div className="stack">
         <div className="form-grid">
           <TimeField
-            label="Hora de entrada"
+            label={t('attendance.manual.times.checkIn')}
             required
             disabled={saving}
             value={values.check_in}
-            presets={start ? [{ value: start, label: `${start} (programada)` }] : []}
+            presets={scheduledPreset(start, t)}
             openTo={start ?? undefined}
             error={errors.check_in}
-            hint={start ? `Programada a las ${start}` : undefined}
+            hint={start ? t('attendance.manual.times.checkInHint', { time: clockLabel(start) }) : undefined}
             onChange={(value) => set('check_in', value)}
           />
           <TimeField
-            label="Hora de salida"
+            label={t('attendance.manual.times.checkOut')}
             required={!values.stillWorking}
             disabled={saving || values.stillWorking}
             value={values.stillWorking ? '' : values.check_out}
-            presets={end ? [{ value: end, label: `${end} (programada)` }] : []}
+            presets={scheduledPreset(end, t)}
             openTo={end ?? undefined}
             error={errors.check_out}
-            hint={end ? `Programada a las ${end}; si es de madrugada, es la del día siguiente` : 'Si es de madrugada, es la del día siguiente'}
+            hint={end ? t('attendance.manual.times.checkOutHint', { time: clockLabel(end) }) : t('attendance.manual.times.overnightHint')}
             onChange={(value) => set('check_out', value)}
           />
         </div>
         <Checkbox
           checked={values.stillWorking}
           disabled={saving}
-          label="Aún no sale"
-          description="La jornada queda abierta para que registre su salida; si ya venció el límite para checarla, queda «Sin salida»."
+          label={t('attendance.manual.stillWorking')}
+          description={t('attendance.manual.stillWorkingHint')}
           onChange={(checked) => set('stillWorking', checked)}
         />
       </div>
@@ -166,14 +183,15 @@ interface ManualFormProps {
 }
 
 function ManualForm({ target, schedule, form, day }: ManualFormProps) {
+  const t = useT();
   const navigate = useNavigate();
   const feedback = useFeedback();
   const today = businessToday();
   const creating = target.kind === 'new';
   const employee = creating ? target.employee : target.session.employee;
   const back = creating
-    ? { backTo: `${paths.company.attendance}?date=${target.workDate}`, backLabel: 'Asistencia del día' }
-    : { backTo: paths.company.attendanceSession(target.session.id), backLabel: 'Jornada' };
+    ? { backTo: `${paths.company.attendance}?date=${target.workDate}`, backLabel: t('attendance.nav.dayBoard') }
+    : { backTo: paths.company.attendanceSession(target.session.id), backLabel: t('attendance.nav.session') };
   const { values, errors, saving } = form;
 
   const onSubmit = (event: SubmitEvent) => {
@@ -184,11 +202,10 @@ function ManualForm({ target, schedule, form, day }: ManualFormProps) {
         const saved = creating
           ? await attendanceService.createSession({ ...times, employee_id: employee.id, work_date: values.work_date })
           : await attendanceService.correctSession(target.session.id, times);
-        if (creating) void feedback.success('Asistencia registrada', `La jornada de ${employee.full_name} del ${formatDate(saved.work_date)} quedó registrada por la empresa.`);
-        else void feedback.success('Jornada corregida', `Lo que había se conserva en la bitácora de ${employee.full_name}.`);
+        void feedback.success(savedTitle(creating), savedText(creating, employee.full_name, saved.work_date));
         void navigate(paths.company.attendanceSession(saved.id), { replace: true });
       },
-      creating ? 'No se pudo registrar la asistencia' : 'No se pudo corregir la jornada',
+      saveError(creating),
       () => manualConfirm(target, employee, values),
     );
   };
@@ -197,14 +214,14 @@ function ManualForm({ target, schedule, form, day }: ManualFormProps) {
     <div className="page">
       <Panel onSubmit={onSubmit} className="manual-session">
         <PanelHeader
-          title={creating ? 'Registrar asistencia' : 'Corregir jornada'}
+          title={t(creating ? 'attendance.record' : 'attendance.manual.correctTitle')}
           subtitle={creating ? `${employee.full_name} · ${employee.employee_number}` : `${employee.full_name} · ${formatDate(target.session.work_date)} · ${target.session.shift_name}`}
           {...back}
         />
         {day && (
-          <PanelSection title="Día" icon={<CalendarDays size={20} />}>
+          <PanelSection title={t('attendance.fields.day')} icon={<CalendarDays size={20} />}>
             <DateField
-              label="Día que trabajó"
+              label={t('attendance.manual.workDate')}
               name="work_date"
               required
               max={today}
@@ -217,32 +234,32 @@ function ManualForm({ target, schedule, form, day }: ManualFormProps) {
           </PanelSection>
         )}
         <TimesSection form={form} schedule={schedule} />
-        <PanelSection title="Descansos" icon={<Coffee size={20} />}>
+        <PanelSection title={t('attendance.fields.breaks')} icon={<Coffee size={20} />}>
           <BreaksEditor
             value={values.breaks}
             max={creating ? MAX_BREAKS : target.session.breaks_allowed}
-            hint={creating ? `Los que tomó, hasta los que permite su turno (a lo más ${MAX_BREAKS}).` : undefined}
+            hint={creating ? t('attendance.manual.breaksHint', { max: MAX_BREAKS }) : undefined}
             disabled={saving}
             markMissing={form.attempted}
             error={errors.breaks}
             onChange={(breaks) => form.set('breaks', breaks)}
           />
         </PanelSection>
-        <PanelSection title="Motivo" icon={<MessageSquareText size={20} />}>
+        <PanelSection title={t('common.fields.reason')} icon={<MessageSquareText size={20} />}>
           <ReasonField
             catalog="attendance_edit_reasons"
-            label={creating ? '¿Por qué la registras tú?' : '¿Por qué la corriges?'}
+            label={t(creating ? 'attendance.manual.reasonCreate' : 'attendance.manual.reasonCorrect')}
             required
             disabled={saving}
             value={values.reason}
             error={errors.reason}
-            placeholder="Por ejemplo: olvidó checar su salida."
-            hint="El empleado lo verá en su historial junto a la jornada (de 5 a 500 caracteres)."
+            placeholder={t('attendance.manual.reasonPlaceholder')}
+            hint={t('attendance.manual.reasonHint')}
             onChange={(reason) => form.set('reason', reason)}
           />
         </PanelSection>
         <FormFooter
-          submitLabel={creating ? 'Registrar asistencia' : 'Guardar corrección'}
+          submitLabel={t(creating ? 'attendance.record' : 'attendance.manual.saveCorrection')}
           submitIcon={creating ? <ClipboardPen size={20} /> : <Save size={20} />}
           saving={saving}
           onCancel={() => void navigate(back.backTo)}
@@ -254,9 +271,10 @@ function ManualForm({ target, schedule, form, day }: ManualFormProps) {
 
 /** Registrar: el empleado y el día del enlace del tablero (el día se puede cambiar, hasta hoy). */
 function NewSessionForm({ employee, workDate }: { employee: EmployeeRef; workDate: string }) {
+  const t = useT();
   const form = useManualSession(emptyValues(workDate), { today: businessToday(), withDate: true });
   const lookup = useDayLookup(employee, form.values.work_date);
-  return <ManualForm target={{ kind: 'new', employee, workDate }} schedule={lookup.row} form={form} day={{ hint: dayHint(lookup) }} />;
+  return <ManualForm target={{ kind: 'new', employee, workDate }} schedule={lookup.row} form={form} day={{ hint: dayHint(lookup, t) }} />;
 }
 
 /** Corregir: lo registrado ya viene en el formulario (horas en la hora del negocio). */
@@ -266,10 +284,11 @@ function CorrectSessionForm({ session }: { session: CompanySessionDetail }) {
 }
 
 function NewSession({ employeeId, workDate }: { employeeId: number; workDate: string }) {
-  const { data, error, retry } = useResource((signal) => employeeService.get(employeeId, signal), employeeId, 'No se pudo cargar al empleado');
+  const t = useT();
+  const { data, error, retry } = useResource((signal) => employeeService.get(employeeId, signal), employeeId, employeeLoadError);
   if (!data) {
     return error ? (
-      <LoadFailed title="Registrar asistencia" backTo={`${paths.company.attendance}?date=${workDate}`} backLabel="Asistencia del día" onRetry={retry} />
+      <LoadFailed title={t('attendance.record')} backTo={`${paths.company.attendance}?date=${workDate}`} backLabel={t('attendance.nav.dayBoard')} onRetry={retry} />
     ) : (
       <SkeletonCard lines={8} />
     );
@@ -278,27 +297,33 @@ function NewSession({ employeeId, workDate }: { employeeId: number; workDate: st
 }
 
 function CorrectSession({ sessionId }: { sessionId: number }) {
-  const { data, error, retry } = useResource((signal) => attendanceService.session(sessionId, signal), sessionId, 'No se pudo cargar la jornada');
+  const t = useT();
+  const { data, error, retry } = useResource((signal) => attendanceService.session(sessionId, signal), sessionId, sessionLoadError);
   if (!data) {
-    return error ? <LoadFailed title="Corregir jornada" backTo={paths.company.attendanceSession(sessionId)} backLabel="Jornada" onRetry={retry} /> : <SkeletonCard lines={8} />;
+    return error ? (
+      <LoadFailed title={t('attendance.manual.correctTitle')} backTo={paths.company.attendanceSession(sessionId)} backLabel={t('attendance.nav.session')} onRetry={retry} />
+    ) : (
+      <SkeletonCard lines={8} />
+    );
   }
   return <CorrectSessionForm key={data.id} session={data} />;
 }
 
 /** Sin empleado en el enlace: se registra desde el tablero, en la fila de quien no checó. */
 function MissingEmployee() {
+  const t = useT();
   return (
     <div className="page">
       <Panel>
-        <PanelHeader title="Registrar asistencia" backTo={paths.company.attendance} backLabel="Asistencia del día" />
+        <PanelHeader title={t('attendance.record')} backTo={paths.company.attendance} backLabel={t('attendance.nav.dayBoard')} />
         <PanelSection>
           <EmptyState
             icon={<UserSearch />}
-            title="Elige a quién registrar"
-            description="En el tablero del día toca «Registrar asistencia» en la fila del empleado que no checó."
+            title={t('attendance.manual.missing.title')}
+            description={t('attendance.manual.missing.description')}
             action={
               <ButtonLink to={paths.company.attendance} variant="primary">
-                Ir al tablero
+                {t('attendance.manual.missing.action')}
               </ButtonLink>
             }
           />

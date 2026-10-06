@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>18/18</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
-                <span class="quiet">Branches</span>
                 <span class='fraction'>20/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>18/18</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>13/13</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/14</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -172,7 +172,10 @@
 <a name='L107'></a><a href='#L107'>107</a>
 <a name='L108'></a><a href='#L108'>108</a>
 <a name='L109'></a><a href='#L109'>109</a>
-<a name='L110'></a><a href='#L110'>110</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -197,18 +200,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">120x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">279x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">145x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">240x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">99x</span>
+<span class="cline-any cline-yes">290x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">124x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -237,18 +240,21 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">241x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">279x</span>
+<span class="cline-any cline-yes">279x</span>
+<span class="cline-any cline-yes">290x</span>
+<span class="cline-any cline-yes">279x</span>
+<span class="cline-any cline-yes">279x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">279x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">145x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -283,6 +289,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Coffee, Plus, X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useT, type Translate } from '../../i18n';
 import type { BreakTimes } from '../../types';
 import { Button } from '../ui/Button';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
@@ -306,17 +313,18 @@ export interface BreaksEditorLabels {
   limit: (max: number) =&gt; string;
 }
 &nbsp;
-const DEFAULT_LABELS: BreaksEditorLabels = {
-  legend: 'Descansos',
-  item: (index) =&gt; `Descanso ${index + 1}`,
-  start: 'Inicio',
-  end: 'Fin',
-  add: 'Agregar descanso',
-  remove: (index) =&gt; `Quitar el descanso ${index + 1}`,
-  empty: 'Sin descansos: agrega los que tomó.',
-  missing: 'Indica la hora',
-  limit: (max) =&gt; (max === 0 ? 'Su turno no tiene descansos' : `Su turno permite ${max === 1 ? '1 descanso' : `${max} descansos`}`),
-};
+/** Textos por omisión en el idioma activo (se arman en cada dibujo: siguen al idioma). */
+const defaultLabels = (t: Translate): BreaksEditorLabels =&gt; ({
+  legend: t('attendance.fields.breaks'),
+  item: (index) =&gt; t('attendance.breaks.item', { number: index + 1 }),
+  start: t('attendance.breaks.start'),
+  end: t('attendance.breaks.end'),
+  add: t('attendance.breaks.add'),
+  remove: (index) =&gt; t('attendance.breaks.remove', { number: index + 1 }),
+  empty: t('attendance.breaks.empty'),
+  missing: t('attendance.breaks.missing'),
+  limit: (max) =&gt; (max === 0 ? t('attendance.breaks.none') : t('attendance.breaks.limit', { count: max })),
+});
 &nbsp;
 export interface BreaksEditorProps {
   /** Los descansos ("HH:MM" de la hora del negocio; "" mientras falta una hora). */
@@ -346,7 +354,8 @@ export interface BreaksEditorProps {
  *   &lt;BreaksEditor value={breaks} onChange={setBreaks} max={2} error={errors.breaks} /&gt;
  */
 export function BreaksEditor({ value, onChange, max, error, hint, disabled = false, markMissing = false, presets = [], icon = &lt;Coffee size={18} /&gt;, labels: custom }: BreaksEditorProps) {
-  const labels = { ...DEFAULT_LABELS, ...custom };
+  const t = useT();
+  const labels = { ...defaultLabels(t), ...custom };
   const missing = (time: string) =&gt; (markMissing &amp;&amp; !time ? labels.missing : undefined);
   const update = (index: number, item: BreakTimes) =&gt; onChange(value.map((current, i) =&gt; (i === index ? item : current)));
   const full = value.length &gt;= max;
@@ -397,7 +406,7 @@ export function BreaksEditor({ value, onChange, max, error, hint, disabled = fal
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

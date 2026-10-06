@@ -1,3 +1,4 @@
+import { t } from '../../../i18n';
 import { ATTENDANCE_SLUGS } from '../../../services/attendanceService';
 import type { AttendanceAction, AttendanceToday, BoardState, WorkBreak, WorkSession } from '../../../types';
 import { formatMinutes, formatTime } from '../../../utils/format';
@@ -6,6 +7,7 @@ import { addMinutes } from './serverTime';
 /**
  * Presentación de "Mi asistencia" a partir de lo que respondió el servidor (puras). Nada de esto
  * decide qué se puede registrar (`today.actions`); solo cómo se muestra y cuándo volver a preguntar.
+ * Los textos salen en el idioma activo: se piden al dibujar (nunca se guardan).
  */
 
 /** La acción de la ruta ("check-in" → CHECK_IN); null si la ruta no corresponde a ninguna. */
@@ -16,7 +18,7 @@ export function actionFromSlug(slug: string | undefined): AttendanceAction | nul
 
 /** "Registrar entrada", "Registrar inicio de descanso"... a partir del nombre del catálogo. */
 export function recordLabel(actionName: string): string {
-  return `Registrar ${actionName.toLowerCase()}`;
+  return t('myAttendance.record.label', { action: actionName.toLowerCase() });
 }
 
 /** El descanso en curso de la jornada (a lo más uno). */
@@ -56,13 +58,15 @@ export function clockCountdown(today: AttendanceToday): ClockCountdown | null {
   if (session?.status === 'OPEN') {
     const pause = openBreak(session);
     return pause
-      ? { until: addMinutes(pause.started_at, session.break_minutes_allowed), label: 'Tu descanso termina en', done: 'Terminó tu tiempo de descanso' }
-      : { until: session.scheduled_end, label: 'Tu salida es en', done: 'Ya es hora de tu salida' };
+      ? { until: addMinutes(pause.started_at, session.break_minutes_allowed), label: t('myAttendance.clock.countdown.breakEnds'), done: t('myAttendance.clock.countdown.breakOver') }
+      : { until: session.scheduled_end, label: t('myAttendance.clock.countdown.checkOutIn'), done: t('myAttendance.clock.countdown.checkOutNow') };
   }
   if (session) return null;
-  if (occurrence) return isAfter(occurrence.start, today) ? { until: occurrence.start, label: 'Tu turno empieza en', done: 'Tu turno ya empezó' } : null;
+  if (occurrence) {
+    return isAfter(occurrence.start, today) ? { until: occurrence.start, label: t('myAttendance.clock.countdown.shiftStarts'), done: t('myAttendance.clock.countdown.shiftStarted') } : null;
+  }
   const next = today.next_occurrence;
-  return next ? { until: next.opens, label: 'Podrás checar en', done: 'Ya puedes checar' } : null;
+  return next ? { until: next.opens, label: t('myAttendance.clock.countdown.opensIn'), done: t('myAttendance.clock.countdown.open') } : null;
 }
 
 /**
@@ -95,8 +99,8 @@ export function primaryAction(today: AttendanceToday): AttendanceAction | undefi
 export function breakWindowText(today: AttendanceToday): string | null {
   const { session, break_window: window } = today;
   if (session?.status !== 'OPEN' || !window || !session.breaks_allowed || openBreak(session)) return null;
-  if (window.remaining === 0) return 'Ya tomaste tus descansos';
-  if (today.actions.includes('BREAK_START')) return `Descanso disponible hasta las ${formatTime(window.ends_at)} · ${formatMinutes(window.minutes)}`;
-  if (isAfter(window.starts_at, today)) return `Podrás tomar tu descanso desde las ${formatTime(window.starts_at)}`;
-  return isAfter(window.ends_at, today) ? null : 'Tu horario terminó: ya no puedes iniciar un descanso';
+  if (window.remaining === 0) return t('myAttendance.clock.breakWindow.taken');
+  if (today.actions.includes('BREAK_START')) return t('myAttendance.clock.breakWindow.available', { time: formatTime(window.ends_at), duration: formatMinutes(window.minutes) });
+  if (isAfter(window.starts_at, today)) return t('myAttendance.clock.breakWindow.opensAt', { time: formatTime(window.starts_at) });
+  return isAfter(window.ends_at, today) ? null : t('myAttendance.clock.breakWindow.closed');
 }

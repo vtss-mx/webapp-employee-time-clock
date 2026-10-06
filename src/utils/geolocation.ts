@@ -3,6 +3,7 @@
  * inicio de sesión de los validadores que requieren ubicación, el registro de asistencia y el botón
  * "Mi ubicación" del mapa.
  */
+import { t } from '../i18n/core';
 
 export type LocationProblem = 'unsupported' | 'insecure' | 'denied' | 'unavailable' | 'timeout';
 
@@ -15,50 +16,51 @@ export interface DeviceLocation {
 
 export class LocationError extends Error {
   constructor(readonly problem: LocationProblem) {
-    super(LOCATION_MESSAGES[problem].text);
+    super();
     this.name = 'LocationError';
+    // El texto se traduce al leerse (como `localizedError`): un popup abierto sigue al idioma activo.
+    Object.defineProperty(this, 'message', { get: () => locationProblemCopy(problem).text, configurable: true, enumerable: false });
   }
 }
 
-/** Cómo volver a permitir la ubicación (los mismos pasos en cualquier pantalla). */
-export const LOCATION_PERMISSION_STEPS = [
-  'iPhone: Ajustes › Privacidad › Localización › Safari (o tu navegador) › «Al usar la app».',
-  'Android: toca el candado junto a la dirección › Permisos › Ubicación › Permitir.',
-];
+/** Cómo volver a permitir la ubicación (los mismos pasos en cualquier pantalla), en el idioma activo. */
+export function locationPermissionSteps(): string[] {
+  return [t('location.permissionSteps.iphone'), t('location.permissionSteps.android')];
+}
 
-/** Título, explicación y pasos de cada problema (popup de la aplicación). */
-export const LOCATION_MESSAGES: Record<LocationProblem, { title: string; text: string; steps?: string[] }> = {
-  unsupported: {
-    title: 'Ubicación no disponible',
-    text: 'Este navegador no permite conocer la ubicación del dispositivo. Usa Safari o Chrome actualizados.',
-  },
-  insecure: {
-    title: 'Conexión no segura',
-    text: 'La ubicación solo se puede leer desde una conexión segura (https). Abre la aplicación con su dirección segura.',
-  },
-  // Por qué se necesita y cómo seguir dependen de la pantalla (`locationProblemMessage(problem, purpose)`).
-  denied: { title: 'Permite el acceso a tu ubicación', text: 'El permiso de ubicación está bloqueado en este navegador.', steps: LOCATION_PERMISSION_STEPS },
-  unavailable: {
-    title: 'No se pudo obtener tu ubicación',
-    text: 'Activa la ubicación (GPS) del dispositivo y vuelve a intentarlo, de preferencia cerca de una ventana.',
-  },
-  timeout: {
-    title: 'La ubicación tardó demasiado',
-    text: 'No se obtuvo la ubicación a tiempo. Activa la ubicación precisa del dispositivo y vuelve a intentarlo.',
-  },
-};
+/**
+ * Título y explicación de cada problema (popup de la aplicación), en el idioma activo: se piden al
+ * dibujarse. Por qué se necesita y cómo permitirla cuando está bloqueada dependen de la pantalla
+ * (`locationProblemMessage(problem, purpose)`).
+ */
+export function locationProblemCopy(problem: LocationProblem): { title: string; text: string } {
+  return { title: t(`location.problems.${problem}.title`), text: t(`location.problems.${problem}.text`) };
+}
 
 const PROBLEM_BY_CODE: Record<number, LocationProblem> = { 1: 'denied', 2: 'unavailable', 3: 'timeout' };
 
-/** Una lectura fresca y precisa (GPS si el dispositivo lo tiene). */
-export function currentLocation({ timeoutMs = 15_000 } = {}): Promise<DeviceLocation> {
-  if (typeof window !== 'undefined' && window.isSecureContext === false) return Promise.reject(new LocationError('insecure'));
-  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return Promise.reject(new LocationError('unsupported'));
+/** El problema detrás de un error del navegador (permiso, GPS sin señal, tiempo agotado). */
+export const locationProblemOf = (error: GeolocationPositionError): LocationProblem => PROBLEM_BY_CODE[error.code] ?? 'unavailable';
+
+/** Lo que impide leer la ubicación en este navegador antes de intentarlo (conexión no segura o sin la API); null si nada. */
+export function locationBlocker(): LocationProblem | null {
+  if (typeof window !== 'undefined' && window.isSecureContext === false) return 'insecure';
+  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return 'unsupported';
+  return null;
+}
+
+/**
+ * Una lectura fresca y precisa (GPS si el dispositivo lo tiene). `highAccuracy: false` + `maxAgeMs` piden la de la red
+ * (Wi-Fi), que una computadora sin GPS sí suele tener; solo la usa el mapa como respaldo, nunca un registro.
+ */
+export function currentLocation({ timeoutMs = 15_000, highAccuracy = true, maxAgeMs = 0 } = {}): Promise<DeviceLocation> {
+  const blocker = locationBlocker();
+  if (blocker) return Promise.reject(new LocationError(blocker));
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy }),
-      (error) => reject(new LocationError(PROBLEM_BY_CODE[error.code] ?? 'unavailable')),
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
+      (error) => reject(new LocationError(locationProblemOf(error))),
+      { enableHighAccuracy: highAccuracy, timeout: timeoutMs, maximumAge: maxAgeMs },
     );
   });
 }

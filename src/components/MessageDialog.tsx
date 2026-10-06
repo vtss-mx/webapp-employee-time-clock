@@ -1,6 +1,8 @@
 import { Check, Copy } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { useCopy } from '../hooks/useCopy';
+import { t, useT } from '../i18n';
+import type { Lazy } from '../i18n/lazy';
 import type { MessageVariant } from '../utils/errorPresentation';
 import { Button, type ButtonVariant } from './ui/Button';
 import { DialogHero } from './ui/DialogHero';
@@ -38,9 +40,16 @@ export interface MessageInput {
   wide?: boolean;
 }
 
+/**
+ * Un mensaje, o la función que lo arma al dibujarse: así un popup abierto sigue al idioma activo
+ * (se vuelve a armar con los textos, fechas y números del idioma nuevo).
+ */
+export type MessageSource = Lazy<MessageInput>;
+
 const ROLES = { error: 'alertdialog', warning: 'alertdialog', info: 'dialog', success: 'dialog' } as const;
 
-export const DEFAULT_ACTIONS: MessageAction[] = [{ id: 'ok', label: 'Entendido', variant: 'primary' }];
+/** Acción por omisión ("Entendido"), en el idioma activo. */
+export const defaultActions = (): MessageAction[] => [{ id: 'ok', label: t('feedback.understood'), variant: 'primary' }];
 
 interface MessageDialogProps {
   message: MessageInput;
@@ -55,7 +64,8 @@ interface MessageDialogProps {
 export function MessageDialog({ message, position, total, onAction, onClose }: MessageDialogProps) {
   const { variant, title, text, details = [], detailsStyle = 'bullets', body, traceId, footnote } = message;
   const dismissible = message.dismissible ?? true;
-  const actions = message.actions?.length ? message.actions : DEFAULT_ACTIONS;
+  const t = useT();
+  const actions = message.actions?.length ? message.actions : defaultActions();
   const titleId = useId();
   const textId = useId();
   const { copied, copy } = useCopy();
@@ -78,7 +88,7 @@ export function MessageDialog({ message, position, total, onAction, onClose }: M
         title={title}
         titleId={titleId}
         onClose={dismissible ? onClose : undefined}
-        queue={total > 1 ? `${position} de ${total}` : undefined}
+        queue={total > 1 ? t('feedback.queue', { position, total }) : undefined}
       />
 
       <div className="msg__content">
@@ -101,11 +111,11 @@ export function MessageDialog({ message, position, total, onAction, onClose }: M
         {traceId && (
           <div className="msg__trace">
             <span>
-              Código de rastreo <code>{traceId}</code>
+              {t('feedback.trace.label')} <code>{traceId}</code>
             </span>
-            <button type="button" onClick={copyTrace} aria-label="Copiar código de rastreo">
+            <button type="button" onClick={copyTrace} aria-label={t('feedback.trace.copy')}>
               {copied ? <Check size={15} /> : <Copy size={15} />}
-              {copied ? 'Copiado' : 'Copiar'}
+              {copied ? t('feedback.trace.copied') : t('common.actions.copy')}
             </button>
           </div>
         )}

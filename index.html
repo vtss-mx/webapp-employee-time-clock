@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-MX">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
@@ -11,11 +11,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="description" content="%VITE_APP_TAGLINE%" />
     <meta name="apple-mobile-web-app-title" content="%VITE_APP_NAME%" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>%VITE_APP_NAME% · %VITE_APP_TAGLINE%</title>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Solo si el idioma no se pudo descargar al arrancar (main.tsx): aviso en ambos idiomas. -->
+    <div id="boot-error" class="boot-error" role="alert" hidden>
+      <p lang="es-MX">No se pudo cargar la aplicación. Revisa tu conexión e inténtalo de nuevo.</p>
+      <p lang="en-US">The app could not be loaded. Check your connection and try again.</p>
+      <button type="button" class="btn btn--primary">Reintentar · Retry</button>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

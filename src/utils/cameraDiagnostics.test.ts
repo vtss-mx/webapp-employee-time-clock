@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { describeCameraProblem, detectPlatform, errorKind, secureUrlFor, type Platform } from './cameraDiagnostics';
+import { cameraProblemText, describeCameraProblem, detectPlatform, errorKind, secureUrlFor, type CameraProblemKind, type Platform } from './cameraDiagnostics';
+
+/** Los textos del problema en el idioma activo (es-MX en las pruebas). */
+const textOf = (...args: [CameraProblemKind, Platform?, Parameters<typeof describeCameraProblem>[2]?]) => cameraProblemText(describeCameraProblem(...args));
 
 const UA = {
   macChrome: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
@@ -76,17 +79,17 @@ describe('describeCameraProblem', () => {
   it('conexión insegura: ofrece la versión HTTPS', () => {
     const problem = describeCameraProblem('insecure', mac, lanHttp);
     expect(problem.secureUrl).toBe('https://192.168.1.76:8443/employee/enroll?x=1');
-    expect(problem.steps.join(' ')).toContain('certificado');
+    expect(cameraProblemText(problem).steps.join(' ')).toContain('certificado');
   });
 
   it('conexión insegura sin dirección alternativa', () => {
     const problem = describeCameraProblem('insecure', mac, { ...lanHttp, protocol: 'https:' });
     expect(problem.secureUrl).toBeUndefined();
-    expect(problem.steps).toEqual(['Entra a la aplicación con una dirección https://.']);
+    expect(cameraProblemText(problem).steps).toEqual(['Entra a la aplicación con una dirección https://.']);
   });
 
   it('navegador sin soporte', () => {
-    expect(describeCameraProblem('unsupported', mac, local).title).toContain('navegador');
+    expect(textOf('unsupported', mac, local).title).toContain('navegador');
   });
 
   it.each<[Platform, string]>([
@@ -99,34 +102,34 @@ describe('describeCameraProblem', () => {
     [{ os: 'android', browser: 'chrome' }, 'Aplicaciones → Chrome → Permisos'],
     [{ os: 'linux', browser: 'other' }, 'permisos del sitio'],
   ])('permiso denegado en %o', (platform, expected) => {
-    const problem = describeCameraProblem('denied', platform, local);
-    expect(problem.steps.join(' ')).toContain(expected);
-    expect(problem.steps.at(-1)).toBe('Pulsa "Reintentar".');
+    const { steps } = textOf('denied', platform, local);
+    expect(steps.join(' ')).toContain(expected);
+    expect(steps.at(-1)).toBe('Pulsa "Reintentar".');
   });
 
   it('Linux sin pasos del sistema: solo sitio y reintentar', () => {
-    expect(describeCameraProblem('denied', { os: 'linux', browser: 'chrome' }, local).steps).toHaveLength(2);
+    expect(textOf('denied', { os: 'linux', browser: 'chrome' }, local).steps).toHaveLength(2);
   });
 
   it('sin cámara en Mac: Informe del sistema, antivirus y Mac sin cámara integrada', () => {
-    const steps = describeCameraProblem('not-found', mac, local).steps.join(' ');
+    const steps = textOf('not-found', mac, local).steps.join(' ');
     expect(steps).toContain('Informe del sistema → Cámara');
     expect(steps).toContain('Kaspersky');
     expect(steps).toContain('Mac mini');
   });
 
   it('sin cámara en Windows y otros sistemas', () => {
-    expect(describeCameraProblem('not-found', { os: 'windows', browser: 'edge' }, local).steps.join(' ')).toContain('Administrador de dispositivos');
-    expect(describeCameraProblem('not-found', { os: 'android', browser: 'chrome' }, local).steps).toHaveLength(2);
+    expect(textOf('not-found', { os: 'windows', browser: 'edge' }, local).steps.join(' ')).toContain('Administrador de dispositivos');
+    expect(textOf('not-found', { os: 'android', browser: 'chrome' }, local).steps).toHaveLength(2);
   });
 
   it('cámara ocupada: menciona antivirus solo en escritorio', () => {
-    expect(describeCameraProblem('busy', mac, local).steps.join(' ')).toContain('antivirus');
-    expect(describeCameraProblem('busy', { os: 'ios', browser: 'safari' }, local).steps.join(' ')).not.toContain('antivirus');
+    expect(textOf('busy', mac, local).steps.join(' ')).toContain('antivirus');
+    expect(textOf('busy', { os: 'ios', browser: 'safari' }, local).steps.join(' ')).not.toContain('antivirus');
   });
 
   it('error desconocido y valores por defecto', () => {
     expect(describeCameraProblem('unknown', mac, local).kind).toBe('unknown');
-    expect(describeCameraProblem('unknown').title).toContain('cámara');
+    expect(textOf('unknown').title).toContain('cámara');
   });
 });

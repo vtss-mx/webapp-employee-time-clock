@@ -9,12 +9,14 @@ import type {
   EmployeeUpdatePayload,
   IdentityReverifySummary,
   PageQuery,
+  Restored,
   VerificationLogList,
   VerificationResult,
 } from '../types';
 import { hasKeys, isNothing, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
 import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
+import { restoreRecord } from './http/restore';
 import { isVerificationResult } from './verificationService';
 
 const isEmployee = hasKeys<Employee>('id', 'employee_number', 'first_name', 'last_name');
@@ -62,8 +64,14 @@ export const employeeService = {
     return apiRequest<Employee>(`/employees/${id}/status`, { method: 'PATCH', body: { active }, validate: isEmployee });
   },
 
+  /** Lo manda a «Eliminados» (se restaura durante 1 año); su rostro y sus fotos se borran para siempre. */
   async remove(id: number): Promise<void> {
     await apiRequest<null | undefined>(`/employees/${id}`, { method: 'DELETE', validate: isNothing });
+  },
+
+  /** Lo regresa de «Eliminados» (deberá registrar su rostro de nuevo). */
+  restore(id: number): Promise<Restored<Employee>> {
+    return restoreRecord(`/employees/${id}`, isEmployee);
   },
 
   /** Solicita al empleado verificar de nuevo su identidad (motivo opcional, visible para él). */

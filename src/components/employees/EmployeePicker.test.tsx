@@ -2,11 +2,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../i18n/core';
 import { apiFail, apiOk } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
 import type { BulkResult } from '../../types';
 import { bulkResultMessage, BulkResultSummary } from '../BulkResultSummary';
-import { EmployeePicker, type EmployeePickerProps } from './EmployeePicker';
+import { describeEmployees, EmployeePicker, type EmployeePickerProps } from './EmployeePicker';
 import { page, pickerServer } from './testData';
 
 function Harness(props: Partial<EmployeePickerProps>) {
@@ -82,8 +83,8 @@ describe('EmployeePicker', () => {
     await userEvent.click(screen.getByRole('option', { name: 'Activos' }));
     await waitFor(() => expect(calls.some((c) => c.url.includes('department_id=2') && c.url.includes('active=true'))).toBe(true));
     await userEvent.click(await screen.findByRole('button', { name: 'Seleccionar los 2 de este filtro' }));
-    const warning = await screen.findByRole('alertdialog', { name: 'Se eligieron los primeros' });
-    expect(warning).toHaveTextContent('El filtro tiene 600 empleados y una operación llega hasta 500: se eligieron los primeros 1');
+    const warning = await screen.findByRole('alertdialog', { name: 'Se alcanzó el límite' });
+    expect(warning).toHaveTextContent('El filtro tiene 600 empleados y el máximo por operación es 500: se eligieron los primeros 1');
     await userEvent.click(within(warning).getByRole('button', { name: 'Entendido' }));
     expect(chosen()).toBe('7');
     expect(calls.find((c) => c.url.startsWith('/api/employees/ids'))?.url).toBe('/api/employees/ids?active=true&department_id=2');
@@ -111,13 +112,13 @@ describe('EmployeePicker', () => {
   it('estados vacíos: sin empleados y sin coincidencias', async () => {
     pickerServer((call) => (call.url.includes('search=zz') ? apiOk(page([])) : null), { people: [] });
     const { unmount } = renderWithProviders(<Harness />);
-    expect(await screen.findByText('No hay empleados registrados')).toBeInTheDocument();
+    expect(await screen.findByText('Sin empleados')).toBeInTheDocument();
     unmount();
     pickerServer((call) => (call.url.includes('search=zz') ? apiOk(page([])) : null));
     renderWithProviders(<Harness />);
     await screen.findByRole('checkbox', { name: /Ana Ruiz/ });
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar empleados' }), 'zz');
-    expect(await screen.findByText('Ningún empleado coincide con la búsqueda')).toBeInTheDocument();
+    expect(await screen.findByText('Sin resultados')).toBeInTheDocument();
   });
 });
 
@@ -148,5 +149,41 @@ describe('resultado de una operación masiva', () => {
     expect(message).toMatchObject({ variant: 'success', title: 'Turno asignado', text: 'Asignado: 1' });
     renderWithProviders(<>{message.body}</>);
     expect(screen.getAllByRole('heading').map((h) => h.textContent)).toEqual([' Asignado 1']); // sin grupos vacíos
+  });
+});
+
+describe('EmployeePicker: fallas, confirmaciones e inglés', () => {
+  it.each([
+    ['los departamentos', '/api/departments', 'No se pudieron cargar los departamentos'],
+    ['los empleados', '/api/employees', 'No se pudieron cargar los empleados'],
+  ])('si %s no cargan lo explica con su título', async (_, failing, title) => {
+    pickerServer((call) => (call.url.startsWith(failing) ? apiFail(403, 'FORBIDDEN', 'Sin acceso') : null));
+    renderWithProviders(<Harness />);
+    expect(await screen.findByRole('alertdialog', { name: title })).toHaveTextContent('Sin acceso');
+  });
+
+  it('a quiénes afecta: con nombres, sin ninguno conocido y en inglés', async () => {
+    expect(describeEmployees(1, ['Ana Ruiz'])).toEqual({ label: 'Empleado', value: 'Ana Ruiz' });
+    expect(describeEmployees(12, [])).toEqual({ label: 'Empleados (12)', value: '12 empleados' });
+    await setLocale('en-US');
+    expect(describeEmployees(12, [])).toEqual({ label: 'Employees (12)', value: '12 employees' });
+    expect(describeEmployees(3, ['Ana', 'Luis'])).toEqual({ label: 'Employees (3)', value: 'Ana, Luis, and 1 more' });
+  });
+
+  it('en inglés: búsqueda, cuántos van elegidos y la selección masiva', async () => {
+    await setLocale('en-US');
+    pickerServer();
+    renderWithProviders(<Harness />);
+    const ana = await screen.findByRole('checkbox', { name: /Ana Ruiz/ });
+    expect(screen.getByRole('group', { name: 'Employees' })).toBeInTheDocument();
+    expect(screen.getByText('No one selected')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search employees' })).toHaveAttribute('placeholder', 'Search by name, number or email');
+    expect(screen.getByText('No. EMP-7 · Producción')).toBeInTheDocument();
+    await userEvent.click(ana);
+    expect(screen.getByText('1 employee selected')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 2' }));
+    expect(await screen.findByText('2 employees selected')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(screen.getByText('No one selected')).toBeInTheDocument();
   });
 });

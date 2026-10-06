@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
+import { setLocale } from '../i18n/core';
 import { apiFail, apiOk, mockFetch } from '../test/http';
 import { renderWithProviders } from '../test/render';
 import type { FaceLearningSummary } from '../types';
@@ -59,5 +60,17 @@ describe('FaceLearningPanel (consola del ADMIN: política de una empresa)', () =
     const [retry] = await screen.findAllByRole('button', { name: /Reintentar/ });
     await userEvent.click(retry);
     expect(await screen.findByText('Aprendiendo')).toBeInTheDocument();
+  });
+});
+
+describe('FaceLearningPanel en inglés (en-US)', () => {
+  it('la evolución del reconocimiento y la pausa, en inglés', async () => {
+    await setLocale('en-US');
+    mockFetch(apiOk({ ...summary, enabled: false }));
+    renderWithProviders(<FaceLearningPanel companyId={4} enabled={false} />);
+    expect(await screen.findByText('Paused')).toBeInTheDocument();
+    expect(screen.getByText('Evolving face recognition')).toBeInTheDocument();
+    expect(screen.getByText(/12 of 40 employees with an approved face/)).toBeInTheDocument();
+    expect(screen.getByText('Continuous learning is paused')).toBeInTheDocument();
   });
 });

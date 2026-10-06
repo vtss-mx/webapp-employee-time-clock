@@ -1,5 +1,6 @@
 import { Building2, MessageSquareText } from 'lucide-react';
 import { useCatalogs } from '../../hooks/useCatalogs';
+import { useT } from '../../i18n';
 import type { WorkMode, WorkSession } from '../../types';
 import { formatDateTime } from '../../utils/format';
 
@@ -29,6 +30,7 @@ export function CompanyBadge() {
  *   <CompanyEditNote session={session} />
  */
 export function CompanyEditNote({ session }: { session: Pick<WorkSession, 'edited_at' | 'edit_reason'> }) {
+  const t = useT();
   if (!session.edited_at) return null;
   return (
     <div className="att-edited">
@@ -38,7 +40,7 @@ export function CompanyEditNote({ session }: { session: Pick<WorkSession, 'edite
         <p className="att-edited__reason">
           <MessageSquareText size={16} aria-hidden />
           <span>
-            <strong>Motivo:</strong> {session.edit_reason}
+            <strong>{t('attendance.company.reasonLabel')}</strong> {session.edit_reason}
           </span>
         </p>
       )}

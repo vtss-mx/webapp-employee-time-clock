@@ -5,7 +5,8 @@ import { useFormState } from './useFormState';
 import { formatPhone, validatePhone } from '../utils/phone';
 import { emptyEmployeeForm, validateEmployeeForm } from '../utils/formRules';
 import type { EmployeeFormValues, EmployeeUniqueField, LiveChecks } from '../types';
-import type { ConfirmInput } from '../types/confirm';
+import { t } from '../i18n';
+import type { ConfirmSource } from '../types/confirm';
 import type { FieldLabels } from '../utils/changes';
 import { formatDate } from '../utils/format';
 import { CURP_LENGTH, NSS_LENGTH, RFC_LENGTH, normalizeCurp, normalizeRfc, type FieldErrors, validateEmail } from '../utils/validation';
@@ -27,20 +28,26 @@ const ERROR_FIELDS: Partial<Record<string, keyof EmployeeFormValues>> = {
   PASSWORD_REQUIRED: 'password',
 };
 
-/** Datos del empleado en las confirmaciones: lo que se registra (alta) o lo que cambia (edición). */
-export const EMPLOYEE_LABELS: FieldLabels<EmployeeFormValues & { headwear_exempt?: boolean }> = {
-  first_name: 'Nombres',
-  last_name: 'Apellidos',
-  birth_date: { label: 'Fecha de nacimiento', format: formatDate },
-  employee_number: 'No. de empleado',
+/**
+ * Datos del empleado en las confirmaciones: lo que se registra (alta) o lo que cambia (edición), con
+ * los nombres de los campos en el idioma activo (se llama al armar la confirmación).
+ */
+export const employeeLabels = (): FieldLabels<EmployeeFormValues & { headwear_exempt?: boolean }> => ({
+  first_name: t('employees.fields.firstName'),
+  last_name: t('employees.fields.lastName'),
+  birth_date: { label: t('employees.fields.birthDate'), format: formatDate },
+  employee_number: t('employees.fields.employeeNumber'),
   curp: 'CURP',
   rfc: 'RFC',
   nss: 'NSS',
-  phone: { label: 'Teléfono celular', format: formatPhone },
-  email: 'Correo electrónico',
-  password: { label: 'Contraseña', secret: true },
-  headwear_exempt: 'Excepción de prenda de cabeza',
-};
+  phone: { label: t('common.fields.mobilePhone'), format: formatPhone },
+  email: t('common.fields.email'),
+  password: { label: t('employees.fields.password'), secret: true },
+  headwear_exempt: t('employees.fields.headwear'),
+});
+
+/** Título del popup si no se pudo guardar (el motivo lo explica el error). */
+const saveError = () => t('employees.form.saveError');
 
 /** Errores de campo devueltos por el backend (duplicados y validación). */
 export const serverFieldErrors = (err: unknown): FieldErrors<EmployeeFormValues> => fieldErrorsFrom(err, ERROR_FIELDS);
@@ -86,21 +93,27 @@ export function useEmployeeForm({ excludeId, original, passwordOptional = false 
   // La persona ya trabaja en otra empresa: se vincula su cuenta (conserva su contraseña).
   const linking = !passwordOptional && live.email.status === 'linkable';
 
-  const clientErrors = validateEmployeeForm(values, { passwordOptional: passwordOptional || linking });
+  const rules = () => validateEmployeeForm(values, { passwordOptional: passwordOptional || linking });
+  const clientErrors = rules();
   const pendingLive = UNIQUE_FIELDS.some((f) => availabilityBlocks(live[f]));
   /** Todo lleno correctamente, sin duplicados y nada pendiente de verificar. */
   const canSubmit = Object.keys(clientErrors).length === 0 && !pendingLive && !saving;
 
-  /** Red de seguridad al enviar (Enter): marca todo y resume en un popup lo que falta. */
-  const validate = (): boolean => {
-    const validation: FieldErrors<EmployeeFormValues> = { ...clientErrors };
+  /** Lo que falta o está mal: las reglas del cliente y los datos únicos ya verificados (en el idioma activo). */
+  const problems = (): FieldErrors<EmployeeFormValues> => {
+    const validation: FieldErrors<EmployeeFormValues> = rules();
     for (const field of UNIQUE_FIELDS) {
       const message = validation[field] ?? availabilityError(live[field]);
       if (message) validation[field] = message;
     }
+    return validation;
+  };
+
+  /** Red de seguridad al enviar (Enter): marca todo y resume en un popup lo que falta (sigue al idioma activo). */
+  const validate = (): boolean => {
     form.touchAll();
-    const ok = Object.keys(validation).length === 0;
-    if (!ok) void form.feedback.invalidForm(validation);
+    const ok = Object.keys(problems()).length === 0;
+    if (!ok) void form.feedback.invalidForm(problems);
     return ok && !pendingLive;
   };
 
@@ -115,8 +128,11 @@ export function useEmployeeForm({ excludeId, original, passwordOptional = false 
     saving,
     canSubmit,
     validate,
-    /** Guarda tras confirmar (cancelar no envía nada y el formulario sigue igual). */
-    save: (action: () => Promise<void>, confirm: ConfirmInput) => form.save(action, 'No se pudo guardar', confirm),
+    /**
+     * Guarda tras confirmar (cancelar no envía nada y el formulario sigue igual). Con `confirm` como
+     * función (`() => ({ title: t('…'), … })`) la confirmación abierta sigue al idioma activo.
+     */
+    save: (action: () => Promise<void>, confirm: ConfirmSource) => form.save(action, saveError, confirm),
     live,
     linking,
   };

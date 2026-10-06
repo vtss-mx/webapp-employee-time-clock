@@ -1,5 +1,6 @@
 import { Timer } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocale } from '../../../i18n';
 import { formatMinutes } from '../../../utils/format';
 import { countdownText, MINUTE, msUntil } from './serverTime';
 
@@ -43,6 +44,7 @@ interface CountdownProps {
 
 /** "Cuánto falta" con la hora del servidor: corre cada segundo y se detiene al llegar. */
 export function Countdown({ until, offsetMs, label, done }: CountdownProps) {
+  useLocale(); // las unidades ("min", "s") se vuelven a armar al cambiar el idioma
   const left = useTicking(
     () => msUntil(until, offsetMs),
     (ms) => (ms > 0 ? ms % 1000 || 1000 : null),
@@ -66,6 +68,7 @@ export function Countdown({ until, offsetMs, label, done }: CountdownProps) {
  * hora del servidor: "3 h 20 min". Corre cada minuto.
  */
 export function Elapsed({ since, offsetMs, minusMinutes }: { since: string; offsetMs: number; minusMinutes: number }) {
+  useLocale(); // "3 h 20 min" se vuelve a armar al cambiar el idioma
   const ms = useTicking(
     () => -msUntil(since, offsetMs) - minusMinutes * MINUTE,
     (value) => MINUTE - (Math.max(0, value) % MINUTE),

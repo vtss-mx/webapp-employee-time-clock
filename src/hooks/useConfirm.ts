@@ -1,11 +1,12 @@
 import { useCallback, useContext, useEffect, useRef } from 'react';
 import { ConfirmContext } from '../context/ConfirmContext';
-import type { ConfirmInput } from '../types/confirm';
+import type { ConfirmSource } from '../types/confirm';
 
 /**
  * Pregunta antes de crear, editar o eliminar (decisión del dueño del producto: nada se crea, cambia
- * ni borra por accidente): `await confirm({ kind: 'delete', title: '¿Eliminar…?' })` abre el popup
- * personalizable y se resuelve true solo si la persona confirma.
+ * ni borra por accidente): `await confirm(() => ({ kind: 'delete', title: t('…') }))` abre el popup
+ * personalizable y se resuelve true solo si la persona confirma. Con una función, la confirmación
+ * abierta sigue al idioma activo (se arma de nuevo al cambiarlo).
  *
  * - Una edición sin cambios (`changes: []`) no pregunta: avisa "Sin cambios" y resuelve false.
  * - Si la pantalla que preguntó se cierra con el popup abierto (navegó, se desmontó), la
@@ -14,7 +15,7 @@ import type { ConfirmInput } from '../types/confirm';
  * Casi nunca se usa directo: `useAction().run(task, { confirm })`, `useSubmit().submit(task, title,
  * { confirm })` y `useFormState().save(task, title, confirm)` ya preguntan antes de enviar.
  */
-export function useConfirm(): (input: ConfirmInput) => Promise<boolean> {
+export function useConfirm(): (input: ConfirmSource) => Promise<boolean> {
   const context = useContext(ConfirmContext);
   if (!context) throw new Error('useConfirm debe usarse dentro de <FeedbackProvider>');
   const { ask, cancel } = context;
@@ -26,7 +27,7 @@ export function useConfirm(): (input: ConfirmInput) => Promise<boolean> {
   }, [cancel]);
 
   return useCallback(
-    async (input: ConfirmInput) => {
+    async (input: ConfirmSource) => {
       const { id, done } = ask(input);
       open.current.add(id);
       const confirmed = await done;

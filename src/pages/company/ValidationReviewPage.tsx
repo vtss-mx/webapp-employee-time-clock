@@ -1,18 +1,21 @@
-import { AlertTriangle, Camera, Check, CheckCircle2, ImageOff, ShieldCheck, UserCheck, UserX } from 'lucide-react';
+import { AlertTriangle, Camera, Check, CheckCircle2, ImageOff, ShieldCheck, UserCheck, Users, UserX } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { EnrollmentBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonRows } from '../../components/ui/Skeleton';
-import { useAction } from '../../hooks/useAction';
+import { useAction, type SuccessNotice } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { notifyEnrollmentsChanged } from '../../hooks/usePendingEnrollments';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { RetryState } from '../../components/ui/RetryState';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { enrollmentService } from '../../services/enrollmentService';
+import type { FaceEnrollmentDetail } from '../../types';
+import type { ConfirmInput } from '../../types/confirm';
 import type { CatalogApi } from '../../utils/catalogs';
 import { ageFrom, formatDate, formatDateTime, formatPercent } from '../../utils/format';
 
@@ -25,14 +28,48 @@ function describeFlags(flags: string[], { byCode }: CatalogApi): Array<{ code: s
   });
 }
 
+/** Aceptar: confirma que la persona de la foto es el empleado (con lo que el análisis marcó para revisar). */
+function approveConfirm(item: FaceEnrollmentDetail, flagNames: string[]): ConfirmInput {
+  return {
+    tone: 'success',
+    icon: <UserCheck size={30} />,
+    eyebrow: t('enrollments.review.approve.eyebrow'),
+    title: t('enrollments.review.approve.title', { name: item.full_name }),
+    message: t('enrollments.review.approve.message'),
+    details: [{ label: t('common.fields.employee'), value: `${item.full_name} · ${item.employee_number}` }, ...flagNames.map((flag) => t('enrollments.review.approve.check', { flag }))],
+    confirmLabel: t('enrollments.review.approve.confirm'),
+    confirmIcon: <UserCheck size={18} />,
+  };
+}
+
+/** Lo que el análisis automático comprobó (lo marcado para revisar no se da por verificado). */
+function automaticChecks(item: FaceEnrollmentDetail, accessoryFlagged: boolean, spoofFlag: boolean): string[] {
+  return [
+    t('enrollments.review.checks.singleFace'),
+    accessoryFlagged ? null : t('enrollments.review.checks.noAccessories'),
+    spoofFlag ? null : t('enrollments.review.checks.realFace'),
+    t('enrollments.review.checks.samples', { samples: item.samples }),
+    item.liveness_passed ? t('enrollments.review.checks.liveness') : null,
+    t('enrollments.review.checks.quality', { quality: formatPercent(item.quality_score) }),
+  ].filter((check): check is string => check !== null);
+}
+
+const loadError = () => t('enrollments.loadError');
+const approveError = () => t('enrollments.review.approve.error');
+/** Avisos: se arman al dibujarse (siguen al idioma activo). */
+const approved = (name: string): SuccessNotice => [t('enrollments.review.approve.done'), t('enrollments.review.approve.doneText', { name })];
+const flagsTitle = () => t('enrollments.review.flags.title');
+const flagsText = () => t('enrollments.review.flags.text');
+
 /** Revisión de identidad: foto de referencia vs. datos del empleado → Aceptar / Rechazar. */
 export function ValidationReviewPage() {
+  const t = useT();
   const { id } = useParams();
   const enrollmentId = Number(id);
   const navigate = useNavigate();
   const feedback = useFeedback();
   const catalogs = useCatalogs();
-  const { data: item, error, retry } = useResource((signal) => enrollmentService.get(enrollmentId, signal), enrollmentId, 'No se pudo cargar la solicitud');
+  const { data: item, error, retry } = useResource((signal) => enrollmentService.get(enrollmentId, signal), enrollmentId, loadError);
   const { busy, run } = useAction();
 
   const flags = item?.flagged_accessories ?? [];
@@ -45,29 +82,17 @@ export function ValidationReviewPage() {
     if (item?.status !== 'PENDING') return;
     const reasons = describeFlags(item.flagged_accessories ?? [], catalogs).map((flag) => flag.detail);
     if (reasons.length === 0) return;
-    void feedback.warning('Revisa la fotografía con atención', 'Acepta solo si la foto muestra claramente el rostro descubierto de la persona.', {
+    void feedback.warning(flagsTitle, flagsText, {
       details: reasons,
       key: `review-flags-${item.id}`,
     });
   }, [item, feedback, catalogs]);
 
-  const approve = (fullName: string, employeeNumber: string) =>
+  const approve = (enrollment: FaceEnrollmentDetail) =>
     run(() => enrollmentService.approve(enrollmentId), {
-      confirm: {
-        tone: 'success',
-        icon: <UserCheck size={30} />,
-        eyebrow: 'Validar identidad',
-        title: `¿Aceptar a ${fullName}?`,
-        message: 'Confirmas que la persona de la fotografía es este empleado. Podrá identificarse con su rostro o su código QR.',
-        details: [
-          { label: 'Empleado', value: `${fullName} · ${employeeNumber}` },
-          ...flagged.map((flag) => `Revisa: ${flag.name}`),
-        ],
-        confirmLabel: 'Sí, aceptar',
-        confirmIcon: <UserCheck size={18} />,
-      },
-      errorTitle: 'No se pudo aceptar',
-      success: (res) => ['Usuario aceptado', `${res.full_name} ya puede identificarse.`],
+      confirm: () => approveConfirm(enrollment, flagged.map((flag) => flag.name)),
+      errorTitle: approveError,
+      success: (res) => approved(res.full_name),
       onSuccess: () => {
         notifyEnrollmentsChanged();
         void navigate(paths.company.validations);
@@ -78,7 +103,7 @@ export function ValidationReviewPage() {
     return (
       <div className="page">
         <Panel>
-          <PanelHeader title="Validación de identidad" backTo={paths.company.validations} backLabel="Validaciones" />
+          <PanelHeader title={t('enrollments.review.title')} backTo={paths.company.validations} backLabel={t('enrollments.back')} />
           <PanelSection>
             <RetryState onRetry={retry} />
           </PanelSection>
@@ -104,83 +129,74 @@ export function ValidationReviewPage() {
   }
 
   const pending = item.status === 'PENDING';
-  const checks = [
-    'Un solo rostro detectado',
-    accessoryFlagged ? null : 'Sin accesorios que oculten el rostro (según la política vigente)',
-    spoofFlag ? null : 'Rostro real frente a la cámara (anti-spoofing)',
-    `${item.samples} muestras consistentes entre sí`,
-    item.liveness_passed ? 'Prueba de vida superada (giro de cabeza)' : null,
-    `Calidad de captura ${formatPercent(item.quality_score)}`,
-  ].filter(Boolean) as string[];
+  const checks = automaticChecks(item, accessoryFlagged, spoofFlag);
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Validación de identidad"
+          title={t('enrollments.review.title')}
           backTo={paths.company.validations}
-          backLabel="Validaciones"
+          backLabel={t('enrollments.back')}
           subtitle={
             <>
-              <EnrollmentBadge status={item.status} /> Enviado el {formatDateTime(item.submitted_at)}
+              <EnrollmentBadge status={item.status} /> {t('enrollments.review.submittedAt', { date: formatDateTime(item.submitted_at) })}
             </>
           }
         />
 
         <PanelGrid>
-          <PanelSection title="Fotografía de referencia" icon={<Camera size={20} />}>
+          <PanelSection title={t('enrollments.review.photo')} icon={<Camera size={20} />}>
             <div className="review__photo">
               {item.photo ? (
-                <img src={item.photo} alt={`Registro facial de ${item.full_name}`} />
+                <img src={item.photo} alt={t('enrollments.review.photoAlt', { name: item.full_name })} />
               ) : (
                 <div className="camera__state">
                   <span className="camera__state-icon">
                     <ImageOff size={32} />
                   </span>
-                  <p>La fotografía se eliminó porque el registro fue rechazado.</p>
+                  <p>{t('enrollments.review.photoDeleted')}</p>
                 </div>
               )}
               <span className="review__photo-tag">
-                <Camera size={14} /> Captura en vivo del empleado
+                <Camera size={14} /> {t('enrollments.review.liveCapture')}
               </span>
             </div>
             <p className="small muted inline-note">
-              <ShieldCheck size={16} color="var(--success)" /> Imagen cifrada en reposo. Solo visible para administradores.
+              <ShieldCheck size={16} color="var(--success)" /> {t('enrollments.review.encrypted')}
             </p>
           </PanelSection>
 
           <PanelSection
-            title="Datos del empleado"
+            title={t('enrollments.review.employeeData')}
             icon={<UserCheck size={20} />}
             aside={
               <Link to={paths.company.employee(item.employee_id)} className="btn btn--link btn--sm">
-                Ver expediente
+                {t('enrollments.review.openRecord')}
               </Link>
             }
           >
             <dl className="details">
               <div>
-                <dt>Nombre completo</dt>
+                <dt>{t('enrollments.review.fullName')}</dt>
                 <dd>{item.full_name}</dd>
               </div>
               <div>
-                <dt>Número de empleado</dt>
+                <dt>{t('common.fields.employeeNumber')}</dt>
                 <dd>{item.employee_number}</dd>
               </div>
               <div>
-                <dt>Fecha de nacimiento</dt>
-                <dd>
-                  {formatDate(item.birth_date)} · {ageFrom(item.birth_date)} años
-                </dd>
+                <dt>{t('employees.fields.birthDate')}</dt>
+                <dd>{t('enrollments.review.birthDate', { date: formatDate(item.birth_date), age: ageFrom(item.birth_date) })}</dd>
               </div>
               <div>
-                <dt>Correo</dt>
+                <dt>{t('employees.email')}</dt>
                 <dd>{item.email}</dd>
               </div>
             </dl>
 
             <h3 className="panel__section-title">
-              <CheckCircle2 size={20} /> Verificaciones automáticas
+              <CheckCircle2 size={20} /> {t('enrollments.review.checks.title')}
             </h3>
             <ul className="checklist stagger">
               {/* Lo que el análisis marcó para revisar (dato de la solicitud, no un aviso). */}
@@ -196,22 +212,40 @@ export function ValidationReviewPage() {
               ))}
             </ul>
 
+            {item.similar && item.similar.length > 0 && (
+              <>
+                <h3 className="panel__section-title">
+                  <Users size={20} /> {t('enrollments.review.similar.title')}
+                </h3>
+                <p className="muted small">{t('enrollments.review.similar.hint')}</p>
+                <ul className="checklist">
+                  {item.similar.map((person) => (
+                    <li key={person.employee_id} className="checklist__warn">
+                      <AlertTriangle size={18} />
+                      <Link to={paths.company.employee(person.employee_id)}>
+                        {person.full_name} · {person.employee_number}
+                      </Link>
+                      <span className="small muted">{t('enrollments.review.similar.similarity', { value: formatPercent(person.similarity) })}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
             {!pending && (
               <dl className="details">
                 <div>
-                  <dt>Resolución</dt>
-                  <dd>
-                    {catalogs.nameOf('enrollment_statuses', item.status)} por {item.reviewed_by ?? '—'}
-                  </dd>
+                  <dt>{t('enrollments.review.resolution')}</dt>
+                  <dd>{t('enrollments.review.resolvedBy', { status: catalogs.nameOf('enrollment_statuses', item.status), reviewer: item.reviewed_by ?? '—' })}</dd>
                 </div>
                 <div>
-                  <dt>Fecha de revisión</dt>
+                  <dt>{t('enrollments.review.reviewedAt')}</dt>
                   <dd>{formatDateTime(item.reviewed_at)}</dd>
                 </div>
                 {item.rejection_reason && (
                   <div>
-                    <dt>Motivo</dt>
-                    <dd>“{item.rejection_reason}”</dd>
+                    <dt>{t('common.fields.reason')}</dt>
+                    <dd>{t('enrollments.review.quotedReason', { reason: item.rejection_reason })}</dd>
                   </div>
                 )}
               </dl>
@@ -222,10 +256,10 @@ export function ValidationReviewPage() {
         {pending && (
           <PanelFooter>
             <ButtonLink to={paths.company.rejectValidation(item.id)} variant="danger-outline" size="lg" icon={<UserX size={20} />}>
-              Rechazar usuario
+              {t('enrollments.review.reject')}
             </ButtonLink>
-            <Button variant="success" size="lg" icon={<UserCheck size={20} />} loading={busy !== null} onClick={() => void approve(item.full_name, item.employee_number)}>
-              Aceptar usuario
+            <Button variant="success" size="lg" icon={<UserCheck size={20} />} loading={busy !== null} onClick={() => void approve(item)}>
+              {t('enrollments.review.accept')}
             </Button>
           </PanelFooter>
         )}

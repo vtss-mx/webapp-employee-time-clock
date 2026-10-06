@@ -1,11 +1,16 @@
 import {
+  Aperture,
   BrainCircuit,
+  Clapperboard,
+  FileImage,
   Film,
+  FlaskConical,
   Fingerprint,
   Gauge,
   History,
   ImageOff,
   Images,
+  Layers,
   Lock,
   LockKeyhole,
   MapPin,
@@ -13,10 +18,12 @@ import {
   Power,
   PowerOff,
   QrCode,
+  Radar,
   Route,
   Save,
   ScanFace,
   ScanLine,
+  ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
   Smartphone,
@@ -24,13 +31,20 @@ import {
   Timer,
   Users,
   VideoOff,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { ruledAccessories, type AccessoryRule } from '../../components/accessories';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
 import { FaceLearningPanel } from '../../components/FaceLearningPanel';
+import { PolicyChanges } from '../../components/policy/PolicyChanges';
+import { withChanges } from '../../components/policy/policyFields';
+import { PolicyPresets, presetConfirm } from '../../components/policy/PolicyPresets';
+import { PresenceSection } from '../../components/policy/PresenceSection';
+import { RiskEngineSection } from '../../components/policy/RiskEngineSection';
+import { RiskSimulationPanel } from '../../components/policy/RiskSimulation';
 import { PolicyTuning, type TuningKey, type TuningSave } from '../../components/settings/PolicyTuning';
 import { formatConfidence } from '../../utils/format';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
@@ -40,10 +54,12 @@ import { Switch } from '../../components/ui/Switch';
 import { useAction, type SuccessNotice } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useResource } from '../../hooks/useResource';
+import { t, Trans, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
-import type { AccessoryItem, VerificationPolicy, VerificationPolicyUpdate } from '../../types';
-import type { ConfirmInput } from '../../types/confirm';
+import type { AccessoryItem, AdminPolicyUpdate, AdminVerificationPolicy, CatalogItem, PolicyUpdateResult } from '../../types';
+import type { ConfirmInput, ConfirmSource } from '../../types/confirm';
+import type { Messages } from '../../types/i18n';
 
 type PolicyKey =
   | 'block_glasses'
@@ -63,198 +79,209 @@ type PolicyKey =
   | 'lockout_enabled'
   | 'validator_device_approval'
   | 'adaptive_learning'
-  | 'detect_impossible_travel';
+  | 'detect_impossible_travel'
+  | 'qr_only_attendance'
+  | 'risk_engine'
+  | 'fraud_evidence'
+  | 'flash_paced'
+  | 'capture_burst';
+
+/** Las reglas con texto propio en `policy.options` (las de accesorios usan `policy.accessories`). */
+type OptionId = keyof Messages['policy']['options'];
+type AccessoryId = Exclude<keyof Messages['policy']['accessories'], 'remove'>;
+type WarningId = keyof Messages['policy']['warnings'];
+type SectionId = keyof Messages['policy']['sections'];
+
+/** Textos de una regla en el idioma activo: se piden al dibujarse (un popup abierto sigue al idioma). */
+interface OptionText {
+  label: string;
+  on: string;
+  off: string;
+}
 
 interface Option {
   key: PolicyKey;
   /** Ícono del interruptor y de su confirmación. */
   Icon: LucideIcon;
-  label: string;
-  on: string;
-  off: string;
+  text: () => OptionText;
   /** Desactivarla reduce la seguridad: su confirmación lo advierte. */
   security?: boolean;
   /** Advertencia de la confirmación al desactivarla (por defecto, la de suplantación de identidad). */
-  confirmMessage?: string;
+  warning?: WarningId;
+  /** Al revés: ENCENDERLA protege menos (un camino sin rostro, como la asistencia con el QR solo). */
+  inverse?: boolean;
 }
 
-const SPOOFING_WARNING =
-  'Esto reduce la protección contra suplantación de identidad (fotos, pantallas o videos). ¿Deseas continuar?';
-
 interface Section {
-  title: string;
+  id: SectionId;
   icon: ReactNode;
-  hint: string;
   options: Option[];
 }
 
+/** Una regla con sus textos en `policy.options.<id>`. */
+function option(key: PolicyKey, id: OptionId, Icon: LucideIcon, extra: Pick<Option, 'security' | 'warning' | 'inverse'> = {}): Option {
+  return { key, Icon, ...extra, text: () => ({ label: t(`policy.options.${id}.label`), on: t(`policy.options.${id}.on`), off: t(`policy.options.${id}.off`) }) };
+}
+
 /** Efecto de cada regla de accesorios; el nombre del interruptor y su ícono salen del catálogo. */
-const ACCESSORY_EFFECT: Record<AccessoryRule, Pick<Option, 'on' | 'off'>> = {
-  block_glasses: { on: 'Se pedirá quitarse lentes (incluidos los de sol).', off: 'Se permite identificarse con lentes.' },
-  block_headwear: {
-    on: 'Se pedirá quitarse gorras, sombreros y viseras (salvo empleados exentos por motivos religiosos o médicos).',
-    off: 'Se permite identificarse con prendas en la cabeza.',
-  },
-  block_mask: { on: 'Se pedirá quitarse el cubrebocas (verificación física de nariz y mejillas).', off: 'Se permite identificarse con cubrebocas (menor precisión).' },
+const ACCESSORY_TEXT: Record<AccessoryRule, AccessoryId> = {
+  block_glasses: 'blockGlasses',
+  block_headwear: 'blockHeadwear',
+  block_mask: 'blockMask',
 };
 
 /** Requisitos del rostro: un interruptor por accesorio activo del catálogo ("Retirar los lentes"). */
 function faceSection(accessories: AccessoryItem[]): Section {
   return {
-    title: 'Requisitos del rostro',
+    id: 'face',
     icon: <ScanFace size={20} />,
-    hint: 'Qué debe retirarse la persona antes de escanear. Lo que ocultes reduce la precisión del reconocimiento.',
-    options: ruledAccessories(accessories).map(({ item, rule, icon }) => ({
-      key: rule,
-      Icon: icon,
-      label: `Retirar ${item.phrase}`,
-      ...ACCESSORY_EFFECT[rule],
-    })),
+    options: ruledAccessories(accessories).map(({ item, rule, icon }) => {
+      const id = ACCESSORY_TEXT[rule];
+      return {
+        key: rule,
+        Icon: icon,
+        text: () => ({ label: t('policy.accessories.remove', { phrase: item.phrase }), on: t(`policy.accessories.${id}.on`), off: t(`policy.accessories.${id}.off`) }),
+      };
+    }),
   };
 }
 
+const security = { security: true };
+
 const POLICY_SECTIONS: Section[] = [
   {
-    title: 'Seguridad',
+    id: 'security',
     icon: <ShieldCheck size={20} />,
-    hint: 'Protecciones contra suplantación de identidad. Recomendado mantenerlas activas.',
-    options: [
-      { key: 'liveness_challenge', Icon: Fingerprint, label: 'Prueba de vida', on: 'La persona gira la cabeza en una dirección aleatoria.', off: 'Sin reto de giro de cabeza.', security: true },
-      { key: 'anti_spoofing', Icon: ScanFace, label: 'Anti-spoofing', on: 'Detecta fotos impresas, pantallas y videos frente a la cámara.', off: 'No se analizan fotos ni pantallas.', security: true },
-    ],
+    options: [option('liveness_challenge', 'livenessChallenge', Fingerprint, security), option('anti_spoofing', 'antiSpoofing', ScanFace, security)],
   },
   {
-    title: 'Candados contra suplantación',
+    id: 'locks',
     icon: <LockKeyhole size={20} />,
-    hint: 'Cada candado cierra una forma distinta de engañar al reconocimiento facial. Recomendado mantenerlos todos activos.',
     options: [
-      { key: 'block_virtual_cameras', Icon: VideoOff, label: 'Bloquear cámaras virtuales', on: 'Se rechazan programas que fingen ser una cámara (OBS, ManyCam...) para transmitir un video o una foto.', off: 'Se acepta cualquier cámara, incluidas las virtuales.', security: true },
-      { key: 'reject_foreign_images', Icon: ImageOff, label: 'Solo capturas en vivo', on: 'Se rechazan imágenes de la galería o editadas (traen datos de otra cámara o de un editor).', off: 'Se aceptan imágenes con datos de otra cámara o de un editor.', security: true },
-      { key: 'detect_static_captures', Icon: Images, label: 'Detectar fotos fijas', on: 'Se rechaza un intento si sus capturas son idénticas (una foto enviada varias veces).', off: 'No se comparan las capturas entre sí.', security: true },
-      { key: 'detect_replays', Icon: History, label: 'Detectar capturas reutilizadas', on: 'Cada captura sirve una sola vez: reenviar capturas guardadas o interceptadas se rechaza.', off: 'No se recuerdan las capturas recibidas.', security: true },
-      { key: 'check_capture_continuity', Icon: Film, label: 'Exigir una sola toma', on: 'Todas las capturas deben salir de la misma cámara, con el rostro y la luz continuos al girar.', off: 'No se compara la cámara, el encuadre ni la luz entre capturas.', security: true },
-      { key: 'enforce_human_timing', Icon: Timer, label: 'Tiempo humano en la prueba de vida', on: 'Se rechazan respuestas al reto más rápidas de lo que tarda una persona (programas automáticos).', off: 'No se mide cuánto tarda la respuesta al reto.', security: true },
-      { key: 'detect_duplicate_faces', Icon: Users, label: 'Detectar rostros duplicados', on: 'Al registrar un rostro ya aprobado en otro empleado: se marca para revisión o, en persona, se bloquea.', off: 'No se compara el registro con los demás empleados.', security: true },
-      { key: 'lockout_enabled', Icon: Lock, label: 'Bloqueo por intentos fallidos', on: 'Tras varios intentos fallidos o sospechosos seguidos se bloquea temporalmente (ajústalo abajo).', off: 'Se puede intentar sin límite (solo el límite general de peticiones).', security: true },
+      option('block_virtual_cameras', 'blockVirtualCameras', VideoOff, security),
+      option('reject_foreign_images', 'rejectForeignImages', ImageOff, security),
+      option('detect_static_captures', 'detectStaticCaptures', Images, security),
+      option('detect_replays', 'detectReplays', History, security),
+      option('check_capture_continuity', 'checkCaptureContinuity', Film, security),
+      option('enforce_human_timing', 'enforceHumanTiming', Timer, security),
+      option('detect_duplicate_faces', 'detectDuplicateFaces', Users, security),
+      option('lockout_enabled', 'lockoutEnabled', Lock, security),
     ],
   },
+  { id: 'learning', icon: <BrainCircuit size={20} />, options: [option('adaptive_learning', 'adaptiveLearning', Sparkles)] },
   {
-    title: 'Aprendizaje continuo',
-    icon: <BrainCircuit size={20} />,
-    hint: 'El reconocimiento facial mejora con el uso: cada identificación segura le enseña cómo luce hoy cada empleado. Las muestras que validaste nunca se reemplazan.',
-    options: [
-      {
-        key: 'adaptive_learning',
-        Icon: Sparkles,
-        label: 'Aprender de cada identificación segura',
-        on: 'Solo aprende de identificaciones con prueba de vida y confianza holgada: otra luz, otra cámara, peinado, barba o el paso del tiempo. Lo aprendido que deja de servir se reemplaza solo.',
-        off: 'Cada empleado se compara solo con las muestras de su registro aprobado.',
-      },
-    ],
-  },
-  {
-    title: 'Ubicación de la asistencia',
+    id: 'location',
     icon: <MapPin size={20} />,
-    hint: 'Cada entrada, descanso y salida lleva la ubicación del teléfono; la hora la pone el servidor. Ajusta abajo la precisión exigida y la velocidad creíble.',
+    options: [option('detect_impossible_travel', 'detectImpossibleTravel', Route, { security: true, warning: 'impossibleTravel' })],
+  },
+  {
+    id: 'methods',
+    icon: <QrCode size={20} />,
+    options: [option('qr_enabled', 'qrEnabled', QrCode), option('qr_only_attendance', 'qrOnlyAttendance', ScanLine, { inverse: true, warning: 'qrOnly' })],
+  },
+  {
+    id: 'antifraud',
+    icon: <ShieldAlert size={20} />,
+    options: [option('risk_engine', 'riskEngine', Radar, { security: true, warning: 'riskEngine' }), option('fraud_evidence', 'fraudEvidence', FileImage)],
+  },
+  {
+    id: 'capture',
+    icon: <Aperture size={20} />,
     options: [
-      {
-        key: 'detect_impossible_travel',
-        Icon: Route,
-        label: 'Detectar viajes imposibles',
-        on: 'Se rechaza un registro hecho a una distancia que nadie recorre en ese tiempo desde el anterior (ubicación falsa o cuenta compartida).',
-        off: 'No se compara la ubicación de un registro con la del anterior.',
-        security: true,
-        confirmMessage: 'Un registro con una ubicación falsa o desde otro lugar no se detectará por la distancia. ¿Deseas continuar?',
-      },
+      option('flash_paced', 'flashPaced', Zap, { security: true, warning: 'captureProtocol' }),
+      option('capture_burst', 'captureBurst', Clapperboard, { security: true, warning: 'captureProtocol' }),
     ],
   },
   {
-    title: 'Métodos de identificación',
-    icon: <QrCode size={20} />,
-    hint: 'Formas en que los empleados pueden identificarse.',
-    options: [{ key: 'qr_enabled', Icon: QrCode, label: 'Verificación con código QR', on: 'Los empleados muestran en su teléfono un QR dinámico: cambia solo y cada código sirve una sola vez.', off: 'Solo reconocimiento facial.' }],
-  },
-  {
-    title: 'Dispositivos de los validadores',
+    id: 'devices',
     icon: <Smartphone size={20} />,
-    hint: 'Solo los validadores de identidad tienen restricciones de dispositivo. Empleados y administradores usan la aplicación desde cualquier dispositivo.',
     options: [
-      {
-        key: 'validator_device_approval',
-        Icon: MonitorSmartphone,
-        label: 'Autorizar dispositivos de validadores',
-        on: 'Cada tableta o teléfono en que inicia sesión un validador queda por autorizar (Validadores › Dispositivos) y se verifica con su llave en cada inicio de sesión.',
-        off: 'Los validadores pueden iniciar sesión en cualquier dispositivo con su correo y contraseña.',
-        security: true,
-        confirmMessage:
-          'Cualquier persona con el correo y la contraseña de un validador podrá operar desde cualquier dispositivo. ¿Deseas continuar?',
-      },
-      {
-        key: 'validator_mobile_only',
-        Icon: ScanLine,
-        label: 'Validadores solo desde tableta o teléfono',
-        on: 'Los validadores de identidad solo inician sesión en tabletas y teléfonos (cámara a la mano en el acceso).',
-        off: 'Los validadores también pueden operar desde una computadora con cámara.',
-        security: true,
-        confirmMessage:
-          'Los validadores podrán operar desde computadoras, cuya cámara suele ser de menor calidad y más fácil de engañar con fotos o pantallas. ¿Deseas continuar?',
-      },
+      option('validator_device_approval', 'validatorDeviceApproval', MonitorSmartphone, { security: true, warning: 'deviceApproval' }),
+      option('validator_mobile_only', 'validatorMobileOnly', ScanLine, { security: true, warning: 'mobileOnly' }),
     ],
   },
 ];
 
-/** Lo que se puede estar guardando: una regla, un ajuste de los candados o un nivel de confianza. */
-type PolicyField = PolicyKey | TuningKey | 'min_confidence' | 'identify_confidence';
+/**
+ * Lo que se puede estar guardando (su control queda ocupado): una regla (`PolicyKey`), un ajuste (también del motor
+ * de riesgo, `TuningKey`), un nivel de confianza (`min_confidence`, `identify_confidence`) o un nivel predefinido
+ * (`preset`). Los nombres de los campos son textos libres del backend: basta un `string`.
+ */
+type PolicyField = TuningKey;
 
 /** Alcance de cada cambio, al pie de su confirmación. */
-const appliesTo = (company: string) => `Aplica en segundos a todo el personal de ${company}.`;
+const appliesTo = (company: string) => t('policy.appliesTo', { company });
+/** Al pie de lo que relaja la seguridad con la regla de dos personas: no aplica hasta que otro ADMIN lo apruebe. */
+const footnote = (company: string, relaxes: boolean, twoPerson: boolean) => (relaxes && twoPerson ? t('policy.governance.relaxNote') : appliesTo(company));
+const onOff = (value: boolean) => t(value ? 'policy.toggle.on' : 'policy.toggle.off');
 
 /**
- * Encender o apagar una regla: su estado "antes → después" y qué hará. Activar es verde; apagar es
- * rojo y, si es una protección, su advertencia (suplantación, ubicación falsa, dispositivos...).
+ * Encender o apagar una regla: su estado "antes → después" y qué hará. Lo que protege más es verde; lo que
+ * protege menos es rojo y, si es una protección, lleva su advertencia (suplantación, ubicación falsa,
+ * dispositivos, asistencia sin rostro...) y, con la regla de dos personas, que otro ADMIN debe aprobarlo.
  */
-function switchConfirm(option: Option, value: boolean, company: string): ConfirmInput {
-  const effect = value ? option.on : option.off;
+function switchConfirm(option: Option, value: boolean, company: string, twoPerson: boolean): ConfirmInput {
+  const { label, on, off } = option.text();
+  const safer = option.inverse ? !value : value;
+  const risky = option.inverse ? value : Boolean(option.security) && !value;
   return {
     kind: 'edit',
-    tone: value ? 'success' : 'danger',
+    tone: safer ? 'success' : 'danger',
     icon: <option.Icon size={30} />,
-    eyebrow: option.security ? 'Protección recomendada' : 'Política de verificación',
-    title: `¿${value ? 'Activar' : 'Desactivar'} «${option.label}»?`,
-    message: option.security && !value ? (option.confirmMessage ?? SPOOFING_WARNING) : effect,
-    changes: [{ label: option.label, before: value ? 'Desactivado' : 'Activado', after: value ? 'Activado' : 'Desactivado' }],
-    note: appliesTo(company),
-    confirmLabel: value ? 'Activar' : 'Desactivar',
+    eyebrow: t(option.security || option.inverse ? 'policy.toggle.eyebrowSecurity' : 'policy.toggle.eyebrow'),
+    title: t(value ? 'policy.toggle.activateTitle' : 'policy.toggle.deactivateTitle', { label }),
+    message: risky ? t(`policy.warnings.${option.warning ?? 'spoofing'}`) : value ? on : off,
+    changes: [{ label, before: onOff(!value), after: onOff(value) }],
+    note: footnote(company, risky, twoPerson),
+    confirmLabel: t(value ? 'policy.toggle.activate' : 'policy.toggle.deactivate'),
     confirmIcon: value ? <Power size={18} /> : <PowerOff size={18} />,
   };
+}
+
+/** Aviso al encender o apagar una regla: "Prueba de vida: activado" y qué hace ahora. */
+function switchNotice(option: Option, value: boolean): SuccessNotice {
+  const { label, on, off } = option.text();
+  return [t(value ? 'policy.toggle.activated' : 'policy.toggle.deactivated', { label }), value ? on : off];
 }
 
 /**
  * Cambiar un ajuste de los candados: "antes → después"; si protege menos, la advertencia en rojo; si
  * tiene una advertencia propia (exigir el destello sin calibrar), en ámbar y al pie.
  */
-function tuningConfirm({ change, detail, relaxes, warning }: TuningSave, company: string): ConfirmInput {
-  const caution = relaxes ? 'Este valor protege menos contra la suplantación de identidad.' : warning;
+function tuningConfirm({ change, detail, relaxes, warning }: TuningSave, company: string, twoPerson: boolean): ConfirmInput {
+  const caution = relaxes ? t('policy.tuning.relaxes') : warning?.();
+  const changed = change();
+  const scope = footnote(company, relaxes, twoPerson);
   return {
     kind: 'edit',
     tone: relaxes ? 'danger' : warning ? 'warning' : 'primary',
     icon: <SlidersHorizontal size={30} />,
-    eyebrow: 'Ajustes de los candados',
-    title: `¿Cambiar «${change.label}» a ${change.after}?`,
-    message: detail,
-    changes: [change],
-    note: caution ? `${caution} ${appliesTo(company)}` : appliesTo(company),
-    confirmLabel: 'Guardar ajuste',
+    eyebrow: t('policy.tuning.title'),
+    title: t('policy.tuning.confirmTitle', { label: changed.label, value: changed.after }),
+    message: detail(),
+    changes: [changed],
+    note: caution ? `${caution} ${scope}` : scope,
+    confirmLabel: t('policy.tuning.confirmLabel'),
     confirmIcon: <Save size={18} />,
   };
 }
+
+/* Títulos y avisos que se traducen al dibujarse (un popup abierto sigue al idioma activo). */
+const loadError = () => t('policy.loadError');
+const saveError = () => t('policy.saveError');
+const confidenceNotice = (value: number): SuccessNotice => [t('policy.confidence.saved'), t('policy.confidence.savedText', { value: formatConfidence(value) })];
+const identifyNotice = (value: number): SuccessNotice => [t('policy.confidence.identifySaved'), t('policy.confidence.identifySavedText', { value: formatConfidence(value) })];
+const presetNotice = (preset: CatalogItem): SuccessNotice => [t('policy.presets.applied', { name: preset.name }), preset.description ?? ''];
+/** El aviso según lo que pasó: aplicado (el suyo) o por aprobar de otro ADMIN (la política sigue igual). */
+const outcome = (notice: () => SuccessNotice) => (result: PolicyUpdateResult): SuccessNotice =>
+  result.change?.status === 'PENDING' ? [t('policy.governance.pendingTitle'), t('policy.governance.pendingText')] : notice();
 
 interface PolicyEditorProps {
   companyId: number;
   /** Nombre de la empresa: las confirmaciones dicen a quién aplica cada cambio. */
   companyName: string;
-  policy: VerificationPolicy;
-  onChange: (policy: VerificationPolicy) => void;
+  policy: AdminVerificationPolicy;
+  onChange: (policy: AdminVerificationPolicy) => void;
 }
 
 /**
@@ -263,21 +290,22 @@ interface PolicyEditorProps {
  * aplica en segundos a toda la empresa.
  */
 export function CompanyPolicyPage() {
+  const t = useT();
   const companyId = Number(useParams().id);
   const { data, setData, error, retry } = useResource(
     (signal) => Promise.all([adminService.get(companyId, signal), adminService.policy(companyId, signal)]),
     companyId,
-    'No se pudo cargar la política de verificación',
+    loadError,
   );
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Política de verificación de identidad"
+          title={t('policy.title')}
           subtitle={data?.[0].name}
           backTo={paths.admin.company(companyId)}
-          backLabel={data?.[0].name ?? 'Empresa'}
+          backLabel={data?.[0].name ?? t('common.fields.company')}
         />
         {data ? (
           <PolicyEditor companyId={companyId} companyName={data[0].name} policy={data[1]} onChange={(policy) => setData([data[0], policy])} />
@@ -294,22 +322,34 @@ export function CompanyPolicyPage() {
  * la política vigente (sin casos "aún no hay política" que nunca ocurren).
  */
 function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: PolicyEditorProps) {
+  const t = useT();
   const { accessories } = useCatalogs();
   const sections = useMemo(() => [faceSection(accessories), ...POLICY_SECTIONS], [accessories]);
   const { busy: saving, run } = useAction<PolicyField>();
+  /** Cambia con cada cambio pedido: el historial se vuelve a pedir. */
+  const [version, setVersion] = useState(0);
+  const twoPerson = policy.two_person_rule;
+
+  /** Lo que devolvió el servidor manda: si el cambio quedó por aprobar, la política sigue como estaba. */
+  const applied = (result: PolicyUpdateResult) => {
+    setPolicy(result.policy);
+    if (result.change) setVersion((n) => n + 1);
+  };
 
   /**
    * Guarda un cambio. Con `confirm` primero pregunta: cancelar no envía nada y el control queda como
-   * estaba. Ya confirmado, se ve de inmediato (optimista) y se revierte si el servidor no lo acepta.
+   * estaba. Ya confirmado, se ve de inmediato (optimista) y queda lo que responda el servidor: aplicado, o
+   * como estaba si relaja la seguridad y espera a otro ADMIN (el aviso lo dice); si falla, se revierte. La
+   * confirmación y el aviso se arman al dibujarse: un popup abierto sigue al idioma activo.
    */
-  const apply = (key: PolicyField, changes: VerificationPolicyUpdate, notice: SuccessNotice, confirm?: ConfirmInput) => {
+  const apply = (key: PolicyField, changes: AdminPolicyUpdate, notice: () => SuccessNotice, confirm?: ConfirmSource) => {
     const previous = policy;
     void run(
       () => {
-        setPolicy({ ...policy, ...changes }); // optimista, solo después de confirmar
+        setPolicy(withChanges(policy, changes)); // optimista, solo después de confirmar
         return adminService.updatePolicy(companyId, changes);
       },
-      { busy: key, confirm, errorTitle: 'No se pudo guardar', success: notice, onSuccess: setPolicy, onError: () => setPolicy(previous) },
+      { busy: key, confirm, errorTitle: saveError, success: outcome(notice), onSuccess: applied, onError: () => setPolicy(previous) },
     );
   };
 
@@ -317,58 +357,89 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
     apply(
       option.key,
       { [option.key]: value },
-      [value ? `${option.label}: activado` : `${option.label}: desactivado`, value ? option.on : option.off],
-      switchConfirm(option, value, companyName),
+      () => switchNotice(option, value),
+      () => switchConfirm(option, value, companyName, twoPerson),
     );
   // Los niveles de confianza los confirma su propio control (con el nivel "antes → después") antes de llegar aquí.
-  const saveConfidence = (value: number) =>
-    apply('min_confidence', { min_confidence: value }, ['Nivel de confianza actualizado', `Se exigirá ${formatConfidence(value)} en cada verificación facial.`]);
+  const saveConfidence = (value: number) => apply('min_confidence', { min_confidence: value }, () => confidenceNotice(value));
   const saveIdentifyConfidence = (value: number) =>
-    apply('identify_confidence', { identify_confidence: value }, [
-      'Confianza para identificar actualizada',
-      `Los validadores exigirán ${formatConfidence(Math.max(value, policy.min_confidence))} al identificar entre todos los empleados.`,
-    ]);
-  const saveTuning = (tuning: TuningSave) => apply(tuning.key, tuning.changes, [tuning.title, tuning.detail], tuningConfirm(tuning, companyName));
+    apply('identify_confidence', { identify_confidence: value }, () => identifyNotice(Math.max(value, policy.min_confidence)));
+  const saveTuning = (tuning: TuningSave) =>
+    apply(tuning.key, tuning.changes, () => [tuning.title(), tuning.detail()], () => tuningConfirm(tuning, companyName, twoPerson));
+  const applyPreset = (preset: CatalogItem) =>
+    void run(() => adminService.applyPolicyPreset(companyId, preset.code), {
+      busy: 'preset',
+      confirm: () => presetConfirm(preset, companyName, twoPerson),
+      errorTitle: saveError,
+      success: outcome(() => presetNotice(preset)),
+      onSuccess: applied,
+    });
 
   return (
     <>
-      <PanelSection title="Nivel de confianza" icon={<Gauge size={20} />}>
-        <p className="muted small">
-          Probabilidad mínima de que la persona frente a la cámara sea el empleado registrado. Cada verificación
-          informa su confianza y queda en el historial del empleado.
-        </p>
+      <PanelSection title={t('policy.presets.title')} icon={<Layers size={20} />}>
+        <p className="muted small">{t('policy.presets.hint')}</p>
+        <PolicyPresets policy={policy} busy={saving === 'preset'} onApply={applyPreset} />
+      </PanelSection>
+      <PanelSection title={t('policy.confidence.title')} icon={<Gauge size={20} />}>
+        <p className="muted small">{t('policy.confidence.intro')}</p>
         <ConfidenceSlider value={policy.min_confidence} busy={saving === 'min_confidence'} onSave={saveConfidence} />
         <p className="muted small">
-          <strong>Al identificar entre todos los empleados</strong> (validadores, sin saber quién es): buscar entre muchos multiplica
-          las coincidencias falsas, así que se puede exigir más. Nunca rige por debajo del nivel anterior.
+          <Trans k="policy.confidence.identifyIntro" values={{ lead: <strong>{t('policy.confidence.identifyLead')}</strong> }} />
         </p>
         <ConfidenceSlider
-          label="Nivel de confianza para identificar entre todos"
+          label={() => t('policy.confidence.identifyLabel')}
           value={policy.identify_confidence}
           busy={saving === 'identify_confidence'}
           onSave={saveIdentifyConfidence}
         />
       </PanelSection>
       {sections.map((section) => (
-        <PanelSection key={section.title} title={section.title} icon={section.icon}>
-          <p className="muted small">{section.hint}</p>
-          {section.options.map((option) => (
-            <Switch
-              key={option.key}
-              icon={<option.Icon size={20} />}
-              label={option.label}
-              badge={option.security ? <span className="badge badge--info">Recomendado</span> : null}
-              description={policy[option.key] ? option.on : option.off}
-              checked={policy[option.key]}
-              busy={saving === option.key}
-              onChange={(value) => onToggle(option, value)}
-            />
-          ))}
+        <PanelSection key={section.id} title={t(`policy.sections.${section.id}.title`)} icon={section.icon}>
+          <p className="muted small">{t(`policy.sections.${section.id}.hint`)}</p>
+          {section.options.map((option) => {
+            const { label, on, off } = option.text();
+            return (
+              <Switch
+                key={option.key}
+                icon={<option.Icon size={20} />}
+                label={label}
+                badge={option.security ? <span className="badge badge--info">{t('policy.recommended')}</span> : null}
+                description={policy[option.key] ? on : off}
+                checked={policy[option.key]}
+                busy={saving === option.key}
+                onChange={(value) => onToggle(option, value)}
+              />
+            );
+          })}
         </PanelSection>
       ))}
-      <PanelSection title="Ajustes de los candados" icon={<SlidersHorizontal size={20} />}>
-        <p className="muted small">Qué tan estricto es cada candado. Valores más estrictos protegen más, pero pueden pedir repetir la captura con más frecuencia.</p>
+      <PanelSection title={t('policy.tuning.title')} icon={<SlidersHorizontal size={20} />}>
+        <p className="muted small">{t('policy.tuning.hint')}</p>
         <PolicyTuning policy={policy} saving={saving} onSave={saveTuning} />
+      </PanelSection>
+      <PanelSection title={t('policy.risk.title')} icon={<Radar size={20} />}>
+        <p className="muted small">{t('policy.risk.hint')}</p>
+        <RiskEngineSection policy={policy} saving={saving} onSave={saveTuning} />
+      </PanelSection>
+      <PresenceSection policy={policy} saving={saving} onSave={saveTuning} />
+      <PanelSection title={t('policy.simulation.title')} icon={<FlaskConical size={20} />}>
+        <RiskSimulationPanel companyId={companyId} policy={policy} />
+      </PanelSection>
+      <PanelSection
+        title={t('policy.changes.title')}
+        icon={<History size={20} />}
+        aside={policy.pending_changes > 0 && <span className="badge badge--warning badge--live">{t('policy.changes.pending', { count: policy.pending_changes })}</span>}
+      >
+        <p className="muted small">{t(twoPerson ? 'policy.changes.hintTwoPerson' : 'policy.changes.hint')}</p>
+        <PolicyChanges
+          companyId={companyId}
+          companyName={companyName}
+          policy={policy}
+          version={version}
+          onApproved={(result) => setPolicy(result.policy)}
+          onCancelled={() => setPolicy({ ...policy, pending_changes: Math.max(0, policy.pending_changes - 1) })}
+        />
       </PanelSection>
       <FaceLearningPanel companyId={companyId} enabled={policy.adaptive_learning} />
     </>

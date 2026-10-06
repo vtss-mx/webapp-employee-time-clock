@@ -1,133 +1,160 @@
-import { Blocks, Building2, Gauge, KeyRound, Pencil, Power, PowerOff, ShieldCheck, Trash2, Unplug, UserCheck, UserCog, UserPlus, UserX, Users } from 'lucide-react';
+import { Blocks, KeyRound, Pencil, Power, PowerOff, ShieldCheck, Trash2, Unplug, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CompanyBillingSection } from '../../components/billing/CompanyBillingSection';
+import { LoadFailed } from '../../components/shifts/PageStates';
+import { deleteNote } from '../../components/trash/TrashParts';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { PagedItems } from '../../components/ui/PagedItems';
-import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { Switch } from '../../components/ui/Switch';
 import { useAction, type SuccessNotice } from '../../hooks/useAction';
+import { useCatalogs } from '../../hooks/useCatalogs';
 import { usePagedList, type PagedList } from '../../hooks/usePagedList';
 import { useResource } from '../../hooks/useResource';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
 import type { CompanyAdmin, CompanyDetail } from '../../types';
-import type { ConfirmInput } from '../../types/confirm';
+import type { ConfirmInput, ConfirmSource } from '../../types/confirm';
+import type { CatalogApi } from '../../utils/catalogs';
 import { formatDate, formatDateTime } from '../../utils/format';
-import { formatPhone } from '../../utils/phone';
+import { formatCount } from '../../utils/numbers';
+import { CompanyDocumentsSection } from './CompanyDocumentsSection';
+import { CompanyPlanUsage } from './CompanyPlanUsage';
+import { CompanyDataSection, companyFacts, DeletedCompany, taxIdLine } from './CompanyRecord';
 
 /** Qué se está procesando: el estado o el acceso a la API de la empresa, eliminarla o un administrador (su id). */
 type Busy = 'status' | 'api' | 'delete' | number;
-const orMissing = (value: string | null | undefined) => value || <span className="muted">Sin capturar</span>;
+/** Estado de la empresa (femenino: "Activa" / "Inactiva"). */
+const companyState = (active: boolean) => t(active ? 'admin.shared.active' : 'admin.shared.inactive');
+const adminState = (active: boolean) => t(active ? 'common.states.active' : 'common.states.inactive');
+const apiAccess = (enabled: boolean) => t(enabled ? 'admin.detail.api.withAccess' : 'admin.detail.api.withoutAccess');
 
 /** Activar o desactivar la empresa: qué pasa con su personal y el estado "antes → después". */
 function statusConfirm(company: CompanyDetail): ConfirmInput {
-  const state = { label: 'Estado', before: company.active ? 'Activa' : 'Inactiva', after: company.active ? 'Inactiva' : 'Activa' };
+  const state = { label: t('common.fields.status'), before: companyState(company.active), after: companyState(!company.active) };
   const staff = [
-    { label: 'Administradores', value: company.admin_count },
-    { label: 'Empleados', value: company.employee_count },
+    { label: t('admin.shared.admins'), value: formatCount(company.admin_count) },
+    { label: t('admin.shared.employees'), value: formatCount(company.employee_count) },
   ];
   return company.active
     ? {
         tone: 'danger',
         icon: <PowerOff size={30} />,
-        eyebrow: 'Cambiar estado',
-        title: `¿Desactivar ${company.name}?`,
-        message: 'Se cerrará de inmediato la sesión de todo su personal (administradores y empleados) y nadie podrá iniciar sesión hasta que la actives de nuevo.',
+        eyebrow: t('common.actions.changeStatus'),
+        title: t('admin.detail.status.deactivateTitle', { name: company.name }),
+        message: t('admin.detail.status.deactivateMessage'),
         changes: [state],
-        detailsTitle: 'Personal afectado',
+        detailsTitle: t('admin.detail.status.affected'),
         details: staff,
-        note: 'Sus datos se conservan: puedes activarla de nuevo cuando quieras.',
-        confirmLabel: 'Desactivar empresa',
+        note: t('admin.detail.status.deactivateNote'),
+        confirmLabel: t('admin.detail.status.deactivateLabel'),
         confirmIcon: <PowerOff size={18} />,
       }
     : {
         tone: 'success',
         icon: <Power size={30} />,
-        eyebrow: 'Cambiar estado',
-        title: `¿Activar ${company.name}?`,
-        message: 'Su personal (administradores y empleados activos) podrá volver a iniciar sesión de inmediato.',
+        eyebrow: t('common.actions.changeStatus'),
+        title: t('admin.detail.status.activateTitle', { name: company.name }),
+        message: t('admin.detail.status.activateMessage'),
         changes: [state],
-        detailsTitle: 'Personal que recupera el acceso',
+        detailsTitle: t('admin.detail.status.recovers'),
         details: staff,
-        confirmLabel: 'Activar empresa',
+        confirmLabel: t('admin.detail.status.activateLabel'),
         confirmIcon: <Power size={18} />,
       };
 }
 
 /** Dar o quitar Integraciones (API): qué ve la empresa y qué pasa con sus llaves. */
 function apiConfirm(company: CompanyDetail, enabled: boolean): ConfirmInput {
-  const access = { label: 'Integraciones (API)', before: enabled ? 'Sin acceso' : 'Con acceso', after: enabled ? 'Con acceso' : 'Sin acceso' };
+  const access = { label: t('admin.shared.api'), before: apiAccess(!enabled), after: apiAccess(enabled) };
   return enabled
     ? {
         tone: 'success',
         icon: <KeyRound size={30} />,
-        eyebrow: 'Módulos',
-        title: `¿Dar Integraciones a ${company.name}?`,
-        message: 'La pantalla Integraciones (API) aparecerá en su menú: podrá crear llaves para conectar sus sistemas (nómina, ERP) con su información.',
+        eyebrow: t('admin.shared.modules'),
+        title: t('admin.detail.api.giveTitle', { name: company.name }),
+        message: t('admin.detail.api.giveMessage'),
         changes: [access],
-        note: 'Si ya tenía llaves, vuelven a funcionar de inmediato.',
-        confirmLabel: 'Dar acceso',
+        note: t('admin.detail.api.giveNote'),
+        confirmLabel: t('admin.detail.api.giveLabel'),
         confirmIcon: <KeyRound size={18} />,
       }
     : {
         tone: 'danger',
         icon: <Unplug size={30} />,
-        eyebrow: 'Módulos',
-        title: `¿Quitar Integraciones a ${company.name}?`,
-        message: 'Sus sistemas conectados dejarán de recibir información de inmediato: el backend rechazará sus llaves y la pantalla Integraciones (API) desaparecerá de su menú.',
+        eyebrow: t('admin.shared.modules'),
+        title: t('admin.detail.api.removeTitle', { name: company.name }),
+        message: t('admin.detail.api.removeMessage'),
         changes: [access],
-        note: 'Las llaves se conservan y vuelven a funcionar si le devuelves el acceso.',
-        confirmLabel: 'Quitar acceso',
+        note: t('admin.detail.api.removeNote'),
+        confirmLabel: t('admin.detail.api.removeLabel'),
         confirmIcon: <Unplug size={18} />,
       };
 }
 
-/** Eliminar definitivamente (solo sin empleados): se escribe su nombre para habilitarlo. */
-function deleteConfirm(company: CompanyDetail): ConfirmInput {
+/**
+ * Eliminar (solo sin empleados): va a «Eliminadas» (se restaura durante 1 año), pero las fotos de sus cuentas se
+ * borran para siempre; por eso se escribe su nombre para habilitarlo.
+ */
+function deleteConfirm(company: CompanyDetail, catalogs: CatalogApi): ConfirmInput {
   return {
     kind: 'delete',
-    title: `¿Eliminar ${company.name}?`,
-    message: 'Se eliminan la empresa, sus administradores, sus validadores y su configuración.',
-    detailsTitle: 'Se eliminará',
-    details: [
-      { label: 'Razón social', value: orMissing(company.legal_name) },
-      { label: 'RFC', value: orMissing(company.rfc) },
-      { label: 'Administradores', value: company.admin_count },
-    ],
-    note: 'Esta acción no se puede deshacer.',
+    title: t('admin.detail.remove.title', { name: company.name }),
+    message: t('admin.detail.remove.message'),
+    detailsTitle: t('admin.detail.remove.detailsTitle'),
+    details: companyFacts(company, catalogs),
+    note: deleteNote({ person: true, trash: t('admin.trash.note') }),
     confirmText: company.name,
-    confirmLabel: 'Eliminar empresa',
+    confirmLabel: t('admin.detail.remove.confirmLabel'),
   };
 }
 
 /** Activar o desactivar a un administrador de la empresa: su acceso, "antes → después". */
 function adminConfirm(admin: CompanyAdmin, company: CompanyDetail): ConfirmInput {
-  const state = { label: 'Estado', before: admin.active ? 'Activo' : 'Inactivo', after: admin.active ? 'Inactivo' : 'Activo' };
+  const state = { label: t('common.fields.status'), before: adminState(admin.active), after: adminState(!admin.active) };
   return admin.active
     ? {
         tone: 'danger',
         icon: <UserX size={30} />,
-        eyebrow: 'Administrador de la empresa',
-        title: `¿Desactivar a ${admin.email}?`,
-        message: `Ya no podrá iniciar sesión en ${company.name} y su sesión actual se cerrará.`,
+        eyebrow: t('admin.detail.admin.eyebrow'),
+        title: t('admin.detail.admin.deactivateTitle', { email: admin.email }),
+        message: t('admin.detail.admin.deactivateMessage', { company: company.name }),
         changes: [state],
-        note: 'Su cuenta se conserva: puedes activarla de nuevo cuando quieras.',
-        confirmLabel: 'Desactivar administrador',
+        note: t('admin.detail.admin.deactivateNote'),
+        confirmLabel: t('admin.detail.admin.deactivateLabel'),
         confirmIcon: <UserX size={18} />,
       }
     : {
         tone: 'success',
         icon: <UserCheck size={30} />,
-        eyebrow: 'Administrador de la empresa',
-        title: `¿Activar a ${admin.email}?`,
-        message: `Podrá volver a iniciar sesión en ${company.name} con su correo y contraseña.`,
+        eyebrow: t('admin.detail.admin.eyebrow'),
+        title: t('admin.detail.admin.activateTitle', { email: admin.email }),
+        message: t('admin.detail.admin.activateMessage', { company: company.name }),
         changes: [state],
-        confirmLabel: 'Activar administrador',
+        confirmLabel: t('admin.detail.admin.activateLabel'),
         confirmIcon: <UserCheck size={18} />,
       };
 }
+
+/*
+ * Títulos y avisos de las acciones: se traducen al dibujarse (un popup abierto sigue al idioma
+ * activo). Cada aviso de éxito es la función que da [título, detalle].
+ */
+const loadError = () => t('admin.shared.loadCompanyError');
+const adminsError = () => t('admin.detail.adminsError');
+const actionError = () => t('admin.detail.actionError');
+const deleteError = () => t('admin.detail.deleteError');
+const statusNotice = (wasActive: boolean) => (): SuccessNotice =>
+  wasActive
+    ? [t('admin.detail.done.deactivated'), t('admin.detail.done.deactivatedText')]
+    : [t('admin.detail.done.activated'), t('admin.detail.done.activatedText')];
+const apiNotice = (enabled: boolean) => (): SuccessNotice =>
+  enabled ? [t('admin.detail.done.apiOn'), t('admin.detail.done.apiOnText')] : [t('admin.detail.done.apiOff'), t('admin.detail.done.apiOffText')];
+const adminNotice = (wasActive: boolean) => (): SuccessNotice => [t(wasActive ? 'admin.detail.done.adminDeactivated' : 'admin.detail.done.adminActivated')];
+const deletedNotice = (name: string) => (): SuccessNotice => [t('admin.detail.done.deleted'), t('admin.detail.done.deletedText', { name })];
 
 interface CompanyActionsProps {
   company: CompanyDetail;
@@ -138,11 +165,12 @@ interface CompanyActionsProps {
 
 /** Editar, activar o desactivar y eliminar (solo sin empleados: con empleados, se desactiva). */
 function CompanyActions({ company, busy, onToggle, onDelete }: CompanyActionsProps) {
+  const t = useT();
   const removable = company.employee_count === 0;
   return (
     <>
       <ButtonLink to={paths.admin.editCompany(company.id)} variant="secondary" icon={<Pencil size={18} />}>
-        Editar
+        {t('common.actions.edit')}
       </ButtonLink>
       <Button
         variant={company.active ? 'danger-outline' : 'success'}
@@ -151,17 +179,17 @@ function CompanyActions({ company, busy, onToggle, onDelete }: CompanyActionsPro
         disabled={busy !== null}
         onClick={onToggle}
       >
-        {company.active ? 'Desactivar' : 'Activar'}
+        {t(company.active ? 'common.actions.deactivate' : 'common.actions.activate')}
       </Button>
       <Button
         variant="danger-outline"
         icon={<Trash2 size={18} />}
         loading={busy === 'delete'}
         disabled={!removable || busy !== null}
-        title={removable ? undefined : 'Tiene empleados registrados: desactívala en lugar de eliminarla'}
+        title={removable ? undefined : t('admin.detail.hasEmployees')}
         onClick={onDelete}
       >
-        Eliminar
+        {t('common.actions.delete')}
       </Button>
     </>
   );
@@ -176,12 +204,13 @@ interface CompanyAdminsProps {
 
 /** Administradores de la empresa (paginados): último acceso, estado, contraseña y activación. */
 function CompanyAdmins({ list, companyId, busy, onToggle }: CompanyAdminsProps) {
+  const t = useT();
   return (
     <PagedItems
       list={list}
       skeletonRows={2}
-      empty={{ compact: true, icon: <UserCog />, title: 'No hay administradores registrados', description: 'Agrega la cuenta de la persona que administrará la empresa.' }}
-      pager={{ variant: 'compact', siblings: 0, noun: { one: 'administrador', other: 'administradores' } }}
+      empty={{ compact: true, icon: <UserCog />, title: t('admin.detail.admins.emptyTitle'), description: t('admin.detail.admins.emptyDescription') }}
+      pager={{ variant: 'compact', siblings: 0, noun: { one: t('admin.detail.admins.noun.one'), other: t('admin.detail.admins.noun.other') } }}
     >
       {(admins) => (
         <ul className={`company-admins ${list.loading ? 'is-loading' : ''}`}>
@@ -190,14 +219,16 @@ function CompanyAdmins({ list, companyId, busy, onToggle }: CompanyAdminsProps) 
               <span className="avatar">{admin.email.slice(0, 2).toUpperCase()}</span>
               <span className="company-admins__info">
                 <strong className="truncate">{admin.email}</strong>
-                <small className="muted">{admin.last_login_at ? `Último acceso: ${formatDateTime(admin.last_login_at)}` : 'Aún no inicia sesión'}</small>
+                <small className="muted">
+                  {admin.last_login_at ? t('admin.detail.admins.lastLogin', { date: formatDateTime(admin.last_login_at) }) : t('admin.detail.admins.neverLogged')}
+                </small>
               </span>
               <StatusBadge active={admin.active} />
               <ButtonLink to={paths.admin.companyAdminPassword(companyId, admin.id)} size="sm" variant="ghost" icon={<KeyRound size={16} />}>
-                Restablecer contraseña
+                {t('admin.detail.admins.resetPassword')}
               </ButtonLink>
               <Button size="sm" variant={admin.active ? 'ghost' : 'secondary'} loading={busy === admin.id} disabled={busy !== null} onClick={() => onToggle(admin)}>
-                {admin.active ? 'Desactivar' : 'Activar'}
+                {t(admin.active ? 'common.actions.deactivate' : 'common.actions.activate')}
               </Button>
             </li>
           ))}
@@ -220,91 +251,88 @@ interface ApiAccessProps {
  * acceso vuelven a funcionar).
  */
 function ApiAccess({ enabled, busy, saving, onChange }: ApiAccessProps) {
+  const t = useT();
   return (
     <Switch
       checked={enabled}
       onChange={onChange}
       icon={<KeyRound size={20} />}
-      label="Integraciones (API)"
-      description={
-        enabled
-          ? 'La empresa puede crear llaves y conectar sus sistemas (nómina, ERP) con su información.'
-          : 'Sin acceso: la pantalla no aparece en su menú y sus llaves no funcionan.'
-      }
+      label={t('admin.shared.api')}
+      description={t(enabled ? 'admin.detail.apiOn' : 'admin.detail.apiOff')}
       disabled={busy}
       busy={saving}
     />
   );
 }
 
-/** Detalle de una empresa: datos, uso del plan, módulos, administradores y estado. */
+/**
+ * Detalle de una empresa: datos, uso del plan, cobranza, módulos, administradores y estado. En «Eliminadas» solo
+ * sus datos y «Restaurar»: sus administradores, su cobranza y su política ya no existen para el backend (404).
+ */
 export function CompanyDetailPage() {
+  const t = useT();
   const companyId = Number(useParams().id);
+  const { data: company, setData, error, retry } = useResource((signal) => adminService.get(companyId, signal), companyId, loadError);
+  if (!company) {
+    return error ? <LoadFailed title={t('common.fields.company')} backTo={paths.admin.companies} backLabel={t('admin.shared.companies')} onRetry={retry} /> : <SkeletonCard lines={6} />;
+  }
+  if (company.deleted_at) return <DeletedCompany company={company} onRestored={setData} />;
+  return <CompanyView company={company} setCompany={setData} />;
+}
+
+/** La ficha de una empresa vigente con sus acciones (cada cambio se confirma antes). */
+function CompanyView({ company, setCompany }: { company: CompanyDetail; setCompany: (company: CompanyDetail) => void }) {
+  const t = useT();
+  const catalogs = useCatalogs();
   const navigate = useNavigate();
-  const { data: company, setData: setCompany, error, retry: load } = useResource((signal) => adminService.get(companyId, signal), companyId, 'No se pudo cargar la empresa');
-  const admins = usePagedList((page, signal) => adminService.admins(companyId, page, signal), {
-    errorTitle: 'No se pudieron cargar los administradores',
-    filterKey: String(companyId),
+  const admins = usePagedList((page, signal) => adminService.admins(company.id, page, signal), {
+    errorTitle: adminsError,
+    filterKey: String(company.id),
   });
   // Qué se procesa (cada botón muestra su propio "ocupado"; los demás esperan). Cada cambio se
   // confirma antes: cancelar no envía nada y la pantalla queda como estaba.
   const action = useAction<Busy>();
   const busy = action.busy !== null;
 
-  /** Cambio confirmado que devuelve la empresa actualizada (su estado, sus módulos o un administrador). */
-  const change = (task: () => Promise<CompanyDetail>, what: Busy, confirm: ConfirmInput, success: SuccessNotice, onSettled?: () => void) =>
-    void action.run(task, { busy: what, confirm, errorTitle: 'No se pudo completar la acción', success, onSuccess: setCompany, onSettled });
-
-  if (!company) {
-    return error ? (
-      <div className="page">
-        <Panel>
-          <PanelHeader title="Empresa" backTo={paths.admin.companies} backLabel="Empresas" />
-          <PanelSection>
-            <RetryState onRetry={load} />
-          </PanelSection>
-        </Panel>
-      </div>
-    ) : (
-      <SkeletonCard lines={6} />
-    );
-  }
+  /**
+   * Cambio confirmado que devuelve la empresa actualizada (su estado, sus módulos o un administrador).
+   * La confirmación y el aviso son funciones: se arman al dibujarse y siguen al idioma activo.
+   */
+  const change = (task: () => Promise<CompanyDetail>, what: Busy, confirm: ConfirmSource, success: () => SuccessNotice, onSettled?: () => void) =>
+    void action.run(task, { busy: what, confirm, errorTitle: actionError, success, onSuccess: setCompany, onSettled });
 
   const toggleCompany = () =>
     change(
       () => adminService.setStatus(company.id, !company.active),
       'status',
-      statusConfirm(company),
-      company.active ? ['Empresa desactivada', 'Su personal ya no puede iniciar sesión.'] : ['Empresa activada', 'Su personal ya puede iniciar sesión.'],
+      () => statusConfirm(company),
+      statusNotice(company.active),
     );
   const setApiAccess = (enabled: boolean) =>
     change(
       () => adminService.setApiAccess(company.id, enabled),
       'api',
-      apiConfirm(company, enabled),
-      enabled
-        ? ['Integraciones activadas', 'La empresa ya ve la pantalla Integraciones (API) y sus llaves funcionan.']
-        : ['Integraciones desactivadas', 'Sus llaves ya no funcionan hasta que le devuelvas el acceso.'],
+      () => apiConfirm(company, enabled),
+      apiNotice(enabled),
     );
   // Al terminar (bien o mal) se vuelve a pedir la página de administradores: el backend decide su estado.
   const toggleAdmin = (admin: CompanyAdmin) =>
     change(
       () => adminService.setAdminStatus(company.id, admin.id, !admin.active),
       admin.id,
-      adminConfirm(admin, company),
-      [admin.active ? 'Administrador desactivado' : 'Administrador activado'],
+      () => adminConfirm(admin, company),
+      adminNotice(admin.active),
       admins.retry,
     );
   const remove = () =>
     void action.run(() => adminService.remove(company.id), {
       busy: 'delete',
-      confirm: deleteConfirm(company),
-      errorTitle: 'No se pudo eliminar la empresa',
-      success: ['Empresa eliminada', `${company.name} y sus cuentas de acceso se eliminaron.`],
+      confirm: () => deleteConfirm(company, catalogs),
+      errorTitle: deleteError,
+      success: deletedNotice(company.name),
       onSuccess: () => void navigate(paths.admin.companies, { replace: true }),
       keepBusy: true,
     });
-  const usage = company.max_employees ? Math.min(100, Math.round((company.employee_count / company.max_employees) * 100)) : null;
 
   return (
     <div className="page">
@@ -312,10 +340,10 @@ export function CompanyDetailPage() {
         <PanelHeader
           title={company.name}
           backTo={paths.admin.companies}
-          backLabel="Empresas"
+          backLabel={t('admin.shared.companies')}
           subtitle={
             <>
-              <StatusBadge active={company.active} /> {company.rfc ?? 'Sin RFC'} · desde {formatDate(company.created_at)}
+              <StatusBadge active={company.active} /> {t('admin.detail.since', { taxId: taxIdLine(company, catalogs), date: formatDate(company.created_at) })}
             </>
           }
           actions={
@@ -324,66 +352,19 @@ export function CompanyDetailPage() {
         />
 
         <PanelGrid>
-          <PanelSection title="Datos de la empresa" icon={<Building2 size={20} />}>
-            <dl className="details">
-              <div>
-                <dt>Razón social</dt>
-                <dd>{orMissing(company.legal_name)}</dd>
-              </div>
-              <div>
-                <dt>RFC</dt>
-                <dd>{orMissing(company.rfc)}</dd>
-              </div>
-              <div>
-                <dt>Teléfono</dt>
-                <dd>{orMissing(company.phone && formatPhone(company.phone))}</dd>
-              </div>
-              <div>
-                <dt>Última actualización</dt>
-                <dd>{formatDateTime(company.updated_at)}</dd>
-              </div>
-            </dl>
-          </PanelSection>
-
-          <PanelSection
-            title="Uso del plan"
-            icon={<Gauge size={20} />}
-            aside={
-              <ButtonLink to={paths.admin.companyEmployees(company.id)} size="sm" variant="ghost" icon={<Users size={16} />}>
-                Ver empleados
-              </ButtonLink>
-            }
-          >
-            <div className="usage">
-              <div className="usage__numbers">
-                <strong>{company.employee_count}</strong>
-                <span className="muted">{company.max_employees ? `de ${company.max_employees} empleados` : 'empleados · sin límite'}</span>
-              </div>
-              {usage !== null && (
-                <div className={`usage__bar ${usage >= 90 ? 'is-high' : ''}`} role="meter" aria-valuenow={usage} aria-valuemin={0} aria-valuemax={100} aria-label="Uso del límite de empleados">
-                  <span style={{ width: `${usage}%` }} />
-                </div>
-              )}
-              <dl className="details">
-                <div>
-                  <dt>Administradores</dt>
-                  <dd>{company.admin_count}</dd>
-                </div>
-                <div>
-                  <dt>Estado</dt>
-                  <dd>{company.active ? 'Operando' : 'Desactivada: su personal no puede iniciar sesión'}</dd>
-                </div>
-              </dl>
-            </div>
-          </PanelSection>
+          <CompanyDataSection company={company} />
+          <CompanyPlanUsage company={company} />
         </PanelGrid>
 
+        <CompanyBillingSection companyId={company.id} />
+        <CompanyDocumentsSection companyId={company.id} />
+
         <PanelSection
-          title="Módulos y seguridad"
+          title={t('admin.detail.modulesSection')}
           icon={<Blocks size={20} />}
           aside={
             <ButtonLink to={paths.admin.companyPolicy(company.id)} size="sm" variant="secondary" icon={<ShieldCheck size={16} />}>
-              Política de verificación
+              {t('admin.detail.policy')}
             </ButtonLink>
           }
         >
@@ -391,11 +372,11 @@ export function CompanyDetailPage() {
         </PanelSection>
 
         <PanelSection
-          title="Administradores"
+          title={t('admin.shared.admins')}
           icon={<UserCog size={20} />}
           aside={
             <ButtonLink to={paths.admin.newCompanyAdmin(company.id)} size="sm" variant="primary" icon={<UserPlus size={16} />}>
-              Agregar administrador
+              {t('admin.detail.addAdmin')}
             </ButtonLink>
           }
         >

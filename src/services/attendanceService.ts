@@ -15,8 +15,8 @@ import type {
   ShiftRequestPayload,
   WorkSessionStatus,
 } from '../types';
-import type { DeviceLocation } from '../utils/geolocation';
 import { hasKeys, isPage } from '../utils/guards';
+import { locationFormFields, type LocationTake } from '../utils/locationPayload';
 import { apiRequest } from './apiClient';
 import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 import { isShift, isShiftRequest } from './shiftService';
@@ -46,7 +46,12 @@ export interface SessionHistoryQuery extends PageQuery {
   start?: string;
   end?: string;
   status?: WorkSessionStatus;
+  /** Solo las jornadas "en revisión" que esperan la decisión de la empresa. */
+  in_review?: boolean;
 }
+
+/** La empresa confirma o rechaza una jornada "en revisión"; rechazar lleva la nota (la ve el empleado). */
+export type AttendanceReviewDecision = 'CONFIRMED' | 'REJECTED';
 
 /**
  * Asistencia por turno. La empresa ve el tablero del día, el historial y la evidencia de cada jornada;
@@ -79,6 +84,19 @@ export const attendanceService = {
     return apiRequest<CompanySessionDetail>(`/attendance/sessions/${id}`, { method: 'PUT', body: payload, validate: isDetail });
   },
 
+  /** Registros "en revisión" por decidir (contador del menú). */
+  reviewCount(signal?: AbortSignal): Promise<number> {
+    return apiRequest<{ pending: number }>('/attendance/reviews/count', { signal, validate: hasKeys<{ pending: number }>('pending') }).then((result) => result.pending);
+  },
+
+  /**
+   * Confirma o rechaza una jornada que el motor de riesgo dejó "en revisión" (rechazar no la borra: queda
+   * marcada y se corrige con el registro manual si hace falta). 409 si ya se decidió.
+   */
+  review(id: number, decision: AttendanceReviewDecision, note: string | null): Promise<CompanySessionDetail> {
+    return apiRequest<CompanySessionDetail>(`/attendance/sessions/${id}/review`, { method: 'POST', body: { decision, note: note?.trim() || null }, validate: isDetail });
+  },
+
   // ---------- Empleado ----------
 
   today(signal?: AbortSignal): Promise<AttendanceToday> {
@@ -86,11 +104,12 @@ export const attendanceService = {
   },
 
   /**
-   * Registra una acción con el rostro (capturas + prueba de vida) y la ubicación del navegador. Sin un
-   * rostro verificado no se registra nada (`verified: false`); la hora es la del servidor.
+   * Registra una acción con el rostro (capturas + prueba de vida) y la ubicación del navegador (con todas las lecturas
+   * de la toma, antifraude 1b). Sin un rostro verificado no se registra nada (`verified: false`); la hora es la del
+   * servidor. `siteCode` (antifraude 2b): los 6 dígitos escritos o el texto del QR del kiosco, tal cual.
    */
-  record(action: AttendanceAction, captures: FaceCaptures, location: DeviceLocation): Promise<AttendanceActionResult> {
-    const extra = { latitude: String(location.latitude), longitude: String(location.longitude), accuracy: String(Math.min(location.accuracy, 100_000)) };
+  record(action: AttendanceAction, captures: FaceCaptures, location: LocationTake, siteCode?: string | null): Promise<AttendanceActionResult> {
+    const extra = { ...locationFormFields(location), ...(siteCode ? { site_code: siteCode } : {}) };
     return postFaceCaptures(`/me/attendance/${ATTENDANCE_SLUGS[action]}`, captures, isActionResult, extra);
   },
 

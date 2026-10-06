@@ -6,6 +6,7 @@ import { FeedbackProvider } from '../context/FeedbackContext';
 import { useErrorPopup, useFeedback } from '../hooks/useFeedback';
 import { ApiError, TOUCH_DEVICE_REQUIRED } from '../services/apiClient';
 import { describeError, isHandledGlobally } from '../utils/errorPresentation';
+import { detectPlatform } from '../utils/cameraDiagnostics';
 import { lockScroll } from '../utils/scrollLock';
 import { cameraProblemMessage } from './cameraMessages';
 
@@ -18,9 +19,9 @@ const apiError = (statusCode: number, code: string, message: string, extra: obje
 describe('describeError', () => {
   it('título y tono según el tipo de error; rastreo solo en fallas de servidor o red', () => {
     expect(describeError(apiError(0, 'NETWORK_ERROR', 'Sin red'))).toMatchObject({ variant: 'error', title: 'Sin conexión con el servidor', traceId: 'trace-123', retryable: true });
-    expect(describeError(apiError(500, 'INTERNAL_ERROR', 'Falló'))).toMatchObject({ variant: 'error', title: 'Ocurrió un problema en el servidor', traceId: 'trace-123' });
+    expect(describeError(apiError(500, 'INTERNAL_ERROR', 'Falló'))).toMatchObject({ variant: 'error', title: 'Error del servidor', traceId: 'trace-123' });
     expect(describeError(apiError(409, 'RFC_TAKEN', 'RFC en uso'))).toMatchObject({ variant: 'warning', title: 'La información ya existe', traceId: null });
-    expect(describeError(apiError(418, 'TEAPOT', 'x')).title).toBe('No se pudo completar la operación');
+    expect(describeError(apiError(418, 'TEAPOT', 'x')).title).toBe('No se pudo completar');
     expect(describeError(apiError(409, 'X', 'x'), 'No se pudo guardar').title).toBe('No se pudo guardar');
   });
 
@@ -54,7 +55,7 @@ describe('popup de mensajes', () => {
     act(() => {
       choice = feedback.current.show({
         variant: 'warning',
-        title: 'Revisa la información',
+        title: 'Revisa los datos',
         text: 'Corrige los campos',
         details: ['Falta el RFC'],
         actions: [
@@ -63,7 +64,7 @@ describe('popup de mensajes', () => {
         ],
       });
     });
-    const popup = screen.getByRole('alertdialog', { name: 'Revisa la información' });
+    const popup = screen.getByRole('alertdialog', { name: 'Revisa los datos' });
     expect(popup).toHaveAccessibleDescription('Corrige los campos');
     expect(within(popup).getByText('Atención')).toBeInTheDocument();
     expect(within(popup).getByText('Falta el RFC')).toBeInTheDocument();
@@ -154,7 +155,7 @@ describe('popup de mensajes', () => {
     act(() => {
       void feedback.current.invalidForm({ email: 'Correo inválido', password: undefined, rfc: 'Falta el RFC' });
     });
-    const popup = screen.getByRole('alertdialog', { name: 'Revisa la información' });
+    const popup = screen.getByRole('alertdialog', { name: 'Revisa los datos' });
     expect(within(popup).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Correo inválido', 'Falta el RFC']);
   });
 
@@ -185,10 +186,11 @@ describe('lockScroll', () => {
 
 describe('mensajes de la cámara', () => {
   it('fallas: tono según la causa y versión segura cuando aplica', () => {
-    const insecure = cameraProblemMessage({ kind: 'insecure', title: 't', message: 'm', steps: ['a'], secureUrl: 'https://x' });
+    const platform = detectPlatform('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Chrome/130.0', 0);
+    const insecure = cameraProblemMessage({ kind: 'insecure', platform, secureUrl: 'https://x' });
     expect(insecure.variant).toBe('warning');
     expect(insecure.actions?.map((a) => a.id)).toEqual(['retry', 'secure']);
-    const busy = cameraProblemMessage({ kind: 'busy', title: 't', message: 'm', steps: [] });
+    const busy = cameraProblemMessage({ kind: 'busy', platform });
     expect(busy.variant).toBe('error');
     expect(busy.actions?.map((a) => a.id)).toEqual(['close', 'retry']);
   });

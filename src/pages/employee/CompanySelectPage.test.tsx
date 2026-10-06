@@ -1,9 +1,10 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { useAuth } from '../../hooks/useAuth';
+import { setLocale } from '../../i18n/core';
 import { homeForUser, needsCompanySelection, paths } from '../../routes/paths';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders, sampleUser, tokenResponse } from '../../test/render';
@@ -100,9 +101,26 @@ describe('Selección de empresa (persona en varias empresas)', () => {
     expect(await screen.findByText(/Trabajas en 0 empresas/)).toBeInTheDocument();
     expect(screen.queryByRole('listitem')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
-    const ask = await screen.findByRole('alertdialog', { name: '¿Estás seguro de que deseas cerrar sesión?' });
+    const ask = await screen.findByRole('alertdialog', { name: '¿Cerrar sesión?' });
     await userEvent.click(within(ask).getByRole('button', { name: 'Seguir aquí' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(screen.getByRole('heading', { name: 'Elige tu empresa' })).toBeInTheDocument();
+  });
+});
+
+describe('Selección de empresa en inglés (en-US)', () => {
+  it('textos propios en inglés (singular con una empresa); el popup abierto sigue al idioma', async () => {
+    const single = withScreens({ ...multiUser, company: memberships[0].company, memberships: [memberships[0]] });
+    await setLocale('en-US');
+    renderSelect(() => apiFail(409, 'COMPANY_INACTIVE', 'Mensaje del servidor'), single);
+    expect(await screen.findByRole('heading', { name: 'Choose your company' })).toBeInTheDocument();
+    expect(screen.getByText(/You work at 1 company with the account/)).toHaveTextContent('ana@empresa.com');
+    expect(screen.getByRole('button', { name: /Panificadora del Norte/ })).toHaveTextContent('Current company ·');
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: /Language/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Panificadora del Norte/ }));
+    await screen.findByRole('alertdialog', { name: "Couldn't open Panificadora del Norte" });
+    await act(() => setLocale('es-MX'));
+    expect(screen.getByRole('alertdialog', { name: 'No se pudo entrar a Panificadora del Norte' })).toHaveTextContent('Mensaje del servidor');
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
   });
 });

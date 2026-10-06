@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { useCatalogs } from '../../hooks/useCatalogs';
+import { useT } from '../../i18n';
 import type { WorkSession } from '../../types';
 import { formatDateTime, formatMinutes } from '../../utils/format';
 import { CatalogStatusBadge } from '../StatusBadge';
 import { MinutesBadge } from './MinutesBadge';
+import { ReviewFact } from './ReviewParts';
 import { clockOn, exceededMinutes, scheduleRange } from './sessionFacts';
 import { usePlaceLabel } from './SessionTimeline';
 
@@ -21,22 +23,24 @@ function Fact({ label, children, note, className }: { label: string; children: R
 
 /** La salida: su hora (con la salida anticipada), sin salida, o hasta cuándo se puede checar. */
 function CheckOutFact({ session }: { session: WorkSession }) {
+  const t = useT();
   const place = usePlaceLabel();
+  const label = t('attendance.fields.checkOut');
   if (session.check_out_at) {
     return (
-      <Fact label="Salida" note={place(session.check_out_mode, session.check_out_site)}>
+      <Fact label={label} note={place(session.check_out_mode, session.check_out_site)}>
         {clockOn(session.check_out_at, session.work_date)} <MinutesBadge kind="early" minutes={session.early_leave_minutes} />
       </Fact>
     );
   }
   const deadline = clockOn(session.check_out_deadline, session.work_date);
   return session.status === 'MISSED_CHECKOUT' ? (
-    <Fact label="Salida" note={`El límite fue a las ${deadline}`}>
+    <Fact label={label} note={t('attendance.summary.deadlinePassed', { time: deadline })}>
       <CatalogStatusBadge catalog="work_session_statuses" code="MISSED_CHECKOUT" />
     </Fact>
   ) : (
-    <Fact label="Salida" note={`Se puede checar hasta las ${deadline}`}>
-      Pendiente
+    <Fact label={label} note={t('attendance.summary.deadline', { time: deadline })}>
+      {t('attendance.pending')}
     </Fact>
   );
 }
@@ -56,31 +60,37 @@ function CompanyFact({ session }: { session: WorkSession }) {
  * Resumen de una jornada: lo programado contra lo real. Horario, entrada (retardo, modalidad y sitio),
  * salida (anticipada, pendiente o sin salida), descansos usados de los permitidos, minutos en descanso
  * contra los permitidos (con los de más) y el tiempo trabajado. Si la registró o la corrigió la
- * empresa, al final va su motivo y cuándo. Todo lo calculó el backend.
+ * empresa, al final va su motivo y cuándo; si el motor de riesgo la dejó "en revisión", su estado, sus motivos (solo
+ * la empresa) y la nota de la decisión. Todo lo calculó el backend.
  *
  *   <SessionSummary session={session} />
  */
 export function SessionSummary({ session }: { session: WorkSession }) {
+  const t = useT();
   const place = usePlaceLabel();
   return (
     <dl className="details att-summary">
-      <Fact label="Horario" note={session.shift_name}>
+      <Fact label={t('attendance.fields.schedule')} note={session.shift_name}>
         {scheduleRange(session.scheduled_start, session.scheduled_end)}
       </Fact>
-      <Fact label="Entrada" note={place(session.check_in_mode, session.check_in_site)}>
+      <Fact label={t('attendance.fields.checkIn')} note={place(session.check_in_mode, session.check_in_site)}>
         {clockOn(session.check_in_at, session.work_date)} <MinutesBadge kind="late" minutes={session.late_minutes} />
       </Fact>
       <CheckOutFact session={session} />
-      <Fact label="Descansos" note={session.breaks_allowed ? `De ${formatMinutes(session.break_minutes_allowed)} cada uno` : 'Su turno no tiene descansos'}>
-        {session.breaks.length} de {session.breaks_allowed}
+      <Fact
+        label={t('attendance.fields.breaks')}
+        note={session.breaks_allowed ? t('attendance.summary.breakEach', { duration: formatMinutes(session.break_minutes_allowed) }) : t('attendance.breaks.none')}
+      >
+        {t('attendance.summary.breaksUsed', { used: session.breaks.length, allowed: session.breaks_allowed })}
       </Fact>
-      <Fact label="Tiempo en descanso">
+      <Fact label={t('attendance.fields.breakTime')}>
         {formatMinutes(session.break_minutes)} <MinutesBadge kind="exceeded" minutes={exceededMinutes(session)} />
       </Fact>
-      <Fact label="Tiempo trabajado" note={session.worked_minutes == null && 'Se calcula al checar la salida'}>
+      <Fact label={t('attendance.fields.workedTime')} note={session.worked_minutes == null && t('attendance.summary.workedPending')}>
         {formatMinutes(session.worked_minutes)}
       </Fact>
       <CompanyFact session={session} />
+      <ReviewFact session={session} />
     </dl>
   );
 }

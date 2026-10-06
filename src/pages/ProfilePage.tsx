@@ -1,18 +1,31 @@
-import { LogOut, UserRound } from 'lucide-react';
+import { Languages, LogOut, MonitorSmartphone, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../components/ui/Panel';
 import { ChangePasswordSection } from '../components/ChangePasswordSection';
+import { EmployeeDevices } from '../components/devices/EmployeeDevices';
+import { ProfilePhotoSection } from '../components/ProfilePhotoSection';
+import { Avatar } from '../components/ui/Avatar';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { SessionsPanel } from '../components/SessionsPanel';
 import { FaceStatusBadge, StatusBadge } from '../components/StatusBadge';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../hooks/useAuth';
 import { useCatalogs } from '../hooks/useCatalogs';
 import { useErrorPopup } from '../hooks/useFeedback';
-import { formatDateTime, initials } from '../utils/format';
+import { employeeDeviceService } from '../services/employeeDeviceService';
+import { t, useT } from '../i18n';
+import { formatDateTime } from '../utils/format';
 import { formatPhone } from '../utils/phone';
 import { useConfirmLogout } from '../components/auth/logoutConfirm';
 
+/**
+ * Mi perfil: la cuenta, su foto de perfil (de la persona: la ve en el menú y su empresa en sus listas), el idioma
+ * de la aplicación (cambia en caliente y se guarda en la cuenta), la contraseña, las sesiones abiertas y, si tiene un
+ * empleo, los dispositivos desde los que checa (solo lectura: los aprueba o revoca su empresa).
+ */
 export function ProfilePage() {
+  // Redibuja al cambiar el idioma; los textos salen de `t` (también el del popup, que se arma al dibujarse).
+  useT();
   const { user, refreshUser } = useAuth();
   const confirmLogout = useConfirmLogout();
   const { nameOf } = useCatalogs();
@@ -23,7 +36,7 @@ export function ProfilePage() {
     refreshUser().catch(setError);
   }, [refreshUser]);
   // Los datos en pantalla son los de la sesión; si no se pudieron actualizar se avisa en el popup.
-  useErrorPopup(error, { title: 'No se pudo actualizar tu información' });
+  useErrorPopup(error, { title: () => t('profile.refreshFailed') });
 
   if (!user) return null;
   const employee = user.employee;
@@ -32,11 +45,11 @@ export function ProfilePage() {
   return (
     <div className="page">
       <Panel>
-        <PanelHeader title="Mi perfil" subtitle="Tu cuenta, tu contraseña y los dispositivos con sesión iniciada" />
+        <PanelHeader title={t('profile.title')} subtitle={t('profile.subtitle')} />
         <PanelGrid>
-          <PanelSection title="Cuenta" icon={<UserRound size={20} />}>
+          <PanelSection title={t('profile.account.title')} icon={<UserRound size={20} />}>
             <div className="row" style={{ gap: 16 }}>
-              <span className="avatar avatar--lg">{initials(name)}</span>
+              <Avatar name={name} src={user.avatar} size="lg" decorative />
               <div className="stack" style={{ gap: 6 }}>
                 <h2>{name}</h2>
                 <div className="row">
@@ -48,12 +61,12 @@ export function ProfilePage() {
             </div>
             <dl className="details">
               <div>
-                <dt>Correo electrónico</dt>
+                <dt>{t('common.fields.email')}</dt>
                 <dd>{user.email}</dd>
               </div>
               {employee && (
                 <div>
-                  <dt>Número de empleado</dt>
+                  <dt>{t('common.fields.employeeNumber')}</dt>
                   <dd>{employee.employee_number}</dd>
                 </div>
               )}
@@ -77,21 +90,31 @@ export function ProfilePage() {
               )}
               {employee?.phone && (
                 <div>
-                  <dt>Teléfono celular</dt>
+                  <dt>{t('common.fields.mobilePhone')}</dt>
                   <dd>{formatPhone(employee.phone)}</dd>
                 </div>
               )}
               <div>
-                <dt>Último inicio de sesión</dt>
+                <dt>{t('profile.account.lastLogin')}</dt>
                 <dd>{formatDateTime(user.last_login_at)}</dd>
               </div>
               <div>
-                <dt>Cuenta creada</dt>
+                <dt>{t('profile.account.createdAt')}</dt>
                 <dd>{formatDateTime(user.created_at)}</dd>
               </div>
             </dl>
           </PanelSection>
+          <ProfilePhotoSection />
           <ChangePasswordSection onChanged={() => setSessionsVersion((v) => v + 1)} />
+          <PanelSection title={t('profile.language.title')} icon={<Languages size={20} />}>
+            <LanguageSwitcher />
+          </PanelSection>
+          {employee && (
+            <PanelSection title={t('devices.mineTitle')} icon={<MonitorSmartphone size={20} />}>
+              <p className="muted small">{t('devices.mineIntro')}</p>
+              <EmployeeDevices filterKey="mine" load={(query, signal) => employeeDeviceService.mine(query, signal)} />
+            </PanelSection>
+          )}
         </PanelGrid>
         <SessionsPanel key={sessionsVersion} />
         <PanelFooter>
@@ -101,7 +124,7 @@ export function ProfilePage() {
             icon={<LogOut size={18} />}
             onClick={() => void confirmLogout()}
           >
-            Cerrar sesión
+            {t('common.actions.logout')}
           </Button>
         </PanelFooter>
       </Panel>

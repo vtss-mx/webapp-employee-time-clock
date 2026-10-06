@@ -40,7 +40,7 @@ describe('validación de formularios: cada regla con su mensaje', () => {
   });
 
   it('nombres: obligatorio, largo máximo y solo letras', () => {
-    expect(validateName('   ', 'El nombre')).toBe('El nombre es obligatorio');
+    expect(validateName('   ', 'El nombre es obligatorio')).toBe('El nombre es obligatorio');
     expect(validateName('A'.repeat(101), 'El nombre')).toBe('Máximo 100 caracteres');
     expect(validateName('Ana3', 'El nombre')).toBe('Solo letras, espacios, apóstrofes, puntos y guiones');
     expect(validateName(" María-José O'Neil ", 'El nombre')).toBeUndefined();
@@ -79,15 +79,15 @@ describe('validación de formularios: cada regla con su mensaje', () => {
   });
 
   it('RFC de empresa: el genérico (13 caracteres) se rechaza con la regla de persona física, como el backend', () => {
-    expect(validateCompanyRfc('XAXX010101000')).toBe('Captura el RFC personal del empleado; el RFC genérico no es válido');
+    expect(validateCompanyRfc('XAXX010101000')).toBe('El RFC genérico no es válido; escribe el RFC real');
     expect(validateCompanyRfc('ABC900515AB1')).toBeUndefined(); // persona moral (12)
-    expect(validateCompanyRfc(' - ')).toBe('El RFC es obligatorio');
+    expect(validateCompanyRfc(' - ')).toBeUndefined(); // opcional: solo separadores = sin capturar
     expect(validateCompanyRfc('ABC9005')).toBe('El RFC debe tener 12 caracteres (persona moral) o 13 (persona física)');
     expect(validateCompanyRfc('ABC901315AB1')).toBe('La fecha del RFC (aammdd) no es válida');
   });
 
   it('nombre de empresa: espacios repetidos no cuentan y máximo 200 caracteres', () => {
-    expect(validateCompanyName('  A   ', 'La razón social')).toBe('La razón social es obligatorio');
+    expect(validateCompanyName('  A   ', 'La razón social es obligatoria')).toBe('La razón social es obligatoria');
     expect(validateCompanyName('X'.repeat(201), 'La razón social')).toBe('Máximo 200 caracteres');
     expect(validateCompanyName(' Abarrotes   del  Centro ', 'La razón social')).toBeUndefined();
   });
@@ -100,7 +100,7 @@ describe('formato y lecturas defensivas', () => {
 
   it('el mensaje de un error de la API vacío usa el texto por omisión', () => {
     const error = new ApiError({ statusCode: 409, code: 'CONFLICT', message: '', errors: [] });
-    expect(describeError(error).text).toBe('Ocurrió un error inesperado. Intenta nuevamente.');
+    expect(describeError(error).text).toBe('Ocurrió un error inesperado. Intenta de nuevo.');
   });
 
   it('cámara recordada incompleta (sin lado o sin id) se ignora', () => {

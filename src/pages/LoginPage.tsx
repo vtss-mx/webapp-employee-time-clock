@@ -4,20 +4,28 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/auth/AuthLayout';
 import { loginRuleMessage } from '../components/auth/loginMessages';
 import { FormField } from '../components/FormField';
+import type { MessageInput } from '../components/MessageDialog';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { Button } from '../components/ui/Button';
 import { Checkbox } from '../components/ui/Checkbox';
 import { useAuth } from '../hooks/useAuth';
 import { useFeedback } from '../hooks/useFeedback';
 import { useRememberedAccount } from '../hooks/useRememberedAccount';
+import { t, useT } from '../i18n';
 import { isOutdated, reloadApp } from '../services/versionService';
 import { config } from '../utils/config';
 import { homeForUser, needsCompanySelection } from '../routes/paths';
 import { validateEmail } from '../utils/validation';
 
-const REMEMBER_HINT = 'Mantén la sesión abierta en este dispositivo. No la uses en equipos compartidos.';
+/** Qué falta para entrar, con los mensajes en el idioma activo (se calculan al dibujarse). */
+function loginErrors(email: string, password: string) {
+  return { email: validateEmail(email), password: password ? undefined : t('auth.login.passwordRequired') };
+}
 
 export function LoginPage() {
+  // Redibuja al cambiar el idioma (sin perder lo escrito). Los textos salen de `t`, también los de los
+  // popups, que se arman al dibujarse.
+  useT();
   const { login, logoutReason } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,29 +41,30 @@ export function LoginPage() {
     passwordRef.current?.focus();
   });
   const showRemembered = Boolean(rememberedEmail) && email.trim().toLowerCase() === rememberedEmail;
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  // Qué errores se muestran (no su texto: se calcula al dibujar, en el idioma activo).
+  const [shown, setShown] = useState({ email: false, password: false });
+  const live = loginErrors(email, password);
+  const errors = { email: shown.email ? live.email : undefined, password: shown.password ? live.password : undefined };
+  const showEmailError = (value: string) => setShown((prev) => ({ ...prev, email: Boolean(validateEmail(value)) }));
   // Entrar solo con correo válido y contraseña escrita.
-  const canSubmit = !validateEmail(email) && Boolean(password);
+  const canSubmit = !live.email && !live.password;
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const feedback = useFeedback();
 
   // Sesión cerrada por el sistema (expiró, se revocó, se cambió la contraseña): se explica al llegar.
   useEffect(() => {
-    if (logoutReason) void feedback.info('Tu sesión terminó', logoutReason, { key: 'logout-reason' });
+    if (logoutReason) void feedback.info(() => t('auth.login.sessionEnded'), logoutReason, { key: 'logout-reason' });
   }, [logoutReason, feedback]);
 
   // Con sesión iniciada, GuestOnlyRoute lleva al inicio del rol (no se llega aquí).
 
   const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
-    const nextErrors = {
-      email: validateEmail(email),
-      password: password ? undefined : 'La contraseña es obligatoria',
-    };
-    setErrors(nextErrors);
-    if (nextErrors.email || nextErrors.password) {
-      void feedback.invalidForm(nextErrors);
+    const invalid = { email: Boolean(live.email), password: Boolean(live.password) };
+    setShown(invalid);
+    if (invalid.email || invalid.password) {
+      void feedback.invalidForm(() => loginErrors(email, password));
       return;
     }
 
@@ -77,14 +86,14 @@ export function LoginPage() {
       setLoading(false);
       setLocating(false);
       // Reglas del validador (dispositivo por autorizar, ubicación...): su propio aviso.
-      const ruleMessage = loginRuleMessage(err);
-      if (ruleMessage) {
-        void feedback.show(ruleMessage);
+      if (loginRuleMessage(err)) {
+        // Se arma al dibujarse: con el aviso abierto, un cambio de idioma lo traduce.
+        void feedback.show(() => loginRuleMessage(err) as MessageInput);
         return;
       }
       // Credenciales o cuenta desactivada (401) sí se muestran aquí; el dispositivo no
       // permitido lo presenta la app con su propio aviso.
-      void feedback.fromError(err, { title: 'No se pudo iniciar sesión', showAuthErrors: true });
+      void feedback.fromError(err, { title: () => t('auth.login.failed'), showAuthErrors: true });
     }
   };
 
@@ -92,7 +101,7 @@ export function LoginPage() {
     try {
       await forget();
     } catch (err) {
-      void feedback.fromError(err, { title: 'No se pudo cambiar de cuenta' });
+      void feedback.fromError(err, { title: () => t('auth.login.switchFailed') });
       return;
     }
     setEmail('');
@@ -106,24 +115,24 @@ export function LoginPage() {
       <div className="auth-card">
         <div className="auth-card__head">
           <BrandLogo size={76} />
-          <h1>Iniciar sesión</h1>
-          <p className="muted">Usa tu cuenta corporativa de {config.appName}</p>
+          <h1>{t('auth.login.title')}</h1>
+          <p className="muted">{t('auth.login.subtitle', { app: config.appName })}</p>
         </div>
 
         <form onSubmit={onSubmit} noValidate className="stack">
           <FormField
-            label="Correo electrónico"
+            label={t('common.fields.email')}
             type="email"
             inputMode="email"
             autoComplete="username"
-            placeholder="tu@empresa.com"
+            placeholder={t('auth.login.emailPlaceholder')}
             icon={<Mail size={18} />}
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
-              if (errors.email) setErrors((prev) => ({ ...prev, email: validateEmail(e.target.value) }));
+              if (errors.email) showEmailError(e.target.value);
             }}
-            onBlur={() => email && setErrors((prev) => ({ ...prev, email: validateEmail(email) }))}
+            onBlur={() => email && showEmailError(email)}
             error={errors.email}
             disabled={loading}
             required
@@ -132,14 +141,14 @@ export function LoginPage() {
           />
           {showRemembered && (
             <p className="auth-card__remembered">
-              Cuenta recordada en este dispositivo.
+              {t('auth.login.remembered')}
               <Button variant="link" size="sm" onClick={() => void switchAccount()} disabled={loading}>
-                Usar otra cuenta
+                {t('auth.login.useOtherAccount')}
               </Button>
             </p>
           )}
           <FormField
-            label="Contraseña"
+            label={t('auth.login.password')}
             type="password"
             autoComplete="current-password"
             placeholder="••••••••"
@@ -147,7 +156,7 @@ export function LoginPage() {
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
-              if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+              if (errors.password) setShown((prev) => ({ ...prev, password: false }));
             }}
             error={errors.password}
             disabled={loading}
@@ -156,10 +165,10 @@ export function LoginPage() {
           />
 
           <div className="auth-card__options">
-            <Checkbox variant="inline" size="sm" label="Recordar mi cuenta" title={REMEMBER_HINT} checked={remember} disabled={loading} onChange={setRemember} aria-describedby="remember-hint" />
+            <Checkbox variant="inline" size="sm" label={t('auth.login.remember')} title={t('auth.login.rememberHint')} checked={remember} disabled={loading} onChange={setRemember} aria-describedby="remember-hint" />
           </div>
           <span id="remember-hint" className="sr-only">
-            {REMEMBER_HINT}
+            {t('auth.login.rememberHint')}
           </span>
 
           <Button
@@ -169,10 +178,10 @@ export function LoginPage() {
             block
             loading={loading}
             disabled={!canSubmit}
-            title={canSubmit ? undefined : 'Escribe tu correo y tu contraseña'}
+            title={canSubmit ? undefined : t('auth.login.submitDisabled')}
             icon={<LogIn size={20} />}
           >
-            {locating ? 'Verificando tu ubicación...' : 'Iniciar sesión'}
+            {locating ? t('auth.login.locating') : t('auth.login.submit')}
           </Button>
         </form>
       </div>

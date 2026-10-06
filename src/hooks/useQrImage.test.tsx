@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DynamicQrCode } from '../components/DynamicQrCode';
 import { FeedbackProvider } from '../context/FeedbackContext';
+import { setLocale } from '../i18n/core';
 import { useQrImage } from './useQrImage';
 
 // Cuántas veces seguidas falla el dibujo (la librería no se pudo usar).
@@ -27,11 +28,21 @@ describe('useQrImage', () => {
   it('si no se puede dibujar devuelve el error (no se queda cargando) y `retry` lo intenta de nuevo', async () => {
     qrLibrary.failures = 1;
     const { result } = renderHook(() => useQrImage('TCQR2:x'));
-    await waitFor(() => expect(result.current.error?.message).toMatch(/No se pudo preparar el código QR/));
+    await waitFor(() => expect(result.current.error?.message).toMatch(/No se pudo generar el código QR/));
     expect(result.current.src).toBeNull();
     act(() => result.current.retry());
     expect(result.current.error).toBeNull();
     await waitFor(() => expect(result.current.src).toBe('data:image/png;base64,TCQR2:x'));
+  });
+
+  it('el error sigue al idioma activo: su texto se traduce al leerse (sin volver a dibujar)', async () => {
+    qrLibrary.failures = 1;
+    const { result } = renderHook(() => useQrImage('TCQR2:y'));
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    const error = result.current.error as Error;
+    await act(() => setLocale('en-US'));
+    expect(result.current.error).toBe(error); // el mismo error: no se pierde ni se vuelve a intentar
+    expect(error.message).toBe("Couldn't generate the QR code. Check your connection.");
   });
 
   it('sin texto no dibuja nada', () => {

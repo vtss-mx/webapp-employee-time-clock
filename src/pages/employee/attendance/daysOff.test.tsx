@@ -1,9 +1,10 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { absence, holiday, pageOf } from '../../../components/attendance/employee/testData';
 import { toIso } from '../../../components/ui/DateField';
+import { setLocale } from '../../../i18n/core';
 import { paths } from '../../../routes/paths';
 import { apiFail, apiOk, envelope, jsonResponse, mockFetch, type MockCall } from '../../../test/http';
 import { catalogsFixture, catalogsWith, testCatalogs } from '../../../test/catalogs';
@@ -104,7 +105,7 @@ describe('MyDaysOffPage (mis vacaciones, permisos y próximos festivos)', () => 
       'POST /api/me/absences/11/cancel': () => apiOk(absence({ status: 'CANCELLED' })),
     });
     const ask = await askCancel();
-    expect(ask).toHaveTextContent('Se retirará y tu empresa ya no la revisará.');
+    expect(ask).toHaveTextContent('Tu empresa ya no la revisará.');
     expect(factRows(ask)).toEqual(['TipoVacaciones', 'Fechas1 dic 2026 al 15 dic 2026 · 15 días']);
     expect(within(ask).queryByText('Empleado')).toBeNull(); // es suya
     expect(within(ask).getByRole('button', { name: 'Conservarla' })).toHaveFocus(); // lo seguro primero
@@ -156,7 +157,7 @@ describe('MyDaysOffPage (mis vacaciones, permisos y próximos festivos)', () => 
 
   it('sin ausencias ni festivos: estados vacíos', async () => {
     renderAt(paths.employee.daysOff);
-    expect(await screen.findByText('Aún no tienes vacaciones ni permisos')).toBeInTheDocument();
+    expect(await screen.findByText('Sin vacaciones ni permisos')).toBeInTheDocument();
     expect(await screen.findByText('Sin días festivos próximos')).toBeInTheDocument();
   });
 
@@ -166,6 +167,11 @@ describe('MyDaysOffPage (mis vacaciones, permisos y próximos festivos)', () => 
     await userEvent.click(screen.getAllByRole('button', { name: 'Cerrar' })[0]);
     await userEvent.click(screen.getByRole('button', { name: 'Volver a cargar' }));
     expect(await screen.findByText('Pendiente')).toBeInTheDocument();
+  });
+
+  it('si no cargan los festivos lo dice en su popup (sus vacaciones y permisos se ven igual)', async () => {
+    renderAt(paths.employee.daysOff, { 'GET /api/me/holidays': () => apiFail(500, 'INTERNAL_ERROR', 'Falló') });
+    expect(await screen.findByText('No se pudieron cargar los días festivos')).toBeInTheDocument();
   });
 });
 
@@ -196,7 +202,7 @@ describe('AbsenceRequestFormPage (pedir vacaciones o un permiso)', () => {
     expect(screen.getByText('El mismo día si es solo uno.')).toBeInTheDocument();
 
     await send();
-    expect(await screen.findByText('Revisa la información')).toBeInTheDocument();
+    expect(await screen.findByText('Revisa los datos')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     expect(screen.getByText('Elige qué quieres pedir')).toBeInTheDocument();
     expect(screen.getByText('Elige el primer día')).toBeInTheDocument();
@@ -225,7 +231,7 @@ describe('AbsenceRequestFormPage (pedir vacaciones o un permiso)', () => {
     expect(screen.getByRole('button', { name: 'Enviar solicitud' })).toBeEnabled();
 
     await confirmSend(await ask('¿Pedir permiso?'));
-    expect(await screen.findByText('Solicitud enviada a tu empresa')).toBeInTheDocument();
+    expect(await screen.findByText('Solicitud enviada')).toBeInTheDocument();
     const post = calls.find((call) => call.init.method === 'POST');
     expect(JSON.parse(post?.init.body as string)).toEqual({ type: 'PERMISSION', starts_on: toIso(day(8)), ends_on: toIso(day(9)), note: 'Trámite en el banco' });
     expect(await screen.findByRole('heading', { name: 'Mis días libres' })).toBeInTheDocument();
@@ -270,7 +276,7 @@ describe('AbsenceRequestFormPage (pedir vacaciones o un permiso)', () => {
   it('sin tipos que pueda pedir: lo explica y ofrece volver', async () => {
     const none = catalogsWith({ day_off_types: catalogsFixture.day_off_types.map((type) => ({ ...type, requestable: false })) });
     renderAt(paths.employee.newAbsenceRequest, {}, none);
-    expect(await screen.findByText('Por ahora no puedes pedir días desde aquí')).toBeInTheDocument();
+    expect(await screen.findByText('No puedes pedir días aquí')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Volver' })).toHaveAttribute('href', paths.employee.daysOff);
   });
 
@@ -278,11 +284,55 @@ describe('AbsenceRequestFormPage (pedir vacaciones o un permiso)', () => {
     const today = toIso(day(0));
     const values = { type: 'VACATION', starts_on: toIso(day(1)), ends_on: toIso(day(2)), note: '' };
     expect(validateAbsenceRequest(values, today)).toEqual({});
-    expect(validateAbsenceRequest({ ...values, starts_on: toIso(day(-1)) }, today).starts_on).toBe('Pide tus días desde hoy en adelante');
+    expect(validateAbsenceRequest({ ...values, starts_on: toIso(day(-1)) }, today).starts_on).toBe('Elige hoy o una fecha posterior');
     expect(validateAbsenceRequest({ ...values, starts_on: '31/02/2030' }, today).starts_on).toBe('Escribe una fecha válida (dd/mm/aaaa)');
     expect(validateAbsenceRequest({ ...values, starts_on: '' }, today).starts_on).toBe('Elige el primer día');
     expect(validateAbsenceRequest({ ...values, ends_on: toIso(day(0)) }, today).ends_on).toBe('La fecha final no puede ser anterior a la inicial');
     expect(validateAbsenceRequest({ ...values, ends_on: toIso(day(400)) }, today).ends_on).toBe('Una ausencia dura a lo más 366 días');
     expect(validateAbsenceRequest({ ...values, ends_on: toIso(day(366)) }, today).ends_on).toBeUndefined();
+  });
+});
+
+describe('Mis días libres en inglés (en-US)', () => {
+  it('la lista en inglés; la confirmación para cancelar, abierta, sigue al idioma', async () => {
+    renderAt(paths.employee.daysOff, { 'GET /api/me/absences': () => apiOk(pageOf([absence({ decision_note: 'Revisado' })])) });
+    await askCancel();
+    await act(() => setLocale('en-US'));
+    // El tipo es del catálogo (lo envía el servidor en su idioma); lo demás es de la app.
+    const dialog = screen.getByRole('alertdialog', { name: 'Cancel your vacaciones request?' });
+    expect(dialog).toHaveTextContent("Your company won't review it.");
+    expect(within(dialog).getByRole('button', { name: 'Keep it' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'My days off' })).toBeInTheDocument();
+    expect(screen.getByText('You requested it')).toBeInTheDocument();
+    expect(screen.getByText("Your company's reply:")).toBeInTheDocument();
+  });
+
+  it('el resumen de lo que falta, abierto, y los errores de cada campo siguen al idioma', async () => {
+    renderAt(paths.employee.newAbsenceRequest);
+    await screen.findByRole('radiogroup', { name: 'Tipo' });
+    await send();
+    expect(await screen.findByText('Revisa los datos')).toBeInTheDocument();
+    await act(() => setLocale('en-US'));
+    expect(screen.getByText('Check the details')).toBeInTheDocument();
+    expect(screen.getAllByText('Choose the first day')).toHaveLength(2); // en el resumen y en su campo
+    expect(screen.getAllByText('Choose what you want to request')).toHaveLength(2);
+  });
+
+  it('cambio en caliente con el formulario lleno: lo capturado se conserva y se pide y confirma en inglés', async () => {
+    const { calls } = renderAt(paths.employee.newAbsenceRequest);
+    await userEvent.click(within(await screen.findByRole('radiogroup', { name: 'Tipo' })).getByRole('radio', { name: 'Permiso' }));
+    await typeDate(from(), typed(day(7)));
+    await typeDate(to(), typed(day(9)));
+    await userEvent.type(screen.getByLabelText('Nota (opcional)'), 'Trámite en el banco');
+    await act(() => setLocale('en-US'));
+    expect(screen.getByLabelText('Note (optional)')).toHaveValue('Trámite en el banco');
+    expect(screen.getByText("That's 3 days (both included).")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Request permiso?' });
+    expect(dialog).toHaveTextContent("Your company will review it. While it's pending, you can cancel it.");
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send request' }));
+    expect(await screen.findByText('Request sent')).toBeInTheDocument();
+    expect(screen.getByText("You'll see your company's reply here; until then, you can cancel it.")).toBeInTheDocument();
+    expect(JSON.parse(calls.find((call) => call.init.method === 'POST')?.init.body as string)).toMatchObject({ type: 'PERMISSION', starts_on: toIso(day(7)), ends_on: toIso(day(9)) });
   });
 });

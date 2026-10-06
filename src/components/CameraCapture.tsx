@@ -2,7 +2,8 @@ import { Camera, CameraOff, RefreshCw, SwitchCamera } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { CameraController, CameraFacing } from '../hooks/useCamera';
 import { useFeedback } from '../hooks/useFeedback';
-import { cameraProblemMessage } from './cameraMessages';
+import { useT, type MessageKey } from '../i18n';
+import { cameraProblemKey, cameraProblemMessage } from './cameraMessages';
 import { Spinner } from './Spinner';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
@@ -20,12 +21,10 @@ interface CameraCaptureProps {
  * La lógica (permisos, enumeración, MediaStream) vive en el hook useCamera.
  */
 /** Qué se hace con la cámara, para el mensaje mientras el navegador pide el permiso. */
-const REQUEST_TEXT: Record<CameraFacing, string> = {
-  user: 'Usaremos la cámara frontal unos segundos para verificar tu identidad.',
-  environment: 'Usaremos la cámara unos segundos para leer el código QR.',
-};
+const REQUEST_TEXT = { user: 'face.camera.request.user', environment: 'face.camera.request.environment' } as const satisfies Record<CameraFacing, MessageKey>;
 
 export function CameraCapture({ camera, children, className = '' }: CameraCaptureProps) {
+  const t = useT();
   const { videoRef, status, devices, activeDeviceId, isMirrored, facing } = camera;
   const hasMultiple = devices.length > 1;
   const boxRef = useRef<HTMLDivElement>(null);
@@ -45,7 +44,7 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
         autoPlay
         playsInline
         muted
-        aria-label="Vista previa de la cámara"
+        aria-label={t('face.camera.preview')}
       />
 
       {status === 'active' && <div className="camera__overlay">{children}</div>}
@@ -56,18 +55,18 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
           <span className="camera__state-icon camera__state-icon--pulse">
             <Camera size={34} />
           </span>
-          <strong>Activando la cámara</strong>
-          <p>{REQUEST_TEXT[facing]}</p>
-          <small>Si tu navegador lo solicita, elige «Permitir». La cámara solo se usa durante este proceso.</small>
+          <strong>{t('face.camera.requesting')}</strong>
+          <p>{t(REQUEST_TEXT[facing])}</p>
+          <small>{t('face.camera.permissionHint')}</small>
         </div>
       )}
 
       {status === 'idle' && (
         <div className="camera__state">
           <Spinner light size={36} />
-          <p>Cámara en pausa</p>
+          <p>{t('face.camera.paused')}</p>
           <Button variant="light" onClick={() => void camera.start(activeDeviceId ?? undefined)}>
-            Activar cámara
+            {t('face.camera.activate')}
           </Button>
         </div>
       )}
@@ -78,15 +77,15 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
             <CameraOff size={34} />
           </span>
           <Button variant="light" icon={<RefreshCw size={18} />} onClick={() => void camera.start()}>
-            Reintentar
+            {t('common.actions.retry')}
           </Button>
         </div>
       )}
 
       {status === 'active' && hasMultiple && (
         <div className="camera__controls">
-          <Button className="camera__switch" icon={<SwitchCamera size={20} />} onClick={camera.switchCamera} aria-label="Cambiar cámara">
-            <span className="camera__switch-text">Cambiar cámara</span>
+          <Button className="camera__switch" icon={<SwitchCamera size={20} />} onClick={camera.switchCamera} aria-label={t('face.camera.switch')}>
+            <span className="camera__switch-text">{t('face.camera.switch')}</span>
           </Button>
           <Select
             className="camera__select"
@@ -94,7 +93,7 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
             menuWidth="content"
             value={activeDeviceId ?? ''}
             onChange={camera.selectCamera}
-            aria-label="Seleccionar cámara"
+            aria-label={t('face.camera.select')}
             options={devices.map((d) => ({ value: d.deviceId, label: d.label, title: d.rawLabel }))}
           />
         </div>
@@ -103,18 +102,19 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
   );
 }
 
-/** Fallas de la cámara (permiso bloqueado, en uso, sin conexión segura...) en el popup de la aplicación. */
+/**
+ * Fallas de la cámara (permiso bloqueado, en uso, sin conexión segura...) en el popup de la
+ * aplicación. El popup se arma al dibujarse: abierto, sigue al idioma activo.
+ */
 function useCameraMessages({ status, problem, start }: CameraController) {
   const feedback = useFeedback();
 
   useEffect(() => {
     if (status !== 'error' || !problem) return;
-    const message = cameraProblemMessage(problem);
-    void feedback.show(message).then((choice) => {
+    void feedback.show(() => cameraProblemMessage(problem)).then((choice) => {
       if (choice === 'retry') void start();
       if (choice === 'secure' && problem.secureUrl) window.location.assign(problem.secureUrl);
     });
-    // cameraProblemMessage siempre trae su clave (`camera-problem-<tipo>`): con ella se retira el popup.
-    return () => feedback.dismiss(message.key as string);
+    return () => feedback.dismiss(cameraProblemKey(problem));
   }, [status, problem, feedback, start]);
 }

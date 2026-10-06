@@ -1,9 +1,11 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useParams } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { attendanceToday, breakWindow, dayOff, NOW, workSession } from '../../../components/attendance/employee/testData';
+import { setLocale } from '../../../i18n/core';
 import { paths } from '../../../routes/paths';
+import { catalogsWith, testCatalogs } from '../../../test/catalogs';
 import { apiFail, apiOk, mockFetch } from '../../../test/http';
 import { renderWithProviders, sampleUser } from '../../../test/render';
 import type { AttendanceToday, User } from '../../../types';
@@ -21,18 +23,20 @@ function RecordScreen() {
   return <h1>Pantalla de registro: {action}</h1>;
 }
 
-/** "Mi asistencia" con las respuestas de GET /me/attendance/today en orden (la última se repite). */
-function renderPage(...responses: Array<AttendanceToday | Response>) {
+/** "Mi asistencia" con los catálogos dados y las respuestas de GET /me/attendance/today en orden (la última se repite). */
+function renderPageWith(catalogs: typeof testCatalogs, ...responses: Array<AttendanceToday | Response>) {
   const server = mockFetch(...responses.map((item) => (item instanceof Response ? item : apiOk(item))));
   renderWithProviders(
     <Routes>
       <Route path={paths.employee.attendance} element={<MyAttendancePage />} />
       <Route path={paths.employee.recordAttendance(':action')} element={<RecordScreen />} />
     </Routes>,
-    { route: paths.employee.attendance },
+    { route: paths.employee.attendance, catalogs },
   );
   return server;
 }
+
+const renderPage = (...responses: Array<AttendanceToday | Response>) => renderPageWith(testCatalogs, ...responses);
 
 const clock = () => within(screen.getByRole('region', { name: 'Reloj checador' }));
 const clockText = (text: string | RegExp, options?: { timeout: number }) => screen.findByText(text, { selector: '.time-clock__note' }, options);
@@ -143,7 +147,7 @@ describe('MyAttendancePage (inicio del empleado: su reloj checador)', () => {
     expect(card).toHaveTextContent('Vacaciones');
     expect(card).toHaveTextContent('5 oct 2026 al 30 nov 2026 · 57 días');
     expect(card).toHaveTextContent('Estás de vacaciones del 05/10/2026 al 30/11/2026.');
-    expect(screen.queryByText('Aún no tienes un turno asignado')).toBeNull();
+    expect(screen.queryByText('Sin turno asignado')).toBeNull();
     expect(document.querySelector('.time-clock')).toBeNull();
     expect(screen.getByRole('link', { name: 'Mis días libres' })).toHaveAttribute('href', paths.employee.daysOff);
   });
@@ -230,7 +234,7 @@ describe('MyAttendancePage (inicio del empleado: su reloj checador)', () => {
     renderPage(attendanceToday({ now: '2026-10-05T14:05:00Z', sites: [] }));
     expect(await screen.findByText('Sin entrada')).toBeInTheDocument();
     expect(screen.queryByText('Tu turno empieza en')).toBeNull();
-    expect(screen.getByText('Sin sitio de trabajo asignado')).toBeInTheDocument();
+    expect(screen.getByText('Sin sitio de trabajo activo')).toBeInTheDocument();
   });
 
   it('turno ya registrado: "Salió", sin botones y con su jornada', async () => {
@@ -266,7 +270,7 @@ describe('MyAttendancePage (inicio del empleado: su reloj checador)', () => {
     auth.user = { ...sampleUser, employee: null };
     renderPage(attendanceToday({ shift: null, occurrence: null, actions: [], sites: [], message: 'No tienes un turno asignado: pídeselo a tu empresa.' }));
     expect(await screen.findByRole('heading', { name: 'Hola' })).toBeInTheDocument();
-    expect(screen.getByText('Aún no tienes un turno asignado')).toBeInTheDocument();
+    expect(screen.getByText('Sin turno asignado')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Solicitar un turno/ })).toHaveAttribute('href', '/employee/attendance/requests/new');
     expect(screen.getByRole('link', { name: /Mis solicitudes/ })).toHaveAttribute('href', '/employee/attendance/requests');
     expect(document.querySelector('.time-clock')).toBeNull();
@@ -298,5 +302,61 @@ describe('MyAttendancePage (inicio del empleado: su reloj checador)', () => {
     expect(await screen.findByText('Tu siguiente turno...')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Registrar entrada' }, { timeout: 5_000 })).toBeInTheDocument();
     await waitFor(() => expect(calls.length).toBeGreaterThanOrEqual(2));
+  });
+});
+
+describe('MyAttendancePage en inglés (en-US)', () => {
+  /** Lo que el backend envía en inglés (Accept-Language): los nombres de los catálogos. */
+  const row = <Code extends string>(code: Code, name: string, sort_order: number) => ({ code, name, description: null, sort_order, active: true });
+  const englishCatalogs = catalogsWith({
+    attendance_actions: [row('CHECK_IN', 'Check-in', 1), row('BREAK_START', 'Break start', 2), row('BREAK_END', 'Break end', 3), row('CHECK_OUT', 'Check-out', 4)],
+    work_modes: [row('ON_SITE', 'On site', 1), row('REMOTE', 'Remote', 2), row('VALIDATOR', 'Validator', 3), row('COMPANY', 'Recorded by the company', 4)],
+  });
+
+  it('el reloj checador en inglés con horas de 12 h; registrar se confirma en inglés antes de abrir la cámara', async () => {
+    await setLocale('en-US');
+    const { calls } = renderPageWith(
+      englishCatalogs,
+      attendanceToday({
+        now: '2026-10-05T17:00:00Z',
+        occurrence: null,
+        session: workSession({ breaks: [completedBreak], break_minutes: 30 }),
+        break_window: breakWindow(),
+        actions: ['BREAK_START', 'CHECK_OUT'],
+        message: 'On shift since 7:55 AM; your check-out is at 4:00 PM.',
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Hi, Ana' })).toBeInTheDocument();
+    expect(screen.getByText('Oct 5, 2026')).toBeInTheDocument();
+    const clockEn = within(screen.getByRole('region', { name: 'Time clock' }));
+    expect(clockEn.getByText('8:00 AM – 4:00 PM')).toBeInTheDocument();
+    expect(clockEn.getByText('Check-in').nextSibling).toHaveTextContent('7:55 AM On site · Planta Norte');
+    expect(clockEn.getByText('Worked').nextSibling).toHaveTextContent('2 h 35 min');
+    expect(clockEn.getByText('Breaks').nextSibling).toHaveTextContent('1 of 2 30 min each');
+    expect(clockEn.getByText('Your check-out is in')).toBeInTheDocument();
+    expect(clockEn.getByText('Break available until 4:00 PM · 30 min')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Where you can check in today/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My days off' })).toHaveAttribute('href', paths.employee.daysOff);
+
+    await userEvent.click(clockEn.getByRole('button', { name: 'Record check-out' }));
+    const leave = await screen.findByRole('dialog', { name: 'Record your check-out?' });
+    expect(leave).toHaveTextContent("Your location will be read and the camera will open to confirm it's you. The server sets the time.");
+    expect(within(leave).getByText('Checking out closes your workday for today.')).toBeInTheDocument();
+    expect(within(leave).getByText('My attendance')).toBeInTheDocument();
+    await userEvent.click(within(leave).getByRole('button', { name: 'Record check-out' }));
+    expect(await screen.findByRole('heading', { name: 'Pantalla de registro: check-out' })).toBeInTheDocument();
+    expect(calls).toHaveLength(1);
+  });
+
+  it('cambio en caliente con la confirmación abierta: se traduce sin cerrarse y el reloj sigue igual', async () => {
+    renderPage(attendanceToday({ now: '2026-10-05T22:05:00Z', occurrence: null, session: workSession({ breaks_allowed: 0 }), actions: ['CHECK_OUT'] }));
+    await screen.findByText('Ya es hora de tu salida');
+    await askRecord('Registrar salida', '¿Registrar tu salida?');
+    await act(() => setLocale('en-US'));
+    // El nombre de la acción es del catálogo (lo envía el servidor en su idioma); lo demás es de la app.
+    const leave = screen.getByRole('dialog', { name: 'Record your salida?' });
+    expect(within(leave).getByText('Checking out closes your workday for today.')).toBeInTheDocument();
+    expect(screen.getByText("It's time to check out")).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Hi, Ana' })).toBeInTheDocument();
   });
 });

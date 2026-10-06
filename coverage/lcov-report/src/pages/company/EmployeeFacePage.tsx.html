@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>25/25</span>
+                <span class='fraction'>35/35</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>14/14</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>22/22</span>
+                <span class='fraction'>26/26</span>
             </div>
         
             
@@ -139,7 +139,22 @@
 <a name='L74'></a><a href='#L74'>74</a>
 <a name='L75'></a><a href='#L75'>75</a>
 <a name='L76'></a><a href='#L76'>76</a>
-<a name='L77'></a><a href='#L77'>77</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -156,9 +171,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">15x</span>
@@ -179,7 +212,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -202,10 +235,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -217,16 +247,33 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useNavigate, useParams } from 'react-router-dom';
 import { LiveFaceFlow } from '../../components/LiveFaceFlow';
+import { enrollmentCapture } from '../../components/liveFaceView';
+import type { MessageInput } from '../../components/MessageDialog';
 import { VerificationAttempt } from '../../components/VerificationAttempt';
 import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
+import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { errorMessage } from '../../services/apiClient';
 import { employeeService } from '../../services/employeeService';
+import type { Employee } from '../../types';
 import { config } from '../../utils/config';
+&nbsp;
+const loadError = () =&gt; t('employees.loadError');
+const verifyFailed = (employee: Employee) =&gt; () =&gt; t('employees.face.verifyFailed', { name: employee.first_name });
+const enrollError = () =&gt; t('employees.face.enrollError');
+&nbsp;
+/** Aviso al registrar en persona: queda aprobado al momento y con constancia de quién lo hizo. */
+const enrolledMessage = (employee: Employee): MessageInput =&gt; ({
+  variant: 'success',
+  title: t('employees.face.enrolled'),
+  text: t('employees.face.enrolledText', { name: employee.full_name }),
+  details: [t('employees.face.approved'), t('employees.face.loggedBy')],
+  detailsStyle: 'checks',
+});
 &nbsp;
 /**
  * La empresa, con el empleado presente y su propia cámara:
@@ -235,13 +282,14 @@ import { config } from '../../utils/config';
  * La cámara trasera se abre por omisión (en teléfono o tableta se apunta al empleado).
  */
 export function EmployeeFacePage() {
+  const t = useT();
   const params = useParams();
   const employeeId = Number(params.id);
   const verify = params.mode === 'verify';
   const navigate = useNavigate();
   const feedback = useFeedback();
   const { policy } = useVerificationPolicy();
-  const { data: employee, error, retry: load } = useResource((signal) =&gt; employeeService.get(employeeId, signal), employeeId, 'No se pudo cargar el empleado');
+  const { data: employee, error, retry: load } = useResource((signal) =&gt; employeeService.get(employeeId, signal), employeeId, loadError);
 &nbsp;
   const back = () =&gt; void navigate(paths.company.employee(employeeId));
   if (!employee) return error ? &lt;RetryState onRetry={load} /&gt; : &lt;SkeletonCard lines={6} /&gt;;
@@ -255,13 +303,13 @@ export function EmployeeFacePage() {
 &nbsp;
   if (verify) {
     return (
-      &lt;VerificationAttempt failureTitle={() =&gt; `No se pudo verificar a ${employee.first_name}`} onBack={back}&gt;
+      &lt;VerificationAttempt failureTitle={verifyFailed(employee)} onBack={back}&gt;
         {(finish) =&gt; (
           &lt;LiveFaceFlow
             {...shared}
-            title={`Verificar a ${employee.full_name}`}
+            title={t('employees.face.verifyTitle', { name: employee.full_name })}
             frontalFrames={config.verificationFrames}
-            submittingMessage="Verificando identidad..."
+            submittingMessage={t('employees.face.verifying')}
             onSubmit={async (captured) =&gt; finish({ result: await employeeService.verifyFaceInPerson(employee.id, captured), error: null })}
             onFatal={(err) =&gt; finish({ result: null, error: errorMessage(err) })}
           /&gt;
@@ -273,19 +321,16 @@ export function EmployeeFacePage() {
   return (
     &lt;LiveFaceFlow
       {...shared}
-      title={`Registrar el rostro de ${employee.full_name}`}
-      frontalFrames={config.enrollmentFrames}
-      submittingMessage="Registrando rostro..."
+      title={t('employees.face.enrollTitle', { name: employee.full_name })}
+      {...enrollmentCapture()}
+      submittingMessage={t('employees.face.enrolling')}
       onSubmit={async (captured) =&gt; {
         await employeeService.enrollFaceInPerson(employee.id, captured);
-        void feedback.success('Rostro registrado', `${employee.full_name} ya puede identificarse con su rostro.`, {
-          details: ['Su identidad quedó aprobada porque la registraste en persona.', 'Queda constancia de quién lo registró.'],
-          detailsStyle: 'checks',
-        });
+        void feedback.show(() =&gt; enrolledMessage(employee));
         back();
       }}
       onFatal={(err) =&gt; {
-        void feedback.fromError(err, { title: 'No se pudo registrar el rostro' });
+        void feedback.fromError(err, { title: enrollError });
         back();
       }}
     /&gt;
@@ -298,7 +343,7 @@ export function EmployeeFacePage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.541Z
+                at 2026-10-06T18:00:24.187Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

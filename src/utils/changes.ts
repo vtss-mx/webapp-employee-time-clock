@@ -1,9 +1,13 @@
+import { t } from '../i18n/core';
 import type { ConfirmDetail, FieldChange } from '../types/confirm';
+import { formatList } from './numbers';
 
 /**
  * Cómo se muestra un campo en una confirmación: su nombre y, si hace falta, cómo leer su valor
  * (un id → su nombre, un código → su texto del catálogo, una fecha → "10 may 1990").
  * `format` es un método (no una propiedad) para que un formato de un tipo concreto sirva en la lista.
+ * Las etiquetas llegan ya traducidas: quien confirma las pide con `t()` dentro de la función que arma
+ * la confirmación, así una confirmación abierta sigue al idioma activo.
  */
 export interface FieldLabel<V = unknown> {
   label: string;
@@ -15,8 +19,11 @@ export interface FieldLabel<V = unknown> {
 /** Campos que se muestran, en este orden; los que no estén aquí no se comparan ni se muestran. */
 export type FieldLabels<T> = { [K in keyof T]?: string | FieldLabel<T[K]> };
 
-/** Un campo sin valor en la confirmación ("Teléfono: Sin capturar → 662 123 4567"). */
-export const EMPTY_VALUE = 'Sin capturar';
+/**
+ * Un campo sin valor en la confirmación ("Teléfono: Sin capturar → 662 123 4567"), en el idioma
+ * activo: las confirmaciones se arman al dibujarse y siguen al idioma.
+ */
+export const emptyValue = () => t('common.values.empty');
 /** Lo único que se dice de un secreto: que se asigna uno nuevo. */
 export const SECRET_VALUE = '••••••••';
 
@@ -30,7 +37,7 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 function plainText(value: unknown): string {
-  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+  if (typeof value === 'boolean') return t(value ? 'common.values.yes' : 'common.values.no');
   if (Array.isArray(value)) return value.join(', ');
   return String(value);
 }
@@ -38,7 +45,7 @@ function plainText(value: unknown): string {
 /** Valor legible: el formato del campo, o el texto del valor; vacío → "Sin capturar". */
 function readable(value: unknown, spec: FieldLabel): string {
   const text = spec.format ? spec.format(value) : isEmpty(value) ? '' : plainText(value);
-  return text.trim() || EMPTY_VALUE;
+  return text.trim() || emptyValue();
 }
 
 /** Los campos de `labels` con su especificación completa, en el orden en que se declararon. */
@@ -56,7 +63,7 @@ function specs<T extends object>(labels: FieldLabels<T>): Array<[keyof T, FieldL
 export function describeChanges<T extends object>(before: T, after: T, labels: FieldLabels<T>): FieldChange[] {
   return specs(labels).flatMap(([field, spec]) => {
     if (sameValue(before[field], after[field])) return [];
-    if (spec.secret) return [{ label: spec.label, before: SECRET_VALUE, after: 'Nueva' }];
+    if (spec.secret) return [{ label: spec.label, before: SECRET_VALUE, after: t('forms.changes.newSecret') }];
     return [{ label: spec.label, before: readable(before[field], spec), after: readable(after[field], spec) }];
   });
 }
@@ -69,17 +76,16 @@ export function describeValues<T extends object>(values: T, labels: FieldLabels<
   });
 }
 
-/** "Ana, Luis y Eva": nombres unidos como se dicen en español. */
-const joinNames = (names: readonly string[]) => (names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`);
-
 /**
  * A quiénes afecta una acción masiva, para su confirmación: hasta `max` nombres y "y N más" (`total`
- * puede incluir elegidos cuyo nombre no se conoce, p. ej. los de "Seleccionar los N de este filtro").
- * Sin ningún nombre conocido, solo cuántos son ("12 empleados").
+ * puede incluir elegidos cuyo nombre no se conoce, p. ej. los de "Seleccionar los N de este filtro"),
+ * unidos como se dicen en el idioma activo ("Ana, Luis y 3 más" / "Ana, Luis, and 3 more"). Sin
+ * ningún nombre conocido, solo cuántos son: `count(total)` lo dice con su sustantivo ya traducido
+ * (p. ej. `(n) => t('…', { count: n })` → "12 empleados").
  */
-export function namesSummary(names: readonly string[], total: number, noun: { one: string; other: string }, max = 8): string {
+export function namesSummary(names: readonly string[], total: number, count: (total: number) => string, max = 8): string {
   const shown = names.slice(0, max);
-  if (!shown.length) return `${total} ${total === 1 ? noun.one : noun.other}`;
+  if (!shown.length) return count(total);
   const rest = total - shown.length;
-  return rest > 0 ? `${shown.join(', ')} y ${rest} más` : joinNames(shown);
+  return formatList(rest > 0 ? [...shown, t('forms.changes.more', { count: rest })] : shown);
 }

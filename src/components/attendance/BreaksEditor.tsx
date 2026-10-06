@@ -1,5 +1,6 @@
 import { Coffee, Plus, X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useT, type Translate } from '../../i18n';
 import type { BreakTimes } from '../../types';
 import { Button } from '../ui/Button';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
@@ -23,17 +24,18 @@ export interface BreaksEditorLabels {
   limit: (max: number) => string;
 }
 
-const DEFAULT_LABELS: BreaksEditorLabels = {
-  legend: 'Descansos',
-  item: (index) => `Descanso ${index + 1}`,
-  start: 'Inicio',
-  end: 'Fin',
-  add: 'Agregar descanso',
-  remove: (index) => `Quitar el descanso ${index + 1}`,
-  empty: 'Sin descansos: agrega los que tomó.',
-  missing: 'Indica la hora',
-  limit: (max) => (max === 0 ? 'Su turno no tiene descansos' : `Su turno permite ${max === 1 ? '1 descanso' : `${max} descansos`}`),
-};
+/** Textos por omisión en el idioma activo (se arman en cada dibujo: siguen al idioma). */
+const defaultLabels = (t: Translate): BreaksEditorLabels => ({
+  legend: t('attendance.fields.breaks'),
+  item: (index) => t('attendance.breaks.item', { number: index + 1 }),
+  start: t('attendance.breaks.start'),
+  end: t('attendance.breaks.end'),
+  add: t('attendance.breaks.add'),
+  remove: (index) => t('attendance.breaks.remove', { number: index + 1 }),
+  empty: t('attendance.breaks.empty'),
+  missing: t('attendance.breaks.missing'),
+  limit: (max) => (max === 0 ? t('attendance.breaks.none') : t('attendance.breaks.limit', { count: max })),
+});
 
 export interface BreaksEditorProps {
   /** Los descansos ("HH:MM" de la hora del negocio; "" mientras falta una hora). */
@@ -63,7 +65,8 @@ export interface BreaksEditorProps {
  *   <BreaksEditor value={breaks} onChange={setBreaks} max={2} error={errors.breaks} />
  */
 export function BreaksEditor({ value, onChange, max, error, hint, disabled = false, markMissing = false, presets = [], icon = <Coffee size={18} />, labels: custom }: BreaksEditorProps) {
-  const labels = { ...DEFAULT_LABELS, ...custom };
+  const t = useT();
+  const labels = { ...defaultLabels(t), ...custom };
   const missing = (time: string) => (markMissing && !time ? labels.missing : undefined);
   const update = (index: number, item: BreakTimes) => onChange(value.map((current, i) => (i === index ? item : current)));
   const full = value.length >= max;

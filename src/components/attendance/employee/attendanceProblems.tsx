@@ -1,5 +1,6 @@
 import { CalendarClock, LocateOff, MapPinOff, RefreshCw, Route } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { t } from '../../../i18n';
 import { ApiError } from '../../../services/apiClient';
 import { LocationError, type LocationProblem } from '../../../utils/geolocation';
 import { locationProblemMessage } from '../../location/locationMessages';
@@ -9,82 +10,79 @@ import type { MessageAction, MessageInput } from '../../MessageDialog';
  * Lo que impide registrar la asistencia sin ser del rostro: la ubicación del teléfono (permiso, GPS) o
  * la respuesta del servidor (fuera del sitio, imprecisa, no creíble, el estado ya cambió). Cada caso
  * se explica en un popup con qué hacer; los de ubicación ofrecen "Reintentar" (con una lectura nueva).
+ * Los popups se arman al dibujarse (en el idioma activo): un popup abierto sigue al idioma.
  */
 
-const RETRY_ACTIONS: MessageAction[] = [
-  { id: 'close', label: 'Cancelar', variant: 'ghost' },
-  { id: 'retry', label: 'Reintentar', variant: 'primary', icon: <RefreshCw size={18} /> },
+const retryActions = (): MessageAction[] => [
+  { id: 'close', label: t('common.actions.cancel'), variant: 'ghost' },
+  { id: 'retry', label: t('common.actions.retry'), variant: 'primary', icon: <RefreshCw size={18} /> },
 ];
 
 /** Permiso, GPS o conexión del teléfono que impidieron leer la ubicación. */
 export function attendanceLocationMessage(problem: LocationProblem): MessageInput {
-  return { ...locationProblemMessage(problem, 'attendance'), actions: RETRY_ACTIONS };
+  return { ...locationProblemMessage(problem, 'attendance'), actions: retryActions() };
 }
 
-const API_PROBLEMS: Partial<Record<string, { title: string; icon: ReactNode; steps: string[] }>> = {
+/** Título y pasos (llaves) de cada respuesta del servidor que se puede reintentar con otra ubicación. */
+const API_PROBLEMS = {
   LOCATION_INACCURATE: {
-    title: 'Tu ubicación no es precisa',
+    title: 'location.server.inaccurate',
     icon: <LocateOff size={30} />,
-    steps: [
-      'Activa la ubicación precisa: en iPhone, Ajustes › Privacidad › Localización › Safari › «Ubicación exacta».',
-      'Sal a un lugar abierto o acércate a una ventana y espera unos segundos.',
-      'Toca «Reintentar».',
-    ],
+    steps: ['myAttendance.problems.inaccurate.precise', 'myAttendance.problems.inaccurate.outdoors', 'myAttendance.problems.tapRetry'],
   },
   LOCATION_OUT_OF_SITE: {
-    title: 'Estás fuera de tu sitio de trabajo',
+    title: 'myAttendance.problems.outOfSite.title',
     icon: <MapPinOff size={30} />,
-    steps: ['Acércate a uno de tus sitios de trabajo (los ves en «Mi asistencia»).', 'Activa la ubicación precisa (GPS) del teléfono.', 'Toca «Reintentar».'],
+    steps: ['myAttendance.problems.outOfSite.approach', 'myAttendance.problems.outOfSite.gps', 'myAttendance.problems.tapRetry'],
   },
   IMPOSSIBLE_TRAVEL: {
-    title: 'Tu ubicación no es creíble',
+    title: 'myAttendance.problems.impossibleTravel.title',
     icon: <Route size={30} />,
-    steps: [
-      'Desactiva cualquier aplicación que cambie o simule tu ubicación (y la VPN).',
-      'Activa la ubicación precisa (GPS) y vuelve a intentarlo.',
-      'Si sigue ocurriendo, avisa a tu empresa.',
-    ],
+    steps: ['myAttendance.problems.impossibleTravel.spoofing', 'myAttendance.problems.impossibleTravel.gps', 'myAttendance.problems.impossibleTravel.report'],
   },
-};
+} as const satisfies Record<string, { title: string; icon: ReactNode; steps: readonly string[] }>;
+
+const isApiProblem = (code: string): code is keyof typeof API_PROBLEMS => code in API_PROBLEMS;
 
 export interface AttendanceProblem {
   /** retry: se puede reintentar con otra ubicación; stale: lo permitido cambió (se vuelve a "Mi asistencia"). */
   kind: 'retry' | 'stale';
-  message: MessageInput;
+  /** El popup, armado al dibujarse (sigue al idioma activo). */
+  message: () => MessageInput;
 }
 
 /** El problema de ubicación o de estado detrás de un error; null si es otro (rostro, red, servidor). */
 export function attendanceProblem(error: unknown): AttendanceProblem | null {
-  if (error instanceof LocationError) return { kind: 'retry', message: attendanceLocationMessage(error.problem) };
+  if (error instanceof LocationError) return { kind: 'retry', message: () => attendanceLocationMessage(error.problem) };
   if (!(error instanceof ApiError)) return null;
   if (error.code === 'ATTENDANCE_ACTION_NOT_ALLOWED') {
     return {
       kind: 'stale',
-      message: {
+      message: () => ({
         variant: 'warning',
         icon: <CalendarClock size={30} />,
-        eyebrow: 'Mi asistencia',
-        title: 'Tu asistencia cambió',
+        eyebrow: t('myAttendance.home.eyebrow'),
+        title: t('myAttendance.problems.stale.title'),
         text: error.message,
-        footnote: 'Revisa lo que puedes registrar ahora.',
+        footnote: t('myAttendance.problems.stale.footnote'),
         key: 'attendance-stale',
-      },
+      }),
     };
   }
+  if (!isApiProblem(error.code)) return null;
   const copy = API_PROBLEMS[error.code];
-  if (!copy) return null;
   return {
     kind: 'retry',
-    message: {
+    message: () => ({
       variant: 'warning',
       icon: copy.icon,
-      eyebrow: 'Ubicación',
-      title: copy.title,
+      eyebrow: t('location.eyebrow'),
+      title: t(copy.title),
       text: error.message,
-      details: copy.steps,
+      details: copy.steps.map((step) => t(step)),
       detailsStyle: 'steps',
-      actions: RETRY_ACTIONS,
+      actions: retryActions(),
       key: `attendance-${error.code}`,
-    },
+    }),
   };
 }

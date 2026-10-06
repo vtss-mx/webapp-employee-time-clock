@@ -1,4 +1,4 @@
-import { Briefcase, CalendarClock, CalendarOff, CircleCheck, CircleSlash, Coffee, History, RefreshCw, SearchX, TreePalm } from 'lucide-react';
+import { Briefcase, CalendarClock, CalendarOff, CircleCheck, CircleSlash, Coffee, History, RefreshCw, SearchX, ShieldQuestion, TreePalm } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BoardList } from '../../../components/attendance/BoardList';
@@ -11,6 +11,7 @@ import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { useCatalogs } from '../../../hooks/useCatalogs';
 import { useSearchList } from '../../../hooks/useSearchList';
 import { useSyncOnChange } from '../../../hooks/useSyncOnChange';
+import { t, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { attendanceService } from '../../../services/attendanceService';
 import type { AttendanceBoard, BoardRow } from '../../../types';
@@ -27,17 +28,21 @@ function dayFrom(value: string | null, today: string): string {
 
 /** Indicadores del día (los conteos son de todo el día, no solo de la página visible). */
 function useBoardKpis(board: (AttendanceBoard & { searched: boolean }) | null): Kpi[] {
+  const t = useT();
   const { nameOf } = useCatalogs();
   return [
-    { key: 'total', label: board?.searched ? 'Coinciden con la búsqueda' : 'Con turno', icon: CalendarClock, value: board?.total },
+    { key: 'total', label: t(board?.searched ? 'attendance.board.kpis.matches' : 'attendance.board.kpis.withShift'), icon: CalendarClock, value: board?.total },
     { key: 'working', label: nameOf('board_states', 'WORKING'), icon: Briefcase, value: board?.working },
     { key: 'on_break', label: nameOf('board_states', 'ON_BREAK'), icon: Coffee, value: board?.on_break, tile: 'icon-tile--warning' },
-    { key: 'done', label: 'Completas', icon: CircleCheck, value: board?.done, tile: 'icon-tile--success' },
+    { key: 'done', label: t('attendance.board.kpis.done'), icon: CircleCheck, value: board?.done, tile: 'icon-tile--success' },
     { key: 'missed', label: nameOf('board_states', 'MISSED_CHECKOUT'), icon: CircleSlash, value: board?.missed_checkout, tile: 'icon-tile--danger' },
     // Festivo o ausencia aprobada: tienen turno pero no lo trabajan (no es una falta).
     { key: 'day_off', label: nameOf('board_states', 'DAY_OFF'), icon: TreePalm, value: board ? (board.day_off ?? 0) : undefined },
   ];
 }
+
+/** Título del popup si el tablero no carga (se arma al dibujarse: sigue al idioma activo). */
+const boardLoadError = () => t('attendance.board.loadError');
 
 /**
  * Asistencia (COMPANY): el tablero de un día. Quién tiene turno ese día y en qué va (programado, sin
@@ -48,6 +53,7 @@ function useBoardKpis(board: (AttendanceBoard & { searched: boolean }) | null): 
  * la pantalla.
  */
 export function AttendancePage() {
+  const t = useT();
   const [params, setParams] = useSearchParams();
   const today = businessToday();
   const day = dayFrom(params.get('date'), today);
@@ -59,7 +65,7 @@ export function AttendancePage() {
   const list = useSearchList<BoardRow, BoardExtra>(
     (query, signal) =>
       attendanceService.board({ page: query.page, size: query.size, search: query.search, date: day }, signal).then((board) => ({ ...board, searched: Boolean(query.search) })),
-    { errorTitle: 'No se pudo cargar la asistencia del día', filterKey: day },
+    { errorTitle: boardLoadError, filterKey: day },
   );
   const kpis = useBoardKpis(list.data);
 
@@ -72,15 +78,18 @@ export function AttendancePage() {
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Asistencia"
-          subtitle={`${day === today ? 'Hoy, ' : ''}${formatDate(day)}`}
+          title={t('attendance.board.title')}
+          subtitle={day === today ? t('attendance.board.today', { date: formatDate(day) }) : formatDate(day)}
           actions={
             <>
               <ButtonLink to={paths.company.attendanceHistory} variant="ghost" icon={<History size={18} />}>
-                Historial
+                {t('attendance.board.history')}
+              </ButtonLink>
+              <ButtonLink to={`${paths.company.attendanceHistory}?review`} variant="ghost" icon={<ShieldQuestion size={18} />}>
+                {t('attendance.review.inReview')}
               </ButtonLink>
               <Button variant="secondary" icon={<RefreshCw size={18} />} loading={list.loading} onClick={list.retry}>
-                Actualizar
+                {t('common.actions.refresh')}
               </Button>
             </>
           }
@@ -89,7 +98,7 @@ export function AttendancePage() {
           <div className="att-filters att-filters--board">
             <div className="att-day">
               <DateField
-                label="Día"
+                label={t('attendance.fields.day')}
                 name="date"
                 value={input}
                 onChange={(value) => {
@@ -97,7 +106,7 @@ export function AttendancePage() {
                   if (parseIso(value)) pick(value);
                 }}
               />
-              <div className="chips att-day__quick" role="group" aria-label="Días rápidos">
+              <div className="chips att-day__quick" role="group" aria-label={t('attendance.board.quickDays')}>
                 {quick.map((range) => (
                   <button key={range.key} type="button" className={`chip ${range.start === day ? 'is-active' : ''}`} aria-pressed={range.start === day} onClick={() => pick(range.start)}>
                     {range.label}
@@ -105,20 +114,16 @@ export function AttendancePage() {
                 ))}
               </div>
             </div>
-            <ListToolbar search={list.search} onSearch={list.setSearch} placeholder="Buscar por nombre o número de empleado" label="Buscar empleados" />
+            <ListToolbar search={list.search} onSearch={list.setSearch} placeholder={t('attendance.board.searchPlaceholder')} label={t('attendance.board.searchLabel')} />
           </div>
           <KpiGrid kpis={kpis} />
           <PagedItems
             list={list}
-            pager={{ noun: { one: 'empleado', other: 'empleados' } }}
+            pager={{ noun: { one: t('attendance.board.noun.one'), other: t('attendance.board.noun.other') } }}
             empty={
               list.filtered
-                ? { icon: <SearchX />, title: 'Nadie coincide con la búsqueda', description: 'Prueba con otro nombre o número de empleado.' }
-                : {
-                    icon: <CalendarOff />,
-                    title: 'Nadie tiene turno este día',
-                    description: 'Aquí aparecerán los empleados con un turno asignado para ese día: si ya entraron, si están en descanso, si salieron o si faltaron.',
-                  }
+                ? { icon: <SearchX />, title: t('attendance.board.emptySearch.title'), description: t('attendance.board.emptySearch.description') }
+                : { icon: <CalendarOff />, title: t('attendance.board.empty.title'), description: t('attendance.board.empty.description') }
             }
           >
             {(rows) => <BoardList rows={rows} loading={list.loading} workDate={day} />}

@@ -207,7 +207,7 @@ describe('Select: casos límite', () => {
     );
     await userEvent.click(trigger());
     expect(screen.getByRole('option', { name: 'Cereza (elegida)' })).toBeInTheDocument();
-    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar...' }), 'kiwi');
+    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar…' }), 'kiwi');
     expect(screen.getByRole('status')).toHaveTextContent('Sin resultados');
   });
 });

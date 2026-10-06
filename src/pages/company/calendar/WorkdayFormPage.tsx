@@ -1,7 +1,7 @@
 import { CalendarCheck, CalendarDays, UserRound } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { calendarPath, dateError, longDate } from '../../../components/calendar/calendarRules';
+import { calendarPath, dateError, inlineDate, longDate } from '../../../components/calendar/calendarRules';
 import { describeEmployees, EmployeePicker } from '../../../components/employees/EmployeePicker';
 import { TextAreaField } from '../../../components/FormField';
 import { FormFooter } from '../../../components/FormFooter';
@@ -9,8 +9,11 @@ import { DateField } from '../../../components/ui/DateField';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { useFeedback } from '../../../hooks/useFeedback';
 import { useFormState } from '../../../hooks/useFormState';
+import { t, useT } from '../../../i18n';
 import { fieldErrorsFrom } from '../../../services/apiClient';
 import { calendarService } from '../../../services/calendarService';
+import type { Workday } from '../../../types';
+import type { ConfirmInput } from '../../../types/confirm';
 import { businessToday } from '../../../utils/format';
 
 /** Lo capturado: el empleado (su id como texto, vacío si no se elige), el día y la nota. */
@@ -24,20 +27,40 @@ const NOTE_MAX = 300;
 
 /** Reglas del día laborable (solo UX: el backend revisa además que ese día sí sea libre para la persona). */
 export function workdayErrors(values: WorkdayFormValues, today: string): Partial<Record<keyof WorkdayFormValues, string>> {
-  const date = dateError(values.work_date, 'Elige el día que trabaja');
+  const date = dateError(values.work_date, t('calendar.workdayForm.validation.date'));
   return {
-    employee_id: values.employee_id ? undefined : 'Elige al empleado',
-    work_date: date ?? (values.work_date < today ? 'Elige hoy o un día futuro: un día que ya pasó no se puede volver laborable' : undefined),
+    employee_id: values.employee_id ? undefined : t('calendar.workdayForm.validation.employee'),
+    work_date: date ?? (values.work_date < today ? t('calendar.workdayForm.validation.past') : undefined),
   };
 }
 
 const serverErrors = (error: unknown) => fieldErrorsFrom<WorkdayFormValues>(error, { EMPLOYEE_NOT_FOUND: 'employee_id' });
+
+/** Lo que se agrega: la persona, el día y la nota (se arma al dibujarse: sigue al idioma activo). */
+function workdayConfirm(values: WorkdayFormValues, names: string[]): ConfirmInput {
+  const note = values.note.trim();
+  return {
+    kind: 'create',
+    icon: <CalendarCheck size={30} />,
+    eyebrow: t('calendar.workdayForm.confirm.eyebrow'),
+    title: t('calendar.workdayForm.confirm.title'),
+    message: t('calendar.workdayForm.confirm.message'),
+    details: [describeEmployees(1, names), { label: t('calendar.workdayForm.workDate'), value: longDate(values.work_date) }, ...(note ? [{ label: t('common.fields.note'), value: note }] : [])],
+    confirmLabel: t('calendar.workdays.create'),
+    confirmIcon: <CalendarCheck size={18} />,
+  };
+}
+
+const saveError = () => t('calendar.workdayForm.error');
+const savedTitle = () => t('calendar.workdayForm.done');
+const savedText = (saved: Workday) => () => t('calendar.workdayForm.doneText', { name: saved.employee.full_name, date: inlineDate(saved.work_date) });
 
 /**
  * Agregar un día laborable especial (/company/calendar/workdays/new): una persona trabaja un día que
  * para ella sería libre (un festivo o un día dentro de su ausencia). Ese día sí checa.
  */
 export function WorkdayFormPage() {
+  const t = useT();
   const navigate = useNavigate();
   const feedback = useFeedback();
   const today = businessToday();
@@ -52,34 +75,25 @@ export function WorkdayFormPage() {
   const onSubmit = (event: SubmitEvent) => {
     event.preventDefault();
     form.saveIfValid(
-      clientErrors,
+      () => workdayErrors(values, today),
       async () => {
         const saved = await calendarService.createWorkday({ employee_id: Number(values.employee_id), work_date: values.work_date, note: values.note });
-        void feedback.success('Día laborable agregado', `${saved.employee.full_name} trabaja el ${longDate(saved.work_date).toLowerCase()}: ese día sí checa.`);
+        void feedback.success(savedTitle, savedText(saved));
         back();
       },
-      'No se pudo agregar el día laborable',
-      () => ({
-        kind: 'create',
-        icon: <CalendarCheck size={30} />,
-        eyebrow: 'Día laborable especial',
-        title: '¿Agregar el día laborable?',
-        message: 'Ese día, aunque sea festivo o esté dentro de su ausencia, la persona sí trabaja y checa.',
-        details: [describeEmployees(1, names), { label: 'Día que trabaja', value: longDate(values.work_date) }, ...(values.note.trim() ? [{ label: 'Nota', value: values.note.trim() }] : [])],
-        confirmLabel: 'Agregar día laborable',
-        confirmIcon: <CalendarCheck size={18} />,
-      }),
+      saveError,
+      () => workdayConfirm(values, names),
     );
   };
 
   return (
     <div className="page">
       <Panel onSubmit={onSubmit}>
-        <PanelHeader title="Agregar día laborable" subtitle="Una persona trabaja un festivo o un día dentro de sus vacaciones o permiso." backTo={calendarPath('workdays')} backLabel="Calendario" />
-        <PanelSection title="Empleado" icon={<UserRound size={20} />}>
+        <PanelHeader title={t('calendar.workdays.create')} subtitle={t('calendar.workdayForm.subtitle')} backTo={calendarPath('workdays')} backLabel={t('calendar.page.title')} />
+        <PanelSection title={t('common.fields.employee')} icon={<UserRound size={20} />}>
           <EmployeePicker
             single
-            label="Empleado"
+            label={t('common.fields.employee')}
             value={values.employee_id ? [Number(values.employee_id)] : []}
             onChange={(ids, known) => {
               form.setValues({ ...values, employee_id: ids.length ? String(ids[0]) : '' });
@@ -88,33 +102,33 @@ export function WorkdayFormPage() {
             }}
             disabled={form.saving}
             error={errors.employee_id}
-            hint="Solo una persona: el día laborable es una excepción para ella."
+            hint={t('calendar.workdayForm.employeeHint')}
           />
         </PanelSection>
-        <PanelSection title="Día" icon={<CalendarDays size={20} />}>
+        <PanelSection title={t('calendar.fields.day')} icon={<CalendarDays size={20} />}>
           <div className="stack">
             <DateField
-              label="Día que trabaja"
+              label={t('calendar.workdayForm.workDate')}
               name="work_date"
               required
               min={today}
               value={values.work_date}
               disabled={form.saving}
               error={errors.work_date}
-              hint="Debe ser un festivo o un día dentro de una ausencia suya, de hoy en adelante."
+              hint={t('calendar.workdayForm.dateHint')}
               onChange={(work_date) => form.setValues({ ...values, work_date })}
             />
             <TextAreaField
-              label="Nota (opcional)"
+              label={t('calendar.fields.noteOptional')}
               maxLength={NOTE_MAX}
               disabled={form.saving}
               value={values.note}
-              placeholder="P. ej. cubre la guardia del festivo"
+              placeholder={t('calendar.workdayForm.notePlaceholder')}
               onChange={(note) => form.setValues({ ...values, note })}
             />
           </div>
         </PanelSection>
-        <FormFooter submitLabel="Agregar día laborable" submitIcon={<CalendarCheck size={20} />} saving={form.saving} onCancel={back} />
+        <FormFooter submitLabel={t('calendar.workdays.create')} submitIcon={<CalendarCheck size={20} />} saving={form.saving} onCancel={back} />
       </Panel>
     </div>
   );

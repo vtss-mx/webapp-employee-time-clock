@@ -1,7 +1,8 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../i18n/core';
 import { catalogsWith } from '../../test/catalogs';
 import { renderWithProviders } from '../../test/render';
 import type { CountryItem } from '../../types';
@@ -51,28 +52,76 @@ const country = (code: string, name: string, featured: boolean, sort_order: numb
   active,
 });
 
+/** Los campos, en el orden, con las etiquetas y las ayudas que pidió el dueño del producto. */
+const OWNER_FIELDS: Array<[string, string]> = [
+  ['País', 'País donde se encuentra la dirección.'],
+  ['Estado o provincia', 'Entidad federativa o región.'],
+  ['Municipio o alcaldía', 'División administrativa a la que pertenece.'],
+  ['Ciudad o localidad', 'Ciudad, pueblo o localidad; puede tener un nombre distinto al municipio.'],
+  ['Colonia o barrio', 'Zona o asentamiento dentro de la localidad.'],
+  ['Código postal', 'Código de la zona postal.'],
+  ['Calle o vialidad', 'Nombre de la calle, avenida, carretera, etcétera.'],
+  ['Número exterior', 'Número que identifica el inmueble; puede contener letras.'],
+  ['Número interior', 'Departamento, oficina o local dentro del inmueble. Es opcional.'],
+  ['Referencias', 'Indicaciones adicionales para localizarlo, como entrecalles o puntos cercanos. Son opcionales.'],
+];
+const TEXT_LABELS = OWNER_FIELDS.slice(1).map(([label]) => label);
+
 describe('AddressFields', () => {
-  it('pide calle, números, código postal, país, estado, municipio y ciudad, con sus límites y ayudas', () => {
+  it('pide los campos en el orden del dueño del producto, con sus etiquetas, ayudas y límites', () => {
     renderFields();
     const labels = [...document.querySelectorAll('.address-fields label')].map((label) => label.textContent);
-    expect(labels).toEqual(['Calle', 'Número exterior', 'Número interior', 'Código postal', 'País', 'Estado', 'Municipio o alcaldía', 'Ciudad']);
-    expect(screen.getByLabelText('Calle')).toBeRequired();
-    expect(screen.getByLabelText('Calle')).toHaveAttribute('maxLength', '150');
-    expect(screen.getByLabelText('Número interior')).not.toBeRequired();
-    expect(screen.getByLabelText('Número interior')).toHaveAccessibleDescription('Opcional: local, piso, oficina...');
-    expect(screen.getByLabelText('Número exterior')).toHaveAccessibleDescription('Si no tiene, escribe S/N');
-    expect(screen.getByLabelText('Ciudad')).toBeRequired();
+    expect(labels).toEqual(OWNER_FIELDS.map(([label]) => label));
+    for (const [label, hint] of OWNER_FIELDS.slice(1)) expect(screen.getByLabelText(label)).toHaveAccessibleDescription(hint);
+    expect(countryButton()).toHaveAccessibleDescription('País donde se encuentra la dirección.');
     expect(countryButton()).toHaveTextContent('México');
+    for (const label of ['Estado o provincia', 'Municipio o alcaldía', 'Ciudad o localidad', 'Colonia o barrio', 'Código postal', 'Calle o vialidad', 'Número exterior']) {
+      expect(screen.getByLabelText(label), label).toBeRequired();
+    }
+    expect(screen.getByLabelText('Número interior')).not.toBeRequired();
+    expect(screen.getByLabelText('Referencias')).not.toBeRequired();
+    expect(screen.getByLabelText('Calle o vialidad')).toHaveAttribute('maxLength', '150');
+    expect(screen.getByLabelText('Colonia o barrio')).toHaveAttribute('maxLength', '120');
+  });
+
+  it('las referencias son un campo propio de varios renglones, a lo ancho y con contador', async () => {
+    const { onChange, onTouch } = renderFields({ initial: { ...EMPTY_ADDRESS, reference_notes: 'Puerta 2' } });
+    const notes = screen.getByLabelText('Referencias');
+    expect(notes.tagName).toBe('TEXTAREA');
+    expect(notes).toHaveClass('textarea');
+    expect(notes).toHaveAttribute('maxLength', '300');
+    expect(notes).toHaveAttribute('rows', '3');
+    expect(notes.closest('.field')).toHaveClass('address-fields__wide');
+    const counter = () => notes.closest('.field')?.querySelector('.field__counter');
+    expect(counter()).toHaveTextContent('8/300');
+    expect(counter()).toHaveAttribute('aria-hidden', 'true'); // el límite ya lo anuncia el control
+    expect(counter()).not.toHaveClass('is-full');
+
+    await userEvent.type(notes, '{Enter}Timbre');
+    expect(onChange).toHaveBeenLastCalledWith('reference_notes', 'Puerta 2\nTimbre');
+    expect(counter()).toHaveTextContent('15/300');
+    await userEvent.tab();
+    expect(onTouch).toHaveBeenCalledWith('reference_notes');
+  });
+
+  it('el contador avisa al llegar al límite; el error de las referencias se muestra junto a él', () => {
+    renderFields({ initial: { ...EMPTY_ADDRESS, reference_notes: 'x'.repeat(300) }, errors: { reference_notes: 'Máximo 300 caracteres' } });
+    const field = screen.getByLabelText('Referencias').closest('.field');
+    expect(field?.querySelector('.field__counter')).toHaveClass('is-full');
+    expect(field).toHaveClass('field--error');
+    expect(screen.getByRole('alert')).toHaveTextContent('Máximo 300 caracteres');
   });
 
   it('cada campo entrega lo escrito y avisa al salir de él', async () => {
     const { onChange, onTouch } = renderFields();
-    await userEvent.type(screen.getByLabelText('Calle'), 'Juárez');
+    await userEvent.type(screen.getByLabelText('Calle o vialidad'), 'Juárez');
     expect(onChange).toHaveBeenLastCalledWith('street', 'Juárez');
     await userEvent.tab();
     expect(onTouch).toHaveBeenCalledWith('street');
     await userEvent.type(screen.getByLabelText('Municipio o alcaldía'), 'Cajeme');
     expect(onChange).toHaveBeenLastCalledWith('municipality', 'Cajeme');
+    await userEvent.type(screen.getByLabelText('Colonia o barrio'), 'Centro');
+    expect(onChange).toHaveBeenLastCalledWith('neighborhood', 'Centro');
   });
 
   it('el código postal se normaliza (mayúsculas, sin espacios repetidos) y en México usa teclado numérico', async () => {
@@ -119,15 +168,47 @@ describe('AddressFields', () => {
   });
 
   it('sin error el país no se marca; los errores de texto se muestran en su campo', () => {
-    renderFields({ errors: { city: 'Escribe la ciudad' } });
+    renderFields({ errors: { city: 'Escribe la ciudad o localidad' } });
     expect(countryButton().closest('.field')).not.toHaveClass('field--error');
-    expect(screen.getByLabelText('Ciudad')).toBeInvalid();
-    expect(screen.getByRole('alert')).toHaveTextContent('Escribe la ciudad');
+    expect(screen.getByLabelText('Ciudad o localidad')).toBeInvalid();
+    expect(screen.getByRole('alert')).toHaveTextContent('Escribe la ciudad o localidad');
   });
 
   it('deshabilitado no deja escribir ni elegir', () => {
     renderFields({ disabled: true });
-    for (const label of ['Calle', 'Número exterior', 'Número interior', 'Código postal', 'Estado', 'Municipio o alcaldía', 'Ciudad']) expect(screen.getByLabelText(label)).toBeDisabled();
+    for (const label of TEXT_LABELS) expect(screen.getByLabelText(label), label).toBeDisabled();
     expect(countryButton()).toBeDisabled();
+  });
+});
+
+describe('AddressFields en inglés (en-US)', () => {
+  /** Las etiquetas del dueño del producto en inglés, en el mismo orden. */
+  const ENGLISH_LABELS = ['Country', 'State or province', 'Municipality or borough', 'City or town', 'Neighborhood', 'Postal code', 'Street', 'Street number', 'Unit number', 'Reference notes'];
+
+  it('pide los mismos campos con sus etiquetas, ayudas y ejemplos en inglés', async () => {
+    await setLocale('en-US');
+    renderFields({ initial: { ...EMPTY_ADDRESS, country_code: '' } });
+    expect([...document.querySelectorAll('.address-fields label')].map((label) => label.textContent)).toEqual(ENGLISH_LABELS);
+    const country = screen.getByRole('button', { name: /Country/ });
+    expect(country).toHaveAccessibleDescription('Country where the address is located.');
+    expect(country).toHaveTextContent('Choose the country');
+    expect(screen.getByLabelText('Neighborhood')).toHaveAccessibleDescription('Area or district within the city or town.');
+    expect(screen.getByLabelText('Unit number')).toHaveAccessibleDescription('Apartment, office, or suite within the building. Optional.');
+    expect(screen.getByLabelText('Reference notes')).toHaveAttribute('placeholder', 'Between Oak Street and Pine Avenue, across from the park');
+    await userEvent.click(country);
+    expect(screen.getByRole('combobox', { name: 'Search country' })).toBeInTheDocument();
+  });
+
+  it('cambio en caliente: lo escrito se conserva y las etiquetas y ayudas pasan a inglés', async () => {
+    const { onChange } = renderFields();
+    await userEvent.type(screen.getByLabelText('Calle o vialidad'), 'Juárez');
+    await userEvent.type(screen.getByLabelText('Referencias'), 'Puerta azul');
+    await act(() => setLocale('en-US'));
+    expect(screen.getByLabelText('Street')).toHaveValue('Juárez');
+    expect(screen.getByLabelText('Street')).toHaveAccessibleDescription('Name of the street, avenue, highway, and so on.');
+    expect(screen.getByLabelText('Reference notes')).toHaveValue('Puerta azul');
+    expect(screen.queryByLabelText('Calle o vialidad')).toBeNull();
+    expect(screen.getByRole('button', { name: /Country/ })).toHaveTextContent('México'); // el nombre del catálogo lo envía el servidor
+    expect(onChange).toHaveBeenLastCalledWith('reference_notes', 'Puerta azul'); // cambiar el idioma no envía nada
   });
 });

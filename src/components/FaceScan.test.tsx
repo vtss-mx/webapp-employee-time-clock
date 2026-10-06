@@ -31,23 +31,26 @@ describe('FaceScan: etapas del escáner facial', () => {
     expect(stageFill('prepare', base)).toBeGreaterThan(0);
   });
 
-  it('tarjeta: etapa n/N, barra segmentada, indicación, nombre de la etapa y cancelar', async () => {
+  it('tarjeta: barra segmentada que cuenta las etapas, indicación, rótulo de la etapa y cancelar', async () => {
     const onCancel = vi.fn();
-    render(
+    const { rerender } = render(
       <ScanCard
         title="Verificación facial"
         stages={scanStages(true)}
         stage="liveness"
         fill={0.5}
-        intro={{ title: 'Sigue la indicación', text: 'Gira la cabeza hacia tu izquierda' }}
+        intro={{ title: 'Sigue la indicación', text: 'Gira la cabeza hacia tu izquierda', label: 'Prueba de vida · paso 1 de 2' }}
         viewport={<p>visor</p>}
         actions={<button type="button">Identificarme con QR</button>}
         onCancel={onCancel}
       />,
     );
     expect(screen.getByRole('heading', { name: 'Verificación facial' })).toBeInTheDocument();
-    expect(screen.getByText('4 / 5')).toHaveAccessibleName('Etapa 4 de 5');
-    const segments = within(screen.getByRole('list', { name: 'Progreso' })).getAllByRole('listitem');
+    expect(screen.getByRole('heading', { name: 'Sigue la indicación' })).toBeInTheDocument();
+    // El rótulo corto (lo único que se ve arriba en un teléfono; el CSS elige).
+    expect(document.querySelector('.faceid__eyebrow')).toHaveTextContent('Prueba de vida · paso 1 de 2');
+    // La barra es también el contador (sin repetirlo con números a la vista).
+    const segments = within(screen.getByRole('list', { name: 'Etapa 4 de 5' })).getAllByRole('listitem');
     expect(segments.map((s) => s.className)).toEqual(['is-done', 'is-done', 'is-done', 'is-current', '']);
     expect(segments[3]).toHaveAttribute('aria-current', 'step');
     expect(segments[3].style.getPropertyValue('--fill')).toBe('0.5');
@@ -56,6 +59,12 @@ describe('FaceScan: etapas del escáner facial', () => {
     expect(document.querySelector('.faceid__stage, .requirements, .faceid__privacy')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(onCancel).toHaveBeenCalled();
+    // Sin rótulo propio, el rótulo es el título.
+    rerender(
+      <ScanCard title="Verificación facial" stages={scanStages(false)} stage="align" fill={0} intro={{ title: 'Centra tu rostro', text: 'Mira a la cámara.' }} viewport={null} onCancel={onCancel} />,
+    );
+    expect(document.querySelector('.faceid__eyebrow')).toHaveTextContent('Centra tu rostro');
+    expect(screen.getByRole('list', { name: 'Etapa 2 de 4' })).toBeInTheDocument();
   });
 
   it('la pantalla de inicio anuncia las mismas etapas que contará el escáner (n / N)', () => {

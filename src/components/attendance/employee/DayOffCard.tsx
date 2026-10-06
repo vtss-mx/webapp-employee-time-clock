@@ -1,4 +1,5 @@
 import { CalendarCheck, CalendarOff, PartyPopper, Stethoscope, TreePalm, type LucideIcon } from 'lucide-react';
+import { useT } from '../../../i18n';
 import type { DayOff } from '../../../types';
 import { daysText, rangeText, spanDays } from '../../calendar/calendarRules';
 
@@ -30,17 +31,18 @@ interface DayOffCardProps {
  *   <DayOffCard dayOff={today.day_off} today={businessToday(new Date(today.now))} />
  */
 export function DayOffCard({ dayOff, today, message }: DayOffCardProps) {
+  const t = useT();
   const Icon = dayOffIcon(dayOff.kind);
   const holiday = dayOff.kind === 'HOLIDAY';
   const days = spanDays(dayOff.starts_on, dayOff.ends_on);
   return (
-    <section className={`day-off ${holiday ? 'day-off--holiday' : ''}`.trim()} aria-label="Día libre">
+    <section className={`day-off ${holiday ? 'day-off--holiday' : ''}`.trim()} aria-label={t('myAttendance.dayOff.label')}>
       <span className="day-off__icon" aria-hidden>
         <Icon size={26} />
       </span>
       <div className="day-off__body">
-        <h3 className="day-off__title">{dayOff.work_date === today ? 'Hoy no trabajas' : 'Tus próximos días libres'}</h3>
-        <strong className="day-off__name">{holiday ? `Día festivo: ${dayOff.name}` : dayOff.name}</strong>
+        <h3 className="day-off__title">{t(dayOff.work_date === today ? 'myAttendance.dayOff.today' : 'myAttendance.dayOff.upcoming')}</h3>
+        <strong className="day-off__name">{holiday ? t('myAttendance.dayOff.holiday', { name: dayOff.name }) : dayOff.name}</strong>
         <span className="day-off__range">
           {rangeText(dayOff.starts_on, dayOff.ends_on)}
           {days > 1 && <span className="day-off__days"> · {daysText(days)}</span>}

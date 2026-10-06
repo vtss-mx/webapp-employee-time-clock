@@ -1,5 +1,6 @@
-import { CheckCircle2, Palette, RefreshCw, ShieldAlert, ShieldCheck, SlidersHorizontal } from 'lucide-react';
-import { FlashObservationPanel, FlashReadinessBadge, ReinforcedCompanies, ThresholdList } from '../../components/faceSecurity/FaceSecuritySections';
+import { Aperture, CheckCircle2, Globe, Palette, RefreshCw, ShieldAlert, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { CaptureProtocolPanel, ProtocolReadinessBadge } from '../../components/faceSecurity/CaptureProtocolPanel';
+import { FlashObservationPanel, FlashReadinessBadge, IpDatabasePanel, ReinforcedCompanies, ThresholdList } from '../../components/faceSecurity/FaceSecuritySections';
 import { Button } from '../../components/ui/Button';
 import { KpiGrid, type Kpi } from '../../components/ui/KpiCard';
 import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
@@ -7,36 +8,43 @@ import { RetryState } from '../../components/ui/RetryState';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { useAction } from '../../hooks/useAction';
 import { useResource } from '../../hooks/useResource';
+import { t, useT } from '../../i18n';
 import { faceSecurityService } from '../../services/faceSecurityService';
 import type { FaceSecurityOverview } from '../../types/faceSecurity';
 import type { ConfirmInput } from '../../types/confirm';
+import { formatCount, formatNumber } from '../../utils/numbers';
 
-/** Cada cuánto recalcula la plataforma, legible: "6 h", "1.5 h". */
-const hours = (value: number) => `${value.toLocaleString('es-MX', { maximumFractionDigits: 1 })} h`;
+/** Cada cuánto recalcula la plataforma, legible: "6 h", "1.5 h" (la unidad es la misma en ambos idiomas). */
+const hours = (value: number) => `${formatNumber(value, 1)} h`;
 
 /** Qué hace "Recalcular ahora": con qué datos y que solo endurece. */
 function recalibrateConfirm(overview: FaceSecurityOverview): ConfirmInput {
   return {
     kind: 'action',
     icon: <RefreshCw size={30} />,
-    eyebrow: 'Seguridad facial',
-    title: '¿Recalcular ahora los umbrales?',
-    message: `Se recalculan con los intentos exitosos de los últimos ${overview.window_days} días, lo mismo que hace la plataforma cada ${hours(overview.interval_hours)}.`,
+    eyebrow: t('faceSecurity.confirm.eyebrow'),
+    title: t('faceSecurity.confirm.title'),
+    message: t('faceSecurity.confirm.message', { count: overview.window_days, hours: hours(overview.interval_hours) }),
     details: [
-      { label: 'Ventana', value: `${overview.window_days} días` },
-      { label: 'Mediciones para mover un umbral', value: overview.min_samples.toLocaleString('es-MX') },
+      { label: t('faceSecurity.confirm.window'), value: t('faceSecurity.confirm.days', { count: overview.window_days }) },
+      { label: t('faceSecurity.confirm.samples'), value: formatCount(overview.min_samples) },
     ],
-    note: 'Solo endurece: ningún umbral baja de su mínimo ni sube de su tope (para no dejar fuera a personas reales).',
-    confirmLabel: 'Recalcular ahora',
+    note: t('faceSecurity.confirm.note'),
+    confirmLabel: t('faceSecurity.recalibrate'),
     confirmIcon: <RefreshCw size={18} />,
   };
 }
 
 /** Cómo se calibra la plataforma (texto bajo los indicadores). */
 function calibrationText(overview: FaceSecurityOverview): string {
-  if (!overview.autocalibration) return 'La autocalibración está apagada en la configuración del servidor: los umbrales se quedan en su mínimo.';
-  return `Cada ${hours(overview.interval_hours)} la plataforma mide los intentos exitosos de los últimos ${overview.window_days} días y sube cada umbral hasta donde casi todas las personas reales pasan con holgura (con al menos ${overview.min_samples.toLocaleString('es-MX')} mediciones). Nunca lo baja.`;
+  if (!overview.autocalibration) return t('faceSecurity.calibrationOff');
+  return t('faceSecurity.calibration', { count: overview.window_days, hours: hours(overview.interval_hours), samples: formatCount(overview.min_samples) });
 }
+
+/* Títulos y avisos que se traducen al dibujarse (un popup abierto sigue al idioma activo). */
+const loadError = () => t('faceSecurity.loadError');
+const recalibrateError = () => t('faceSecurity.recalibrateError');
+const recalibrated = () => t('faceSecurity.recalibrated');
 
 /**
  * Seguridad facial de la plataforma (solo el ADMIN): lo que la plataforma endureció sola (umbrales
@@ -45,33 +53,34 @@ function calibrationText(overview: FaceSecurityOverview): string {
  * el mantenimiento automático (solo endurece).
  */
 export function FaceSecurityPage() {
-  const { data, setData, error, retry } = useResource((signal) => faceSecurityService.overview(signal), 'face-security', 'No se pudo cargar la seguridad facial');
+  const t = useT();
+  const { data, setData, error, retry } = useResource((signal) => faceSecurityService.overview(signal), 'face-security', loadError);
   const action = useAction();
 
   const recalibrate = (overview: FaceSecurityOverview) =>
     void action.run(() => faceSecurityService.recalibrate(), {
-      confirm: recalibrateConfirm(overview),
-      errorTitle: 'No se pudieron recalcular los umbrales',
-      success: (result) => ['Umbrales recalculados', result.message],
+      confirm: () => recalibrateConfirm(overview),
+      errorTitle: recalibrateError,
+      success: (result) => [recalibrated(), result.message],
       onSuccess: (result) => setData(result.overview),
     });
 
   const kpis: Kpi[] = [
-    { key: 'raised', label: 'Umbrales endurecidos', icon: ShieldCheck, value: data?.thresholds.filter((t) => t.raised).length, tile: 'icon-tile--success' },
-    { key: 'reinforced', label: 'Empresas reforzadas', icon: ShieldAlert, value: data?.reinforced.length, tile: 'icon-tile--warning' },
-    { key: 'measured', label: 'Destellos medidos', icon: Palette, value: data?.flash.measured, tile: '' },
-    { key: 'conclusive', label: 'Destellos concluyentes', icon: CheckCircle2, value: data?.flash.conclusive, tile: '' },
+    { key: 'raised', label: t('faceSecurity.kpis.raised'), icon: ShieldCheck, value: data?.thresholds.filter((item) => item.raised).length, tile: 'icon-tile--success' },
+    { key: 'reinforced', label: t('faceSecurity.kpis.reinforced'), icon: ShieldAlert, value: data?.reinforced.length, tile: 'icon-tile--warning' },
+    { key: 'measured', label: t('faceSecurity.kpis.measured'), icon: Palette, value: data?.flash.measured, tile: '' },
+    { key: 'conclusive', label: t('faceSecurity.kpis.conclusive'), icon: CheckCircle2, value: data?.flash.conclusive, tile: '' },
   ];
 
   return (
     <div className="page">
       <Panel>
         <PanelHeader
-          title="Seguridad facial"
-          subtitle="Lo que la plataforma endureció sola, las empresas bajo ataque y lo medido del destello de colores."
+          title={t('faceSecurity.title')}
+          subtitle={t('faceSecurity.subtitle')}
           actions={
             <Button variant="primary" icon={<RefreshCw size={18} />} loading={action.busy !== null} disabled={!data} onClick={() => data && recalibrate(data)}>
-              Recalcular ahora
+              {t('faceSecurity.recalibrate')}
             </Button>
           }
         />
@@ -82,16 +91,26 @@ export function FaceSecurityPage() {
         </PanelSection>
         {data ? (
           <>
-            <PanelSection title="Umbrales que se endurecen solos" icon={<SlidersHorizontal size={20} />}>
+            <PanelSection title={t('faceSecurity.thresholdsSection')} icon={<SlidersHorizontal size={20} />}>
               <ThresholdList thresholds={data.thresholds} />
             </PanelSection>
             <PanelGrid>
-              <PanelSection title="Empresas reforzadas por ataques" icon={<ShieldAlert size={20} />}>
+              <PanelSection title={t('faceSecurity.reinforcedSection')} icon={<ShieldAlert size={20} />}>
                 <ReinforcedCompanies companies={data.reinforced} minAttacks={data.escalation_min_attacks} windowMinutes={data.escalation_window_minutes} />
               </PanelSection>
-              <PanelSection title="Destello de colores" icon={<Palette size={20} />} aside={<FlashReadinessBadge overview={data} />}>
+              <PanelSection title={t('faceSecurity.flashSection')} icon={<Palette size={20} />} aside={<FlashReadinessBadge overview={data} />}>
                 <FlashObservationPanel overview={data} />
               </PanelSection>
+              {data.protocol && (
+                <PanelSection title={t('faceSecurity.protocolSection')} icon={<Aperture size={20} />} aside={<ProtocolReadinessBadge overview={data} />}>
+                  <CaptureProtocolPanel overview={{ ...data, protocol: data.protocol }} />
+                </PanelSection>
+              )}
+              {data.ip_database && (
+                <PanelSection title={t('faceSecurity.ipSection')} icon={<Globe size={20} />}>
+                  <IpDatabasePanel status={data.ip_database} />
+                </PanelSection>
+              )}
             </PanelGrid>
           </>
         ) : (

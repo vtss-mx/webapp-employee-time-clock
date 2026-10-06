@@ -1,3 +1,4 @@
+import { currentLocale } from '../../i18n/core';
 import { config } from '../../utils/config';
 import { ApiError, currentAccessToken, newTraceId, normalizeResponse, renewAccessToken, type ApiEnvelope } from '../apiClient';
 
@@ -10,6 +11,8 @@ import { ApiError, currentAccessToken, newTraceId, normalizeResponse, renewAcces
  * - Tiempo límite por consulta; ante cualquier falla la promesa se rechaza y el llamador usa el
  *   respaldo HTTP. Tras fallas repetidas se pausa el canal un minuto (sin reconexiones en bucle).
  * - Se cierra solo tras un periodo sin uso para no ocupar conexiones del servidor.
+ * - Lleva el idioma activo (`?lang=`): el servidor responde sus mensajes en ese idioma. Si el idioma
+ *   cambia, la siguiente consulta abre una conexión nueva con el idioma nuevo.
  */
 type Pending = { resolve: (envelope: ApiEnvelope) => void; reject: (error: unknown) => void; timer: number };
 
@@ -19,6 +22,7 @@ const DEGRADED_MS = 60_000;
 export function realtimeUrl(path = '/ws/validation'): string {
   const url = new URL(`${config.apiUrl}${path}`, window.location.href);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.searchParams.set('lang', currentLocale());
   return url.toString();
 }
 
@@ -30,6 +34,8 @@ export class ValidationSocket {
   private failures = 0;
   private degradedUntil = 0;
   private triedRefresh = false;
+  /** Idioma con que se abrió la conexión vigente. */
+  private lang: string | null = null;
 
   constructor(private readonly factory: (url: string) => WebSocket = (url) => new WebSocket(url)) {}
 
@@ -39,6 +45,8 @@ export class ValidationSocket {
 
   async request(message: Record<string, unknown>): Promise<ApiEnvelope> {
     if (!this.available) throw new Error('Canal en tiempo real no disponible');
+    // La conexión abierta habla otro idioma: se cierra y la consulta abre una con el idioma activo.
+    if (this.ready && this.lang !== currentLocale()) this.close();
     await this.connect();
     const id = newTraceId();
     return new Promise<ApiEnvelope>((resolve, reject) => {
@@ -70,6 +78,7 @@ export class ValidationSocket {
     if (!token) return Promise.reject(new Error('Sin sesión'));
     let socket: WebSocket;
     try {
+      this.lang = currentLocale();
       socket = this.factory(realtimeUrl());
     } catch (error) {
       // Un proxy o una URL que el navegador rechaza: esta consulta va por HTTP y la siguiente vuelve a

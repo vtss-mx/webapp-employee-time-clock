@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>27/27</span>
+                <span class='fraction'>29/29</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>24/24</span>
+                <span class='fraction'>25/25</span>
             </div>
         
             
@@ -117,7 +117,12 @@
 <a name='L52'></a><a href='#L52'>52</a>
 <a name='L53'></a><a href='#L53'>53</a>
 <a name='L54'></a><a href='#L54'>54</a>
-<a name='L55'></a><a href='#L55'>55</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -129,7 +134,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">84x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">138x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -137,6 +143,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">63x</span>
 <span class="cline-any cline-yes">63x</span>
 <span class="cline-any cline-yes">63x</span>
 <span class="cline-any cline-yes">63x</span>
@@ -175,6 +185,7 @@
 import { useAuth } from '../hooks/useAuth';
 import { useErrorPopup } from '../hooks/useFeedback';
 import { useRetryOnReconnect } from '../hooks/useRetryOnReconnect';
+import { t, useLocale } from '../i18n';
 import { catalogService } from '../services/catalogService';
 import { createCatalogApi, type CatalogApi } from '../utils/catalogs';
 &nbsp;
@@ -189,14 +200,18 @@ export const CatalogContext = createContext&lt;CatalogState | null&gt;(null);
  * Catálogos de la BD (GET /api/catalogs), única fuente de todo lo que la interfaz muestra como
  * lista o etiqueta. Se cargan UNA vez por sesión al autenticarse, viven solo en memoria (nunca en
  * el navegador) y se descartan al cerrar la sesión. Un error de carga se avisa en el popup.
+ * Sus textos (`name`, `description`, `message`, `phrase`...) llegan en el idioma de la petición: al
+ * cambiar el idioma se vuelven a pedir y, mientras llegan, se siguen mostrando los anteriores (la
+ * pantalla no se vacía ni se recarga).
  */
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const [catalogs, setCatalogs] = useState&lt;CatalogApi | null&gt;(null);
   const [error, setError] = useState&lt;unknown&gt;(null);
   const [attempt, setAttempt] = useState(0);
+  const locale = useLocale();
 &nbsp;
-  // Se carga al autenticarse (y en cada reintento); al cerrar la sesión se cancela y se descarta.
+  // Se carga al autenticarse, en cada reintento y al cambiar el idioma; al cerrar la sesión se cancela y se descarta.
   useEffect(() =&gt; {
     if (!isAuthenticated) {
       setCatalogs(null);
@@ -209,13 +224,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       .then((data) =&gt; !controller.signal.aborted &amp;&amp; setCatalogs(createCatalogApi(data)))
       .catch((cause: unknown) =&gt; !controller.signal.aborted &amp;&amp; setError(cause));
     return () =&gt; controller.abort();
-  }, [isAuthenticated, attempt]);
+  }, [isAuthenticated, attempt, locale]);
 &nbsp;
   const retry = useCallback(() =&gt; {
     setError(null);
     setAttempt((n) =&gt; n + 1);
   }, []);
-  useErrorPopup(error, { title: 'No se pudieron cargar los catálogos', retry });
+  useErrorPopup(error, { title: () =&gt; t('app.catalogsLoadFailed'), retry });
   useRetryOnReconnect(error, retry);
 &nbsp;
   const state = useMemo&lt;CatalogState&gt;(() =&gt; {
@@ -232,7 +247,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-04T17:16:33.415Z
+                at 2026-10-06T18:00:23.868Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -1,10 +1,10 @@
 import { Clock } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
-import { clampToRange, clockText, minuteOptions, overlapsRange, pad2, parseClock, type ClockRange } from './clock';
+import { clampToRange, clockText, hourLabel, minuteOptions, overlapsRange, pad2, parseClock, type ClockRange, type ClockStyle } from './clock';
 import { listKeyAction, type SelectOption } from './Select';
 
-/** Hora sugerida del selector ("HH:MM") con un texto propio opcional (p. ej. "Mediodía"). */
+/** Hora sugerida del selector ("HH:MM") con un texto propio opcional (p. ej. "Mediodía"; por omisión, la hora en el formato del idioma). */
 export interface TimePreset {
   value: string;
   label?: string;
@@ -31,6 +31,8 @@ interface TimePanelProps {
   range: ClockRange;
   presets: ReadonlyArray<string | TimePreset>;
   labels: TimePanelLabels;
+  /** 24 h ("19") o 12 h con AM/PM ("07 PM"): el formato del idioma activo. */
+  style: ClockStyle;
   /** Hora elegida; `done` = ya se eligió completa (cierra el selector). */
   onPick: (minutes: number, done: boolean) => void;
   /** Escape o salir con Tab: cierra y regresa el foco al botón del campo. */
@@ -39,14 +41,14 @@ interface TimePanelProps {
 
 type Side = 'hours' | 'minutes';
 
-const option = (value: number, disabled: boolean): SelectOption => ({ value: pad2(value), label: pad2(value), disabled });
+const option = (value: number, disabled: boolean, label = pad2(value)): SelectOption => ({ value: pad2(value), label, disabled });
 
 /** Sugerencias válidas (las que no son una hora "HH:MM" se ignoran) con su texto. */
-function presetItems(presets: ReadonlyArray<string | TimePreset>) {
+function presetItems(presets: ReadonlyArray<string | TimePreset>, style: ClockStyle) {
   return presets.flatMap((preset) => {
-    const { value, label = value } = typeof preset === 'string' ? { value: preset } : preset;
+    const { value, label } = typeof preset === 'string' ? { value: preset, label: undefined } : preset;
     const minutes = parseClock(value);
-    return minutes === null ? [] : [{ minutes, label }];
+    return minutes === null ? [] : [{ minutes, label: label ?? clockText(minutes, style) }];
   });
 }
 
@@ -58,7 +60,7 @@ function presetItems(presets: ReadonlyArray<string | TimePreset>) {
  * Teclado: flechas arriba/abajo, Inicio/Fin y dígitos dentro de una columna; izquierda/derecha
  * cambian de columna; Enter o Espacio eligen; Escape cierra y Tab sale del selector.
  */
-export function TimePanel({ value, openTo, minuteStep, range, presets, labels, onPick, onClose }: TimePanelProps) {
+export function TimePanel({ value, openTo, minuteStep, range, presets, labels, style, onPick, onClose }: TimePanelProps) {
   const id = useId();
   const start = value ?? openTo;
   const [hour, setHour] = useState(Math.floor(start / 60));
@@ -81,7 +83,7 @@ export function TimePanel({ value, openTo, minuteStep, range, presets, labels, o
 
   const selectedMinute = value === null ? null : value % 60;
   const baseHour = value === null ? hour : Math.floor(value / 60);
-  const hours = Array.from({ length: 24 }, (_, h) => option(h, !overlapsRange(h * 60, h * 60 + 59, range)));
+  const hours = Array.from({ length: 24 }, (_, h) => option(h, !overlapsRange(h * 60, h * 60 + 59, range), hourLabel(h, style)));
   const minuteValues = minuteOptions(minuteStep, [selectedMinute, minute]);
   const minutes = minuteValues.map((m) => option(m, !overlapsRange(baseHour * 60 + m, baseHour * 60 + m, range)));
   const focusSide = (side: Side) => (side === 'hours' ? hoursRef : minutesRef).current?.focus();
@@ -110,12 +112,12 @@ export function TimePanel({ value, openTo, minuteStep, range, presets, labels, o
     if (event.target === (event.shiftKey ? stops[0] : stops[stops.length - 1])) onClose();
   };
 
-  const items = presetItems(presets);
+  const items = presetItems(presets, style);
   return (
     <div className="timepicker" role="dialog" aria-label={labels.title} onKeyDown={onKeyDown}>
       <div className="timepicker__readout" aria-hidden>
         <Clock size={18} />
-        <span>{value === null ? '--:--' : clockText(value)}</span>
+        <span>{value === null ? '--:--' : clockText(value, style)}</span>
       </div>
       {items.length > 0 && (
         <div className="chips timepicker__presets" role="group" aria-label={labels.presets}>

@@ -4,16 +4,17 @@ import { useNavigate } from 'react-router-dom';
 import { FaceRequirements } from '../../components/FaceRequirements';
 import { scanStages, ScanStagesPreview } from '../../components/FaceScan';
 import { LiveFaceFlow, type CapturedFace } from '../../components/LiveFaceFlow';
+import { enrollmentCapture } from '../../components/liveFaceView';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { useAuth } from '../../hooks/useAuth';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
+import { t, useLocale } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { ApiError } from '../../services/apiClient';
 import { enrollmentService } from '../../services/enrollmentService';
-import { config } from '../../utils/config';
 import { sleep } from '../../utils/waits';
 
 /**
@@ -27,6 +28,9 @@ async function submitEnrollment(captured: CapturedFace): Promise<void> {
     if (!(error instanceof ApiError && error.code === 'ENROLLMENT_PENDING')) throw error;
   }
 }
+
+/** Consejos para una buena captura (en el idioma activo). */
+const captureTips = () => [t('employee.enrollment.tips.light'), t('employee.enrollment.tips.front')];
 
 /** Primer inicio de sesión (o registro rechazado): el empleado registra su rostro. */
 /** Relee el usuario hasta 3 veces (1 s, 2 s, 4 s): una red que parpadea justo al enviar no deja al
@@ -44,6 +48,7 @@ export async function refreshWithRetry(refresh: () => Promise<void>, attempts = 
 }
 
 export function EnrollmentPage() {
+  useLocale(); // textos con `t` al dibujarse; popups y confirmaciones reciben funciones y siguen al idioma abiertos
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const feedback = useFeedback();
@@ -60,44 +65,48 @@ export function EnrollmentPage() {
 
   // Registro rechazado o nueva verificación solicitada: se explica en un popup al entrar.
   useEffect(() => {
-    const tips = ['Ubícate en un lugar bien iluminado.', 'Mira de frente a la cámara, con el rostro descubierto.'];
     if (rejected) {
-      void feedback.warning(
-        'Tu registro anterior fue rechazado',
-        rejectionReason ? `Motivo: “${rejectionReason}”.` : 'Tu empresa no pudo validar tu identidad con las capturas enviadas.',
-        { details: tips, key: 'enrollment-rejected' },
-      );
+      void feedback.show(() => ({
+        variant: 'warning',
+        title: t('employee.enrollment.rejected.title'),
+        text: rejectionReason ? t('employee.enrollment.rejected.reason', { reason: rejectionReason }) : t('employee.enrollment.rejected.noReason'),
+        details: captureTips(),
+        key: 'enrollment-rejected',
+      }));
     } else if (reverify) {
-      void feedback.info('Verifica nuevamente tu identidad', rejectionReason, {
-        eyebrow: 'Solicitud de tu empresa',
-        details: ['Registra tu rostro con prueba de vida; toma alrededor de un minuto.', ...tips],
+      void feedback.show(() => ({
+        variant: 'info',
+        title: t('employee.enrollment.reverify.title'),
+        text: rejectionReason,
+        eyebrow: t('employee.enrollment.reverify.eyebrow'),
+        details: [t('employee.enrollment.reverify.step'), ...captureTips()],
         key: 'identity-reverify',
-      });
+      }));
     }
   }, [rejected, reverify, rejectionReason, feedback]);
 
   /** El registro crea sus datos biométricos: se confirma antes de abrir la cámara. */
   const start = async () => {
-    const ok = await confirm({
+    const ok = await confirm(() => ({
       kind: 'create',
       icon: <ScanFace size={30} />,
-      eyebrow: 'Registro facial',
-      title: '¿Registrar tu rostro?',
-      message: 'Se abrirá la cámara para capturar tu rostro con prueba de vida. Al terminar, tu empresa validará tu identidad.',
-      details: ['Ubícate en un lugar bien iluminado.', 'Mira de frente a la cámara, con el rostro descubierto.'],
-      note: rejected || reverify ? 'Tu registro anterior se reemplazará por este.' : undefined,
-      confirmLabel: 'Abrir cámara',
+      eyebrow: t('employee.enrollment.title'),
+      title: t('employee.enrollment.confirm.title'),
+      message: t('employee.enrollment.confirm.message'),
+      details: captureTips(),
+      note: rejected || reverify ? t('employee.enrollment.confirm.replaces') : undefined,
+      confirmLabel: t('employee.enrollment.confirm.open'),
       confirmIcon: <Camera size={18} />,
-    });
+    }));
     if (ok) setStarted(true);
   };
 
   if (started) {
     return (
       <LiveFaceFlow
-        title="Registro facial"
-        frontalFrames={config.enrollmentFrames}
-        submittingMessage="Enviando registro seguro..."
+        title={t('employee.enrollment.title')}
+        {...enrollmentCapture()}
+        submittingMessage={t('employee.enrollment.submitting')}
         policy={policy}
         allowAccessoryReview
         onSubmit={async (captured) => {
@@ -108,15 +117,15 @@ export function EnrollmentPage() {
           // El error nunca sube al flujo facial: lo tomaría por un envío fallido y volvería a enviar.
           const updated = await refreshWithRetry(refreshUser);
           void feedback.success(
-            'Registro enviado',
-            updated ? 'Tu empresa validará tu identidad en breve.' : 'Tu empresa validará tu identidad en breve. Tu pantalla se actualizará en cuanto vuelva la conexión.',
+            () => t('employee.enrollment.sent.title'),
+            () => (updated ? t('employee.enrollment.sent.text') : t('employee.enrollment.sent.offline')),
           );
           if (updated) void navigate(paths.employee.pending, { replace: true });
           else setStarted(false);
         }}
         onFatal={(error) => {
           setStarted(false);
-          void feedback.fromError(error, { title: 'No se pudo completar el registro' });
+          void feedback.fromError(error, { title: () => t('employee.enrollment.fatal') });
         }}
         onCancel={() => setStarted(false)}
       />
@@ -127,10 +136,10 @@ export function EnrollmentPage() {
     <div className="page page-transition">
       <Panel>
         <PanelHero
-          eyebrow={`${stages.length} pasos · 1 minuto`}
-          title={rejected || reverify ? 'Registra tu rostro nuevamente' : `Bienvenido, ${employee?.first_name ?? ''}`}
+          eyebrow={t('employee.enrollment.duration', { count: stages.length })}
+          title={rejected || reverify ? t('employee.enrollment.again') : t('employee.enrollment.welcome', { name: employee?.first_name ?? '' })}
         >
-          <p className="muted">Para proteger tu identidad, registra tu rostro. Solo se hace una vez y tu empresa lo validará.</p>
+          <p className="muted">{t('employee.enrollment.intro')}</p>
         </PanelHero>
 
         <PanelSection>
@@ -142,15 +151,15 @@ export function EnrollmentPage() {
                   <UserCheck size={16} />
                 </span>
                 <div>
-                  <strong>Después: validación de tu empresa</strong>
-                  <span className="muted small">Tu empresa revisa y aprueba tu identidad; te avisamos al terminar.</span>
+                  <strong>{t('employee.enrollment.after.title')}</strong>
+                  <span className="muted small">{t('employee.enrollment.after.text')}</span>
                 </div>
               </li>
             }
           />
           <div className="stack" style={{ gap: 10 }}>
             <span className="inline-note small muted">
-              <AlertTriangle size={16} /> Antes de comenzar:
+              <AlertTriangle size={16} /> {t('employee.enrollment.before')}
             </span>
             <FaceRequirements policy={policy} headwearExempt={employee?.headwear_exempt} />
           </div>
@@ -158,10 +167,10 @@ export function EnrollmentPage() {
 
         <PanelFooter align="between">
           <p className="inline-note small muted">
-            <ShieldCheck size={16} color="var(--success)" /> Solo guardamos datos cifrados; nunca se comparten.
+            <ShieldCheck size={16} color="var(--success)" /> {t('employee.enrollment.privacy')}
           </p>
           <Button variant="primary" size="lg" iconRight={<ArrowRight size={20} />} onClick={() => void start()}>
-            Comenzar registro
+            {t('employee.enrollment.start')}
           </Button>
         </PanelFooter>
       </Panel>

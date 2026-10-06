@@ -4,10 +4,11 @@ import { apiFail, apiOk, mockFetch, type MockCall } from '../test/http';
 /**
  * Cada prueba carga el módulo de nuevo: lo ya reportado vive por carga de la página (como en el
  * navegador) y así ninguna prueba depende de lo que reportó otra. Las clases de error se importan de
- * la misma carga para que `instanceof` las reconozca.
+ * la misma carga para que `instanceof` las reconozca, y el idioma (`locale`) se activa en esa carga.
  */
-async function fresh() {
+async function fresh(locale: 'es-MX' | 'en-US' = 'es-MX') {
   vi.resetModules();
+  await (await import('../i18n/core')).setLocale(locale);
   const service = await import('./clientErrorService');
   const { ApiError } = await import('./apiClient');
   const { MapsApiError } = await import('./maps/googleMaps');
@@ -124,6 +125,16 @@ describe('reportClientError', () => {
     ]);
     const clipped = bodies[4] as Record<string, string>;
     expect([clipped.message.length, clipped.stack.length, clipped.component.length, clipped.detail.length]).toEqual([1000, 8000, 500, 500]);
+  });
+
+  it('una falla sin texto se reporta como "(no message)" en el idioma de quien la tuvo (en-US)', async () => {
+    const { calls } = mockFetch(accepted());
+    const { reportClientError } = await fresh('en-US');
+    const anonymous = new Error('');
+    anonymous.stack = undefined;
+    await reportClientError({ kind: 'UNHANDLED', error: '' });
+    await reportClientError({ kind: 'UNHANDLED', error: anonymous });
+    expect(sent(calls).map((call) => bodyOf(call).message)).toEqual(['(no message)', 'Error: (no message)']);
   });
 
   it('sin una ruta legible usa la raíz (nunca lanza)', async () => {

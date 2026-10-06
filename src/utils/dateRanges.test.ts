@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { setLocale } from '../i18n/core';
 import { quickRanges } from './dateRanges';
 
 describe('rangos de un clic', () => {
@@ -14,5 +15,12 @@ describe('rangos de un clic', () => {
       'last-30': ['2026-09-08', '2026-10-07'],
     });
     expect(quickRanges(new Date(2026, 9, 4)).find((r) => r.key === 'week')?.start).toBe('2026-09-28'); // domingo: su semana empezó el lunes anterior
+  });
+
+  it('etiquetas en el idioma activo (se piden al dibujar)', async () => {
+    const today = new Date(2026, 9, 7);
+    expect(quickRanges(today).map((r) => r.label)).toEqual(['Hoy', 'Ayer', 'Esta semana', 'Semana pasada', 'Este mes', 'Mes pasado', 'Últimos 30 días']);
+    await setLocale('en-US');
+    expect(quickRanges(today).map((r) => r.label)).toEqual(['Today', 'Yesterday', 'This week', 'Last week', 'This month', 'Last month', 'Last 30 days']);
   });
 });

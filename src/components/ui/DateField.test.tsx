@@ -45,8 +45,8 @@ describe('DateField', () => {
     render(<Harness />);
     await userEvent.click(screen.getByRole('button', { name: 'Abrir calendario' }));
     expect(screen.getByRole('dialog', { name: 'Elegir fecha' })).toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: '16 de Junio de 2010' })).toBeDisabled(); // después del máximo
-    await userEvent.click(screen.getByRole('gridcell', { name: '10 de Junio de 2010' }));
+    expect(screen.getByRole('gridcell', { name: '16 de junio de 2010' })).toBeDisabled(); // después del máximo
+    await userEvent.click(screen.getByRole('gridcell', { name: '10 de junio de 2010' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByLabelText('Fecha de nacimiento')).toHaveValue('10/06/2010');
     expect(document.querySelector('output')?.textContent).toBe('2010-06-10');
@@ -74,16 +74,16 @@ describe('DateField', () => {
 
     const months = screen.getByRole('group', { name: 'Meses de 1995' });
     await userEvent.click(within(months).getByRole('button', { name: 'Julio de 1995' }));
-    expect(screen.getByRole('gridcell', { name: '1 de Julio de 1995' })).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: '1 de julio de 1995' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Mes siguiente' }));
-    expect(screen.getByRole('gridcell', { name: '1 de Agosto de 1995' })).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: '1 de agosto de 1995' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
 
     const grid = screen.getByRole('grid');
     fireEvent.keyDown(grid, { key: 'ArrowRight' });
     fireEvent.keyDown(grid, { key: 'ArrowDown' });
-    expect(document.activeElement).toHaveAccessibleName('23 de Julio de 1995');
-    await userEvent.click(screen.getByRole('gridcell', { name: '23 de Julio de 1995' }));
+    expect(document.activeElement).toHaveAccessibleName('23 de julio de 1995');
+    await userEvent.click(screen.getByRole('gridcell', { name: '23 de julio de 1995' }));
     expect(screen.getByLabelText('Fecha de nacimiento')).toHaveValue('23/07/1995');
   });
 
@@ -123,7 +123,7 @@ describe('DateField', () => {
 });
 
 describe('DateField: casos límite', () => {
-  const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const openCalendar = () => userEvent.click(screen.getByRole('button', { name: 'Abrir calendario' }));
 
   it('sin fecha, máximo ni mes inicial abre en el mes de hoy (zona del negocio) con hoy marcado', async () => {
@@ -140,7 +140,7 @@ describe('DateField: casos límite', () => {
     render(<Harness initial="2005-05-10" />);
     await openCalendar();
     expect(fireEvent.keyDown(screen.getByRole('grid'), { key: 'a' })).toBe(true);
-    expect(document.activeElement).toHaveAccessibleName('10 de Mayo de 2005');
+    expect(document.activeElement).toHaveAccessibleName('10 de mayo de 2005');
 
     await userEvent.click(screen.getByRole('button', { name: 'Elegir mes, actual: Mayo' }));
     expect(fireEvent.keyDown(screen.getByRole('group', { name: 'Meses de 2005' }), { key: 'x' })).toBe(true);

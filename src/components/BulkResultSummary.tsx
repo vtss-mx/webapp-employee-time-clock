@@ -1,7 +1,9 @@
 import { CircleCheck, CircleMinus, CircleSlash } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { t as translate, useT } from '../i18n';
 import type { BulkOutcome, BulkResult, BulkResultCode } from '../types';
 import type { MessageInput } from './MessageDialog';
+import { DeletedMark } from './ui/DeletedMark';
 
 /** Nombres que se muestran por grupo; del resto solo se dice cuántos más son. */
 const NAMES_SHOWN = 8;
@@ -22,6 +24,7 @@ const ICONS: Record<BulkResultCode, ReactNode> = {
 };
 
 function Group({ code, title, outcomes }: { code: BulkResultCode; title: string; outcomes: BulkOutcome[] }) {
+  const t = useT();
   if (!outcomes.length) return null;
   const shown = code === 'SKIPPED' ? outcomes : outcomes.slice(0, NAMES_SHOWN);
   const rest = outcomes.length - shown.length;
@@ -33,11 +36,12 @@ function Group({ code, title, outcomes }: { code: BulkResultCode; title: string;
       <ul className="bulk-result__list">
         {shown.map((outcome) => (
           <li key={outcome.employee.id}>
-            <strong>{outcome.employee.full_name}</strong> <small className="muted">No. {outcome.employee.employee_number}</small>
+            <strong>{outcome.employee.full_name}</strong> <small className="muted">{t('dialogs.bulk.employeeNumber', { number: outcome.employee.employee_number })}</small>
+            <DeletedMark deleted={outcome.employee.deleted} />
             {outcome.message && <span className="bulk-result__reason">{outcome.message}</span>}
           </li>
         ))}
-        {rest > 0 && <li className="muted">y {rest} más</li>}
+        {rest > 0 && <li className="muted">{t('dialogs.bulk.more', { count: rest })}</li>}
       </ul>
     </section>
   );
@@ -55,12 +59,16 @@ export function BulkResultSummary({ result, copy }: { result: BulkResult; copy: 
   );
 }
 
-/** El popup del resultado: de éxito si nadie se omitió; si no, de advertencia con los motivos primero. */
+/**
+ * El popup del resultado: de éxito si nadie se omitió; si no, de advertencia con los motivos primero.
+ * Se arma en el idioma activo: para que el popup abierto siga un cambio de idioma se pasa como
+ * función (`feedback.show(() => bulkResultMessage(result, copy()))`).
+ */
 export function bulkResultMessage(result: BulkResult, copy: BulkCopy): MessageInput {
   const parts = [`${copy.done}: ${result.done}`, result.unchanged ? `${copy.unchanged}: ${result.unchanged}` : '', result.skipped ? `${copy.skipped}: ${result.skipped}` : ''];
   return {
     variant: result.skipped ? 'warning' : 'success',
-    title: result.skipped ? `${copy.title} con omisiones` : copy.title,
+    title: result.skipped ? translate('dialogs.bulk.withOmissions', { title: copy.title }) : copy.title,
     text: parts.filter(Boolean).join(' · '),
     body: <BulkResultSummary result={result} copy={copy} />,
     wide: true,

@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { FaceGuidance } from '../hooks/useFaceDetection';
+import { setLocale } from '../i18n/core';
 import { WithCatalogs } from '../test/render';
 import { AccessoryAlert, FaceGuide, guidanceTone, QrGuide } from './FaceGuide';
-
-const progressRing = (container: HTMLElement) => container.querySelector<SVGPathElement>('.face-scan__progress');
 
 describe('FaceGuide: visor del escáner facial', () => {
   it('el tono sigue a la guía: listo en verde, sin rostro neutro y cualquier problema como advertencia', () => {
@@ -14,20 +13,50 @@ describe('FaceGuide: visor del escáner facial', () => {
     expect(tones(['multiple', 'too_far', 'too_close', 'off_center', 'look_straight', 'too_dark', 'too_bright', 'move'])).toEqual(Array(8).fill('warn'));
   });
 
-  it('el anillo se llena con el avance y el mensaje se anuncia a lectores de pantalla', () => {
-    const { container, rerender } = render(<FaceGuide tone="ok" message="Rostro detectado. Mantente quieto..." progress={0.42} stage="align" />);
-    expect(progressRing(container)?.style.strokeDashoffset).toBe('58');
-    expect(container.querySelector('.face-scan')).toHaveClass('face-scan--ok', 'face-scan--align');
-    expect(screen.getByRole('status')).toHaveTextContent('Rostro detectado. Mantente quieto...');
-    expect(screen.getByRole('status').querySelector('.lucide-shield-check')).not.toBeNull();
+  it('círculo con la silueta (verde al estar bien colocado), anillo continuo que avanza con las fotos y UNA indicación en vivo', () => {
+    const { container, rerender } = render(<FaceGuide tone="ok" message="Mantente quieto" progress={0.42} stage="align" />);
+    const scan = container.querySelector('.face-scan');
+    expect(scan).toHaveClass('face-scan', 'face-scan--ok', 'face-scan--align');
+    expect(scan).not.toHaveClass('face-scan--complete');
+    expect(scan).not.toHaveClass('face-scan--flash');
+    expect(container.querySelectorAll('.face-scan__silhouette path')).toHaveLength(2);
+    // El avance es continuo (sin marcas): el anillo lo dice a lectores de pantalla.
+    const ring = screen.getByRole('img', { name: 'Captura al 42 %' });
+    expect(ring).toHaveAttribute('data-value', '42');
+    expect(ring).not.toHaveClass('progress-ring--active');
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Mantente quieto');
+    expect(status).toHaveClass('camera__message--face', 'camera__message--ok');
+    expect(status.querySelector('.camera__detail')).toBeNull();
+    expect(screen.queryByRole('img', { name: 'Captura completa' })).toBeNull();
 
-    rerender(<FaceGuide tone="busy" message="Analizando..." />);
-    expect(progressRing(container)?.style.strokeDashoffset).toBe('0'); // procesando: anillo completo
-    expect(container.querySelector('.face-scan')?.className).not.toMatch(/undefined/);
-    expect(screen.getByRole('status').querySelector('.lucide-scan-face')).not.toBeNull();
+    // Mientras se toman las fotos: la luz en la punta del anillo y la cuenta bajo la indicación (sin anunciarla).
+    rerender(<FaceGuide tone="busy" message="Mantente quieto" detail="Foto 12 de 36" progress={0.3} stage="scan" capturing />);
+    expect(screen.getByRole('img', { name: 'Captura al 30 %' })).toHaveClass('progress-ring--active');
+    expect(screen.getByText('Foto 12 de 36')).toHaveAttribute('aria-hidden', 'true');
 
-    rerender(<FaceGuide tone="idle" message="Coloca tu rostro frente a la cámara" />);
-    expect(progressRing(container)?.style.strokeDashoffset).toBe('100');
+    // El destello: alrededor del círculo, el fondo neutro.
+    rerender(<FaceGuide tone="busy" message="Mantén tu rostro frente a la pantalla" progress={0.75} stage="liveness" flash />);
+    expect(container.querySelector('.face-scan')).toHaveClass('face-scan--flash', 'face-scan--liveness');
+
+    rerender(<FaceGuide tone="busy" message={() => 'Confirmando tu identidad…'} progress={0.5} capturing complete />);
+    expect(container.querySelector('.face-scan')).toHaveClass('face-scan--complete');
+    expect(container.querySelector('.face-scan')?.className).not.toMatch(/undefined|false/);
+    const full = screen.getByRole('img', { name: 'Captura al 100 %' }); // completo con la marca ✓ (ya sin la luz)
+    expect(full).toHaveAttribute('data-value', '100');
+    expect(full).not.toHaveClass('progress-ring--active');
+    expect(screen.getByRole('img', { name: 'Captura completa' }).querySelector('.lucide-check')).not.toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Confirmando tu identidad…');
+
+    rerender(<FaceGuide tone="idle" message="Coloca tu rostro dentro de la silueta" />);
+    expect(screen.getByRole('img', { name: 'Captura al 0 %' })).toHaveAttribute('data-value', '0');
+  });
+
+  it('en inglés: el anillo y la marca de captura completa', async () => {
+    await setLocale('en-US');
+    render(<FaceGuide tone="busy" message="Confirming your identity…" complete />);
+    expect(screen.getByRole('img', { name: 'Capture 100% complete' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Capture complete' })).toBeInTheDocument();
   });
 
   it('accesorios a retirar con su nombre del catálogo; sin accesorios no se muestra nada', () => {

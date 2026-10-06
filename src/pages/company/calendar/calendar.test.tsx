@@ -1,8 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { longDate, monthBounds, monthTitle } from '../../../components/calendar/calendarRules';
+import { afterEach, describe, expect, it } from 'vitest';
+import { gridWeeks, isWeekend, longDate, monthBounds, monthTitle, weekdayName } from '../../../components/calendar/calendarRules';
 import { anniversary, calendarServer, christmas, first, last, monthIndex, third, today, vacation, year } from '../../../components/calendar/testData';
 import { page } from '../../../components/employees/testData';
 import { apiFail, apiOk, type MockCall } from '../../../test/http';
@@ -39,6 +39,10 @@ const monthUrl = (forYear: number, month: number) => {
   const { start, end } = monthBounds(forYear, month);
   return `/api/calendar/absences?status=APPROVED&start=${start}&end=${end}&page=1&size=50`;
 };
+const workdaysUrl = (forYear: number, month: number) => {
+  const { start, end } = monthBounds(forYear, month);
+  return `/api/calendar/workdays?start=${start}&end=${end}&page=1&size=50`;
+};
 const count = (calls: MockCall[], url: string) => calls.filter((call) => call.url === url).length;
 const detail = () => document.querySelector('.cal-day') as HTMLElement;
 
@@ -73,79 +77,102 @@ describe('Calendario: pestañas', () => {
 });
 
 describe('Calendario: días festivos', () => {
-  it('el mes con sus marcas, el detalle del día elegido y la lista del año', async () => {
+  it('el mes con sus marcas, el detalle del día elegido y la tabla del año', async () => {
     const { calls } = calendarServer();
     renderAt('/company/calendar');
     expect(screen.getByRole('grid', { name: monthTitle(year, monthIndex) })).toBeInTheDocument();
     expect(cell(today)).toHaveAttribute('aria-current', 'date');
     await waitFor(() => expect(cell(first)).toHaveAccessibleName(`${longDate(first)}${first === today ? '. hoy' : ''}. Festivo: Aniversario. 1 persona descansa`));
     expect(cell(third).getAttribute('aria-label')).toMatch(/1 persona descansa$/);
-    expect(calls.map((call) => call.url)).toEqual(expect.arrayContaining([listUrl(year), `/api/calendar/holidays?year=${year}&page=1&size=50`, monthUrl(year, monthIndex)]));
+    await waitFor(() => expect(cell(last).getAttribute('aria-label')).toMatch(/1 persona trabaja su día libre$/));
+    expect(calls.map((call) => call.url)).toEqual(expect.arrayContaining([listUrl(year), `/api/calendar/holidays?year=${year}&page=1&size=50`, monthUrl(year, monthIndex), workdaysUrl(year, monthIndex)]));
+    expect(document.querySelector('.month-cal__legend')).toHaveTextContent('FestivoDescansanTrabajan');
 
-    // Lista del año: oficial o de la empresa, con su fecha completa.
-    const item = (await screen.findByRole('button', { name: 'Eliminar el festivo Navidad' })).closest('li') as HTMLElement;
-    expect(item).toHaveTextContent('25');
-    expect(item).toHaveTextContent(longDate(christmas.holiday_date));
-    expect(within(item).getByText('Oficial')).toBeInTheDocument();
-    expect(within(screen.getByRole('button', { name: 'Eliminar el festivo Aniversario' }).closest('li') as HTMLElement).getByText('De la empresa')).toBeInTheDocument();
+    // Tabla del año: fecha, día, nombre, tipo y acciones.
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Fecha', 'Día', 'Nombre', 'Tipo', 'Acciones']);
+    const row = (await screen.findByRole('button', { name: 'Eliminar el festivo Navidad' })).closest('tr') as HTMLElement;
+    expect(row).toHaveTextContent(`${formatDate(christmas.holiday_date)}${weekdayName(christmas.holiday_date)}NavidadOficial`);
+    expect(within(row).getByText(weekdayName(christmas.holiday_date))).toHaveAttribute('data-label', 'Día');
+    expect(within(screen.getByRole('button', { name: 'Eliminar el festivo Aniversario' }).closest('tr') as HTMLElement).getByText('De la empresa')).toBeInTheDocument();
 
-    // El día del festivo: quién descansa y que es de la empresa.
+    // El día del festivo: su estado, de quién es, quién descansa y sus acciones.
     await userEvent.click(cell(first));
-    expect(within(detail()).getByRole('heading')).toHaveTextContent(longDate(first));
+    expect(screen.getByTestId('where')).toHaveTextContent(first === today ? /^\/company\/calendar$/ : `/company/calendar?date=${first}`);
+    expect(within(detail()).getByRole('heading', { level: 3 })).toHaveTextContent(longDate(first));
+    expect(within(detail()).getByText('Festivo')).toHaveClass('badge--danger');
     expect(within(detail()).getByText('Aniversario')).toBeInTheDocument();
     expect(within(detail()).getByText('De la empresa')).toBeInTheDocument();
-    expect(within(detail()).getByRole('list', { name: 'Descansan este día' })).toHaveTextContent(`Ana RuizVacaciones · ${formatDate(first)} al ${formatDate(third)}`);
-    expect(within(detail()).queryByRole('link')).toBeNull();
+    expect(within(detail()).getByRole('list', { name: 'Descansan este día' })).toHaveTextContent(`Ana Ruiz${formatDate(first)} al ${formatDate(third)}Vacaciones`);
+    expect(within(detail()).getByRole('button', { name: 'Quitar festivo' })).toBeEnabled();
+    expect(within(detail()).queryByRole('link', { name: 'Marcar como festivo' })).toBeNull();
+    expect(within(detail()).getByRole('link', { name: 'Registrar ausencia' })).toHaveAttribute('href', `/company/calendar/absences/new?date=${first}`);
 
-    // El último día del mes (nunca pasado): ni festivo ni ausencias, y se puede hacer festivo.
+    // El último día del mes (nunca pasado): sin festivo ni ausencias, alguien trabaja, y se puede marcar como festivo.
     await userEvent.click(cell(last));
-    expect(within(detail()).getByText('No es día festivo.')).toBeInTheDocument();
-    expect(within(detail()).getByText('Nadie tiene vacaciones, permiso ni incapacidad este día.')).toBeInTheDocument();
-    await userEvent.click(within(detail()).getByRole('link', { name: 'Hacer festivo este día' }));
+    expect(within(detail()).getByText(isWeekend(last) ? 'Fin de semana' : 'Laborable')).toBeInTheDocument();
+    expect(within(detail()).getByText('Sin ausencias este día')).toBeInTheDocument();
+    expect(within(detail()).getByRole('list', { name: 'Trabajan este día' })).toHaveTextContent('Ana RuizCubre la guardiaTrabaja');
+    await userEvent.click(within(detail()).getByRole('link', { name: 'Marcar como festivo' }));
     expect(screen.getByTestId('where')).toHaveTextContent(`/company/calendar/holidays/new?date=${last}`);
   });
 
-  it('cambia de año y de mes (con los límites del backend) y pide solo lo de ese periodo', async () => {
+  it('la barra del periodo: mes anterior y siguiente, el selector de mes y año y "Hoy"; el día va en la URL', async () => {
     const { calls } = calendarServer();
     renderAt('/company/calendar');
     await screen.findByRole('button', { name: 'Eliminar el festivo Navidad' });
-    await userEvent.click(screen.getByRole('button', { name: 'Año siguiente' }));
-    expect(screen.getByRole('grid', { name: monthTitle(year + 1, monthIndex) })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: `Agregar festivos oficiales de ${year + 1}` })).toBeInTheDocument();
-    await waitFor(() => expect(count(calls, listUrl(year + 1))).toBe(1));
-    expect(count(calls, monthUrl(year + 1, monthIndex))).toBe(1);
-    // En otro mes se elige su primer día.
-    expect(within(detail()).getByRole('heading')).toHaveTextContent(longDate(monthBounds(year + 1, monthIndex).start));
-
-    await userEvent.click(screen.getByRole('button', { name: 'Año anterior' }));
     await userEvent.click(screen.getByRole('button', { name: 'Mes siguiente' }));
     const next = new Date(year, monthIndex + 1, 1);
+    const nextStart = monthBounds(next.getFullYear(), next.getMonth()).start;
     expect(screen.getByRole('grid', { name: monthTitle(next.getFullYear(), next.getMonth()) })).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent(`/company/calendar?date=${nextStart}`);
     await waitFor(() => expect(count(calls, monthUrl(next.getFullYear(), next.getMonth()))).toBe(1));
-    // De vuelta en el mes de hoy, se elige hoy.
+    // En otro mes se elige su primer día.
+    expect(within(detail()).getByRole('heading', { level: 3 })).toHaveTextContent(longDate(nextStart));
+
+    // Otro año con el selector: pide la lista y el mes de ese año.
+    const target = next.getFullYear() + 1;
+    await userEvent.click(document.querySelector('.cal-period__title') as HTMLElement);
+    await userEvent.click(screen.getByRole('button', { name: 'Año siguiente' }));
+    await userEvent.click(screen.getByRole('button', { name: monthTitle(target, monthIndex) }));
+    expect(screen.getByRole('grid', { name: monthTitle(target, monthIndex) })).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent(`/company/calendar?date=${monthBounds(target, monthIndex).start}`);
+    expect(screen.getByRole('button', { name: `Agregar festivos oficiales de ${target}` })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: `Festivos de ${target}` })).toBeInTheDocument();
+    await waitFor(() => expect(count(calls, listUrl(target))).toBe(1));
+    expect(count(calls, monthUrl(target, monthIndex))).toBe(1);
+
+    // Un día del mes siguiente (atenuado) lleva a su mes.
     await userEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
-    expect(within(detail()).getByRole('heading')).toHaveTextContent(longDate(today));
+    const shown = new Date(target, monthIndex - 1, 1);
+    const outside = gridWeeks(shown.getFullYear(), shown.getMonth())[5][6];
+    await userEvent.click(cell(outside));
+    expect(screen.getByTestId('where')).toHaveTextContent(`/company/calendar?date=${outside}`);
+    expect(within(detail()).getByRole('heading', { level: 3 })).toHaveTextContent(longDate(outside));
+
+    // "Hoy": el mes de hoy, hoy elegido y la URL limpia.
+    await userEvent.click(screen.getByRole('button', { name: 'Hoy' }));
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/company\/calendar$/);
+    expect(within(detail()).getByRole('heading', { level: 3 })).toHaveTextContent(longDate(today));
     expect(within(detail()).getByText('Hoy')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('link', { name: 'Agregar día festivo' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Agregar festivo' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/company/calendar/holidays/new');
   });
 
-  it('respeta los años que acepta el backend (2000 – 2100)', () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    try {
-      calendarServer();
-      vi.setSystemTime(new Date('2100-06-15T18:00:00Z'));
-      const { unmount } = renderAt('/company/calendar');
-      expect(screen.getByRole('button', { name: 'Año siguiente' })).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Año anterior' })).toBeEnabled();
-      unmount();
-      vi.setSystemTime(new Date('2000-06-15T18:00:00Z'));
-      renderAt('/company/calendar');
-      expect(screen.getByRole('button', { name: 'Año anterior' })).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Año siguiente' })).toBeEnabled();
-    } finally {
-      vi.useRealTimers();
-    }
+  it('respeta los años que acepta el backend (2000 – 2100); un día inválido en la URL abre hoy', () => {
+    calendarServer();
+    const last = renderAt('/company/calendar?date=2100-12-15');
+    expect(screen.getByRole('grid', { name: monthTitle(2100, 11) })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mes siguiente' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Mes anterior' })).toBeEnabled();
+    last.unmount();
+    const firstYear = renderAt('/company/calendar?date=2000-01-15');
+    expect(screen.getByRole('button', { name: 'Mes anterior' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Mes siguiente' })).toBeEnabled();
+    firstYear.unmount();
+    renderAt('/company/calendar?date=1999-12-31');
+    expect(screen.getByRole('grid', { name: monthTitle(year, monthIndex) })).toBeInTheDocument();
+    expect(within(detail()).getByRole('heading', { level: 3 })).toHaveTextContent(longDate(today));
   });
 
   it('sin festivos lo explica; si hay más ausencias de las que cuenta, lo dice; un festivo oficial', async () => {
@@ -157,11 +184,12 @@ describe('Calendario: días festivos', () => {
       return null;
     });
     renderAt('/company/calendar');
-    expect(await screen.findByText(`Aún no hay festivos en ${year}`)).toBeInTheDocument();
+    expect(await screen.findByText('Sin festivos')).toBeInTheDocument();
+    expect(screen.getByText('Agrega los festivos oficiales o los de tu empresa.')).toBeInTheDocument();
     expect(await within(detail()).findByText('Día oficial')).toBeInTheDocument();
     expect(within(detail()).getByText('Oficial')).toBeInTheDocument();
     expect(within(detail()).getByText('Hoy')).toBeInTheDocument();
-    expect(within(detail()).getByText(/cuenta las primeras 50 de 60 ausencias del mes/)).toBeInTheDocument();
+    expect(within(detail()).getByText('El mes tiene 60 ausencias; el calendario cuenta las primeras 50.')).toBeInTheDocument();
     expect(cell(first).getAttribute('aria-label')).toMatch(/2 personas descansan$/);
   });
 

@@ -26,6 +26,8 @@ const VALUES: ValidatorFormValues = {
   state: 'Sonora',
   municipality: 'Hermosillo',
   city: 'Hermosillo',
+  neighborhood: ' Centro ',
+  reference_notes: '  Puerta   2 \n\n Timbre ',
 };
 
 describe('useValidatorForm: reglas del cliente (solo UX; el backend valida igual)', () => {
@@ -44,11 +46,24 @@ describe('useValidatorForm: reglas del cliente (solo UX; el backend valida igual
     expect(validateRadius('100')).toBeUndefined();
   });
 
-  it('lo que se guarda: domicilio con su punto, interior vacío como null y el radio solo si es válido', () => {
+  it('lo que se guarda: domicilio con su punto, colonia, referencias limpias, interior vacío como null y el radio solo si es válido', () => {
     expect(settingsFrom(VALUES, 'QR_OR_FACE', { lat: 29.07, lng: -110.95 }, true)).toEqual({
       name: 'Recepción planta 1',
       mode: 'QR_OR_FACE',
-      address: { street: 'Juárez', exterior_number: 'S/N', interior_number: null, postal_code: '83000', country_code: 'MX', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo', latitude: 29.07, longitude: -110.95 },
+      address: {
+        street: 'Juárez',
+        exterior_number: 'S/N',
+        interior_number: null,
+        postal_code: '83000',
+        country_code: 'MX',
+        state: 'Sonora',
+        municipality: 'Hermosillo',
+        city: 'Hermosillo',
+        neighborhood: 'Centro',
+        reference_notes: 'Puerta 2\nTimbre',
+        latitude: 29.07,
+        longitude: -110.95,
+      },
       location_required: true,
       location_radius_m: 150,
     });

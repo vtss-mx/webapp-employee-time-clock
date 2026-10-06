@@ -2,9 +2,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../hooks/useAuth';
+import { resolveLazy } from '../i18n';
+import { setLocale } from '../i18n/core';
 import { apiRequest } from '../services/apiClient';
 import { apiFail, apiOk, mockFetch, testSession } from '../test/http';
 import { sampleUser, tokenResponse } from '../test/render';
+import { acquireAvatar, avatarCacheSize } from '../utils/avatarCache';
 import { AuthProvider } from './AuthContext';
 
 const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>;
@@ -150,6 +153,19 @@ describe('AuthProvider', () => {
     expect(result.current.isAuthenticated).toBe(false);
   });
 
+  it('la foto de perfil nueva se aplica a la sesión y cerrar sesión libera las fotos que la página tenía', async () => {
+    mockFetch(route({ '/auth/login': () => apiOk(tokenResponse()), '/auth/logout': () => apiOk(null) }));
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:foto'), revokeObjectURL: vi.fn() });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(() => result.current.login('ana@empresa.com', 'x'));
+    act(() => result.current.updateAvatar('/users/1/avatar?v=nueva'));
+    expect(result.current.user?.avatar).toBe('/users/1/avatar?v=nueva');
+    await acquireAvatar('/users/1/avatar?v=nueva&size=96', () => Promise.resolve(new Blob(['x'])));
+    await act(() => result.current.logout());
+    expect(avatarCacheSize()).toBe(0);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:foto');
+  });
+
   it('logout en todos los dispositivos: sin aviso en este (el usuario ya lo confirmó)', async () => {
     mockFetch(route({ '/auth/login': () => apiOk(tokenResponse()), '/auth/logout-all': () => apiOk({ revoked: 2 }) }));
     const { result } = renderHook(() => useAuth(), { wrapper });
@@ -177,8 +193,11 @@ describe('AuthProvider', () => {
     expect(result.current.isAuthenticated).toBe(true);
     await act(() => vi.advanceTimersByTimeAsync(2_000));
     expect(result.current.isAuthenticated).toBe(false);
-    expect(result.current.logoutReason).toMatch(/expirado/);
+    expect(resolveLazy(result.current.logoutReason ?? '')).toMatch(/expiró/);
     expect(refreshes).toBe(0); // la sesión de 12 h no se extiende
+    // El motivo lo pone la app: se traduce al mostrarse (sigue al idioma activo).
+    await act(() => setLocale('en-US'));
+    expect(resolveLazy(result.current.logoutReason ?? '')).toBe('Your session expired. Sign in again.');
     vi.useRealTimers();
   });
 

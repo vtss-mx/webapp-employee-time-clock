@@ -158,7 +158,6 @@ describe('RFC', () => {
   });
 
   it.each([
-    ['', 'obligatorio'],
     ['XAXX010101000', 'genérico'],
     ['PEG900515AB1', '13 caracteres'],
     ['PEGJ9005ABAB1', 'formato'],
@@ -179,9 +178,17 @@ describe('RFC', () => {
     expect(validateRfc('PEGJ900515AB1', '')).toBeUndefined(); // sin fecha aún: no se compara
   });
 
-  it('el formulario exige el RFC y su coincidencia con la fecha', () => {
+  it('RFC, CURP y NSS son opcionales: vacíos no tienen nada que validar', () => {
+    expect(validateRfc('')).toBeUndefined();
+    expect(validateRfc(' - ', '1990-01-01')).toBeUndefined();
+    expect(validateCurp('', '1990-01-01')).toBeUndefined();
+    expect(validateNss(' ')).toBeUndefined();
+  });
+
+  it('el formulario acepta el RFC vacío y, si se captura, exige que coincida con la fecha', () => {
     const base = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'E1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123', password_confirm: 'Segura123' };
-    expect(validateEmployeeForm({ ...base, rfc: '' })).toHaveProperty('rfc', 'El RFC es obligatorio');
+    expect(validateEmployeeForm({ ...base, rfc: '' })).toEqual({});
+    expect(validateEmployeeForm({ ...base, rfc: '', curp: '', nss: '' })).toEqual({});
     expect(validateEmployeeForm({ ...base, rfc: 'RUAA900102AB1' })).toHaveProperty('rfc');
     expect(validateEmployeeForm({ ...base, rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567' })).toEqual({});
   });
@@ -192,7 +199,6 @@ describe('CURP, NSS y teléfono (mismas reglas que el backend)', () => {
     expect(normalizeCurp(' hegg-560427-mvzrrl04 ')).toBe('HEGG560427MVZRRL04');
     expect(validateCurp('HEGG560427MVZRRL04')).toBeUndefined(); // ejemplo oficial de RENAPO
     expect(curpCheckDigit('HEGG560427MVZRRL0')).toBe('4');
-    expect(validateCurp('')).toBe('La CURP es obligatoria');
     expect(validateCurp('HEGG560427MVZRRL0')).toContain('18 caracteres');
     expect(validateCurp('HEGG560427MXXRRL04')).toContain('formato');
     expect(validateCurp('HEGG561327MVZRRL04')).toContain('fecha');
@@ -209,7 +215,6 @@ describe('CURP, NSS y teléfono (mismas reglas que el backend)', () => {
     expect(validateNss('1234 5678 903')).toBeUndefined();
     expect(validateNss('12345678904')).toContain('dígito verificador');
     expect(validateNss('123')).toContain('11 dígitos');
-    expect(validateNss('')).toBe('El NSS es obligatorio');
   });
 
   it('teléfono internacional (E.164): valida por país igual que el backend y se muestra con lada', () => {
@@ -265,7 +270,7 @@ describe('catálogos', () => {
   it('búsqueda por código (también inactivos), nombre con respaldo y listas de activos', () => {
     const [periodic, ...others] = catalogsFixture.reverification_reasons;
     const catalogs = catalogsWith({ reverification_reasons: [{ ...periodic, active: false }, ...others] });
-    expect(catalogs.byCode('roles', 'COMPANY')?.name).toBe('Company');
+    expect(catalogs.byCode('roles', 'COMPANY')?.name).toBe('Empresa');
     expect(catalogs.byCode('reverification_reasons', 'PERIODIC')?.name).toBe('Actualización periódica de identidad'); // inactivo
     expect(catalogs.byCode('roles', null)).toBeUndefined();
     expect(catalogs.byCode('roles', 'GUEST')).toBeUndefined();
@@ -280,7 +285,7 @@ describe('catálogos', () => {
 
   it('valida la forma de GET /api/catalogs', () => {
     expect(isCatalogs(catalogsFixture)).toBe(true);
-    expect(isCatalogs({ ...catalogsFixture, face_errors: undefined })).toBe(false);
+    expect(isCatalogs({ ...catalogsFixture, face_errors: null })).toBe(false);
     expect(isCatalogs({ ...catalogsFixture, roles: [{ code: 'ADMIN' }] })).toBe(false);
     expect(isCatalogs([])).toBe(false);
   });

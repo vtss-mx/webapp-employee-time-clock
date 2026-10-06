@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../i18n/core';
 import { apiOk, mockFetch, type MockCall } from '../test/http';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -20,7 +21,7 @@ describe('ErrorBoundary: reporte de la falla', () => {
         <Bomb />
       </ErrorBoundary>,
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Algo no salió como esperábamos');
+    expect(screen.getByRole('alert')).toHaveTextContent('Error en esta pantalla');
     const [report] = reports(calls);
     expect(report).toMatchObject({ kind: 'CRASH', message: 'RangeError: índice fuera de rango', component: 'Bomb', path: '/' });
     expect(report.detail).toContain('Bomb');
@@ -36,5 +37,23 @@ describe('ErrorBoundary: reporte de la falla', () => {
       ['Error: sin pila', null, null],
       ['Error: sin marcos', null, 'sin marcos legibles'],
     ]);
+  });
+});
+
+describe('ErrorBoundary en inglés (en-US)', () => {
+  it('la pantalla de la falla en inglés', async () => {
+    mockFetch(apiOk(null, { status: 202 }));
+    await setLocale('en-US');
+    function Bomb(): never {
+      throw new Error('falla');
+    }
+    render(
+      <ErrorBoundary inline>
+        <Bomb />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole('heading', { name: 'This screen ran into an error' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to home' })).toBeInTheDocument();
   });
 });

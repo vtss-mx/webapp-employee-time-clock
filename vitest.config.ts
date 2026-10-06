@@ -7,7 +7,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    // También las pruebas de las reglas propias del lint (eslint-rules/: textos de la interfaz).
+    include: ['src/**/*.test.{ts,tsx}', 'eslint-rules/**/*.test.js'],
     restoreMocks: true,
     testTimeout: 20_000,
     env: { VITE_API_URL: '/api' },

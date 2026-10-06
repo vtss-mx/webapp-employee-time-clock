@@ -3,17 +3,20 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { businessTomorrow } from '../../../components/shifts/shiftRules';
+import { setLocale } from '../../../i18n/core';
 import { apiFail, apiOk, envelope, jsonResponse, mockFetch, type MockCall } from '../../../test/http';
 import { renderWithProviders } from '../../../test/render';
-import type { ShiftRef, ShiftRequest, WorkSite } from '../../../types';
+import { morning as morningShift, plantRef, weekend as weekendShift } from '../../../test/shifts';
+import type { ShiftRef, ShiftRequest, ShiftSummary } from '../../../types';
 import { formatDate } from '../../../utils/format';
 import { ShiftRequestApprovePage } from './ShiftRequestApprovePage';
 import { validateRejectNote } from '../../../components/RejectRequestPanel';
 import { ShiftRequestRejectPage } from './ShiftRequestRejectPage';
 import { ShiftRequestsPage } from './ShiftRequestsPage';
 
-const morning: ShiftRef = { id: 5, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', overnight: false, weekdays: [0, 1, 2, 3, 4] };
-const weekend: ShiftRef = { id: 6, name: 'Fin de semana', start_time: '22:00:00', end_time: '06:00:00', overnight: true, weekdays: [5, 6] };
+/** El turno actual (resumido) y el pedido (con dónde se checa: el sábado en la planta, el domingo remoto). */
+const morning: ShiftRef = { id: 5, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', overnight: false, weekdays: [0, 1, 2, 3, 4], remote_weekdays: morningShift.remote_weekdays };
+const weekend: ShiftSummary = { ...weekendShift, remote_weekdays: [6], sites: [plantRef] };
 
 const pending: ShiftRequest = {
   id: 31,
@@ -28,16 +31,6 @@ const pending: ShiftRequest = {
   created_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
 };
 const rejected: ShiftRequest = { ...pending, id: 30, status: 'REJECTED', current_shift: null, review_note: 'Falta personal ese día', reviewed_at: '2026-10-02T10:00:00Z' };
-
-const plant: WorkSite = {
-  id: 3,
-  name: 'Planta Norte',
-  radius_m: 100,
-  active: true,
-  employees: 1,
-  created_at: '2026-10-01T00:00:00Z',
-  address: { street: 'Blvd. Kino', exterior_number: '100', interior_number: null, postal_code: '83150', country_code: 'MX', state: 'Sonora', municipality: 'Hermosillo', city: 'Hermosillo', latitude: 29.1, longitude: -110.9 },
-};
 
 const page = <T,>(items: T[], total = items.length, size = 10) => ({ items, total, page: 1, size });
 const bodyOf = (call: MockCall | undefined) => JSON.parse(call?.init.body as string) as unknown;
@@ -97,7 +90,7 @@ describe('Solicitudes de cambio: bandeja', () => {
     expect(within(item).getByRole('link', { name: 'Aprobar la solicitud de Ana Ruiz' })).toHaveAttribute('href', '/company/shifts/requests/31/approve');
     expect(within(item).getByRole('link', { name: 'Rechazar la solicitud de Ana Ruiz' })).toHaveAttribute('href', '/company/shifts/requests/31/reject');
     expect(screen.getByRole('link', { name: /Turnos/ })).toHaveAttribute('href', '/company/shifts');
-    expect(screen.getByText(/1 solicitud ·/)).toBeInTheDocument();
+    expect(screen.getByText(/1 solicitud de tus empleados/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Filtrar por estado/ }));
     await userEvent.click(screen.getByRole('option', { name: 'Rechazada' }));
@@ -111,19 +104,53 @@ describe('Solicitudes de cambio: bandeja', () => {
     await waitFor(() => expect(calls.at(-1)?.url).toBe('/api/shift-requests?page=1&size=10'));
   });
 
-  it('sin pendientes es buena noticia; con otro estado dice que no hay de ese estado', async () => {
+  it('sin pendientes es buena noticia; con otro estado sugiere otro; con «Todas» dice qué aparecerá', async () => {
     mockFetch(() => apiOk({ ...page([]), total: 0 }));
     renderAt('/company/shifts/requests');
-    expect(await screen.findByText('No hay solicitudes pendientes')).toBeInTheDocument();
+    expect(await screen.findByText('Todo al día')).toBeInTheDocument();
+    expect(screen.getByText('No hay solicitudes de turno por revisar.')).toBeInTheDocument();
     expect(screen.getByText(/0 solicitudes/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Filtrar por estado/ }));
     await userEvent.click(screen.getByRole('option', { name: 'Cancelada' }));
-    expect(await screen.findByText('No hay solicitudes con este estado')).toBeInTheDocument();
+    expect(await screen.findByText('Sin solicitudes')).toBeInTheDocument();
+    expect(screen.getByText('Prueba con otro estado.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Filtrar por estado/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'Todas las solicitudes' }));
+    expect(await screen.findByText('Aquí verás los cambios de turno que pida tu personal.')).toBeInTheDocument();
+  });
+
+  it('los vacíos en inglés (en-US): buena noticia, otro estado y «Todas»', async () => {
+    await setLocale('en-US');
+    mockFetch(() => apiOk({ ...page([]), total: 0 }));
+    renderAt('/company/shifts/requests');
+    expect(await screen.findByText('All caught up')).toBeInTheDocument();
+    expect(screen.getByText('No shift requests to review.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Filter by status/ }));
+    await userEvent.click(screen.getByRole('option', { name: 'All requests' }));
+    expect(await screen.findByText('Shift changes your staff requests will appear here.')).toBeInTheDocument();
+    expect(screen.getByText('No requests')).toBeInTheDocument();
+  });
+
+  it('en inglés (en-US): si no carga lo dice y se reintenta; cada solicitud con su cambio, su fecha y cómo decidirla', async () => {
+    await setLocale('en-US');
+    let attempts = 0;
+    mockFetch(() => (++attempts === 1 ? apiFail(500, 'INTERNAL_ERROR', 'Unexpected failure') : apiOk(page([pending]))));
+    renderAt('/company/shifts/requests');
+    const failed = await screen.findByRole('alertdialog', { name: "Couldn't load the requests" });
+    await userEvent.click(within(failed).getByRole('button', { name: 'Retry' }));
+    const item = (await screen.findByText('Estudio entre semana', { exact: false })).closest('li') as HTMLElement;
+    expect(screen.getByRole('heading', { name: 'Shift change requests' })).toBeInTheDocument();
+    expect(screen.getByText(/1 request from your employees/)).toBeInTheDocument();
+    expect(item).toHaveTextContent('Matutino (8:00 AM – 4:00 PM)');
+    expect(item).toHaveTextContent('Fin de semana (10:00 PM – 6:00 AM (next day))');
+    expect(item).toHaveTextContent(`From ${formatDate('2030-01-07')} · requested 2 hours ago`);
+    expect(within(item).getByRole('link', { name: "Approve Ana Ruiz's request" })).toHaveTextContent('Approve');
+    expect(within(item).getByRole('img', { name: 'changes to' })).toBeInTheDocument();
   });
 });
 
 describe('Solicitudes de cambio: aprobar', () => {
-  it('desde la bandeja: conserva días remotos y sitios, aprueba con la fecha pedida y vuelve a la bandeja', async () => {
+  it('desde la bandeja: muestra dónde checará con el turno pedido, aprueba con la fecha pedida y vuelve a la bandeja', async () => {
     const { calls } = mockFetch((call) => (call.init.method === 'POST' ? apiOk({ ...pending, status: 'APPROVED' }) : apiOk(page([pending]))));
     renderAt('/company/shifts/requests');
     await userEvent.click(await screen.findByRole('link', { name: 'Aprobar la solicitud de Ana Ruiz' }));
@@ -131,19 +158,23 @@ describe('Solicitudes de cambio: aprobar', () => {
     expect(calls.filter(isList)).toHaveLength(1); // la solicitud llegó con la navegación
     expect(screen.getByText('“Estudio entre semana”')).toBeInTheDocument();
     expect(screen.getByLabelText(/Aplica desde/)).toHaveValue('07/01/2030');
-    expect(screen.getByRole('switch', { name: 'Conservar días remotos y sitios actuales' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.queryByRole('group', { name: 'Días en que checa remoto' })).toBeNull();
+    // Dónde checará lo dice el turno pedido: no se eligen días remotos ni sitios.
+    const card = screen.getByRole('group', { name: 'Turno Fin de semana: cuándo y dónde se checa' });
+    expect(card).toHaveTextContent('Remoto: Dom');
+    expect(card).toHaveTextContent('Planta Norte');
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(calls.some((c) => c.url.startsWith('/api/sites'))).toBe(false);
 
-    // Se confirma el horario, la fecha y que conserva sus días remotos y sitios; cancelar no envía nada.
+    // Se confirma el horario, dónde checará y la fecha; cancelar no envía nada.
     const confirm = await askApprove();
     expect(confirm).toHaveTextContent('Su turno actual termina el día anterior y lo ya registrado no cambia.');
-    expect(rows(confirm)).toEqual(['Horario22:00 – 06:00 (día siguiente) · Sáb y dom', `Aplica desde${formatDate('2030-01-07')}`, 'Conserva sus días remotos y sus sitios actuales.']);
+    expect(rows(confirm)).toEqual(['Horario22:00 – 06:00 (día siguiente) · Sáb y dom', 'Sitios donde checaPlanta Norte', 'Días remotosDom', `Aplica desde${formatDate('2030-01-07')}`]);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog', { name: APPROVE })).toBeNull();
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
     expect(changes).not.toHaveBeenCalled();
     expect(screen.getByLabelText(/Aplica desde/)).toHaveValue('07/01/2030');
-    expect(screen.getByRole('switch', { name: 'Conservar días remotos y sitios actuales' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: 'Aprobar cambio' })).toBeEnabled();
     await userEvent.click(within(await askApprove()).getByRole('button', { name: 'Aprobar cambio' }));
 
@@ -154,12 +185,11 @@ describe('Solicitudes de cambio: aprobar', () => {
     expect(changes).toHaveBeenCalledTimes(1);
   });
 
-  it('por enlace directo la busca entre las pendientes; elige días remotos y sitios; errores del servidor', async () => {
+  it('por enlace directo la busca entre las pendientes; la fecha pasada se corrige; errores del servidor', async () => {
     const old = { ...pending, valid_from: '2026-01-05' };
     const others = Array.from({ length: 50 }, (_, i) => ({ ...pending, id: 100 + i }));
     let posts = 0;
     const { calls } = mockFetch((call) => {
-      if (call.url.startsWith('/api/sites')) return apiOk(page([plant], 1, 50));
       if (call.init.method === 'POST') {
         posts += 1;
         return posts === 1
@@ -175,20 +205,20 @@ describe('Solicitudes de cambio: aprobar', () => {
     expect(date).toHaveValue(businessTomorrow().split('-').reverse().join('/'));
     expect(screen.getByText(new RegExp(`Pidió desde el ${formatDate('2026-01-05')}`))).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('switch', { name: 'Conservar días remotos y sitios actuales' }));
-    expect(screen.getByRole('button', { name: 'lunes' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'sábado' }));
+    // Una fecha sin el día de anticipación no se confirma.
+    await userEvent.clear(date);
+    await userEvent.type(date, '01012020');
     await userEvent.click(screen.getByRole('button', { name: 'Aprobar cambio' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'Revisa la información' })).getByRole('button', { name: 'Entendido' }));
-    expect(screen.getByText('Elige al menos un sitio donde checar los días que no son remotos')).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Planta Norte/ }));
-    // Elegidos de nuevo: la confirmación dice qué días checa remoto y en qué sitios.
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'Revisa los datos' })).getByRole('button', { name: 'Entendido' }));
+    expect(screen.getByText('Elige desde mañana: el cambio de turno se programa con un día de anticipación.')).toBeInTheDocument();
+    await userEvent.clear(date);
+    await userEvent.type(date, businessTomorrow().split('-').reverse().join(''));
     const confirm = await askApprove();
-    expect(rows(confirm)).toEqual(['Horario22:00 – 06:00 (día siguiente) · Sáb y dom', `Aplica desde${formatDate(businessTomorrow())}`, 'Días remotosSáb', 'Sitios donde checaPlanta Norte']);
+    expect(rows(confirm).at(-1)).toBe(`Aplica desde${formatDate(businessTomorrow())}`);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Aprobar cambio' }));
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'No se pudo aprobar el cambio de turno' })).getByRole('button', { name: 'Entendido' }));
     expect(screen.getByText(/elige desde mañana/)).toBeInTheDocument();
-    expect(bodyOf(calls.find((c) => c.init.method === 'POST'))).toEqual({ valid_from: businessTomorrow(), remote_weekdays: [5], site_ids: [3] });
+    expect(bodyOf(calls.find((c) => c.init.method === 'POST'))).toEqual({ valid_from: businessTomorrow() });
     expect(changes).not.toHaveBeenCalled();
 
     // Otra persona ya la decidió: se explica y vuelve a la bandeja (con el contador actualizado).

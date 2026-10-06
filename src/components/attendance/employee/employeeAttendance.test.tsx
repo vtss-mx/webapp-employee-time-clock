@@ -1,8 +1,10 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../../i18n/core';
 import { ApiError } from '../../../services/apiClient';
 import { renderWithProviders } from '../../../test/render';
+import { addressLine } from '../../../utils/address';
 import { LocationError } from '../../../utils/geolocation';
 import { attendanceProblem } from './attendanceProblems';
 import { AttendanceResultCard } from './AttendanceResultCard';
@@ -10,7 +12,8 @@ import { CheckPlaces } from './CheckPlaces';
 import { Countdown, Elapsed } from './LiveTime';
 import { addMinutes, countdownText, minutesBetween, msUntil, serverOffset } from './serverTime';
 import { DayOffCard, dayOffIcon } from './DayOffCard';
-import { actionResult, attendanceToday, breakWindow, dayOff, NOW, sampleSite, workSession } from './testData';
+import { HolidayList } from './HolidayList';
+import { actionResult, attendanceToday, breakWindow, dayOff, holiday, NOW, sampleSite, workSession } from './testData';
 import { actionFromSlug, breakWindowText, clockCountdown, clockState, primaryAction, recordLabel, refreshAt } from './todayView';
 
 const apiError = (statusCode: number, code: string, message = 'Mensaje del servidor') => new ApiError({ statusCode, code, message });
@@ -147,35 +150,38 @@ describe('problemas al registrar', () => {
   it('ubicación del teléfono: el permiso bloqueado se explica para la asistencia; los demás, con su texto', () => {
     const denied = attendanceProblem(new LocationError('denied'));
     expect(denied?.kind).toBe('retry');
-    expect(denied?.message).toMatchObject({ title: 'Permite el acceso a tu ubicación', text: expect.stringContaining('asistencia') as string });
-    expect(denied?.message.details?.at(-1)).toBe('Regresa aquí y toca «Reintentar».');
-    expect(denied?.message.actions?.map((a) => a.id)).toEqual(['close', 'retry']);
-    expect(attendanceProblem(new LocationError('timeout'))?.message.title).toBe('La ubicación tardó demasiado');
+    expect(denied?.message()).toMatchObject({ title: 'Permite el acceso a tu ubicación', text: expect.stringContaining('asistencia') as string });
+    expect(denied?.message().details?.at(-1)).toBe('Regresa aquí y toca «Reintentar».');
+    expect(denied?.message().actions?.map((a) => a.id)).toEqual(['close', 'retry']);
+    expect(attendanceProblem(new LocationError('timeout'))?.message().title).toBe('La ubicación tardó demasiado');
   });
 
   it('respuestas del servidor: fuera del sitio, imprecisa, no creíble y estado que cambió', () => {
-    expect(attendanceProblem(apiError(403, 'LOCATION_OUT_OF_SITE'))?.message).toMatchObject({ title: 'Estás fuera de tu sitio de trabajo', text: 'Mensaje del servidor' });
-    expect(attendanceProblem(apiError(422, 'LOCATION_INACCURATE'))?.message.title).toBe('Tu ubicación no es precisa');
-    expect(attendanceProblem(apiError(403, 'IMPOSSIBLE_TRAVEL'))?.message.title).toBe('Tu ubicación no es creíble');
+    expect(attendanceProblem(apiError(403, 'LOCATION_OUT_OF_SITE'))?.message()).toMatchObject({ title: 'Estás fuera de tu sitio de trabajo', text: 'Mensaje del servidor' });
+    expect(attendanceProblem(apiError(422, 'LOCATION_INACCURATE'))?.message().title).toBe('Tu ubicación no es precisa');
+    expect(attendanceProblem(apiError(403, 'IMPOSSIBLE_TRAVEL'))?.message().title).toBe('Tu ubicación no es creíble');
     const stale = attendanceProblem(apiError(409, 'ATTENDANCE_ACTION_NOT_ALLOWED'));
-    expect(stale).toMatchObject({ kind: 'stale', message: { title: 'Tu asistencia cambió' } });
+    expect(stale?.kind).toBe('stale');
+    expect(stale?.message()).toMatchObject({ title: 'Tu asistencia cambió', footnote: 'Revisa lo que puedes registrar ahora.' });
     expect(attendanceProblem(apiError(409, 'FACE_LOCKED'))).toBeNull();
     expect(attendanceProblem(new Error('otro'))).toBeNull();
   });
 });
 
 describe('CheckPlaces (dónde puede checar hoy)', () => {
-  it('remoto y sus sitios con su radio', () => {
+  it('remoto y los sitios de su turno con su domicilio y su radio', () => {
     renderWithProviders(<CheckPlaces today={attendanceToday({ remote_allowed: true, sites: [sampleSite, { ...sampleSite, id: 3, name: 'Bodega', radius_m: 1500 }] })} />);
     expect(screen.getByText('Puedes checar de forma remota')).toBeInTheDocument();
     expect(screen.getByText('Planta Norte')).toBeInTheDocument();
+    expect(screen.getAllByText(addressLine(sampleSite.address))).toHaveLength(2);
     expect(screen.getByText('Dentro de 150 m de su ubicación')).toBeInTheDocument();
     expect(screen.getByText('Dentro de 1.5 km de su ubicación')).toBeInTheDocument();
   });
 
-  it('sin remoto ni sitios: explica que debe pedir uno', () => {
+  it('sin remoto ni sitios: explica que su empresa debe revisar su turno', () => {
     renderWithProviders(<CheckPlaces today={attendanceToday({ sites: [] })} />);
-    expect(screen.getByText('Sin sitio de trabajo asignado')).toBeInTheDocument();
+    expect(screen.getByText('Sin sitio de trabajo activo')).toBeInTheDocument();
+    expect(screen.getByText(/Pide a tu empresa que revise tu turno/)).toBeInTheDocument();
   });
 });
 
@@ -244,5 +250,46 @@ describe('DayOffCard (día libre del empleado)', () => {
   it('ícono por motivo (uno nuevo del catálogo usa el de día libre)', () => {
     expect(dayOffIcon('SICK_LEAVE')).not.toBe(dayOffIcon('OTHER'));
     expect(dayOffIcon('NEW_KIND')).toBe(dayOffIcon('OTHER'));
+  });
+});
+
+describe('Mi asistencia en inglés (en-US)', () => {
+  it('lo que corre, la ventana del descanso y el texto de los botones', async () => {
+    await setLocale('en-US');
+    expect(countdownText((2 * 24 + 3) * 3_600_000)).toBe('2 d 3 h');
+    expect(countdownText(14 * 60_000 + 4_200)).toBe('14 min 05 s');
+    expect(recordLabel('Break start')).toBe('Record break start');
+    const working = attendanceToday({ occurrence: null, session: workSession(), break_window: breakWindow(), actions: ['BREAK_START', 'CHECK_OUT'], now: '2026-10-05T16:00:00Z' });
+    expect(breakWindowText(working)).toBe('Break available until 4:00 PM · 30 min');
+    expect(breakWindowText({ ...working, actions: ['CHECK_OUT'], now: '2026-10-05T13:56:00Z' })).toBe('You can take your break from 8:00 AM');
+    expect(clockCountdown(attendanceToday())).toMatchObject({ label: 'Your shift starts in', done: 'Your shift has started' });
+  });
+
+  it('un problema al registrar se arma al dibujarse: el mismo popup sigue al idioma activo', async () => {
+    const outside = attendanceProblem(apiError(403, 'LOCATION_OUT_OF_SITE'));
+    expect(outside?.message().title).toBe('Estás fuera de tu sitio de trabajo');
+    await setLocale('en-US');
+    expect(outside?.message()).toMatchObject({ eyebrow: 'Location', title: "You're outside your work site", text: 'Mensaje del servidor' });
+    expect(outside?.message().details?.at(-1)).toBe('Tap “Retry.”');
+    expect(outside?.message().actions?.map((a) => a.label)).toEqual(['Cancel', 'Retry']);
+    expect(new LocationError('timeout').message).toBe("Turn on precise location on the device and try again.");
+  });
+
+  it('el registro hecho, el día libre y los festivos en inglés (fechas y horas del idioma)', async () => {
+    await setLocale('en-US');
+    const view = renderWithProviders(<AttendanceResultCard result={actionResult({ session: workSession() })} onDone={vi.fn()} />);
+    expect(screen.getByText('7:55 AM').parentElement).toHaveTextContent(/^at 7:55 AM/);
+    expect(screen.getByText('Check out by').nextSibling).toHaveTextContent('5:00 PM');
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    view.unmount();
+    renderWithProviders(<DayOffCard dayOff={dayOff({ kind: 'HOLIDAY', name: 'Christmas', work_date: '2026-12-25', starts_on: '2026-12-25', ends_on: '2026-12-25' })} today="2026-12-25" />);
+    const card = screen.getByRole('region', { name: 'Day off' });
+    expect(card).toHaveTextContent("You're off today");
+    expect(card).toHaveTextContent('Holiday: Christmas');
+    renderWithProviders(<HolidayList holidays={[holiday(), holiday({ id: 4, official: false })]} loading={false} />);
+    expect(screen.getAllByText('Dec')).toHaveLength(2);
+    expect(screen.getAllByText('Friday')).toHaveLength(2);
+    expect(screen.getByText('Official')).toBeInTheDocument();
+    expect(screen.getByText("Your company's")).toBeInTheDocument();
   });
 });
