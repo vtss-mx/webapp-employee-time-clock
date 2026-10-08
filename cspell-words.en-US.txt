@@ -4,16 +4,16 @@
 # Palabras válidas que el diccionario no trae (headwear: gorras y sombreros; look-alikes: parecidos)
 headwear
 alikes
+# Máscara de fecha del RFC y la CURP (año, mes y día con dos dígitos; en español, aammdd)
+yymmdd
 
 # Backend: término técnico (geofence: el perímetro virtual de un sitio de trabajo)
 geofence
+# Atribución de la base local de IP (IP Geolocation by DB-IP): geolocation es correcta en inglés de Estados Unidos
+Geolocation
+geolocation
 # Backend: países y territorios con su nombre en inglés (catálogo countries)
-Åland
-Barthélemy
-Cunha
-Eswatini
-Kitts
-Réunion
-SAR
-São
 Türkiye
+
+# Guía por voz del registro (decisión del dueño, 2026-10-08): activar la síntesis de voz silenciada
+unmute

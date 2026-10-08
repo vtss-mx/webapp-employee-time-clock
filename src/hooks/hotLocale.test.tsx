@@ -159,15 +159,25 @@ describe('useFormState: lo capturado no se pierde al cambiar el idioma', () => {
 describe('listas y recursos: el popup de la carga que falló sigue al idioma', () => {
   const failingPage = () => Promise.reject<Page<string>>(serverError());
 
-  it('useResource: título de una función y "Reintentar" cambian; reintentar sigue funcionando', async () => {
-    const fetch = vi.fn<(signal: AbortSignal) => Promise<string>>().mockRejectedValueOnce(serverError()).mockResolvedValue('empresa');
+  it('useResource: al cambiar el idioma se vuelve a pedir; si sigue fallando, el popup sale en el idioma nuevo y "Reintentar" sigue funcionando', async () => {
+    const fetch = vi.fn<(signal: AbortSignal) => Promise<string>>().mockRejectedValueOnce(serverError()).mockRejectedValueOnce(serverError()).mockResolvedValue('empresa');
     const { result } = renderHook(() => useResource(fetch, 1, say('No se pudo cargar la empresa', 'Could not load the company')), { wrapper });
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo cargar la empresa' });
     expect(within(popup).getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
     await act(() => setLocale('en-US'));
-    const english = screen.getByRole('alertdialog', { name: 'Could not load the company' });
+    const english = await screen.findByRole('alertdialog', { name: 'Could not load the company' });
+    expect(fetch).toHaveBeenCalledTimes(2); // los textos del servidor llegan en el idioma nuevo
     await userEvent.click(within(english).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(result.current.data).toBe('empresa'));
+  });
+
+  it('useResource: si al cambiar el idioma la carga ya responde, el popup de la falla anterior se cierra solo', async () => {
+    const fetch = vi.fn<(signal: AbortSignal) => Promise<string>>().mockRejectedValueOnce(serverError()).mockResolvedValue('company');
+    const { result } = renderHook(() => useResource(fetch, 1, say('No se pudo cargar la empresa', 'Could not load the company')), { wrapper });
+    await screen.findByRole('alertdialog', { name: 'No se pudo cargar la empresa' });
+    await act(() => setLocale('en-US'));
+    await waitFor(() => expect(result.current.data).toBe('company'));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
   it('usePagedList: el popup cambia de idioma sin perder la página ni el tamaño elegidos', async () => {

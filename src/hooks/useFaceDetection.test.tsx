@@ -176,16 +176,28 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
     expect(requestAnimationFrame).not.toHaveBeenCalled();
   });
 
-  it('cada problema del encuadre tiene su indicación', () => {
+  it('cada problema del encuadre tiene su indicación, medido contra la guía (lo que se dibuja es lo que se exige)', () => {
     expect(guidanceFor([])).toBe('no_face');
     expect(guidanceFor([face({ score: 0.3 })])).toBe('no_face'); // poco seguro: no cuenta
     expect(guidanceFor([{ ...face(), categories: [] }])).toBe('no_face');
     expect(guidanceFor([face({ box: false })])).toBe('no_face');
     expect(guidanceFor([face(), face({ cx: 0.3 })])).toBe('multiple');
-    expect(guidanceFor([face({ size: 60 })])).toBe('too_far');
-    expect(guidanceFor([face({ size: 420 })])).toBe('too_close');
+    expect(guidanceFor([face({ cx: 0.1 })])).toBe('cut_off'); // asoma fuera del cuadro de la cámara, por cada lado
+    expect(guidanceFor([face({ cx: 0.9 })])).toBe('cut_off');
+    expect(guidanceFor([face({ cy: 0.05 })])).toBe('cut_off');
+    expect(guidanceFor([face({ cy: 0.95 })])).toBe('cut_off');
+    // Sin geometría de la página la guía es el círculo inscrito: la caja objetivo mide 240 × 254 px en (320, 286).
+    expect(guidanceFor([face({ size: 60 })])).toBe('too_far'); // llena el 25 % (mínimo 60 %)
+    expect(guidanceFor([face({ size: 143 })])).toBe('too_far');
+    expect(guidanceFor([face({ size: 145 })])).toBe('hold_still');
+    expect(guidanceFor([face({ size: 275 })])).toBe('hold_still'); // 115 %: justo cabe en el contorno
+    expect(guidanceFor([face({ size: 280 })])).toBe('too_close');
     expect(guidanceFor([face({ cx: 0.2 })])).toBe('off_center');
     expect(guidanceFor([face({ cy: 0.2 })])).toBe('off_center');
+    // El caso del dueño (2026-10-07): el rostro en la parte baja del círculo no es válido aunque esté completo.
+    expect(guidanceFor([face({ cy: 0.72 })])).toBe('off_center');
+    expect(guidanceFor([face({ cx: 0.55 })])).toBe('hold_still'); // 13 % de la caja: dentro de la tolerancia (15 %)
+    expect(guidanceFor([face({ cx: 0.57 })])).toBe('off_center');
     expect(guidanceFor([face({ nose: 0.03 })])).toBe('look_straight');
     luminance = 30;
     expect(guidanceFor([face()])).toBe('too_dark');
@@ -198,14 +210,90 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
     expect(guidanceFor([face()])).toBe('hold_still');
   });
 
+  it('de frente, estricto (decisión del dueño, 2026-10-07): mirar abajo o arriba, inclinarse o girar no es válido', () => {
+    // Cabeceo: la nariz entre los ojos (0) y la boca (1); de frente mide 0.51-0.59 en un rostro real.
+    expect(guidanceFor([face({ pitch: 0.55 })])).toBe('hold_still');
+    expect(guidanceFor([face({ pitch: 0.75 })])).toBe('look_straight'); // mirando abajo
+    expect(guidanceFor([face({ pitch: 0.35 })])).toBe('look_straight'); // mirando arriba
+    expect(guidanceFor([face({ noMouth: true })])).toBe('hold_still'); // sin la boca no se mide el cabeceo
+    // Inclinación lateral: la línea de los ojos (64 px entre ojos; 0.03 del alto son 14 px: 12.7°; 0.02, 8.5°).
+    expect(guidanceFor([face({ tilt: 0.02 })])).toBe('hold_still');
+    expect(guidanceFor([face({ tilt: 0.03 })])).toBe('look_straight');
+    expect(guidanceFor([face({ tilt: -0.03 })])).toBe('look_straight');
+    // Con el rostro en reposo (las fotos y la vuelta al frente): la cabeza no subió ni bajó respecto a él.
+    const rest: DetectionMode = { kind: 'frontal', baseline: { pitch: 0.5, width: 200 } };
+    expect(guidanceFor([face({ pitch: 0.54 })], rest)).toBe('hold_still');
+    expect(guidanceFor([face({ pitch: 0.58 })], rest)).toBe('look_straight'); // bajó la cabeza (0.08 > 0.06)
+    expect(guidanceFor([face({ pitch: 0.42 })], rest)).toBe('look_straight');
+    expect(guidanceFor([face({ pitch: 0.58 })], { kind: 'frontal', baseline: { pitch: null, width: 200 } })).toBe('hold_still'); // sin cabeceo en reposo
+  });
+
+  it('la quietud se suaviza (ventana + histéresis, decisión del dueño 2026-10-07): un cuadro movido no rechaza; un movimiento sostenido sí y, al quietarse, vuelve a contar', () => {
+    detections = [face({ size: 200 })];
+    const { result } = renderCapture({ stableFrames: 8 });
+    frame();
+    expect(result.current.guidance).toBe('hold_still');
+    // UN cuadro con otro tamaño (pico de ruido de BlazeFace): la histéresis de 2 cuadros no lo marca como movimiento.
+    detections = [face({ size: 240 })];
+    frame();
+    expect(result.current.guidance).toBe('hold_still');
+    // Oscila de vuelta (movimiento real: dos cuadros seguidos lejos del promedio de la ventana) → «Mantente quieto».
+    detections = [face({ size: 200 })];
+    frame();
+    expect(result.current).toMatchObject({ guidance: 'moving', progress: 0 });
+    // Quieto en la nueva posición: la ventana lo alcanza y vuelve a contar.
+    detections = [face({ size: 200 })];
+    frame();
+    expect(result.current.guidance).toBe('hold_still');
+  });
+
+  it('con la medición de nitidez, un cuadro de frente bien colocado pero BORROSO es «blurry» (no cuenta); nítido, cuenta', () => {
+    detections = [face()];
+    let sharp = false;
+    const videoRef = { current: videoElement() };
+    const detector = { detectForVideo: detect } as unknown as FaceDetector;
+    const onStable = vi.fn();
+    const { result } = renderHook(() => useFaceAutoCapture({ detector, videoRef, enabled: true, stableFrames: 2, onStable, quality: () => sharp }));
+    frame();
+    expect(result.current).toMatchObject({ guidance: 'blurry', progress: 0 });
+    expect(onStable).not.toHaveBeenCalled();
+    sharp = true;
+    frame();
+    frame();
+    expect(result.current.guidance).toBe('ready'); // ya enfocado y quieto: cuenta y dispara
+    expect(onStable).toHaveBeenCalledOnce();
+  });
+
+  it('con la guía medida en la página, el encuadre se exige donde se dibuja', () => {
+    const videoRef = { current: videoElement() };
+    videoRef.current.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 400, right: 400, bottom: 400, x: 0, y: 0, toJSON: () => '' });
+    // Video de 640 × 480 mostrado en 400 × 400 (escala 400/480; se recortan 67 px de video a cada lado); la guía, un
+    // círculo de 320 px centrado: su caja objetivo queda en el video en x 224-416, y 175-378 (centro 320, 277).
+    const guide = document.createElement('div');
+    guide.getBoundingClientRect = () => ({ left: 40, top: 40, width: 320, height: 320, right: 360, bottom: 360, x: 40, y: 40, toJSON: () => '' });
+    const guideRef = { current: guide };
+    const detector = { detectForVideo: detect } as unknown as FaceDetector;
+    const { result } = renderHook(() => useFaceAutoCapture({ detector, videoRef, guideRef, enabled: true, stableFrames: 2 }));
+    detections = [face({ cy: 0.5 })]; // centrado en el video (y 240) no está centrado en la guía (y 277): 18 % de la caja
+    frame();
+    expect(result.current.guidance).toBe('off_center');
+    detections = [face({ cy: 0.58, size: 170 })]; // donde la guía espera el rostro, llenándola al 89 %
+    frame();
+    // Tras salir de la guía la ventana de quietud arranca limpia: el primer cuadro válido ya cuenta (no «moving»).
+    expect(result.current.guidance).toBe('hold_still');
+    frame();
+    expect(result.current.guidance).toBe('hold_still');
+  });
+
   it('prueba de vida: pide girar hasta superar el mínimo (con margen) hacia el lado del reto', () => {
     expect(guidanceFor([face()], LEFT)).toBe('move');
     expect(guidanceFor([face({ nose: 0.05 })], LEFT)).toBe('hold_still');
     expect(guidanceFor([face({ nose: 0.05 })], RIGHT)).toBe('move');
     expect(guidanceFor([face({ nose: -0.05 })], RIGHT)).toBe('hold_still');
-    expect(guidanceFor([face({ cx: 0.75, nose: 0.05 })], LEFT)).toBe('hold_still'); // al moverse se tolera más el descentrado
+    expect(guidanceFor([face({ cx: 0.6, nose: 0.05 })], LEFT)).toBe('hold_still'); // al moverse se tolera el doble de descentrado
+    expect(guidanceFor([face({ cx: 0.6 })])).toBe('off_center'); // de frente no
     expect(guidanceFor([face({ eyeGap: 0 })], LEFT)).toBe('move');
-    expect(guidanceFor([face({ size: 420, nose: 0.05 })], LEFT)).toBe('too_close'); // girando no se permite acercarse de más
+    expect(guidanceFor([face({ size: 400, cy: 0.5, nose: 0.05 })], LEFT)).toBe('too_close'); // girando no se permite acercarse de más
   });
 
   it('mirar arriba o abajo: la nariz sube o baja respecto al rostro en reposo (más el margen)', () => {
@@ -226,8 +314,8 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
     expect(guidanceFor([face()], closer)).toBe('move');
     expect(guidanceFor([face({ size: 255 })], closer)).toBe('move'); // 1.275: no llega a 1.30
     expect(guidanceFor([face({ size: 270 })], closer)).toBe('hold_still');
-    expect(guidanceFor([face({ size: 420 })], closer)).toBe('hold_still'); // de frente sería "aléjate"
-    expect(guidanceFor([face({ size: 470 })], closer)).toBe('too_close'); // ya no cabe en el cuadro
+    expect(guidanceFor([face({ size: 340 })], closer)).toBe('hold_still'); // de frente sería "aléjate"
+    expect(guidanceFor([face({ size: 380 })], closer)).toBe('too_close'); // ya no cabe ni con la holgura de acercarse
     expect(guidanceFor([face({ size: 270 })], { ...closer, baseline: null })).toBe('move');
   });
 
@@ -244,14 +332,14 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
 
   it('al quedar estable de frente entrega el rostro en reposo (promedio de los cuadros estables)', () => {
     const onStable = vi.fn();
-    detections = [face({ size: 190, pitch: 0.48 })];
+    detections = [face({ size: 198, pitch: 0.48 })];
     const { result } = renderCapture({ stableFrames: 2, onStable });
     frame();
-    detections = [face({ size: 210, pitch: 0.52 })];
+    detections = [face({ size: 202, pitch: 0.52 })]; // un cambio mínimo de tamaño: sigue quieto
     frame();
     expect(result.current.guidance).toBe('ready');
     // Con la caja del rostro en reposo: la zona que recorta la ráfaga del antifraude 2a.
-    expect(onStable).toHaveBeenCalledExactlyOnceWith({ pitch: expect.closeTo(0.5) as number, width: 200, box: { x: 220, y: 140, width: 200, height: 200 } });
+    expect(onStable).toHaveBeenCalledExactlyOnceWith({ pitch: expect.closeTo(0.5) as number, width: 200, box: { x: 220, y: 188, width: 200, height: 200 } });
   });
 
   it('rostro estable: el avance llega a 1 y la captura se dispara una sola vez', () => {
@@ -273,6 +361,20 @@ describe('useFaceAutoCapture: guía en vivo y captura automática', () => {
     expect(detect).toHaveBeenCalledTimes(3);
     unmount();
     expect(cancelAnimationFrame).toHaveBeenCalledWith(7);
+  });
+
+  it('en modo continuo (las fotos del registro) sigue leyendo el rostro sin disparar nunca la captura', () => {
+    detections = [face()];
+    const onStable = vi.fn();
+    const videoRef = { current: videoElement() };
+    const detector = { detectForVideo: detect } as unknown as FaceDetector;
+    const { result } = renderHook(() => useFaceAutoCapture({ detector, videoRef, enabled: true, stableFrames: 2, onStable, continuous: true }));
+    frame();
+    frame();
+    frame();
+    expect(result.current.guidance).toBe('hold_still');
+    expect(onStable).not.toHaveBeenCalled();
+    expect(detect).toHaveBeenCalledTimes(3);
   });
 
   it('si el rostro se mueve, el avance vuelve a empezar; sin onStable solo guía', () => {

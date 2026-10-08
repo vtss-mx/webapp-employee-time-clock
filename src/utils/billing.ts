@@ -17,6 +17,7 @@ import type { FieldLabels } from './changes';
 import type { CatalogApi } from './catalogs';
 import { businessToday, formatDate, localeDateFormat } from './format';
 import { formatCount, formatList, formatMoney, formatRate } from './numbers';
+import { inSentence } from './text';
 
 /**
  * Reglas puras de la cobranza en la interfaz: el formulario del plan (valores, límites, validación y
@@ -226,7 +227,7 @@ export const cadenceText = (months: number) => t('billing.plan.cadence', { count
 
 /** "$120.00 MXN por mes": el precio en su moneda con su periodo (nombre del catálogo). */
 export const priceText = (price: string, period: PricePeriod, currency: CurrencyCode, nameOf: NameOf) =>
-  t('billing.plan.price', { amount: formatMoney(price, currency), period: nameOf('price_periods', period).toLowerCase() });
+  t('billing.plan.price', { amount: formatMoney(price, currency), period: inSentence(nameOf('price_periods', period)) });
 
 /** A qué cargos aplica un descuento: "en todos los cargos", "en los primeros 3 cargos", "cada 2 cargos". */
 function recurrenceText(recurrence: DiscountRecurrence, periods: number | null): string {

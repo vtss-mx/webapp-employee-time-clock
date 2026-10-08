@@ -181,7 +181,7 @@ export function ValidatorsPage() {
                   <DeletedValidatorItem key={validator.id} validator={validator} busy={restoring === validator.id} disabled={restoring !== null} onRestore={() => restoreValidator(validator)} />
                 ) : (
                   <li key={validator.id}>
-                    <Avatar name={validator.name} decorative />
+                    <Avatar name={validator.name} src={validator.avatar} decorative />
                     <span className="validator-list__info">
                       <strong className="truncate">{validator.name}</strong>
                       <small className="muted truncate">{validator.email}</small>

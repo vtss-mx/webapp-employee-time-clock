@@ -153,7 +153,7 @@ describe('Política: niveles predefinidos', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     await userEvent.click(screen.getAllByRole('button', { name: 'Aplicar nivel' })[0]);
     await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Aplicar el nivel «Alto»?' })).getByRole('button', { name: 'Aplicar nivel' }));
-    expect(await screen.findByRole('dialog', { name: 'Nivel Alto aplicado' })).toHaveTextContent('Más exigente.');
+    expect(await screen.findByRole('dialog', { name: 'Nivel Alto aplicado' })).toHaveTextContent('Más exigente:');
     expect(writes(calls).map((c) => [c.url, body(c)])).toEqual([
       [`${URL}/preset`, { preset: 'HIGH', reason: null }],
       [`${URL}/preset`, { preset: 'HIGH', reason: null }],
@@ -399,6 +399,9 @@ describe('policyFields: nombre y valor de cada campo del historial', () => {
     expect(fieldLabel('block_mask', policy, testCatalogs)).toBe('Retirar el cubrebocas');
     expect(fieldLabel('risk_signals.SPOOF_PROB_LOW.points', policy, testCatalogs)).toBe('Puntos de «Probabilidad de rostro real baja»');
     expect(fieldLabel('risk_signals.NUEVA.mode', policy, testCatalogs)).toBe('Modo de «NUEVA»');
+    // Guía por voz (decisión del dueño, 2026-10-08): interruptor y voz del catálogo.
+    expect(fieldLabel('voice_guidance_enabled', policy, testCatalogs)).toBe('Guía por voz');
+    expect(fieldLabel('voice_profile', policy, testCatalogs)).toBe('Voz de la guía');
     expect(fieldLabel('campo_nuevo', policy, testCatalogs)).toBe('campo_nuevo');
   });
 
@@ -411,6 +414,7 @@ describe('policyFields: nombre y valor de cada campo del historial', () => {
     expect(fieldValue('employee_device_mode', 'APPROVAL', testCatalogs)).toBe('Aprobación de la empresa');
     expect(fieldValue('risk_signals.X.mode', 'OFF', testCatalogs)).toBe('Apagada');
     expect(fieldValue('preset', 'HIGH', testCatalogs)).toBe('HIGH');
+    expect(fieldValue('voice_profile', 'FEMALE_WARM', testCatalogs)).toBe('Femenina cálida'); // nombre del catálogo voice_profiles
     expect(fieldValue('blocked_cameras', ['obs'], testCatalogs)).toBe('["obs"]');
     expect(describeFieldChange({ field: 'qr_enabled', before: true, after: false, relaxes: false }, policy, testCatalogs)).toEqual({
       label: 'Verificación con código QR',

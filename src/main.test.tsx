@@ -29,7 +29,9 @@ function page({ failure = true } = {}) {
   const panel = document.createElement('div');
   panel.id = 'boot-error';
   panel.hidden = true;
-  panel.innerHTML = '<p>No se pudo cargar la aplicación.</p><button type="button">Reintentar · Retry</button>';
+  panel.innerHTML =
+    '<div lang="es-MX" hidden><p>No se pudo cargar la aplicación.</p><button type="button">Reintentar</button></div>' +
+    '<div lang="en-US" hidden><p>The app couldn\'t load.</p><button type="button">Retry</button></div>';
   document.body.append(panel);
   return { root, failure: panel };
 }
@@ -65,7 +67,7 @@ describe('arranque (main.tsx)', () => {
   });
 
   it('sin el elemento #root falla con un error claro y no monta nada', async () => {
-    await expect(import('./main')).rejects.toThrow('No se encontró el elemento #root');
+    await expect(import('./main')).rejects.toThrow('ROOT_ELEMENT_MISSING');
     expect(dom.createRoot).not.toHaveBeenCalled();
   });
 
@@ -78,14 +80,18 @@ describe('arranque (main.tsx)', () => {
     expect(failure?.hidden).toBe(true);
   });
 
-  it('si fue la red, muestra el aviso bilingüe y su botón vuelve a intentar el arranque sin recargar la página', async () => {
+  it('si fue la red, muestra el aviso SOLO en el idioma del dispositivo y su botón vuelve a intentar el arranque sin recargar la página', async () => {
     boot.setLocale.mockRejectedValueOnce(new TypeError('Failed to fetch dynamically imported module'));
     const { failure } = page();
     await import('./main');
     expect(failure?.hidden).toBe(false);
     expect(dom.createRoot).not.toHaveBeenCalled();
+    // Nunca se mezclan idiomas: el dispositivo está en inglés, el aviso en español queda oculto.
+    const notice = (lang: string) => failure?.querySelector<HTMLElement>(`[lang="${lang}"]`);
+    expect(notice('en-US')?.hidden).toBe(false);
+    expect(notice('es-MX')?.hidden).toBe(true);
 
-    failure?.querySelector('button')?.click();
+    notice('en-US')?.querySelector('button')?.click();
     await vi.waitFor(() => expect(dom.render).toHaveBeenCalledOnce());
     expect(failure?.hidden).toBe(true);
     expect(boot.reloadForNewVersion).toHaveBeenCalledOnce();

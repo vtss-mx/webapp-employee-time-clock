@@ -13,7 +13,6 @@ checarás
 checarla
 checó
 cubrebocas
-laptops
 # Imperativos y formas con pronombre enclítico
 actívalo
 acércala
@@ -37,6 +36,7 @@ escanéalo
 escríbelo
 márcalo
 muéstralo
+pégalo
 quítalo
 quítalos
 recházalo
@@ -49,7 +49,6 @@ rótala
 # telemetría: medición a distancia, en el DLE)
 monto
 montos
-prom
 autocalibración
 biométrico
 telemetría
@@ -60,8 +59,6 @@ recalcular
 recalculan
 recalculados
 reintentando
-# Préstamos técnicos (anti-spoofing: detección de suplantación del rostro)
-spoofing
 # Antifraude (prefijo anti- unido, como lo escribe la RAE) y puntaje (calificación en puntos, uso de América)
 antifraude
 puntaje
@@ -77,16 +74,14 @@ Miquelón
 Sáhara
 Taiwán
 Tristán
-# Backend: términos válidos que el diccionario no trae (RAE: biometría, perceptual, sobreexpuesto, megapíxel;
+# Backend: términos válidos que el diccionario no trae (RAE: biometría, geolocalización, sobreexpuesto, megapíxel;
 # geocerca: zona delimitada en un mapa, de uso común en México)
 biometría
 geocerca
+Geolocalización
+geolocalización
 megapíxeles
-perceptual
 sobreexpuesta
-# Backend: préstamos técnicos (embedding: el vector del rostro; morphing: un rostro que combina el de dos personas)
-embedding
-morphing
 # Backend: imperativos y formas con pronombre enclítico
 céntralo
 identifícate
@@ -94,3 +89,5 @@ inclinarla
 reasígnalos
 regístralo
 suspéndela
+confírmalos
+enciéndelo

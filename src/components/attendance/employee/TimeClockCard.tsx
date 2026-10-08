@@ -18,6 +18,7 @@ import type { SiteCodeIntent } from './SiteCodeStep';
 import { Countdown, Elapsed } from './LiveTime';
 import { minutesBetween } from './serverTime';
 import { breakWindowText, clockCountdown, clockState, openBreak, primaryAction, recordLabel } from './todayView';
+import { inSentence } from '../../../utils/text';
 
 interface ClockProps {
   today: AttendanceToday;
@@ -109,7 +110,7 @@ function ClockActions({ today, shift }: { today: AttendanceToday; shift: ShiftRe
         kind: 'create',
         icon: <Icon size={30} />,
         eyebrow: t('myAttendance.home.eyebrow'),
-        title: t('myAttendance.record.confirm.title', { action: name.toLowerCase() }),
+        title: t('myAttendance.record.confirm.title', { action: inSentence(name) }),
         message: t('myAttendance.record.confirm.message'),
         details: [{ label: t('myAttendance.labels.shift'), value: `${shift.name} · ${shiftSchedule(shift)}` }],
         // Lo que se aclara: la salida cierra la jornada.

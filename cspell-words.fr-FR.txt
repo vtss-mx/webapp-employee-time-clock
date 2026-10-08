@@ -1,0 +1,13 @@
+# Palabras propias revisadas SOLO del francés de Francia (ortografía de los diccionarios fr-FR, regla 16).
+# El diccionario de francés de cspell (@cspell/dict-fr-fr) no trae algunos términos del dominio (biometría, pointage)
+# que son correctos. Antes de agregar una se confirma que está bien escrita; una palabra del inglés nunca va aquí
+# (la prueba src/i18n/dictionaryLanguage.test.ts lo rechaza). Una por renglón, tal como se escribe.
+# «aujourd'hui» es una sola palabra del francés (el apóstrofo es parte de ella, no una elisión). El revisor estricto
+# (src/test/language.ts) no la reconoce con el apóstrofo recto (') que la app usa como en-US; con esta entrada pasan
+# también «Aujourd'hui» y «d'aujourd'hui».
+aujourd'hui
+
+# Backend: máscara de fecha del RFC y la CURP en francés (AAMMJJ: année, mois, jour) y «Sao» de «Sao Tomé-et-Principe»,
+# la forma oficial en francés (catálogo countries)
+AAMMJJ
+Sao

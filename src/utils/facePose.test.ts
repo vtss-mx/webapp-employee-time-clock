@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { face, videoElement } from '../test/faces';
 import { config } from './config';
-import { actionMeasure, actionProgress, actionTarget, averageSample, faceSample, moveProgress, pitchRatio, yawRatio, type ActionMode } from './facePose';
+import { actionMeasure, actionProgress, actionTarget, averageSample, faceSample, moveProgress, pitchRatio, rollDegrees, yawRatio, type ActionMode } from './facePose';
 
 /** Las mismas métricas que el servidor (app/facial_recognition/pose.py), con los puntos de MediaPipe. */
 const video = videoElement();
@@ -15,6 +15,16 @@ describe('pose de la cabeza (misma métrica que el backend)', () => {
     expect(yawRatio({ ...face(), keypoints: face().keypoints.slice(0, 2) }, video)).toBeNull();
     expect(yawRatio({ ...face(), keypoints: undefined } as never, video)).toBeNull();
     expect(yawRatio(face({ eyeGap: 0 }), video)).toBeNull();
+  });
+
+  it('inclinación lateral: el ángulo de la línea de los ojos en grados; sin dos ojos separados no se mide', () => {
+    expect(rollDegrees(face(), video)).toBe(0);
+    // `tilt` baja el ojo izquierdo de la imagen: la línea de los ojos sube hacia la derecha (ángulo negativo).
+    expect(rollDegrees(face({ tilt: 0.02 }), video)).toBeCloseTo(-(Math.atan2(0.02 * 480, 0.1 * 640) * 180) / Math.PI);
+    expect(rollDegrees(face({ tilt: -0.02 }), video)).toBeGreaterThan(0);
+    expect(rollDegrees(face({ eyeGap: 0 }), video)).toBeNull();
+    expect(rollDegrees({ ...face(), keypoints: face().keypoints.slice(0, 1) }, video)).toBeNull();
+    expect(rollDegrees({ ...face(), keypoints: undefined } as never, video)).toBeNull();
   });
 
   it('altura de la nariz entre ojos (0) y boca (1); sin boca o con ojos y boca encimados no se mide', () => {

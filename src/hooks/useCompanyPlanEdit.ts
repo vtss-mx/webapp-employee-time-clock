@@ -1,9 +1,10 @@
-import { useLayoutEffect, useState } from 'react';
+import { useState } from 'react';
 import { t } from '../i18n';
 import { billingService } from '../services/billingService';
 import { emptyPlanForm, planChanged, planFormFrom, planLabels, planView } from '../utils/billing';
 import { describeChanges } from '../utils/changes';
 import { useCatalogs } from './useCatalogs';
+import { useLoadValues } from './useLoadValues';
 import { usePlanForm } from './usePlanForm';
 import { useResource } from './useResource';
 
@@ -24,11 +25,10 @@ export function useCompanyPlanEdit(companyId: number) {
   const form = usePlanForm(emptyPlanForm());
   const [charging, setCharging] = useState(false);
   const { load, set } = form;
-  // El plan guardado llena los campos en cuanto llega (antes de pintarse); sin plan, la moneda de la cuenta.
-  useLayoutEffect(() => {
-    if (saved) load(planFormFrom(saved));
-    else if (accountCurrency) set('currency', accountCurrency);
-  }, [saved, accountCurrency, load, set]);
+  // El plan guardado llena los campos en cuanto llega (antes de pintarse); sin plan, la moneda de la cuenta. Por
+  // valores (`useLoadValues`): volver a pedir la cuenta al cambiar el idioma no pisa lo que ya se capturó.
+  useLoadValues(saved ? planFormFrom(saved) : null, load);
+  useLoadValues(!saved && accountCurrency ? accountCurrency : null, (currency) => set('currency', currency));
 
   const editable = account.data !== null && (saved !== null || charging);
   const changed = editable && form.valid && planChanged(saved, form.values);

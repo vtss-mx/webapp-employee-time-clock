@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { setLocale } from '../../i18n/core';
@@ -28,15 +28,15 @@ describe('PolicyTuning', () => {
     const onSave = vi.fn<(save: TuningSave) => void>();
     renderWithProviders(<PolicyTuning policy={{ ...samplePolicy, anti_spoofing_level: 'RETIRADO' }} saving={null} onSave={onSave} />, { catalogs });
     expect(screen.getByText('Qué tan estricto es al detectar fotos, pantallas y videos.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Sensibilidad del anti-spoofing/ })).toHaveTextContent('Selecciona una opción');
-    await choose(/Sensibilidad del anti-spoofing/, 'Alto');
+    expect(screen.getByRole('button', { name: /Sensibilidad de la detección de suplantación/ })).toHaveTextContent('Selecciona una opción');
+    await choose(/Sensibilidad de la detección de suplantación/, 'Alto');
     // Sin el nivel vigente en la lista no se sabe si el nuevo protege menos: no se advierte.
     expect(lastSave(onSave)).toEqual({
       key: 'anti_spoofing_level',
       changes: { anti_spoofing_level: 'HIGH' },
-      title: 'Anti-spoofing: nivel Alto',
+      title: 'Detección de suplantación: nivel Alto',
       detail: '',
-      change: { label: 'Sensibilidad del anti-spoofing', before: 'RETIRADO', after: 'Alto' },
+      change: { label: 'Sensibilidad de la detección de suplantación', before: 'RETIRADO', after: 'Alto' },
       relaxes: false,
     });
   });
@@ -44,9 +44,9 @@ describe('PolicyTuning', () => {
   it('bajar la sensibilidad o los movimientos protege menos; subirlos, no', async () => {
     const onSave = vi.fn<(save: TuningSave) => void>();
     renderWithProviders(<PolicyTuning policy={{ ...samplePolicy, anti_spoofing_level: 'HIGH', liveness_steps: 2 }} saving={null} onSave={onSave} />);
-    await choose(/Sensibilidad del anti-spoofing/, /^Estándar/);
-    expect(lastSave(onSave)).toEqual(expect.objectContaining({ change: { label: 'Sensibilidad del anti-spoofing', before: 'Alto', after: 'Estándar' }, relaxes: true }));
-    await choose(/Sensibilidad del anti-spoofing/, /^Máximo/);
+    await choose(/Sensibilidad de la detección de suplantación/, /^Estándar/);
+    expect(lastSave(onSave)).toEqual(expect.objectContaining({ change: { label: 'Sensibilidad de la detección de suplantación', before: 'Alto', after: 'Estándar' }, relaxes: true }));
+    await choose(/Sensibilidad de la detección de suplantación/, /^Máximo/);
     expect(lastSave(onSave)).toEqual(expect.objectContaining({ change: expect.objectContaining({ after: 'Máximo' }), relaxes: false }));
     await choose(/Movimientos de la prueba de vida/, '1 movimiento');
     expect(lastSave(onSave)).toEqual(expect.objectContaining({ change: { label: 'Movimientos de la prueba de vida', before: '2 movimientos', after: '1 movimiento' }, relaxes: true }));
@@ -107,37 +107,15 @@ describe('PolicyTuning', () => {
     expect(lastSave(onSave)).toEqual(expect.objectContaining({ changes: { liveness_timeout_seconds: 180 }, detail: 'Cada reto vencerá a los 3 min.', relaxes: true }));
   });
 
-  it('destello de colores (catálogo flash_modes): exigirlo advierte calibrar antes; apagarlo protege menos', async () => {
+  it('destello de colores: retirado por decisión del dueño (2026-10-06): se muestra apagado, con su nota y sin control', () => {
     const onSave = vi.fn<(save: TuningSave) => void>();
-    renderWithProviders(<PolicyTuning policy={samplePolicy} saving={null} onSave={onSave} />);
-    expect(screen.getByText(/se mide cómo los refleja el rostro, sin bloquear a nadie/)).toBeInTheDocument(); // modo vigente: Solo medir
-    await userEvent.click(screen.getByRole('button', { name: /Destello de colores/ }));
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
-      expect.stringMatching(/^Apagado/),
-      expect.stringMatching(/^Solo medir/),
-      expect.stringMatching(/^Obligatorio/),
-    ]);
-    await userEvent.click(screen.getByRole('option', { name: /^Obligatorio/ }));
-    expect(lastSave(onSave)).toEqual({
-      key: 'flash_liveness',
-      changes: { flash_liveness: 'ENFORCE' },
-      title: 'Destello de colores: Obligatorio',
-      detail: 'El rostro debe reflejar los colores que pinta la pantalla: un video inyectado o generado no los ve.',
-      warning: expect.stringMatching(/después de calibrar con capturas reales.*luz del sol directa puede pedir repetir/) as string,
-      change: { label: 'Destello de colores', before: 'Solo medir', after: 'Obligatorio' },
-      relaxes: false,
-    });
-    await choose(/Destello de colores/, /^Apagado/);
-    expect(lastSave(onSave)).toEqual(expect.objectContaining({ changes: { flash_liveness: 'OFF' }, warning: undefined, relaxes: true }));
-  });
-
-  it('destello: un modo sin descripción o que ya no está en el catálogo se muestra con su texto genérico', async () => {
-    const onSave = vi.fn<(save: TuningSave) => void>();
-    const bare = catalogsWith({ flash_modes: catalogsFixture.flash_modes.map((mode) => ({ ...mode, description: null })) });
-    renderWithProviders(<PolicyTuning policy={{ ...samplePolicy, flash_liveness: 'RETIRADO' }} saving={null} onSave={onSave} />, { catalogs: bare });
-    expect(screen.getByText('La pantalla destella colores y el rostro real debe reflejarlos.')).toBeInTheDocument();
-    await choose(/Destello de colores/, 'Solo medir');
-    expect(lastSave(onSave)).toEqual(expect.objectContaining({ detail: '', change: { label: 'Destello de colores', before: 'RETIRADO', after: 'Solo medir' }, relaxes: false }));
+    renderWithProviders(<PolicyTuning policy={{ ...samplePolicy, flash_liveness: 'OFF' }} saving={null} onSave={onSave} />);
+    const row = screen.getByText('Destello de colores').closest('.tuning-row') as HTMLElement;
+    expect(row).toHaveClass('tuning-row--retired');
+    expect(within(row).getByText(/Desactivado por decisión del producto \(2026-10-06\)/)).toBeInTheDocument();
+    expect(within(row).getByText('Apagado')).toBeInTheDocument(); // el modo del catálogo, fijo
+    expect(within(row).queryByRole('button')).toBeNull(); // nada que elegir
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it('bloqueo y vigencia del QR: cada ajuste se guarda con su explicación (horas y minutos legibles) y si protege menos', async () => {

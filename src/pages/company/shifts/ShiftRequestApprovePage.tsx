@@ -14,6 +14,7 @@ import { t as translate, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { shiftService } from '../../../services/shiftService';
 import type { ShiftRequest } from '../../../types';
+import { employeeLabel } from '../../../utils/employeeLabel';
 import { formatDate } from '../../../utils/format';
 
 /**
@@ -69,7 +70,7 @@ function ApproveForm({ request }: { request: ShiftRequest }) {
   return (
     <div className="page">
       <Panel onSubmit={onSubmit}>
-        <PanelHeader title={t('shifts.requests.approve.title')} subtitle={`${request.employee.full_name} · ${request.employee.employee_number}`} backTo={paths.company.shiftRequests} backLabel={t('shifts.requests.backLabel')} />
+        <PanelHeader title={t('shifts.requests.approve.title')} subtitle={employeeLabel(request.employee)} backTo={paths.company.shiftRequests} backLabel={t('shifts.requests.backLabel')} />
         <PanelSection title={t('shifts.requests.approve.request')} icon={<FileText size={20} />}>
           <RequestSummary request={request} />
         </PanelSection>

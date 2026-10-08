@@ -131,7 +131,7 @@ export function DayDetail({ date, today, holiday, absences, workdays, truncated,
             items={absences}
             label={t('calendar.day.resting')}
             render={(absence) => (
-              <PersonItem key={absence.id} name={absence.employee.full_name} deleted={absence.employee.deleted} detail={rangeText(absence.starts_on, absence.ends_on)} badges={<DayOffTypeBadge code={absence.type} />} />
+              <PersonItem key={absence.id} name={absence.employee.full_name} avatar={absence.employee.avatar} deleted={absence.employee.deleted} detail={rangeText(absence.starts_on, absence.ends_on)} badges={<DayOffTypeBadge code={absence.type} />} />
             )}
           />
         ) : (
@@ -153,8 +153,9 @@ export function DayDetail({ date, today, holiday, absences, workdays, truncated,
               <PersonItem
                 key={workday.id}
                 name={workday.employee.full_name}
+                avatar={workday.employee.avatar}
                 deleted={workday.employee.deleted}
-                detail={workday.note ?? workday.employee.employee_number}
+                detail={workday.note ?? workday.employee.employee_number ?? undefined}
                 badges={<span className="badge badge--plain badge--success">{t('calendar.workdays.works')}</span>}
               />
             )}

@@ -10,7 +10,7 @@ import type { MessageInput } from '../MessageDialog';
  */
 
 /** Para qué se pidió la ubicación: cambia por qué se necesita y cómo seguir tras permitirla. */
-export type LocationPurpose = 'login' | 'attendance' | 'map' | 'checkpoint';
+export type LocationPurpose = 'login' | 'attendance' | 'map' | 'checkpoint' | 'verification';
 
 /** Ubicación del dispositivo bloqueada o no disponible (inicio de sesión, asistencia o "Mi ubicación"). */
 export function locationProblemMessage(problem: LocationProblem, purpose: LocationPurpose = 'login'): MessageInput {

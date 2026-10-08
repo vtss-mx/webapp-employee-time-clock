@@ -67,6 +67,8 @@ export default {
     network: 'Red: {network}',
     asn: 'AS{asn}',
     hosting: 'nube o centro de datos',
+    /** Atribución que pide la licencia CC BY 4.0 de la base local de IP (enlace a DB-IP). */
+    dbIpCredit: 'Geolocalización de IP por DB-IP',
   },
   evidence: {
     title: 'Evidencia',

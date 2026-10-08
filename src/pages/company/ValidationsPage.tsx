@@ -102,10 +102,10 @@ export function ValidationsPage() {
                     <tr key={e.id} style={{ animationDelay: `${i * 30}ms` }}>
                       <td className="table__primary">
                         <Link to={paths.company.validation(e.id)} className="person" style={{ color: 'inherit', textDecoration: 'none' }}>
-                          <Avatar name={e.full_name} decorative />
+                          <Avatar name={e.full_name} src={e.avatar} decorative />
                           <span className="person__info">
                             <strong className="truncate">{e.full_name}</strong>
-                            <small>{e.employee_number}</small>
+                            {e.employee_number && <small>{e.employee_number}</small>}
                           </span>
                         </Link>
                       </td>

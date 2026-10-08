@@ -1,0 +1,26 @@
+# Palabras propias revisadas SOLO del italiano de Italia (ortografía de los diccionarios it-IT, regla 16).
+# El diccionario de italiano de cspell (@cspell/dict-it-it) no trae algunos términos del dominio (timbratura,
+# biometria...) que son correctos. Antes de agregar una se confirma que está bien escrita; una palabra del inglés
+# nunca va aquí (la prueba src/i18n/dictionaryLanguage.test.ts lo rechaza). Una por renglón, tal como se escribe.
+
+# Glosario (validador → validatore): el dispositivo que identifica al personal; sustantivo italiano regular de
+# «validare» (Treccani: validare, validazione) que el diccionario no trae, en singular y plural
+validatore
+validatori
+# Términos del dominio correctos en italiano que el diccionario no trae: «antifrode» (sistema antifrode, Banca d'Italia)
+# y «geolocalizzazione» (Treccani), la atribución que pide la licencia de la base local de IP (DB-IP)
+antifrode
+geolocalizzazione
+# Máscara de fecha del RFC y la CURP: anno, mese e giorno con dos dígitos (aammgg), como «aammdd» en español
+aammgg
+
+# Backend: máscara de fecha en mayúsculas (AAMMGG: anno, mese, giorno) y países con su nombre en italiano que el diccionario no
+# trae (catálogo countries: Cechia, Guadalupa, Fær Øer)
+AAMMGG
+Cechia
+Guadalupa
+Fær
+Øer
+all’assunzione
+# «dalla azienda» elidido (expediente del empleado, it-IT; migración 0087)
+dall’azienda

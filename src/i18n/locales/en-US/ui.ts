@@ -116,4 +116,8 @@ export default {
     count_one: '{count} deleted',
     count_other: '{count} deleted',
   },
+  /** Reproductor de video propio (ui/VideoPlayer). */
+  video: {
+    position: 'Video position',
+  },
 } satisfies Translation<typeof es>;

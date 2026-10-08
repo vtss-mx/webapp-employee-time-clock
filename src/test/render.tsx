@@ -14,8 +14,15 @@ export function WithCatalogs({ children, catalogs = testCatalogs }: { children: 
   return <CatalogContext.Provider value={{ status: 'ready', catalogs }}>{children}</CatalogContext.Provider>;
 }
 
+interface RenderOptions {
+  /** La ruta inicial (o la ruta con su `state` de navegación, p. ej. una confirmación ya dada). */
+  route?: string | { pathname: string; state?: unknown };
+  auth?: boolean;
+  catalogs?: CatalogApi;
+}
+
 /** Renderiza con router en memoria, mensajes (popup), catálogos de prueba y (opcional) sesión. */
-export function renderWithProviders(ui: ReactElement, { route = '/', auth = false, catalogs = testCatalogs } = {}): RenderResult {
+export function renderWithProviders(ui: ReactElement, { route = '/', auth = false, catalogs = testCatalogs }: RenderOptions = {}): RenderResult {
   const content = auth ? <AuthProvider>{ui}</AuthProvider> : ui;
   return render(
     <MemoryRouter initialEntries={[route]}>

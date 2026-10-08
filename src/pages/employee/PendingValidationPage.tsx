@@ -1,18 +1,26 @@
 import { Check, Clock, RefreshCw, ScanFace, UserCheck } from 'lucide-react';
 import { useCallback } from 'react';
+import { EnrollmentStepper } from '../../components/EnrollmentStepper';
 import { FaceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { StatusMark } from '../../components/ui/StatusMark';
 import { useAction } from '../../hooks/useAction';
 import { useAuth } from '../../hooks/useAuth';
 import { usePolling } from '../../hooks/usePolling';
+import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { t, useLocale } from '../../i18n';
 import { config } from '../../utils/config';
 
-/** Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. */
+/**
+ * Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. Arriba, los pasos del registro con los tres
+ * hechos en verde (adenda del dueño, 2026-10-07): esta pantalla solo llega cuando el servidor dejó el registro en
+ * validación (`face_status` PENDING_REVIEW en `user.screens`), así que lo verde es lo que el servidor procesó. El paso
+ * del video se muestra según la política de la empresa (la misma lectura compartida de las demás pantallas).
+ */
 export function PendingValidationPage() {
   useLocale(); // textos con `t` al dibujarse: un cambio de idioma los traduce
   const { user, refreshUser } = useAuth();
+  const { policy } = useVerificationPolicy();
   const { busy, run } = useAction();
 
   // Al aprobarse, el backend cambia las pantallas del empleado y la ruta lleva a su nuevo inicio.
@@ -25,6 +33,7 @@ export function PendingValidationPage() {
   return (
     <div className="page page--narrow page-transition">
       <div className="result-card">
+        <EnrollmentStepper current="done" withVideo={policy.voice_verification} />
         <StatusMark kind="pending" />
         <div className="stack" style={{ gap: 8 }}>
           <span style={{ justifySelf: 'center' }}>

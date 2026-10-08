@@ -7,7 +7,7 @@ export default {
   footer: 'Solo se identifican empleados activos de {company} · Cada intento queda en la bitácora',
   notIdentified: 'Empleado no identificado',
   failed: 'No se pudo identificar',
-  invalidQr: 'QR inválido. Pide al empleado que muestre su código desde la app',
+  invalidQr: 'QR inválido. Pide al empleado que muestre su código desde la aplicación',
   qrDisabled: {
     title: 'Identificación con QR desactivada',
     /** `mode`: el nombre del modo del validador (catálogo). */

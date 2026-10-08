@@ -14,6 +14,7 @@ import { paths } from '../../../routes/paths';
 import { calendarService } from '../../../services/calendarService';
 import type { Absence } from '../../../types';
 import type { ConfirmInput } from '../../../types/confirm';
+import { inSentence } from '../../../utils/text';
 
 /** Festivos por página: es un vistazo de lo que viene (la lista completa se pagina igual). */
 const HOLIDAYS_PAGE = 5;
@@ -26,7 +27,7 @@ const cancelError = () => t('myAttendance.cancelRequest.error');
 /** Cancelar unas vacaciones o un permiso pendientes: el tipo (nombre del catálogo), sus fechas y su nota. */
 function absenceCancelConfirm(absence: Absence, typeName: string): ConfirmInput {
   return cancelRequestConfirm({
-    title: t('myAttendance.daysOff.cancel.title', { type: typeName.toLowerCase() }),
+    title: t('myAttendance.daysOff.cancel.title', { type: inSentence(typeName) }),
     message: t('myAttendance.daysOff.cancel.message'),
     // Es suya: no hace falta decir de quién es.
     details: absenceFacts({ ...absence, employee: undefined }, typeName),

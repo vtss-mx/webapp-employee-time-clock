@@ -51,7 +51,7 @@ export function MyQrPage() {
               <span className="badge badge--success">
                 <BadgeCheck size={14} /> {t('employee.myQr.validated')}
               </span>
-              {code.qr && <span className="muted small">{t('employee.myQr.employeeNumber', { number: code.qr.employee_number })}</span>}
+              {code.qr?.employee_number && <span className="muted small">{t('employee.myQr.employeeNumber', { number: code.qr.employee_number })}</span>}
             </div>
             <div className="button-row my-qr__actions">
               <Button variant="primary" icon={<Maximize2 size={18} />} disabled={!code.qr} onClick={() => setFullscreen(true)}>
@@ -91,7 +91,7 @@ export function MyQrPage() {
         <div className="qr-view qr-view--large">
           <DynamicQrCode {...shared} large />
           {countdown}
-          {code.qr && <strong>{code.qr.employee_number}</strong>}
+          {code.qr?.employee_number && <strong>{code.qr.employee_number}</strong>}
           <span className="muted small">{t('employee.myQr.brightnessLarge')}</span>
         </div>
       </Modal>

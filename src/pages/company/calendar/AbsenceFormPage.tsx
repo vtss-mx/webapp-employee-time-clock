@@ -19,6 +19,7 @@ import { fieldErrorsFrom } from '../../../services/apiClient';
 import { calendarService } from '../../../services/calendarService';
 import type { BulkResult } from '../../../types';
 import type { ConfirmInput } from '../../../types/confirm';
+import { inSentence } from '../../../utils/text';
 
 /** Lo que se captura además de los empleados (que se eligen con `EmployeePicker`). */
 interface AbsenceFormValues {
@@ -56,7 +57,7 @@ const serverErrors = (error: unknown) => fieldErrorsFrom<AbsenceFormValues>(erro
  */
 function absenceConfirm(values: AbsenceFormValues, employeeIds: number[], names: string[], kind: string): ConfirmInput {
   const many = employeeIds.length > 1;
-  const type = kind.toLowerCase();
+  const type = inSentence(kind);
   return {
     kind: 'create',
     icon: <CalendarOff size={30} />,

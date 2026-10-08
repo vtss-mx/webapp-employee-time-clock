@@ -40,7 +40,7 @@ export default {
     nssPlaceholder: '11 digits from the IMSS',
     nssHint: 'Optional · 11 digits, as registered with the IMSS',
     employeeNumber: 'Employee No.',
-    employeeNumberHint: 'Unique. Letters, numbers, hyphens or underscores',
+    employeeNumberHint: 'Optional · unique, with letters, numbers, hyphens, or underscores',
     phoneHint: 'Choose the country and enter the number',
     password: 'Password',
     newPassword: 'New password',

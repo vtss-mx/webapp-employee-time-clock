@@ -7,7 +7,7 @@ import { FeedbackProvider } from '../context/FeedbackContext';
 import { useFeedback } from '../hooks/useFeedback';
 import { samplePolicy } from '../test/fixtures';
 import { apiFail, apiOk, mockFetch } from '../test/http';
-import { catalogsFixture, catalogsWith } from '../test/catalogs';
+import { catalogsFixture } from '../test/catalogs';
 import { renderWithProviders, WithCatalogs } from '../test/render';
 import type { EmployeeFormValues, FaceChallenge, VerificationResult } from '../types';
 import { Ban, Glasses } from 'lucide-react';
@@ -32,6 +32,8 @@ import { SkeletonCard, SkeletonRows } from './ui/Skeleton';
 import { StatusMark } from './ui/StatusMark';
 import { VerificationAttempt } from './VerificationAttempt';
 import { VerificationResultCard } from './VerificationResultCard';
+import { setLocale } from '../i18n/core';
+import { forgetServerTexts, rememberServerTexts } from '../i18n/serverTexts';
 
 const verified: VerificationResult = {
   verified: true,
@@ -61,7 +63,7 @@ describe('componentes de presentación', () => {
     render(
       <MemoryRouter>
         <StatusBadge active={false} />
-        <FaceRequirements policy={{ block_glasses: true, block_headwear: true, block_mask: false, anti_spoofing: true }} headwearExempt />
+        <FaceRequirements policy={{ anti_spoofing: true }} />
         <PageHeader title="Título" subtitle="Sub" backTo="/" actions={<span>acción</span>} />
         <PageLoader text="Cargando datos" />
         <SkeletonCard lines={2} />
@@ -71,9 +73,8 @@ describe('componentes de presentación', () => {
       { wrapper: WithCatalogs },
     );
     expect(screen.getByText('Título')).toBeInTheDocument();
-    expect(screen.getByText('Sin lentes')).toBeInTheDocument(); // nombre del catálogo de accesorios
-    expect(screen.queryByText('Sin cubrebocas')).toBeNull(); // la empresa lo permite
-    expect(screen.queryByText('Sin gorra')).toBeNull(); // empleado exento
+    expect(screen.getByText('Buena iluminación')).toBeInTheDocument();
+    expect(screen.queryByText(/^Sin /)).toBeNull(); // nunca se pide retirar un accesorio (decisión del dueño, 2026-10-07)
     expect(screen.getByText('Tu rostro real, sin fotos')).toBeInTheDocument();
     expect(screen.getByText('Cargando datos')).toBeInTheDocument();
     expect(screen.getByText('acción')).toBeInTheDocument();
@@ -115,25 +116,27 @@ describe('componentes de presentación', () => {
     expect(screen.getByText('ARCHIVED')).toHaveClass('badge--muted'); // código sin registro en el catálogo
   });
 
-  it('accesorios: ícono y regla de la política por código del catálogo', () => {
+  it('accesorios: ícono y regla de la política por código del catálogo (uno nuevo sin regla no aparece; su ícono es el genérico)', () => {
     expect(accessoryIcon('GLASSES')).toBe(Glasses);
-    expect(accessoryIcon('SCARF')).toBe(Ban); // accesorio nuevo en el catálogo: ícono genérico
-    const [glasses, headwear] = catalogsFixture.accessories;
+    expect(accessoryIcon('SCARF')).toBe(Ban);
+    const [glasses, headwear, mask] = catalogsFixture.accessories;
     const scarf = { ...glasses, code: 'SCARF', name: 'Bufanda', phrase: 'la bufanda' };
-    expect(ruledAccessories([glasses, { ...headwear, active: false }, scarf]).map(({ item, rule }) => [item.code, rule])).toEqual([
+    const ruled = ruledAccessories([glasses, { ...headwear, active: false }, mask, scarf]);
+    expect(ruled.map(({ item, rule }) => [item.code, rule])).toEqual([
       ['GLASSES', 'block_glasses'],
+      ['MASK', 'block_mask'],
     ]);
+    expect(ruled.map(({ icon }) => icon)).toEqual([Glasses, Ban]);
   });
 
-  it('requisitos del rostro: solo accesorios activos del catálogo que la política exige', () => {
-    const accessories = catalogsFixture.accessories.map((a) => (a.code === 'MASK' ? { ...a, active: false } : a));
+  it('requisitos del rostro: buena luz y el rostro real; nunca pide retirar un accesorio', () => {
     render(
-      <WithCatalogs catalogs={catalogsWith({ accessories })}>
-        <FaceRequirements policy={{ block_glasses: false, block_headwear: true, block_mask: true, anti_spoofing: false }} />
+      <WithCatalogs>
+        <FaceRequirements policy={{ anti_spoofing: false }} />
       </WithCatalogs>,
     );
     const items = within(screen.getByRole('list', { name: 'Requisitos para la captura' })).getAllByRole('listitem');
-    expect(items.map((li) => li.textContent?.trim())).toEqual(['Sin gorra', 'Buena iluminación']);
+    expect(items.map((li) => li.textContent?.trim())).toEqual(['Buena iluminación']);
   });
 
   it('CountUp termina en el valor final', async () => {
@@ -213,6 +216,17 @@ describe('verificación', () => {
     expect(screen.getByText('Sin red')).toBeInTheDocument();
   });
 
+  it('VerificationResultCard dibuja el mensaje del servidor en el idioma activo (también al cambiarlo)', async () => {
+    const variants = { 'es-MX': 'Rostro no reconocido', 'en-US': 'Face not recognized' };
+    rememberServerTexts(new Map([[variants['es-MX'], variants], [variants['en-US'], variants]]));
+    const failed: VerificationResult = { ...verified, verified: false, message: 'Rostro no reconocido' };
+    render(<VerificationResultCard result={failed} failureTitle="No" onRetry={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByText('Rostro no reconocido')).toBeInTheDocument();
+    await act(() => setLocale('en-US'));
+    expect(screen.getByText('Face not recognized')).toBeInTheDocument();
+    forgetServerTexts();
+  });
+
   it('VerificationAttempt reinicia la captura al reintentar', async () => {
     const mounts = vi.fn();
     function Capture({ finish }: { finish: (o: { result: VerificationResult | null; error: string | null }) => void }) {
@@ -236,20 +250,39 @@ describe('verificación', () => {
     expect(captureDetail({ current: 2, total: 5 })).toBe('Foto 2 de 5');
     expect(captureDetail(null)).toBeNull();
     expect(flowStatus({ ...base, phase: 'submitting' }).message).toBe('Enviando');
-    expect(flowStatus({ ...base, phase: 'blocked', blockedMessage: 'Quita lentes' })).toEqual({ message: 'Quita lentes', tone: 'warn' });
-    expect(flowStatus({ ...base, phase: 'flash' })).toEqual({ message: 'Mantén tu rostro frente a la pantalla', tone: 'busy' });
+    expect(flowStatus({ ...base, phase: 'blocked', blockedMessage: 'Hay poca luz' })).toEqual({ message: 'Hay poca luz', tone: 'warn' });
+    // Bloqueo por un accesorio: la insignia es el aviso; la indicación grande es de colocación, nunca «Quítate…».
+    expect(flowStatus({ ...base, phase: 'blocked', blockedByAccessory: true })).toEqual({ message: 'Muestra tu rostro completo', tone: 'warn' });
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'hold_still' }).tone).toBe('ok');
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha' }).message).toBe('Gira a la derecha');
     // A medio movimiento se anima a terminarlo.
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha', moveProgress: 0.6 }).message).toBe('Un poco más');
     expect(flowStatus({ ...base, phase: 'frontal', detectorFailed: true }).message).toMatch(/Capturar/);
     expect(flowStatus({ ...base, phase: 'frontal', detectorReady: false }).message).toBeTruthy();
-    // Entre dos movimientos: de vuelta al frente.
-    expect(flowStatus({ ...base, phase: 'recenter' })).toEqual({ message: 'Vuelve a mirar al frente', tone: 'idle' });
+    // Entre dos movimientos: de vuelta al frente, con la corrección precisa cuando la hay («Centra tu rostro» si no).
+    expect(flowStatus({ ...base, phase: 'recenter' })).toEqual({ message: 'Centra tu rostro', tone: 'warn' });
+    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'move' })).toEqual({ message: 'Centra tu rostro', tone: 'idle' });
+    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'no_face' })).toEqual({ message: 'Centra tu rostro', tone: 'idle' });
+    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'look_straight' })).toEqual({ message: 'Mira al frente', tone: 'warn' });
     expect(flowStatus({ ...base, phase: 'recenter', guidance: 'ready' })).toEqual({ message: 'Listo para el siguiente paso', tone: 'ok' });
+    expect(flowStatus({ ...base, phase: 'recenter', guidance: 'ready', finalRecenter: true })).toEqual({ message: 'Rostro centrado', tone: 'ok' });
+    // Las fotos del registro (decisión del dueño, 2026-10-07): la indicación sigue a la guía y el BORDE va en rojo/verde
+    // (`captureTone`): válido verde, un rostro que no sirve rojo (`bad`), sin rostro neutro.
+    const photos = { ...base, phase: 'checking' as const, capture: { current: 2, total: 32 }, validPhotos: true };
+    expect(flowStatus(photos)).toEqual({ message: 'Centra tu rostro', tone: 'bad' });
+    expect(flowStatus({ ...photos, guidance: 'moving' })).toEqual({ message: 'Mantente quieto', tone: 'bad' });
+    expect(flowStatus({ ...photos, guidance: 'blurry' })).toEqual({ message: 'Mantente quieto', tone: 'bad' });
+    expect(flowStatus({ ...photos, guidance: 'cut_off' })).toEqual({ message: 'Muestra tu rostro completo', tone: 'bad' });
+    expect(flowStatus({ ...photos, guidance: 'no_face' })).toEqual({ message: 'Coloca tu rostro en la guía', tone: 'idle' });
+    expect(flowStatus({ ...photos, guidance: 'hold_still' })).toEqual({ message: 'Mantente quieto', tone: 'ok' });
+    // Al ALINEAR la foto inicial del registro, el borde también va en rojo/verde (no ámbar); en una verificación, ámbar.
+    expect(flowStatus({ ...base, phase: 'frontal', validPhotos: true })).toEqual({ message: 'Centra tu rostro', tone: 'bad' });
+    expect(flowStatus({ ...base, phase: 'frontal', validPhotos: true, guidance: 'hold_still' }).tone).toBe('ok');
+    expect(flowStatus({ ...base, phase: 'frontal', validPhotos: true, guidance: 'no_face' }).tone).toBe('idle');
+    expect(flowStatus({ ...base, phase: 'frontal' }).tone).toBe('warn'); // verificación: ámbar
   });
 
-  it('reto de varios movimientos: orden, título por paso, destello y cámara virtual', () => {
+  it('reto de varios movimientos: orden, título por paso y cámara virtual', () => {
     const challenge: FaceChallenge = {
       liveness_required: true,
       challenge_id: 'c1',
@@ -272,12 +305,11 @@ describe('verificación', () => {
     expect(second.message).toBe('Un poco más');
     expect(second.detail).toBeNull();
     expect(second.intro).toEqual({ title: 'Prueba de vida · paso 2 de 3', text: 'Gira a tu derecha', label: 'Prueba de vida · paso 2 de 3' });
-    expect(scannerView({ ...base, phase: 'flash', step: 0 }).intro).toEqual({
-      title: 'Prueba de vida · destello',
-      text: 'Mantén tu rostro frente a la pantalla mientras cambia de color.',
-      label: 'Prueba de vida · destello',
-    });
     expect(scannerView({ ...base, phase: 'recenter', step: 1 }).intro).toMatchObject({ text: 'Vuelve a mirar al frente para el siguiente paso.', label: 'Prueba de vida · paso 2 de 3' });
+    // La vuelta al frente final (registro: tras el último movimiento) nunca cuenta «paso 4 de 3».
+    const ending = scannerView({ ...base, phase: 'recenter', step: 3, guidance: 'move' });
+    expect(ending.intro).toMatchObject({ title: 'Prueba de vida · paso 3 de 3', text: 'Centra tu rostro para terminar.' });
+    expect(ending.message).toBe('Centra tu rostro');
     // Fuera de la prueba de vida, el rótulo es el nombre de la etapa (la indicación grande va bajo el círculo).
     expect(scannerView({ ...base, phase: 'checking', step: 0, capture: { current: 3, total: 36 } })).toMatchObject({
       message: 'Mantente quieto',
@@ -290,7 +322,7 @@ describe('verificación', () => {
     expect(scannerView({ ...base, phase: 'frontal', step: 0, virtualCamera: true })).toMatchObject({ tone: 'warn', message: expect.stringMatching(/Cámara virtual/) as string });
     expect(introFor({ phase: 'challenge', stage: 'liveness', instruction: null, submittingMessage: '', step: { current: 1, total: 1 } })).toEqual({
       title: 'Prueba de vida',
-      text: 'Mueve la cabeza como se indique; la pantalla puede cambiar de color un instante.',
+      text: 'Mueve la cabeza como se indique hasta completar cada paso.',
       label: 'Prueba de vida',
     });
   });
@@ -298,8 +330,11 @@ describe('verificación', () => {
   it('qué mide el detector en cada fase: el movimiento contra el rostro en reposo (con los mínimos del reto o los pisos)', () => {
     const baseline = { pitch: 0.5, width: 200 };
     const bare: FaceChallenge = { liveness_required: true, challenge_id: 'c', action: null, instruction: null, actions: [], instructions: [], min_yaw_ratio: null, min_pitch_delta: null, min_closer_scale: null, flash: [], flash_required: false, expires_in: null };
-    expect(detectionMode('frontal', bare, 'TURN_LEFT', baseline)).toEqual({ kind: 'frontal' });
-    expect(detectionMode('challenge', bare, null, baseline)).toEqual({ kind: 'frontal' });
+    // De frente: al alinearse por primera vez sin rostro en reposo; en las fotos y la vuelta al frente, contra él.
+    expect(detectionMode('frontal', bare, 'TURN_LEFT', baseline)).toEqual({ kind: 'frontal', baseline: null });
+    expect(detectionMode('challenge', bare, null, baseline)).toEqual({ kind: 'frontal', baseline: null });
+    expect(detectionMode('checking', bare, null, baseline)).toEqual({ kind: 'frontal', baseline });
+    expect(detectionMode('recenter', bare, 'TURN_LEFT', baseline)).toEqual({ kind: 'frontal', baseline });
     expect(detectionMode('challenge', bare, 'TURN_LEFT', baseline)).toEqual({ kind: 'action', action: 'TURN_LEFT', minimum: 0.2, baseline });
     expect(detectionMode('challenge', bare, 'LOOK_DOWN', null)).toEqual({ kind: 'action', action: 'LOOK_DOWN', minimum: 0.08, baseline: null });
     expect(detectionMode('challenge', null, 'MOVE_CLOSER', baseline)).toMatchObject({ minimum: 1.25 });

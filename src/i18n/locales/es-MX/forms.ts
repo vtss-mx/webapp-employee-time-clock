@@ -29,7 +29,6 @@ export default {
       minAge: 'El empleado debe tener al menos {age} años',
     },
     employeeNumber: {
-      required: 'El número de empleado es obligatorio',
       format: '1-30 caracteres: letras, números, guion o guion bajo',
     },
     /**

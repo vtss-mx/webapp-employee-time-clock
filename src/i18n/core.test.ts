@@ -14,19 +14,26 @@ afterEach(() => {
 });
 
 describe('idiomas de la aplicación', () => {
-  it('reconoce solo es-MX y en-US', () => {
-    expect(isLocale('es-MX')).toBe(true);
-    expect(isLocale('en-US')).toBe(true);
-    expect(isLocale('fr-FR')).toBe(false);
+  it('reconoce solo los siete idiomas de la plataforma', () => {
+    for (const locale of ['es-MX', 'en-US', 'pt-BR', 'fr-FR', 'de-DE', 'it-IT', 'es-ES']) expect(isLocale(locale)).toBe(true);
+    expect(isLocale('ja-JP')).toBe(false);
+    expect(isLocale('pt-PT')).toBe(false); // una variante del navegador no es un idioma de la app: la lleva matchLocale
     expect(isLocale(null)).toBe(false);
   });
 
-  it('lleva cualquier variante del navegador al idioma más cercano', () => {
+  it('lleva cualquier variante del navegador al idioma más cercano (España y sus regiones → es-ES; el resto del español → es-MX)', () => {
     expect(matchLocale('es')).toBe('es-MX');
     expect(matchLocale('es-419')).toBe('es-MX');
-    expect(matchLocale(' ES_es ')).toBe('es-MX');
+    expect(matchLocale('es-AR')).toBe('es-MX');
+    expect(matchLocale(' ES_es ')).toBe('es-ES');
+    expect(matchLocale('es-EA')).toBe('es-ES');
+    expect(matchLocale('es-IC')).toBe('es-ES');
     expect(matchLocale('en-GB')).toBe('en-US');
-    expect(matchLocale('fr')).toBeNull();
+    expect(matchLocale('pt-PT')).toBe('pt-BR');
+    expect(matchLocale('fr-CA')).toBe('fr-FR');
+    expect(matchLocale('de-AT')).toBe('de-DE');
+    expect(matchLocale('it-CH')).toBe('it-IT');
+    expect(matchLocale('ja')).toBeNull();
   });
 });
 
@@ -85,6 +92,20 @@ describe('estado y documento', () => {
     activate('es-MX', fake({ app: { tagline: 'Lema' } }));
     expect(listener).toHaveBeenCalledTimes(2);
     meta.remove();
+  });
+
+  it('el manifiesto de la aplicación instalable sigue al idioma (su nombre y descripción no se mezclan)', () => {
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = '/site.webmanifest';
+    document.head.append(link);
+    activate('en-US', fake({ app: { tagline: 'Attendance' } }));
+    expect(link.getAttribute('href')).toBe('/site.en-US.webmanifest');
+    activate('de-DE', fake({ app: { tagline: 'Anwesenheit' } }));
+    expect(link.getAttribute('href')).toBe('/site.de-DE.webmanifest');
+    activate('es-MX', fake({ app: { tagline: 'Lema' } }));
+    expect(link.getAttribute('href')).toBe('/site.webmanifest');
+    link.remove();
   });
 
   it('un traductor guardado en un dibujo anterior traduce en el idioma vigente (fábricas de popups abiertos)', () => {

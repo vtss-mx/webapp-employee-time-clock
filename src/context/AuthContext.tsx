@@ -4,6 +4,7 @@ import { ApiError, configureApiClient, retryDelay } from '../services/apiClient'
 import { authService, type LoginProofs } from '../services/authService';
 import { meService } from '../services/meService';
 import type { AuthTokenResponse, Session, User, UserPreferences } from '../types';
+import type { PasskeyAssertion } from '../types/passkeys';
 import { clearAvatarCache } from '../utils/avatarCache';
 import { deviceProof } from '../utils/deviceKey';
 import { setBusinessTimeZone } from '../utils/format';
@@ -12,16 +13,17 @@ import { describeDevice } from '../utils/userAgent';
 import { sleep, whenOnline } from '../utils/waits';
 
 /**
- * Inicio de sesión con las pruebas que el backend pida a un validador, en el orden en que las pide:
+ * Inicio de sesión (con contraseña o con una llave de acceso: `attempt`) con las pruebas que el backend pida a un
+ * validador, en el orden en que las pide:
  * - DEVICE_PROOF_REQUIRED: el dispositivo firma el reto con su llave (no exportable).
  * - LOCATION_REQUIRED: la ubicación del dispositivo (aviso nativo del navegador).
  * Cada prueba se pide una sola vez; cualquier otro error (incluido "dispositivo por autorizar") sube.
  */
-async function loginWithProofs(email: string, password: string, remember: boolean, onLocating?: () => void): Promise<AuthTokenResponse> {
+async function loginWithProofs(attempt: (proofs: LoginProofs) => Promise<AuthTokenResponse>, onLocating?: () => void): Promise<AuthTokenResponse> {
   const proofs: LoginProofs = {};
   for (;;) {
     try {
-      return await authService.login(email, password, remember, proofs);
+      return await attempt(proofs);
     } catch (err) {
       if (!(err instanceof ApiError)) throw err;
       if (err.code === 'DEVICE_PROOF_REQUIRED' && !proofs.device) {
@@ -89,6 +91,8 @@ export interface AuthContextValue {
   dismissSuspension: () => Promise<void>;
   /** `onLocating`: el backend pidió la ubicación del dispositivo y se está obteniendo. */
   login: (email: string, password: string, remember?: boolean, options?: { onLocating?: () => void }) => Promise<User>;
+  /** Con una llave de acceso ya firmada (WebAuthn): la misma sesión y las mismas pruebas de un validador. */
+  loginWithPasskey: (assertion: PasskeyAssertion, options?: { onLocating?: () => void }) => Promise<User>;
   logout: (reason?: LazyText) => Promise<void>;
   logoutEverywhere: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -285,7 +289,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string, remember = false, { onLocating }: { onLocating?: () => void } = {}) => {
-      const response = await loginWithProofs(email, password, remember, onLocating);
+      const response = await loginWithProofs((proofs) => authService.login(email, password, remember, proofs), onLocating);
+      apply(response);
+      return response.user;
+    },
+    [apply],
+  );
+
+  const loginWithPasskey = useCallback(
+    async (assertion: PasskeyAssertion, { onLocating }: { onLocating?: () => void } = {}) => {
+      const response = await loginWithProofs((proofs) => authService.loginWithPasskey(assertion, proofs), onLocating);
       apply(response);
       return response.user;
     },
@@ -335,6 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       suspension,
       dismissSuspension,
       login,
+      loginWithPasskey,
       logout,
       logoutEverywhere,
       refreshUser,
@@ -342,7 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatePreferences,
       updateAvatar,
     }),
-    [session, status, logoutReason, deviceBlock, dismissDeviceBlock, suspension, dismissSuspension, login, logout, logoutEverywhere, refreshUser, selectCompany, updatePreferences, updateAvatar],
+    [session, status, logoutReason, deviceBlock, dismissDeviceBlock, suspension, dismissSuspension, login, loginWithPasskey, logout, logoutEverywhere, refreshUser, selectCompany, updatePreferences, updateAvatar],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

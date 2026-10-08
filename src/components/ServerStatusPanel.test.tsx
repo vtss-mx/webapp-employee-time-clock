@@ -79,12 +79,12 @@ describe('ServerStatusPanel', () => {
     expect(screen.getByText(/entre 8 y 200/)).toBeInTheDocument();
   });
 
-  it('sin bucket configurado: por qué está apagado y qué hay en el bucket (nada por migrar: las imágenes nunca viven en la base)', async () => {
+  it('sin bucket configurado: por qué está apagado y qué hay en el almacenamiento (nada por migrar: las imágenes nunca viven en la base)', async () => {
     mockFetch(apiOk(status));
     renderWithProviders(<ServerStatusPanel />);
     expect(await screen.findByText('Almacenamiento de imágenes: apagado')).toBeInTheDocument();
     expect(screen.getByText(/aún no está montada \(archivo vacío\)\. Hasta configurarlo, no se pueden guardar registros faciales/)).toBeInTheDocument();
-    expect(screen.getByText('12 en el bucket')).toBeInTheDocument();
+    expect(screen.getByText('12 en el almacenamiento')).toBeInTheDocument();
     expect(screen.getByText('0 por borrar')).toBeInTheDocument(); // el mantenimiento aún no corre
     expect(screen.queryByText(/por migrar/)).not.toBeInTheDocument();
   });
@@ -100,8 +100,8 @@ describe('ServerStatusPanel', () => {
     renderWithProviders(<ServerStatusPanel />);
     expect(await screen.findByText('Almacenamiento de imágenes: gs://employee-time-clock-fb8ba.firebasestorage.app/local/')).toBeInTheDocument();
     expect(screen.getByText(/la base de datos solo guarda su referencia/)).toBeInTheDocument();
-    expect(screen.getByText('10,000+ en el bucket')).toBeInTheDocument();
-    expect(screen.getByText('3 en el bucket')).toBeInTheDocument();
+    expect(screen.getByText('10,000+ en el almacenamiento')).toBeInTheDocument();
+    expect(screen.getByText('3 en el almacenamiento')).toBeInTheDocument();
     const deletions = screen.getByText(/^3 por borrar · última vuelta correcta/);
     expect(deletions).toHaveTextContent('último error');
     expect(deletions).toHaveTextContent('StorageUnavailable: ConnectionError');

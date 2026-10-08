@@ -30,7 +30,7 @@ vi.mock('../../components/LiveFaceFlow', () => ({
     <div data-testid="flow" data-facing={facing} data-headwear={String(allowHeadwear)} data-frames={frontalFrames} data-photo={frontalPhoto?.maxSide ?? 'normal'}>
       <h1>{title}</h1>
       <p>{submittingMessage}</p>
-      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false })}>capturar rostro</button>
+      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] })}>capturar rostro</button>
       <button onClick={() => onFatal(new ApiError({ statusCode: 503, code: 'FACE_SERVICE_UNAVAILABLE', message: 'El motor facial no responde' }))}>falla del flujo</button>
       <button onClick={onCancel}>salir del flujo</button>
     </div>
@@ -77,7 +77,7 @@ describe('EmployeeFacePage: registro en persona', () => {
     expect(screen.getByTestId('flow')).toHaveAttribute('data-facing', 'environment');
     expect(screen.getByTestId('flow')).toHaveAttribute('data-headwear', 'true'); // exento de prenda de cabeza
     // El registro en persona toma las 36 fotos completas del registro facial (las elige el servidor).
-    expect(screen.getByTestId('flow')).toHaveAttribute('data-frames', String(config.enrollmentFrames));
+    expect(screen.getByTestId('flow')).toHaveAttribute('data-frames', String(config.enrollmentValidPhotos));
     expect(screen.getByTestId('flow')).toHaveAttribute('data-photo', String(config.enrollmentPhotoPx));
     expect(screen.getByText('Registrando rostro…')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));

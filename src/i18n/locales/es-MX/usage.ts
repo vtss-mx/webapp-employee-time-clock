@@ -6,7 +6,7 @@ export default {
   subtitle_other: '{period} · {count} empresas con actividad',
   daily: 'Día por día',
   /** Tiempo promedio ya formateado ("150 ms"). */
-  average: 'prom. {time}',
+  average: 'promedio {time}',
   otherRange: 'Elige otro rango de fechas.',
   range: {
     quick: 'Rangos rápidos',

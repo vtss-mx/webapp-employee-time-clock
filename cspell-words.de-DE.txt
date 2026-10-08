@@ -1,0 +1,45 @@
+# Palabras propias revisadas SOLO del alemán de Alemania (ortografía de los diccionarios de-DE, regla 16).
+# El diccionario de alemán de cspell (@cspell/dict-de-de) no trae todas las palabras compuestas del dominio
+# (Gesichtsregistrierung, Lebenderkennung...), que son correctas. Antes de agregar una se confirma que está bien
+# escrita; una palabra del inglés nunca va aquí (la prueba src/i18n/dictionaryLanguage.test.ts lo rechaza).
+# Una por renglón, tal como se escribe.
+# Verbos de la Stempeluhr (Duden: einstempeln, ausstempeln); el diccionario solo trae «einstempeln» y no sus formas
+# Prueba de vida (glosario §2: «Lebenderkennung»), compuesto que el diccionario no trae
+# Plural de «Integration» (el diccionario solo trae el singular)
+# Tableta (Duden: «Tabletcomputer»); el préstamo «Tablet» lo conoce el inglés y no puede ir aquí
+# Tecla «Strg» (Steuerung) del teclado alemán, el equivalente de Ctrl en el atajo del menú
+# Máscara de fecha del RFC y la CURP (Jahr, Monat, Tag con dos dígitos), como «aammdd» en español
+# Países con su nombre alemán del CLDR (catálogo countries del backend)
+ausgestempelt
+ausstempeln
+auszustempeln
+Cabo
+Caicosinseln
+eingestempelt
+Grenadinen
+Integrationen
+JJMMTT
+Lebenderkennung
+Mikrofonpegel
+Mikrofonzugriff
+Strg
+Tabletcomputer
+Tabletcomputern
+Tabletcomputers
+Verifizierungsvideo
+Ålandinseln
+# Documentos de identidad del empleado (onboarding con OCR, 2026-10-07): compuestos que el diccionario alemán no trae
+Adressnachweis
+Ausweisdokument
+Ausweisdokumente
+Ausweisdokuments
+Dokumentnummer
+Dokumenttyp
+Dokumentdaten
+Reisedokument
+Telefonrechnung
+Wählerschlüssel
+Maschinenlesbare
+
+# Guía por voz del registro (decisión del dueño, 2026-10-08): silenciar la síntesis de voz
+stummschalten

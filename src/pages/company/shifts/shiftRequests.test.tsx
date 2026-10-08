@@ -104,6 +104,14 @@ describe('Solicitudes de cambio: bandeja', () => {
     await waitFor(() => expect(calls.at(-1)?.url).toBe('/api/shift-requests?page=1&size=10'));
   });
 
+  it('de un empleado sin número (opcional): la bandeja solo lo nombra', async () => {
+    mockFetch(apiOk(page([{ ...pending, employee: { ...pending.employee, employee_number: null } }])));
+    renderAt('/company/shifts/requests');
+    const item = (await screen.findByText('Estudio entre semana', { exact: false })).closest('li') as HTMLElement;
+    expect(item).toHaveTextContent('Ana Ruiz');
+    expect(item).not.toHaveTextContent('Ana Ruiz ·');
+  });
+
   it('sin pendientes es buena noticia; con otro estado sugiere otro; con «Todas» dice qué aparecerá', async () => {
     mockFetch(() => apiOk({ ...page([]), total: 0 }));
     renderAt('/company/shifts/requests');

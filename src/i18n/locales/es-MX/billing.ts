@@ -1,5 +1,5 @@
-import account from './billingAccount';
-import plan from './billingPlan';
+import account from './billing/account';
+import plan from './billing/plan';
 
 /**
  * Textos de la cobranza de las empresas (ADMIN), es-MX. El dinero nunca va escrito aquí: llega como

@@ -42,6 +42,21 @@ describe('MyQrPage (QR dinámico)', () => {
     await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cerrar' })[0]);
   });
 
+  it('sin número de empleado (opcional): el código y su vista grande solo llevan su nombre', async () => {
+    mockFetch((call) => {
+      if (call.url.includes('/settings/')) return apiOk(samplePolicy);
+      return call.init.method === 'POST' ? apiOk({ ...qr(1), employee_number: null }) : apiOk({ id: 1, status: 'ACTIVE', expires_at: null, used_at: null });
+    });
+    renderWithProviders(<MyQrPage />);
+    expect(await screen.findByAltText('Código QR de Ana Ruiz')).toBeInTheDocument();
+    expect(screen.queryByText(/No\. de empleado/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar en grande' }));
+    const dialog = screen.getByRole('dialog', { name: 'Ana Ruiz' });
+    // Ningún renglón vacío donde iba el número (la cuenta regresiva sigue ahí).
+    expect([...dialog.querySelectorAll('.qr-view strong')].filter((element) => !element.textContent?.trim())).toHaveLength(0);
+    expect(dialog).not.toHaveTextContent('null');
+  });
+
   it('si no se puede generar lo explica y permite reintentar', async () => {
     let failed = false;
     mockFetch((call) => {

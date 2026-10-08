@@ -1,5 +1,5 @@
 import { Camera, CameraOff, RefreshCw, SwitchCamera } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode, type SyntheticEvent } from 'react';
 import type { CameraController, CameraFacing } from '../hooks/useCamera';
 import { useFeedback } from '../hooks/useFeedback';
 import { useT, type MessageKey } from '../i18n';
@@ -36,6 +36,16 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
   }, []);
   useCameraMessages(camera);
 
+  // La relación de aspecto REAL del flujo (16:9 de una computadora portátil, 3:4 o 9:16 de un teléfono, 4:3 de una
+  // cámara web) va al visor como variable de CSS (`--video-ar`): con ella el CSS dimensiona el video respecto al
+  // círculo de la guía y no al visor (decisión del dueño, 2026-10-07: el campo visual es el mismo en todo dispositivo).
+  // Se escribe directo en el elemento (una medida calculada, no un estilo): no vuelve a dibujar nada en React, y solo
+  // cambia al abrir el flujo o si el teléfono gira (`resize` del video).
+  const readAspect = (event: SyntheticEvent<HTMLVideoElement>) => {
+    const { videoWidth, videoHeight } = event.currentTarget;
+    if (videoWidth && videoHeight) boxRef.current?.style.setProperty('--video-ar', (videoWidth / videoHeight).toFixed(4));
+  };
+
   return (
     <div ref={boxRef} className={`camera ${className}`}>
       <video
@@ -45,6 +55,8 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
         playsInline
         muted
         aria-label={t('face.camera.preview')}
+        onLoadedMetadata={readAspect}
+        onResize={readAspect}
       />
 
       {status === 'active' && <div className="camera__overlay">{children}</div>}
@@ -94,7 +106,7 @@ export function CameraCapture({ camera, children, className = '' }: CameraCaptur
             value={activeDeviceId ?? ''}
             onChange={camera.selectCamera}
             aria-label={t('face.camera.select')}
-            options={devices.map((d) => ({ value: d.deviceId, label: d.label, title: d.rawLabel }))}
+            options={devices.map((d) => ({ value: d.deviceId, label: d.label, title: d.label }))}
           />
         </div>
       )}

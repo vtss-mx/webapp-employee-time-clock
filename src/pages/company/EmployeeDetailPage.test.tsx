@@ -60,6 +60,7 @@ function session(user: User | null): AuthContextValue {
     suspension: null,
     dismissSuspension: vi.fn(),
     login: vi.fn(),
+    loginWithPasskey: vi.fn(),
     logout: vi.fn(),
     logoutEverywhere: vi.fn(),
     refreshUser: vi.fn(),
@@ -223,6 +224,26 @@ describe('EmployeeDetailPage: expediente', () => {
     expect(await screen.findByText('Listado de empleados')).toBeInTheDocument();
     expect(await screen.findByText('Empleado eliminado')).toBeInTheDocument();
     expect(calls.filter((c) => c.init.method === 'DELETE').map((c) => c.url)).toEqual(['/api/employees/7', '/api/employees/7']);
+  });
+
+  it('sin número de empleado (opcional): el expediente dice «Sin capturar» y eliminarlo pide escribir su nombre', async () => {
+    const { calls } = serve(
+      () => ({ ...employee, employee_number: null }),
+      (call) => (call.init.method === 'DELETE' ? apiOk(null) : undefined),
+    );
+    renderDetail();
+    await screen.findByRole('heading', { name: 'Ana Ruiz' });
+    expect(document.querySelector('.badge--info.badge--plain')).toBeNull();
+    expect(screen.getByText('Número de empleado').closest('div')).toHaveTextContent('Número de empleadoSin capturar');
+    await userEvent.click(screen.getByRole('button', { name: 'Eliminar empleado' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar a Ana Ruiz?' });
+    expect(dialog).not.toHaveTextContent('Número de empleado');
+    expect(dialog).toHaveTextContent('Correoana@empresa.com');
+    const button = within(dialog).getByRole('button', { name: 'Eliminar empleado' });
+    await userEvent.type(within(dialog).getByLabelText('Escribe «Ana Ruiz» para confirmar'), 'Ana Ruiz');
+    await userEvent.click(button);
+    expect(await screen.findByText('Listado de empleados')).toBeInTheDocument();
+    expect(calls.filter((c) => c.init.method === 'DELETE').map((c) => c.url)).toEqual(['/api/employees/7']);
   });
 
   it('si no carga ofrece volver a cargar', async () => {

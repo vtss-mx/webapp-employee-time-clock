@@ -1,68 +1,19 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactElement } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { FeedbackProvider } from '../../context/FeedbackContext';
 import { setLocale } from '../../i18n/core';
+import { admin, adminsPage, bare, company, renderFrom, sent } from '../../test/adminCompanies';
 import { billingReply } from '../../test/billing';
-import { apiFail, apiOk, liveCheck, mockFetch, type MockCall } from '../../test/http';
-import { WithCatalogs } from '../../test/render';
-import type { CompanyAdmin, CompanyDetail } from '../../types';
+import { apiFail, apiOk, liveCheck, mockFetch } from '../../test/http';
+import type { CompanyDetail } from '../../types';
 import { businessToday, formatDate } from '../../utils/format';
 import { CompanyAdminFormPage } from './CompanyAdminFormPage';
 import { CompanyCreatePage } from './CompanyCreatePage';
 import { CompanyDetailPage } from './CompanyDetailPage';
 import { CompanyEditPage } from './CompanyEditPage';
 
-const company: CompanyDetail = {
-  id: 4,
-  name: 'Panificadora',
-  legal_name: 'Panificadora del Norte SA de CV',
-  tax_country: 'MX',
-  tax_id_type: 'MX_RFC',
-  tax_id: 'PNO120315AB1',
-  phone: '+526621234567',
-  active: true,
-  max_employees: 50,
-  api_enabled: false,
-  max_validators: 0,
-  active_validators: 0,
-  employee_count: 3,
-  admin_count: 1,
-  billing_status: 'ACTIVE',
-  suspension_reason: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-};
-/** Empresa capturada solo con lo mínimo (sin razón social, identificador fiscal, teléfono ni límite). */
-const bare: CompanyDetail = { ...company, legal_name: null, tax_country: null, tax_id_type: null, tax_id: null, phone: null, max_employees: null };
-const admin: CompanyAdmin = { id: 9, email: 'admin@pan.com', active: false, last_login_at: null, created_at: '2026-01-01T00:00:00Z' };
-const adminsPage = (items: CompanyAdmin[]) => apiOk({ items, total: items.length, page: 1, size: 10 });
-
-/**
- * La pantalla con historial (de dónde se llegó, para "Cancelar") y las pantallas a las que lleva.
- * El listado de empresas es la pantalla anterior.
- */
-function renderFrom(path: string, route: string, page: ReactElement) {
-  return render(
-    <MemoryRouter initialEntries={['/admin/companies', route]} initialIndex={1}>
-      <FeedbackProvider>
-        <WithCatalogs>
-          <Routes>
-            <Route path={path} element={page} />
-            <Route path="/admin/companies" element={<p>Listado de empresas</p>} />
-            {path !== '/admin/companies/:id' && <Route path="/admin/companies/:id" element={<p>Detalle de empresa</p>} />}
-          </Routes>
-        </WithCatalogs>
-      </FeedbackProvider>
-    </MemoryRouter>,
-  );
-}
 /** Envío del formulario sin pasar por el botón (Enter de un gestor de contraseñas, requestSubmit...). */
 const forceSubmit = (button: HTMLElement) => fireEvent.submit(button.closest('form') as HTMLFormElement);
-/** Lo que se envió a la empresa (sin las vistas previas del cobro, que se piden solas mientras se escribe). */
-const sent = (calls: MockCall[], method: string) => calls.filter((c) => c.init.method === method && !c.url.endsWith('/billing/preview'));
 
 describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
   async function fillCompany() {
@@ -384,6 +335,27 @@ describe('CompanyDetailPage (estado de la empresa y datos sin capturar)', () => 
     expect(await screen.findByRole('dialog', { name: 'Integraciones desactivadas' })).toHaveTextContent('Sus llaves ya no funcionan');
     expect(JSON.parse(sent(calls, 'PUT')[1].init.body as string)).toEqual({ api_enabled: false });
     expect(api).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('Documentos del registro: pedirlos y dejar de pedirlos se confirman', async () => {
+    const calls = renderDetail(company);
+    const docs = await screen.findByRole('switch', { name: 'Documentos del registro' });
+    expect(docs).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText('La empresa no pide documentos; enciéndelo para pedirlos en el registro.')).toBeInTheDocument();
+
+    await userEvent.click(docs);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Pedir documentos a Panificadora?' })).getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByRole('dialog', { name: 'Documentos activados' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
+    const [enable] = sent(calls, 'PUT');
+    expect(enable.url).toBe('/api/admin/companies/4');
+    expect(JSON.parse(enable.init.body as string)).toEqual({ require_employee_documents: true });
+    expect(docs).toHaveAttribute('aria-checked', 'true');
+
+    await userEvent.click(docs);
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Dejar de pedir documentos a Panificadora?' })).getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByRole('dialog', { name: 'Documentos desactivados' })).toBeInTheDocument();
+    expect(JSON.parse(sent(calls, 'PUT')[1].init.body as string)).toEqual({ require_employee_documents: false });
   });
 
   it('"Ver empleados" y "Política de verificación" llevan a sus pantallas de la empresa', async () => {

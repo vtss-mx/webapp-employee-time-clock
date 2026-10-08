@@ -1,5 +1,8 @@
-/** Permiso de lectura de una llave de la API de integración (catálogo api_scopes). */
-export type ApiScope = 'EMPLOYEES_READ' | 'ATTENDANCE_READ' | 'VALIDATORS_READ';
+/**
+ * Permiso de una llave de la API de integración (catálogo api_scopes): los de lectura y `VERIFICATION`, la verificación
+ * facial desde la aplicación móvil de la empresa (SDK; migración 0084 del backend).
+ */
+export type ApiScope = 'EMPLOYEES_READ' | 'ATTENDANCE_READ' | 'VALIDATORS_READ' | 'VERIFICATION';
 
 /** Estado de una llave de la API (catálogo api_key_statuses): se deriva de sus fechas. */
 export type ApiKeyStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';

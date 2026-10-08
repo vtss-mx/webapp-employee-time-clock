@@ -1,5 +1,5 @@
 import { Save, UserPen } from 'lucide-react';
-import { useLayoutEffect, type SubmitEvent } from 'react';
+import type { SubmitEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { EmployeeFormFields, HeadwearExemptField } from '../../components/EmployeeForm';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
@@ -8,6 +8,7 @@ import { SkeletonCard } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { employeeLabels, useEmployeeForm } from '../../hooks/useEmployeeForm';
 import { useFeedback } from '../../hooks/useFeedback';
+import { useLoadValues } from '../../hooks/useLoadValues';
 import { useResource } from '../../hooks/useResource';
 import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
@@ -15,7 +16,7 @@ import { employeeService } from '../../services/employeeService';
 import type { Employee, EmployeeFormValues, EmployeeUpdatePayload } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
 import { describeChanges } from '../../utils/changes';
-import { OPTIONAL_DOCUMENTS } from '../../utils/formRules';
+import { OPTIONAL_FIELDS } from '../../utils/formRules';
 
 /** El formulario con los datos actuales del empleado (la contraseña vacía = no cambiarla). */
 function toForm(employee: Employee): EmployeeFormValues {
@@ -26,7 +27,7 @@ function toForm(employee: Employee): EmployeeFormValues {
     curp: employee.curp ?? '',
     rfc: employee.rfc ?? '',
     nss: employee.nss ?? '',
-    employee_number: employee.employee_number,
+    employee_number: employee.employee_number ?? '',
     phone: employee.phone ?? '',
     email: employee.email,
     password: '',
@@ -54,8 +55,8 @@ function changedFields(original: Employee, values: EmployeeFormValues, headwearE
       payload[key] = value;
     }
   });
-  // Borrar un documento opcional (RFC, CURP, NSS) se envía como null: queda sin capturar.
-  for (const field of OPTIONAL_DOCUMENTS) if (payload[field] === '') payload[field] = null;
+  // Borrar un dato opcional (número, RFC, CURP, NSS) se envía como null: queda sin capturar.
+  for (const field of OPTIONAL_FIELDS) if (payload[field] === '') payload[field] = null;
   if (headwearExempt !== original.headwear_exempt) payload.headwear_exempt = headwearExempt;
   return payload;
 }
@@ -76,7 +77,7 @@ export function EmployeeEditPage() {
       passwordOptional: true,
       original: original
         ? {
-            employee_number: original.employee_number,
+            employee_number: original.employee_number ?? undefined,
             rfc: original.rfc ?? undefined,
             curp: original.curp ?? undefined,
             nss: original.nss ?? undefined,
@@ -87,11 +88,11 @@ export function EmployeeEditPage() {
     });
 
   // Los campos se llenan con el empleado en cuanto llega (antes de pintarse: sin parpadeo de campos vacíos).
-  useLayoutEffect(() => {
-    if (!original) return;
-    setHeadwearExempt(original.headwear_exempt);
-    loadValues(toForm(original));
-  }, [original, setHeadwearExempt, loadValues]);
+  // Por valores (`useLoadValues`): volver a pedirlo al cambiar el idioma no pisa lo que ya se escribió.
+  useLoadValues(original ? { form: toForm(original), headwear: original.headwear_exempt } : null, ({ form, headwear }) => {
+    setHeadwearExempt(headwear);
+    loadValues(form);
+  });
 
   // Solo se envían los campos modificados (y sin cambios no hay nada que guardar).
   const payload: EmployeeUpdatePayload = original ? changedFields(original, values, headwearExempt) : {};

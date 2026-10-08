@@ -202,6 +202,22 @@ describe('useCamera: fallas al abrir', () => {
     expect(getUserMedia).not.toHaveBeenCalled();
   });
 
+  it('un navegador que altera los lienzos (protección contra huellas) se explica sin abrir la cámara', () => {
+    const random = new Uint8ClampedArray(16 * 16 * 4).map((_, i) => (i * 97) % 256);
+    vi.stubGlobal(
+      'OffscreenCanvas',
+      class {
+        getContext() {
+          return { fillRect: () => undefined, getImageData: () => ({ data: random }) };
+        }
+      },
+    );
+    const { result } = renderHook(() => useCamera({ facing: 'user' }));
+    expect(result.current).toMatchObject({ status: 'error', problem: expect.objectContaining({ kind: 'canvas-blocked' }) });
+    expect(getUserMedia).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it('navegador sin getUserMedia: se explica que no es compatible', () => {
     installNavigator(undefined);
     const { result } = renderHook(() => useCamera({ facing: 'user' }));

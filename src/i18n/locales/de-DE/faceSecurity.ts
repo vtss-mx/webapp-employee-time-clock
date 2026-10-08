@@ -1,0 +1,125 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/faceSecurity';
+
+/** Textos de seguridad facial de la plataforma en alemán (de-DE): las mismas llaves que es-MX. */
+export default {
+  loadError: 'Die Gesichtssicherheit konnte nicht geladen werden',
+  title: 'Gesichtssicherheit',
+  subtitle: 'Verschärfte Schwellenwerte, angegriffene Unternehmen und Messungen der Aufnahme.',
+  recalibrate: 'Jetzt neu berechnen',
+  recalibrateError: 'Die Schwellenwerte konnten nicht neu berechnet werden',
+  recalibrated: 'Schwellenwerte neu berechnet',
+  kpis: {
+    raised: 'Verschärfte Schwellenwerte',
+    reinforced: 'Verstärkte Unternehmen',
+    measured: 'Gemessene Blitze',
+    conclusive: 'Aussagekräftige Blitze',
+  },
+  calibrationOff: 'Die automatische Kalibrierung ist in der Serverkonfiguration deaktiviert: Die Schwellenwerte bleiben auf ihrem Minimum.',
+  calibration_one:
+    'Alle {hours} misst die Plattform die erfolgreichen Versuche des letzten Tages und hebt jeden Schwellenwert so weit an, dass fast alle echten Personen ihn sicher bestehen (mit mindestens {samples} Messungen). Sie senkt ihn nie.',
+  calibration_other:
+    'Alle {hours} misst die Plattform die erfolgreichen Versuche der letzten {count} Tage und hebt jeden Schwellenwert so weit an, dass fast alle echten Personen ihn sicher bestehen (mit mindestens {samples} Messungen). Sie senkt ihn nie.',
+  thresholdsSection: 'Schwellenwerte, die sich selbst verschärfen',
+  reinforcedSection: 'Wegen Angriffen verstärkte Unternehmen',
+  flashSection: 'Farbblitz',
+  protocolSection: 'Aufnahmeprotokoll',
+  ipSection: 'Lokale IP-Datenbank',
+  confirm: {
+    eyebrow: 'Gesichtssicherheit',
+    title: 'Schwellenwerte jetzt neu berechnen?',
+    message_one: 'Sie werden mit den erfolgreichen Versuchen des letzten Tages neu berechnet, wie es die Plattform alle {hours} tut.',
+    message_other: 'Sie werden mit den erfolgreichen Versuchen der letzten {count} Tage neu berechnet, wie es die Plattform alle {hours} tut.',
+    window: 'Zeitfenster',
+    days_one: '{count} Tag',
+    days_other: '{count} Tage',
+    samples: 'Messungen, um einen Schwellenwert zu verschieben',
+    note:
+      'Es wird nur verschärft: Kein Schwellenwert fällt unter sein Minimum oder steigt über seine Obergrenze (damit echte Personen nicht ausgeschlossen werden).',
+  },
+  thresholds: {
+    raised: 'Von der Plattform verschärft',
+    atFloor: 'Am Minimum',
+    atStart: 'Auf dem Ausgangswert',
+    tightest: 'Am strengsten',
+    start: 'Ausgangswert',
+    measured_one: '{count} Versuch gemessen',
+    measured_other: '{count} Versuche gemessen',
+    computed: 'berechnet am {date}',
+    notComputed: 'noch nicht berechnet',
+  },
+  reinforced: {
+    rule_one:
+      'Bei {count} verdächtigen Versuch in {minutes} min verlangen die Aufgaben des Unternehmens die maximale Anzahl an Bewegungen, bis das Zeitfenster wieder sauber ist.',
+    rule_other:
+      'Bei {count} verdächtigen Versuchen in {minutes} min verlangen die Aufgaben des Unternehmens die maximale Anzahl an Bewegungen, bis das Zeitfenster wieder sauber ist.',
+    emptyTitle: 'Kein Unternehmen wird angegriffen',
+    challenges: 'Verstärkte Aufgaben',
+    attempts_one: '{count} Versuch',
+    attempts_other: '{count} Versuche',
+  },
+  flash: {
+    retired: 'Blitz durch Produktentscheidung entfernt (2026-10-06): diese Messungen sind historisch.',
+    ready: 'Bereit zur Durchsetzung',
+    calibrating: 'Wird kalibriert',
+    window_one: 'Erfolgreiche Versuche des letzten Tages.',
+    window_other: 'Erfolgreiche Versuche der letzten {count} Tage.',
+    explain:
+      'Die Reaktion misst, wie genau das Gesicht den Farben des Bildschirms gefolgt ist (1 = perfekt). Bei zu viel Umgebungslicht ist der Blitz kaum sichtbar und die Messung zählt nicht.',
+    measured: 'Gemessen',
+    conclusive: 'Aussagekräftig',
+    bright: 'Zu viel Licht',
+    medianScore: 'Median der Reaktion',
+    lowScore: 'Reaktion der niedrigsten 10 %',
+    medianMagnitude: 'Median der Intensität',
+    medianRatio: 'Gesicht gegenüber Hintergrund (Median)',
+    lowRatio: 'Gesicht gegenüber Hintergrund (niedrigste 10 %)',
+    canEnforce: 'Der Blitz kann jetzt verpflichtend werden',
+    notYet: 'Für eine Pflicht ist es noch zu früh',
+    advice:
+      'Stellen Sie ein Unternehmen in seiner Richtlinie auf „{enforce}“ um, wenn genügend aussagekräftige Messungen vorliegen, die 10 % mit der geringsten Reaktion den aktuellen Schwellenwert übertreffen und nur wenige zu viel Licht haben. Bis dahin belassen Sie es bei „{observe}“: Das blockiert niemanden.',
+    pending: {
+      samples: '{required} aussagekräftige Messungen sammeln (bisher {current}).',
+      score: 'Die 10 % mit der geringsten Reaktion müssen {required} übertreffen (heute {current}).',
+      bright: 'Weniger Messungen mit zu viel Licht: heute {current} (höchstens {max}).',
+    },
+  },
+  protocol: {
+    ready: 'Bereit zur Durchsetzung',
+    calibrating: 'Wird gemessen',
+    explain:
+      'Der vorgegebene Blitz zeigt jede Farbe erst im Moment, und die Serie sendet einige Sekunden an Gesichtsausschnitten. Beides schützt vor eingespeisten Videos.',
+    flashAttempts: 'Gemessene Blitze',
+    paced: 'Vom Server vorgegeben',
+    late: 'Verspätet',
+    paceTypical: 'Typische Reaktion',
+    paceSlow: 'Langsame Reaktion (95 %)',
+    window: 'Zeitfenster pro Farbe',
+    livenessAttempts: 'Versuche mit Lebenderkennung',
+    bursts: 'Mit Serie',
+    pulseMeasured: 'Puls gemessen',
+    pulseSeen: 'Puls sichtbar',
+    pulseSnr: 'Deutlichkeit des Pulses (Median)',
+    pulseNote: 'Der Puls wird nur gemessen: Er entscheidet nie.',
+    canEnforce: 'Das Protokoll kann jetzt verpflichtend werden',
+    notYet: 'Für eine Pflicht ist es noch zu früh',
+    advice:
+      'Machen Sie das Protokoll in der Richtlinie jedes Unternehmens verpflichtend (Signale „Blitz nicht vorgegeben“ und „Keine Aufnahmeserie“), sobald fast alle Versuche es erfüllen. Bis dahin wird es nur gemessen.',
+    pending: {
+      samples: '{required} vorgegebene Blitze sammeln (bisher {current}).',
+      paced: 'Mindestens {min} der Blitze vorgegeben (heute {current}).',
+      late: 'Weniger verspätete Reaktionen: heute {current} (höchstens {max}).',
+      bursts: 'Mindestens {min} der Versuche mit Serie (heute {current}).',
+    },
+  },
+  ip: {
+    country: 'Land',
+    asn: 'Netz (autonomes System)',
+    built: 'Datei vom {date}',
+    missing: 'Keine Datei: Netzsignale werden nicht gemessen',
+    refresh_one: 'Aktualisiert sich automatisch im Abstand von {count} Tag.',
+    refresh_other: 'Aktualisiert sich automatisch im Abstand von {count} Tagen.',
+    refreshOff: 'Die automatische Aktualisierung ist in der Serverkonfiguration deaktiviert.',
+    privacy: 'Die IP verlässt nie den Server: Sie wird in einer lokalen Datenbank abgefragt.',
+  },
+} satisfies Translation<typeof es>;

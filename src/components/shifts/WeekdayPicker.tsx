@@ -4,6 +4,7 @@ import { weekdayOptions } from '../../utils/shifts';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { QuickChoices } from './formFields';
 import { sortedDays } from './shiftRules';
+import { inSentence } from '../../utils/text';
 
 export interface WeekdayPreset {
   label: string;
@@ -58,7 +59,7 @@ export function WeekdayPicker({ label, value, onChange, allowed, presets = [], e
       </div>
       {presets.length > 0 && (
         <QuickChoices
-          label={t('shifts.weekdayPicker.quick', { label: label.toLowerCase() })}
+          label={t('shifts.weekdayPicker.quick', { label: inSentence(label) })}
           value={picked}
           choices={presets.map((preset, index) => ({ value: String(index), text: preset.label }))}
           disabled={disabled}

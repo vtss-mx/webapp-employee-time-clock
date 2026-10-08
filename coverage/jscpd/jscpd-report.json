@@ -1,56 +1,209 @@
 {
-  "duplicates": [],
+  "duplicates": [
+    {
+      "firstFile": {
+        "end": 89,
+        "endLoc": {
+          "column": 79,
+          "line": 89,
+          "position": 4223
+        },
+        "name": "components/documents/DocumentList.tsx",
+        "start": 81,
+        "startLoc": {
+          "column": 24,
+          "line": 81,
+          "position": 3969
+        }
+      },
+      "format": "tsx",
+      "fragment": "      {t('documents.add')}\n    </ButtonLink>\n  );\n  return (\n    <>\n      <ListToolbar filter={list.filter} onFilter={list.setFilter} trash statuses={false} />\n      <ListResults\n        list={list}\n        columns={list.trash ? [...columns, ...trashColumns()] : [...columns, t('documents.columns.uploaded'), t('documents.columns.note'), t('documents.columns.actions')]}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 73,
+        "endLoc": {
+          "column": 79,
+          "line": 73,
+          "position": 3630
+        },
+        "name": "components/employeeDocuments/EmployeeDocumentList.tsx",
+        "start": 65,
+        "startLoc": {
+          "column": 32,
+          "line": 65,
+          "position": 3376
+        }
+      },
+      "tokens": 69
+    },
+    {
+      "firstFile": {
+        "end": 146,
+        "endLoc": {
+          "column": 48,
+          "line": 146,
+          "position": 6711
+        },
+        "name": "components/documents/DocumentList.tsx",
+        "start": 129,
+        "startLoc": {
+          "column": 59,
+          "line": 129,
+          "position": 6220
+        }
+      },
+      "format": "tsx",
+      "fragment": "                      aria-label={t('documents.deleteLabel', { name: doc.file_name })}\n                      loading={busy === `delete:${doc.id}`}\n                      disabled={busy !== null}\n                      onClick={() => remove(doc)}\n                    />\n                  )}\n                </td>\n              </>\n            )}\n          </>\n        )}\n      />\n    </>\n  );\n}\n\n/** Las celdas que se ven siempre (también en «Eliminados»): el documento, su tipo y su tamaño en MB. */\nfunction DocumentFacts({ doc, typeName }: { doc: CompanyDocument; typeName: DocumentTypeName }) {",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 18,
+      "secondFile": {
+        "end": 122,
+        "endLoc": {
+          "column": 48,
+          "line": 122,
+          "position": 5888
+        },
+        "name": "components/employeeDocuments/EmployeeDocumentList.tsx",
+        "start": 105,
+        "startLoc": {
+          "column": 67,
+          "line": 105,
+          "position": 5397
+        }
+      },
+      "tokens": 81
+    },
+    {
+      "firstFile": {
+        "end": 77,
+        "endLoc": {
+          "column": 49,
+          "line": 77,
+          "position": 3969
+        },
+        "name": "components/documents/DocumentUploadForm.tsx",
+        "start": 69,
+        "startLoc": {
+          "column": 41,
+          "line": 69,
+          "position": 3663
+        }
+      },
+      "format": "tsx",
+      "fragment": "        const { message } = await service.upload(input).catch((error: unknown) => {\n          setFileServerError(serverErrors(error).file);\n          throw error;\n        });\n        void form.feedback.success(message);\n        void navigate(backTo, { replace: true });\n      },\n      uploadError,\n      () => uploadDocumentConfirm(input, typeName, company),",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 64,
+        "endLoc": {
+          "column": 49,
+          "line": 64,
+          "position": 3430
+        },
+        "name": "components/employeeDocuments/EmployeeDocumentUploadForm.tsx",
+        "start": 56,
+        "startLoc": {
+          "column": 51,
+          "line": 56,
+          "position": 3124
+        }
+      },
+      "tokens": 65
+    },
+    {
+      "firstFile": {
+        "end": 127,
+        "endLoc": {
+          "column": 32,
+          "line": 127,
+          "position": 6092
+        },
+        "name": "components/location/MapCanvas.tsx",
+        "start": 110,
+        "startLoc": {
+          "column": 8,
+          "line": 110,
+          "position": 5469
+        }
+      },
+      "format": "tsx",
+      "fragment": "        });\n        setState('ready');\n      })\n      .catch((error: unknown) => failed(error instanceof MapsApiError ? error : new MapsApiError('maps', 'failed')));\n    return () => {\n      cancelled = true;\n      stopAuth();\n    };\n  }, []);\n\n  // Punto nuevo desde fuera (búsqueda, \"Mi ubicación\", dirección escrita): el mapa va hacia él.\n  useEffect(() => {\n    const map = mapRef.current;\n    if (!map || !point) return;\n    const center = map.getCenter();\n    if (!center || Math.abs(center.lat() - point.lat) > 1e-7 || Math.abs(center.lng() - point.lng) > 1e-7) {\n      map.panTo(point);\n      if ((map.getZoom() ?? 0) < MIN_PICK_ZOOM) map.setZoom(POINT_ZOOM);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 18,
+      "secondFile": {
+        "end": 74,
+        "endLoc": {
+          "column": 32,
+          "line": 74,
+          "position": 3325
+        },
+        "name": "components/location/VerificationMap.tsx",
+        "start": 56,
+        "startLoc": {
+          "column": 8,
+          "line": 56,
+          "position": 2623
+        }
+      },
+      "tokens": 149
+    }
+  ],
   "statistics": {
-    "detectionDate": "2026-10-06T18:00:25.083Z",
+    "detectionDate": "2026-10-08T07:13:30.863Z",
     "formats": {
       "css": {
         "clones": 0,
         "duplicatedLines": 0,
         "duplicatedTokens": 0,
-        "lines": 11177,
+        "lines": 11585,
         "newClones": 0,
         "newDuplicatedLines": 0,
         "percentage": 0.0,
         "percentageTokens": 0.0,
         "sources": 1,
-        "tokens": 109352
+        "tokens": 120413
       },
       "tsx": {
-        "clones": 0,
-        "duplicatedLines": 0,
-        "duplicatedTokens": 0,
-        "lines": 34355,
+        "clones": 4,
+        "duplicatedLines": 54,
+        "duplicatedTokens": 364,
+        "lines": 37548,
         "newClones": 0,
         "newDuplicatedLines": 0,
-        "percentage": 0.0,
-        "percentageTokens": 0.0,
-        "sources": 301,
-        "tokens": 266776
+        "percentage": 0.14381591562799617,
+        "percentageTokens": 0.12451851699814591,
+        "sources": 326,
+        "tokens": 292326
       },
       "typescript": {
         "clones": 0,
         "duplicatedLines": 0,
         "duplicatedTokens": 0,
-        "lines": 30023,
+        "lines": 59814,
         "newClones": 0,
         "newDuplicatedLines": 0,
         "percentage": 0.0,
         "percentageTokens": 0.0,
-        "sources": 294,
-        "tokens": 160508
+        "sources": 563,
+        "tokens": 278379
       }
     },
     "total": {
-      "clones": 0,
-      "duplicatedLines": 0,
-      "duplicatedTokens": 0,
-      "lines": 75555,
+      "clones": 4,
+      "duplicatedLines": 54,
+      "duplicatedTokens": 364,
+      "lines": 108947,
       "newClones": 0,
       "newDuplicatedLines": 0,
-      "percentage": 0.0,
-      "percentageTokens": 0.0,
-      "sources": 596,
-      "tokens": 536636
+      "percentage": 0.04956538500371741,
+      "percentageTokens": 0.05266828530005006,
+      "sources": 890,
+      "tokens": 691118
     }
   }
 }

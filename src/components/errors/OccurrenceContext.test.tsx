@@ -46,7 +46,7 @@ describe('Contexto de una ocurrencia', () => {
     expect(screen.getByText('Registrado por app.services.x (purge)')).toBeInTheDocument();
     expect(screen.getByText('Dónde')).toBeInTheDocument();
     rerender(<OccurrenceContext context={{}} />);
-    expect(screen.getByText('Registrado por el backend')).toBeInTheDocument();
+    expect(screen.getByText('Registrado por el servidor')).toBeInTheDocument();
   });
 
   it('una falla de la aplicación web dice en qué pantalla, con lo que contó el navegador', () => {

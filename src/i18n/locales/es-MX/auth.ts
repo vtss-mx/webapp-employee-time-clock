@@ -6,7 +6,6 @@ export default {
   },
   login: {
     title: 'Iniciar sesión',
-    subtitle: 'Usa tu cuenta corporativa de {app}',
     emailPlaceholder: 'tu@empresa.com',
     password: 'Contraseña',
     passwordRequired: 'La contraseña es obligatoria',

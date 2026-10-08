@@ -17,7 +17,7 @@ import type { ConfirmSource } from '../types/confirm';
  */
 export function useConfirm(): (input: ConfirmSource) => Promise<boolean> {
   const context = useContext(ConfirmContext);
-  if (!context) throw new Error('useConfirm debe usarse dentro de <FeedbackProvider>');
+  if (!context) throw new Error('FEEDBACK_PROVIDER_MISSING');
   const { ask, cancel } = context;
   const open = useRef(new Set<number>());
 

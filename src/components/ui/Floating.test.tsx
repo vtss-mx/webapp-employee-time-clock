@@ -6,13 +6,20 @@ import { Floating } from './Floating';
 /** Posición simulada del campo (jsdom no calcula diseño). */
 let anchorRect = { top: 100, bottom: 140, left: 30, width: 200, height: 40 };
 
-function Field({ withAnchor = true, matchWidth = false }: { withAnchor?: boolean; matchWidth?: boolean }) {
+interface FieldProps {
+  withAnchor?: boolean;
+  matchWidth?: boolean;
+  minWidth?: number;
+  align?: 'start' | 'end';
+}
+
+function Field({ withAnchor = true, matchWidth = false, minWidth, align }: FieldProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const missing: RefObject<HTMLElement | null> = { current: null };
   return (
     <>
       <div ref={anchorRef} data-anchor="" />
-      <Floating anchorRef={withAnchor ? anchorRef : missing} className="menu" matchWidth={matchWidth}>
+      <Floating anchorRef={withAnchor ? anchorRef : missing} className="menu" matchWidth={matchWidth} minWidth={minWidth} align={align}>
         opciones
       </Floating>
     </>
@@ -40,6 +47,24 @@ describe('Floating', () => {
     unmount();
     render(<Field matchWidth />);
     expect(surface()).toHaveStyle({ width: '200px' });
+  });
+
+  it('con ancho mínimo: nunca más angosta que él, también cuando iguala el ancho del campo', () => {
+    const { unmount } = render(<Field matchWidth minWidth={260} />);
+    expect(surface()).toHaveStyle({ width: '260px', minWidth: '260px' });
+    unmount();
+    render(<Field minWidth={100} />); // el contenido (180) ya es más ancho: el mínimo solo se declara
+    expect(surface()).toHaveStyle({ minWidth: '100px', left: '30px' });
+  });
+
+  it('alineada al borde derecho del campo (un control pegado a la derecha) sin salirse de la pantalla', () => {
+    anchorRect = { top: 100, bottom: 140, left: 700, width: 120, height: 40 }; // termina en 820
+    const { unmount } = render(<Field align="end" matchWidth minWidth={260} />);
+    expect(surface()).toHaveStyle({ left: '560px', width: '260px' }); // 820 − 260
+    unmount();
+    anchorRect = { top: 100, bottom: 140, left: 0, width: 120, height: 40 }; // a la izquierda: no cabe hacia la izquierda
+    render(<Field align="end" matchWidth minWidth={260} />);
+    expect(surface()).toHaveStyle({ left: '16px' }); // el margen con el borde
   });
 
   it('si abajo no cabe y arriba hay más espacio, se abre hacia arriba', () => {

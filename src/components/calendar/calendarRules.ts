@@ -2,6 +2,7 @@ import { t } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { ApiError } from '../../services/apiClient';
 import type { ConfirmDetail } from '../../types/confirm';
+import { employeeLabel } from '../../utils/employeeLabel';
 import { formatDate, localeDateFormat } from '../../utils/format';
 import { parseIso, toIso } from '../ui/DateField';
 
@@ -161,7 +162,7 @@ interface AbsenceLike {
   ends_on: string;
   days: number;
   note?: string | null;
-  employee?: { full_name: string; employee_number: string };
+  employee?: { full_name: string; employee_number?: string | null };
 }
 
 /**
@@ -170,7 +171,7 @@ interface AbsenceLike {
  */
 export function absenceFacts(absence: AbsenceLike, typeName: string): ConfirmDetail[] {
   return [
-    ...(absence.employee ? [{ label: t('common.fields.employee'), value: `${absence.employee.full_name} · ${absence.employee.employee_number}` }] : []),
+    ...(absence.employee ? [{ label: t('common.fields.employee'), value: employeeLabel(absence.employee) }] : []),
     { label: t('calendar.fields.type'), value: typeName },
     { label: t('calendar.fields.dates'), value: `${rangeText(absence.starts_on, absence.ends_on)} · ${daysText(absence.days)}` },
     ...(absence.note?.trim() ? [{ label: t('common.fields.note'), value: absence.note.trim() }] : []),

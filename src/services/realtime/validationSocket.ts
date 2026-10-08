@@ -44,7 +44,7 @@ export class ValidationSocket {
   }
 
   async request(message: Record<string, unknown>): Promise<ApiEnvelope> {
-    if (!this.available) throw new Error('Canal en tiempo real no disponible');
+    if (!this.available) throw new Error('REALTIME_UNAVAILABLE');
     // La conexión abierta habla otro idioma: se cierra y la consulta abre una con el idioma activo.
     if (this.ready && this.lang !== currentLocale()) this.close();
     await this.connect();
@@ -53,7 +53,7 @@ export class ValidationSocket {
       const timer = window.setTimeout(() => {
         this.pending.delete(id);
         this.fail();
-        reject(new Error('Tiempo de espera agotado'));
+        reject(new Error('REALTIME_TIMEOUT'));
         // Sin respuesta, la conexión puede estar medio abierta (el servidor ya no la atiende): se
         // cierra para que la siguiente consulta abra otra en lugar de volver a esperar en vano.
         this.close();
@@ -68,14 +68,14 @@ export class ValidationSocket {
     window.clearTimeout(this.idleTimer);
     const socket = this.socket;
     // Primero se suelta: su aviso de cierre (que llega después) ya no toca el canal ni una conexión nueva.
-    this.reset(new Error('Canal cerrado'));
+    this.reset(new Error('REALTIME_CLOSED'));
     socket?.close(1000);
   }
 
   private connect(): Promise<void> {
     if (this.ready) return this.ready;
     const token = currentAccessToken();
-    if (!token) return Promise.reject(new Error('Sin sesión'));
+    if (!token) return Promise.reject(new Error('REALTIME_NO_SESSION'));
     let socket: WebSocket;
     try {
       this.lang = currentLocale();
@@ -84,12 +84,12 @@ export class ValidationSocket {
       // Un proxy o una URL que el navegador rechaza: esta consulta va por HTTP y la siguiente vuelve a
       // intentar el canal (sin dejar una conexión «rota» guardada para siempre).
       this.fail();
-      return Promise.reject(new Error('No se pudo abrir el canal', { cause: error }));
+      return Promise.reject(new Error('REALTIME_OPEN_FAILED', { cause: error }));
     }
     this.socket = socket;
     this.ready = new Promise<void>((resolve, reject) => {
       const timer = window.setTimeout(() => {
-        reject(new Error('No se pudo abrir el canal'));
+        reject(new Error('REALTIME_OPEN_FAILED'));
         socket.close();
       }, config.realtimeTimeoutMs);
       socket.onopen = () => socket.send(JSON.stringify({ type: 'auth', token }));
@@ -120,7 +120,7 @@ export class ValidationSocket {
       socket.onerror = () => undefined; // el cierre (onclose) informa la causa
       socket.onclose = (event: CloseEvent) => {
         window.clearTimeout(timer);
-        reject(new Error(`Canal cerrado (${event.code})`));
+        reject(new Error(`REALTIME_CLOSED:${event.code}`));
         if (this.socket !== socket) return; // conexión ya descartada (cierre propio)
         // Token vencido o revocado: se intenta renovar una vez; la siguiente consulta reconecta.
         if (AUTH_CLOSE_CODES.has(event.code) && !this.triedRefresh) {
@@ -129,7 +129,7 @@ export class ValidationSocket {
         } else if (event.code !== 1000) {
           this.fail();
         }
-        this.reset(new Error(`Canal cerrado (${event.code})`));
+        this.reset(new Error(`REALTIME_CLOSED:${event.code}`));
       };
     });
     return this.ready;

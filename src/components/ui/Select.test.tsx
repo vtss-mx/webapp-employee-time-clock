@@ -212,3 +212,12 @@ describe('Select: casos límite', () => {
   });
 });
 
+describe('Select: ancho, alineación y clase de la lista', () => {
+  it('pasa a la capa flotante el ancho mínimo, la alineación y la clase propia de la lista', async () => {
+    render(<Select<Fruit> value="apple" options={OPTIONS} onChange={() => undefined} aria-label="Fruta" menuMinWidth={260} menuAlign="end" menuClassName="frutas-menu" />);
+    await userEvent.click(trigger());
+    const menu = screen.getByRole('listbox').closest('.floating') as HTMLElement;
+    expect(menu).toHaveClass('select__menu', 'select__menu--light', 'frutas-menu');
+    expect(menu).toHaveStyle({ minWidth: '260px', width: '260px' }); // el control (sin diseño en jsdom) mide 0: manda el mínimo
+  });
+});

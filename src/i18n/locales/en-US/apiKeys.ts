@@ -71,6 +71,12 @@ export default {
     scopes: 'Permissions (read-only)',
     scopesIntro: 'Choose only what the system needs. No key can change data or see photos or biometric data.',
     scopesRequired: 'Choose at least one permission.',
+    /** Aviso del permiso de verificación (SDK móviles): la llave irá dentro de una aplicación. */
+    verificationWarning: {
+      title: 'This key will go inside a mobile app',
+      message: 'A key inside an app can be extracted. Use it only with the “Verification” permission and rotate it if you suspect a leak.',
+      mixed: "A key inside an app can be extracted: don't combine it with read permissions. Create one key with only “Verification” and another one for your server.",
+    },
     lifetime: 'Expiration',
     expiresIn: 'Expires in',
     lifetimeNote: 'It stops working when it expires. Before then, you can rotate it and keep its permissions.',

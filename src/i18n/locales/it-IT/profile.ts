@@ -1,0 +1,98 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/profile';
+
+/** Textos de Mi perfil: cuenta, idioma, contraseña y sesiones en italiano (it-IT): las mismas llaves que es-MX. */
+export default {
+  title: 'Il mio profilo',
+  subtitle: 'Il tuo account, la password e le sessioni attive',
+  refreshFailed: 'Impossibile aggiornare le tue informazioni',
+  account: {
+    title: 'Account',
+    lastLogin: 'Ultimo accesso',
+    createdAt: 'Account creato',
+  },
+  language: {
+    title: 'Lingua',
+  },
+  photo: {
+    title: 'Foto del profilo',
+    description: 'Ti identifica nel menu, nel tuo profilo e negli elenchi della tua azienda. Viene salvata cifrata e senza la posizione né i dati della fotocamera.',
+    saveAsk: {
+      eyebrow: 'La tua foto del profilo',
+      titleNew: 'Salvare questa foto del profilo?',
+      titleReplace: 'Cambiare la tua foto del profilo?',
+      message: 'Apparirà così nel tuo profilo, nel menu e negli elenchi della tua azienda.',
+      file: 'File',
+      note: 'Prima di salvarla vengono rimossi la posizione e i dati della fotocamera.',
+      replaceNote: 'La tua foto precedente viene eliminata. Prima di salvare quella nuova vengono rimossi la posizione e i dati della fotocamera.',
+      confirm: 'Salva foto',
+    },
+    removeAsk: {
+      eyebrow: 'La tua foto del profilo',
+      title: 'Rimuovere la tua foto del profilo?',
+      message: 'Al suo posto verranno mostrate le tue iniziali.',
+      note: 'La foto viene eliminata e non si può recuperare.',
+      confirm: 'Rimuovi foto',
+    },
+    saveFailed: 'Impossibile salvare la tua foto',
+    removeFailed: 'Impossibile rimuovere la tua foto',
+  },
+  password: {
+    title: 'Cambia password',
+    current: 'Password attuale',
+    new: 'Nuova password',
+    confirm: 'Conferma la nuova password',
+    submit: 'Aggiorna password',
+    submitDisabled: 'Compila correttamente tutti i campi obbligatori',
+    currentRequired: 'Inserisci la tua password attuale',
+    mustDiffer: 'Deve essere diversa da quella attuale',
+    failed: 'Impossibile cambiare la password',
+    changed: 'Password aggiornata',
+    revoked_zero: 'La tua sessione attuale resta attiva.',
+    revoked_one: 'È stata chiusa la sessione su {count} altro dispositivo.',
+    revoked_other: 'È stata chiusa la sessione su altri {count} dispositivi.',
+    ask: {
+      eyebrow: 'Sicurezza del tuo account',
+      title: 'Cambiare la tua password?',
+      message: "D'ora in poi entrerai con la nuova password.",
+      otherDevices: 'La tua sessione verrà chiusa sugli altri dispositivi.',
+      thisDevice: 'Su questo dispositivo la sessione resterà aperta.',
+      confirm: 'Cambia password',
+    },
+  },
+  sessions: {
+    title: 'Sessioni attive',
+    loadFailed: 'Impossibile caricare le tue sessioni',
+    empty: {
+      title: 'Nessuna sessione aperta',
+      description: 'Qui vedrai i dispositivi con la tua sessione aperta.',
+    },
+    noun: {
+      one: 'sessione',
+      other: 'sessioni',
+    },
+    thisDevice: 'Questo dispositivo',
+    unknownIp: 'IP sconosciuto',
+    activity: '{ip} · Attiva {ago} · Iniziata il {started}',
+    hint: 'Non riconosci un dispositivo? Chiudi la sessione e cambia la password.',
+    revokeAll: 'Esci da tutti i dispositivi',
+    revoke: {
+      eyebrow: 'Sessione attiva',
+      title: 'Chiudere la sessione di {device}?',
+      message: 'Quel dispositivo dovrà accedere di nuovo per usare il tuo account.',
+      ip: 'IP',
+      unknown: 'Sconosciuto',
+      started: 'Iniziata',
+      failed: 'Impossibile chiudere la sessione',
+      done: 'Sessione chiusa',
+      doneText: 'Quel dispositivo dovrà accedere di nuovo.',
+    },
+    revokeAllAsk: {
+      eyebrow: 'Tutte le tue sessioni',
+      title: 'Uscire da tutti i tuoi dispositivi?',
+      message: 'Include questo dispositivo: dovrai accedere di nuovo.',
+      confirm: 'Chiudi tutte',
+      failed: 'Impossibile uscire da tutti i dispositivi',
+    },
+  },
+} satisfies Translation<typeof es>;

@@ -118,9 +118,11 @@ describe('useEmployeeForm', () => {
     const { result } = renderHook(() => useEmployeeForm(), { wrapper });
     expect(result.current.canSubmit).toBe(false);
     expect(result.current.errors).toEqual({}); // nada marcado antes de tocar los campos
+    act(() => result.current.touch('first_name'));
+    expect(result.current.errors.first_name).toBe('El nombre es obligatorio');
     act(() => result.current.touch('employee_number'));
-    expect(result.current.errors.employee_number).toBe('El número de empleado es obligatorio');
     act(() => result.current.touch('rfc'));
+    expect(result.current.errors.employee_number).toBeUndefined(); // opcional
     expect(result.current.errors.rfc).toBeUndefined(); // opcional
 
     act(() => result.current.setValues(valid));
@@ -133,15 +135,20 @@ describe('useEmployeeForm', () => {
     expect(result.current.errors).toEqual({});
   });
 
-  it('RFC, CURP y NSS son opcionales: sin ellos el botón se habilita y no se consultan en vivo', async () => {
+  it('número, RFC, CURP y NSS son opcionales: sin ellos el botón se habilita y no se consultan en vivo', async () => {
     const check = vi.spyOn(availability, 'checkAvailability').mockImplementation((field, value) =>
       Promise.resolve({ field, value, normalized: value, valid: true, available: true, code: 'AVAILABLE', message: 'Disponible', via: 'http' }),
     );
     const { result } = renderHook(() => useEmployeeForm(), { wrapper });
-    act(() => result.current.setValues({ ...valid, rfc: '', curp: '', nss: '' }));
+    act(() => result.current.setValues({ ...valid, employee_number: '', rfc: '', curp: '', nss: '' }));
     await waitFor(() => expect(result.current.canSubmit).toBe(true));
-    expect(check.mock.calls.map(([field]) => field).sort()).toEqual(['email', 'employee_number', 'phone']);
+    expect(check.mock.calls.map(([field]) => field).sort()).toEqual(['email', 'phone']);
+    expect(result.current.live.employee_number.status).toBe('idle');
     expect(result.current.live.rfc.status).toBe('idle');
+    // Con valor, el número se valida en vivo como siempre (único en la empresa).
+    act(() => result.current.setValues({ ...valid, employee_number: 'EMP-9', rfc: '', curp: '', nss: '' }));
+    await waitFor(() => expect(check.mock.calls.map(([field]) => field)).toContain('employee_number'));
+    await waitFor(() => expect(result.current.live.employee_number.status).toBe('available'));
   });
 
   it('persona de otra empresa (correo LINKABLE): se vincula sin contraseña', async () => {
@@ -215,7 +222,7 @@ describe('useEmployeeForm', () => {
 describe('useFeedback', () => {
   it('requiere el provider', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(() => renderHook(() => useFeedback())).toThrow(/FeedbackProvider/);
+    expect(() => renderHook(() => useFeedback())).toThrow('FEEDBACK_PROVIDER_MISSING');
     const wrapper = ({ children }: { children: ReactNode }) => <FeedbackProvider>{children}</FeedbackProvider>;
     expect(renderHook(() => useFeedback(), { wrapper }).result.current.fromError).toBeTypeOf('function');
   });

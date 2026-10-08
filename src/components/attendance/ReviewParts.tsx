@@ -8,6 +8,7 @@ import { paths } from '../../routes/paths';
 import { attendanceService } from '../../services/attendanceService';
 import type { CompanySessionDetail, WorkSession } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
+import { employeeLabel } from '../../utils/employeeLabel';
 import { formatDate, formatDateTime } from '../../utils/format';
 import { formatList } from '../../utils/numbers';
 import { CatalogStatusBadge } from '../StatusBadge';
@@ -59,7 +60,7 @@ function confirmReview(session: CompanySessionDetail, current: string, next: str
     message: t('attendance.review.confirmMessage'),
     changes: [{ label: t('attendance.review.label'), before: current, after: next }],
     details: [
-      { label: t('common.fields.employee'), value: `${session.employee.full_name} · ${session.employee.employee_number}` },
+      { label: t('common.fields.employee'), value: employeeLabel(session.employee) },
       { label: t('common.fields.date'), value: formatDate(session.work_date) },
     ],
     confirmLabel: t('attendance.review.confirm'),

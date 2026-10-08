@@ -1,5 +1,6 @@
 /**
- * Traducción de la interfaz (es-MX por omisión y en-US): una capa propia y pequeña, sin librerías.
+ * Traducción de la interfaz en los siete idiomas (es-MX por omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES): una capa
+ * propia y pequeña, sin librerías.
  *
  * - Un solo estado por pestaña con el idioma activo y su traductor; `t()` sirve en cualquier parte
  *   (componentes, hooks, reglas puras) y `useT()` (`./react`) además redibuja al cambiar el idioma.
@@ -15,32 +16,32 @@
 import type { Locale, Messages, Translate, Translation } from '../types/i18n';
 import { config } from '../utils/config';
 import { importWithRetry } from '../utils/importRetry';
+import { DEFAULT_LOCALE } from './negotiation';
 
 export type { Locale, MessageKey, Translate } from '../types/i18n';
 
-/** Idiomas de la aplicación, en el orden en que se ofrecen. */
-export const LOCALES: readonly Locale[] = ['es-MX', 'en-US'];
-export const DEFAULT_LOCALE: Locale = 'es-MX';
+/** Idiomas de la aplicación, en el orden en que se ofrecen (el mismo que `LOCALES` del backend). */
+export const LOCALES: readonly Locale[] = ['es-MX', 'en-US', 'pt-BR', 'fr-FR', 'de-DE', 'it-IT', 'es-ES'];
+/** La negociación con el navegador (`matchLocale`) vive aparte, en `negotiation.ts`: la comparte el aviso de `index.html`. */
+export { DEFAULT_LOCALE, matchLocale } from './negotiation';
 
-/** Un diccionario completo (el de es-MX define las llaves; el de en-US las repite). */
+/** Un diccionario completo (el de es-MX define las llaves; los demás las repiten). */
 export type Dictionary = Translation<Messages>;
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
-/** Etiqueta de idioma del navegador ("es", "es-419", "en-GB") → el idioma de la app; otro idioma → null. */
-export function matchLocale(tag: string): Locale | null {
-  const language = tag.trim().toLowerCase().split(/[-_]/)[0];
-  if (language === 'es') return 'es-MX';
-  return language === 'en' ? 'en-US' : null;
-}
-
-// es-MX exporta su diccionario (de él salen los tipos); en-US exporta un espacio por nombre y aquí se
-// comprueba que esté completo.
+// Cada idioma exporta su diccionario completo: es-MX a mano (de él salen los tipos); los demás lo arman con `assemble`
+// desde los archivos de su carpeta (es-ES deriva de es-MX con `derive`: cada archivo trae solo lo que cambia).
 const LOADERS: Record<Locale, () => Promise<{ default: Dictionary }>> = {
   'es-MX': () => import('./locales/es-MX'),
-  'en-US': () => import('./locales/en-US').then((module) => ({ default: module satisfies Dictionary })),
+  'en-US': () => import('./locales/en-US'),
+  'pt-BR': () => import('./locales/pt-BR'),
+  'fr-FR': () => import('./locales/fr-FR'),
+  'de-DE': () => import('./locales/de-DE'),
+  'it-IT': () => import('./locales/it-IT'),
+  'es-ES': () => import('./locales/es-ES'),
 };
 
 type Params = Record<string, string | number>;
@@ -126,11 +127,26 @@ export function currentLocale(): Locale {
 /** Traduce en el idioma activo. En componentes se usa `useT()` para redibujar al cambiar el idioma. */
 export const t: Translate = (key, ...params) => state.engine.translate(key, params[0]);
 
-/** La pestaña, su título y su descripción en el idioma activo (lectores de pantalla, traductores, buscadores). */
+/**
+ * Manifiesto de la aplicación instalable en cada idioma (`public/`): su nombre y su descripción no se mezclan con
+ * los de otro idioma al instalarla.
+ */
+const MANIFESTS: Record<Locale, string> = {
+  'es-MX': '/site.webmanifest',
+  'en-US': '/site.en-US.webmanifest',
+  'pt-BR': '/site.pt-BR.webmanifest',
+  'fr-FR': '/site.fr-FR.webmanifest',
+  'de-DE': '/site.de-DE.webmanifest',
+  'it-IT': '/site.it-IT.webmanifest',
+  'es-ES': '/site.es-ES.webmanifest',
+};
+
+/** La pestaña, su título, su descripción y el manifiesto en el idioma activo (lectores de pantalla, traductores, buscadores, instalación). */
 function applyToDocument(): void {
   document.documentElement.lang = state.locale;
   document.title = `${config.appName} · ${state.t('app.tagline')}`;
   document.querySelector('meta[name="description"]')?.setAttribute('content', state.t('app.tagline'));
+  document.querySelector('link[rel="manifest"]')?.setAttribute('href', MANIFESTS[state.locale]);
 }
 
 /** Activa un idioma con su diccionario ya disponible (arranque, pruebas y `setLocale`). */

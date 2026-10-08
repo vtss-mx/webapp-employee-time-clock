@@ -1,4 +1,5 @@
 // Consola de la plataforma (solo el ADMIN): empresas, sus administradores y el resumen global.
+import type { WithAvatar } from './avatar';
 import type { BillingStatus, SuspensionReason } from './billing';
 import type { SoftDeleted } from './trash';
 
@@ -20,6 +21,11 @@ export interface Company extends SoftDeleted {
   max_validators: number;
   /** El ADMIN de la plataforma decide si la empresa usa el módulo de Integraciones (API). */
   api_enabled: boolean;
+  /**
+   * El ADMIN decide si la empresa exige documentos de identidad en el onboarding (comprobante de domicilio e
+   * identificación oficial; decisión del dueño, 2026-10-07). Encendido, el empleado los sube y la empresa los revisa.
+   */
+  require_employee_documents: boolean;
   employee_count: number;
   admin_count: number;
   /** Validadores activos: cuentan contra `max_validators` y se cobran como empleados. */
@@ -31,7 +37,7 @@ export interface Company extends SoftDeleted {
   updated_at: string;
 }
 
-export interface CompanyAdmin {
+export interface CompanyAdmin extends WithAvatar {
   id: number;
   email: string;
   active: boolean;

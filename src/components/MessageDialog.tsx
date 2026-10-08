@@ -3,6 +3,7 @@ import { useId, type ReactNode } from 'react';
 import { useCopy } from '../hooks/useCopy';
 import { t, useT } from '../i18n';
 import type { Lazy } from '../i18n/lazy';
+import { localizeServerText } from '../i18n/serverTexts';
 import type { MessageVariant } from '../utils/errorPresentation';
 import { Button, type ButtonVariant } from './ui/Button';
 import { DialogHero } from './ui/DialogHero';
@@ -62,7 +63,12 @@ interface MessageDialogProps {
 
 /** Popup de mensajes de la aplicación: error, advertencia, información o confirmación. */
 export function MessageDialog({ message, position, total, onAction, onClose }: MessageDialogProps) {
-  const { variant, title, text, details = [], detailsStyle = 'bullets', body, traceId, footnote } = message;
+  const { variant, detailsStyle = 'bullets', body, traceId, footnote } = message;
+  // Un texto del servidor (el motivo de un error, el aviso de una restauración) se dibuja en el idioma activo:
+  // con el popup abierto, un cambio de idioma lo cambia al instante (`i18n/serverTexts.ts`).
+  const title = localizeServerText(message.title);
+  const text = typeof message.text === 'string' ? localizeServerText(message.text) : message.text;
+  const details = (message.details ?? []).map((detail) => localizeServerText(detail));
   const dismissible = message.dismissible ?? true;
   const t = useT();
   const actions = message.actions?.length ? message.actions : defaultActions();

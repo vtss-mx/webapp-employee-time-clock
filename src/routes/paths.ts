@@ -5,6 +5,9 @@ export const paths = {
   /** Empleado que trabaja en varias empresas: elige a cuál entrar. */
   selectCompany: '/select-company',
   profile: '/profile',
+  /** Llaves de acceso (WebAuthn) de la cuenta: registrar una en este dispositivo y renombrar una existente. */
+  profilePasskeyNew: '/profile/passkeys/new',
+  profilePasskeyRename: (id: number | string) => `/profile/passkeys/${id}/rename`,
   forbidden: '/forbidden',
   /** Pantalla pública de la tableta de un sitio (sin sesión): muestra el código del sitio (`#pair=` la vincula). */
   kiosk: '/kiosk',
@@ -28,6 +31,8 @@ export const paths = {
     error: (id: number | string) => `/admin/errors/${id}`,
     /** Seguridad facial de la plataforma: umbrales autocalibrados, empresas reforzadas y destello. */
     faceSecurity: '/admin/face-security',
+    /** Deriva de las señales del motor facial (antifraude fase 3): por señal, plataforma y empresa, cada semana. */
+    drift: '/admin/drift',
     /** Cobranza: indicadores, empresas y la cuenta de cada una (cargos, pagos, estado de cuenta en `?tab=`). */
     billing: '/admin/billing',
     companyBilling: (id: number | string) => `/admin/billing/companies/${id}`,
@@ -74,6 +79,8 @@ export const paths = {
     editValidator: (id: number | string) => `/company/validators/${id}/edit`,
     validatorDevices: (id: number | string) => `/company/validators/${id}/devices`,
     validatorPassword: (id: number | string) => `/company/validators/${id}/password`,
+    /** Verificaciones de identidad con su ubicación en el mapa (decisión del dueño, 2026-10-07). */
+    verifications: '/company/verifications',
     /** Asistencia: tablero del día, historial de jornadas y la evidencia de cada una. */
     attendance: '/company/attendance',
     attendanceHistory: '/company/attendance/history',
@@ -132,7 +139,14 @@ export const paths = {
     verify: '/employee/verify',
     verifyFace: '/employee/verify/face',
     myQr: '/employee/qr',
+    /** Registro facial: el índice de los tres pasos independientes y la pantalla de cada uno (decisión del dueño, 2026-10-07). */
     enroll: '/employee/enroll',
+    enrollPhoto: '/employee/enroll/photo',
+    enrollCapture: '/employee/enroll/capture',
+    enrollVoice: '/employee/enroll/voice',
+    /** Documentos del onboarding: comprobante de domicilio e identificación oficial (decisión del dueño, 2026-10-07). */
+    documents: '/employee/documents',
+    newDocument: '/employee/documents/new',
     pending: '/employee/pending',
   },
 } as const;

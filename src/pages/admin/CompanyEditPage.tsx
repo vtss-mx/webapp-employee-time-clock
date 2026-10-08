@@ -1,5 +1,5 @@
 import { Building2, Save } from 'lucide-react';
-import { useLayoutEffect, type SubmitEvent } from 'react';
+import type { SubmitEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CompanyPlanEditor } from '../../components/billing/CompanyPlanEditor';
 import { CompanyDataFields } from '../../components/CompanyForm';
@@ -10,6 +10,7 @@ import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { companyLabels, companyView, emptyCompanyForm, useCompanyForm } from '../../hooks/useCompanyForm';
 import { useCompanyPlanEdit } from '../../hooks/useCompanyPlanEdit';
+import { useLoadValues } from '../../hooks/useLoadValues';
 import { useResource } from '../../hooks/useResource';
 import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
@@ -88,9 +89,8 @@ export function CompanyEditPage() {
   const form = useCompanyForm({ withAdmin: false, excludeId: companyId, original: original ? toForm(original) : undefined, minValidators });
   const { loadValues } = form;
   // Los campos se llenan con la empresa en cuanto llega (antes de pintarse: sin parpadeo de campos vacíos).
-  useLayoutEffect(() => {
-    if (original) loadValues(toForm(original));
-  }, [original, loadValues]);
+  // Por valores (`useLoadValues`): volver a pedirla al cambiar el idioma no pisa lo que ya se escribió.
+  useLoadValues(original ? toForm(original) : null, loadValues);
 
   const plan = useCompanyPlanEdit(companyId);
 

@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>8/8</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
-                <span class="quiet">Branches</span>
-                <span class='fraction'>7/7</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
-                <span class="quiet">Functions</span>
                 <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>2/2</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>2/2</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
@@ -89,16 +89,7 @@
 <a name='L24'></a><a href='#L24'>24</a>
 <a name='L25'></a><a href='#L25'>25</a>
 <a name='L26'></a><a href='#L26'>26</a>
-<a name='L27'></a><a href='#L27'>27</a>
-<a name='L28'></a><a href='#L28'>28</a>
-<a name='L29'></a><a href='#L29'>29</a>
-<a name='L30'></a><a href='#L30'>30</a>
-<a name='L31'></a><a href='#L31'>31</a>
-<a name='L32'></a><a href='#L32'>32</a>
-<a name='L33'></a><a href='#L33'>33</a>
-<a name='L34'></a><a href='#L34'>34</a>
-<a name='L35'></a><a href='#L35'>35</a>
-<a name='L36'></a><a href='#L36'>36</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L27'></a><a href='#L27'>27</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -112,21 +103,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">34x</span>
-<span class="cline-any cline-yes">34x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">34x</span>
-<span class="cline-any cline-yes">101x</span>
-<span class="cline-any cline-yes">98x</span>
-<span class="cline-any cline-yes">34x</span>
+<span class="cline-any cline-yes">38x</span>
+<span class="cline-any cline-yes">38x</span>
+<span class="cline-any cline-yes">38x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">34x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">165x</span>
+<span class="cline-any cline-yes">75x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -134,30 +116,21 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { ScanFace, Sun } from 'lucide-react';
-import { useCatalogs } from '../hooks/useCatalogs';
 import { useT } from '../i18n';
 import type { VerificationRules } from '../types';
-import { ruledAccessories } from './accessories';
 &nbsp;
 interface FaceRequirementsProps {
-  policy: Pick&lt;VerificationRules, 'block_glasses' | 'block_headwear' | 'block_mask' | 'anti_spoofing'&gt;;
-  /** El empleado está exento de retirar prendas de cabeza (motivos religiosos o médicos). */
-  headwearExempt?: boolean;
+  policy: Pick&lt;VerificationRules, 'anti_spoofing'&gt;;
 }
 &nbsp;
-/** Recordatorio de lo que exige la empresa antes de la captura (según su política y el catálogo de accesorios). */
-export function FaceRequirements({ policy, headwearExempt = false }: FaceRequirementsProps) {
+/**
+ * Recordatorio antes de la captura: buena luz y el rostro real. Nunca pide retirar un accesorio (decisión del dueño,
+ * 2026-10-07: los lentes se permiten y el cubrebocas o la gorra, si la empresa los exige, los explica el servidor al
+ * validar la foto inicial; la experiencia no los anuncia).
+ */
+export function FaceRequirements({ policy }: FaceRequirementsProps) {
   const t = useT();
-  const { accessories } = useCatalogs();
-  // El nombre del accesorio viene del catálogo, ya en el idioma activo.
-  const removals = ruledAccessories(accessories)
-    .filter(({ rule }) =&gt; policy[rule] &amp;&amp; !(headwearExempt &amp;&amp; rule === 'block_headwear'))
-    .map(({ item, icon }) =&gt; ({ icon, text: t('face.requirements.without', { name: item.name.toLowerCase() }) }));
-  const items = [
-    ...removals,
-    { icon: Sun, text: t('face.requirements.lighting') },
-    ...(policy.anti_spoofing ? [{ icon: ScanFace, text: t('face.requirements.realFace') }] : []),
-  ];
+  const items = [{ icon: Sun, text: t('face.requirements.lighting') }, ...(policy.anti_spoofing ? [{ icon: ScanFace, text: t('face.requirements.realFace') }] : [])];
   return (
     &lt;ul className="requirements" aria-label={t('face.requirements.label')}&gt;
       {items.map(({ icon: Icon, text }) =&gt; (
@@ -175,7 +148,7 @@ export function FaceRequirements({ policy, headwearExempt = false }: FaceRequire
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:24.187Z
+                at 2026-10-08T07:13:14.472Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -27,15 +27,13 @@ export default {
   },
   timeout: {
     label: 'Liveness check time',
-    description: 'For the flash and the moves; if it runs out, a new challenge is requested without repeating the scan.',
+    description: 'For the liveness moves; if it runs out, a new challenge is requested without repeating the scan.',
     saved: 'Liveness check time updated',
     savedText: 'Each challenge will expire after {time}.',
   },
   flash: {
     label: 'Color flash',
-    description: 'The screen flashes colors and a real face must reflect them.',
-    saved: 'Color flash: {mode}',
-    warning: 'Do this after calibrating with real captures (Face security › Color flash). In direct sunlight it may ask people to retake the check.',
+    retired: 'Turned off by product decision (2026-10-06): the screen no longer flashes colors. The movements, the burst, and the voice check cover the liveness test.',
   },
   quality: {
     label: 'Minimum capture quality',

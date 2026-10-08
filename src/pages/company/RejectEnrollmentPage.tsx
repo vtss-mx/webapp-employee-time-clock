@@ -7,6 +7,7 @@ import { useFeedback } from '../../hooks/useFeedback';
 import { notifyEnrollmentsChanged } from '../../hooks/usePendingEnrollments';
 import { useResource } from '../../hooks/useResource';
 import { t, useT } from '../../i18n';
+import { employeeLabel } from '../../utils/employeeLabel';
 import { paths } from '../../routes/paths';
 import { enrollmentService } from '../../services/enrollmentService';
 import type { FaceEnrollmentDetail } from '../../types';
@@ -26,7 +27,7 @@ function rejectConfirm(item: FaceEnrollmentDetail, reason: string): ConfirmInput
     title: t('enrollments.reject.confirm.title', { name: item.full_name }),
     message: t('enrollments.reject.confirm.message'),
     details: [
-      { label: t('common.fields.employee'), value: `${item.full_name} · ${item.employee_number}` },
+      { label: t('common.fields.employee'), value: employeeLabel(item) },
       { label: t('enrollments.reject.confirm.reason'), value: reason },
     ],
     note: t('enrollments.reject.confirm.note'),
@@ -53,7 +54,7 @@ export function RejectEnrollmentPage() {
   return (
     <ReasonFormPanel
       title={t('enrollments.reject.title')}
-      subtitle={`${item.full_name} · ${item.employee_number}`}
+      subtitle={employeeLabel(item)}
       backTo={paths.company.validation(enrollmentId)}
       backLabel={t('enrollments.reject.back')}
       icon={<UserX size={20} />}

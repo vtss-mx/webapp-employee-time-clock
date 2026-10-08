@@ -38,20 +38,17 @@ describe('envío de capturas (antifraude 1b)', () => {
 });
 
 describe('envío de capturas (antifraude 2a)', () => {
-  it('con el reto viajan la hoja de la ráfaga, su descripción y el comprobante del destello dictado', async () => {
+  it('con el reto viajan la hoja de la ráfaga y su descripción (ninguna captura de colores: el destello se retiró)', async () => {
     const { calls } = mockFetch(apiOk({ ok: true }));
     const sheet = new Blob(['hoja'], { type: 'image/jpeg' });
-    await postFaceCaptures(
-      '/verification/face',
-      { frontal: [new Blob(['a'])], challenge: { id: 'ch-1', images: [new Blob(['t'])] }, flash: [new Blob(['c'])], flashReceipt: 'comprobante', burst: { image: sheet, meta: '{"v":1}' } },
-      anything,
-    );
+    await postFaceCaptures('/verification/face', { frontal: [new Blob(['a'])], challenge: { id: 'ch-1', images: [new Blob(['t'])] }, burst: { image: sheet, meta: '{"v":1}' } }, anything);
     const form = calls[0].init.body as FormData;
-    expect([form.get('flash_receipt'), form.get('burst_meta')]).toEqual(['comprobante', '{"v":1}']);
+    expect(form.get('burst_meta')).toBe('{"v":1}');
     expect(form.get('burst')).toBeInstanceOf(Blob);
-    // Sin ráfaga ni comprobante (la app sin canal o un reto que no los pide) no viaja nada de más.
+    expect([form.get('flash_receipt'), form.getAll('flash_image')]).toEqual([null, []]);
+    // Sin ráfaga (un reto que no la pide) no viaja nada de más.
     await postFaceCaptures('/verification/face', { frontal: [new Blob(['a'])], challenge: { id: 'ch-1', images: [] } }, anything);
     const plain = calls[1].init.body as FormData;
-    expect([plain.get('flash_receipt'), plain.get('burst'), plain.get('burst_meta')]).toEqual([null, null, null]);
+    expect([plain.get('burst'), plain.get('burst_meta')]).toEqual([null, null]);
   });
 });

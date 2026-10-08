@@ -86,7 +86,7 @@ describe('LiveFaceFlow en inglés (en-US)', () => {
     expect(screen.getByText('Front camera')).toBeInTheDocument();
     expect(screen.getByLabelText('Camera preview')).toBeInTheDocument();
     see({ guidance: 'too_dark' });
-    expect(message()).toHaveTextContent('Find a brighter spot');
+    expect(message()).toHaveTextContent('More light');
     expect(heading()).toHaveTextContent('Look at the camera');
     see({ guidance: 'hold_still' });
 

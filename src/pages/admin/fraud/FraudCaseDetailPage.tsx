@@ -6,8 +6,7 @@ import { RiskBadge } from '../../../components/fraud/RiskBadge';
 import { CatalogStatusBadge } from '../../../components/StatusBadge';
 import { Button } from '../../../components/ui/Button';
 import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../../components/ui/Panel';
-import { RetryState } from '../../../components/ui/RetryState';
-import { SkeletonCard } from '../../../components/ui/Skeleton';
+import { ResourceFallback } from '../../../components/ui/ResourceFallback';
 import { useAction } from '../../../hooks/useAction';
 import { useCatalogs } from '../../../hooks/useCatalogs';
 import { notifyFraudCasesChanged } from '../../../hooks/usePendingFraudCases';
@@ -19,7 +18,7 @@ import type { FraudCaseDetail } from '../../../types';
 import type { ConfirmInput } from '../../../types/confirm';
 import { formatDateTime } from '../../../utils/format';
 import { formatCount } from '../../../utils/numbers';
-import { subjectOf } from './FraudCasesPage';
+import { FraudSubject, subjectOf } from './FraudCasesPage';
 
 /** Decisiones que se toman en su formulario (con nota): confirmar, descartar o dejar no concluyente. */
 const DECISIONS = [
@@ -64,18 +63,7 @@ export function FraudCaseDetailPage() {
   const { busy, run } = useAction();
 
   if (!item) {
-    return error ? (
-      <div className="page">
-        <Panel>
-          <PanelHeader title={t('fraud.detail.title', { id: caseId })} backTo={paths.admin.fraudCases} backLabel={t('fraud.title')} />
-          <PanelSection>
-            <RetryState onRetry={retry} />
-          </PanelSection>
-        </Panel>
-      </div>
-    ) : (
-      <SkeletonCard lines={8} />
-    );
+    return <ResourceFallback error={error} retry={retry} lines={8} header={{ title: t('fraud.detail.title', { id: caseId }), backTo: paths.admin.fraudCases, backLabel: t('fraud.title') }} />;
   }
 
   const take = () =>
@@ -134,7 +122,9 @@ export function FraudCaseDetailPage() {
               </div>
               <div>
                 <dt>{t('fraud.list.subject')}</dt>
-                <dd>{subjectOf(item)}</dd>
+                <dd>
+                  <FraudSubject item={item} />
+                </dd>
               </div>
               <div>
                 <dt>{t('fraud.list.kind')}</dt>

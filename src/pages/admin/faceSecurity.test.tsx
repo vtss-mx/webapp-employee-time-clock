@@ -51,7 +51,7 @@ describe('FaceSecurityPage (seguridad facial de la plataforma)', () => {
     const section = (await screen.findByRole('heading', { name: 'Base local de IP' })).closest('section') as HTMLElement;
     expect(section).toHaveTextContent(/PaísArchivo del .+Red \(sistema autónomo\)Sin archivo: las señales de red no se miden/);
     expect(section).toHaveTextContent('Se actualiza sola cada 30 días.');
-    expect(within(section).getByRole('link', { name: 'IP Geolocation by DB-IP' })).toBeInTheDocument();
+    expect(within(section).getByRole('link', { name: 'Geolocalización de IP por DB-IP' })).toBeInTheDocument();
     unmount();
     mockFetch(apiOk({ ...overview, ip_database: { ...overview.ip_database, refresh_enabled: false, refresh_days: 1 } }));
     renderPage();
@@ -96,6 +96,7 @@ describe('FaceSecurityPage (seguridad facial de la plataforma)', () => {
 
     const flash = screen.getByRole('heading', { name: 'Destello de colores' }).closest('section') as HTMLElement;
     expect(within(flash).getByText('Calibrando')).toBeInTheDocument();
+    expect(within(flash).getByText(/Destello retirado por decisión del producto/)).toBeInTheDocument(); // mediciones históricas
     expect(within(flash).getByText('Respuesta del 10 % más bajo').nextSibling).toHaveTextContent('0.3');
     expect(within(flash).getByText('Intensidad mediana').nextSibling).toHaveTextContent('0.012');
     expect(within(flash).getByText('Aún no conviene exigirlo')).toBeInTheDocument();

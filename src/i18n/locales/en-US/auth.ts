@@ -8,7 +8,6 @@ export default {
   },
   login: {
     title: 'Sign in',
-    subtitle: 'Use your {app} work account',
     emailPlaceholder: 'you@company.com',
     password: 'Password',
     passwordRequired: 'Password is required',

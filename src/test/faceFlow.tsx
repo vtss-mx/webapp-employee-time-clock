@@ -56,17 +56,33 @@ export function serve({ check = () => apiOk(CHECK_OK), challenge = () => apiOk(N
   return { checks: () => calls.filter((c) => c.url.includes('/face/check')).length, challenges: () => calls.filter((c) => c.url.includes('/face/challenge')).length, calls };
 }
 
-/** Rechazo de la validación previa por accesorios (con los códigos que el servidor detectó). */
+/** La validación previa aceptada que INFORMA accesorios (bloqueados o no): las insignias sobre el rostro. */
+export const checkReporting = (accessories: string[]) => apiOk({ ...CHECK_OK, accessories });
+
+/** Rechazo de la validación previa por accesorios que la política bloquea (con los códigos que el servidor detectó). */
 export const accessoriesFound = (accessories: string[]) =>
   jsonResponse(
     envelope(null, {
       status: 422,
       code: 'ACCESSORIES_DETECTED',
-      message: 'Retira tus accesorios',
-      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'Retira tus accesorios', field: null, details: { accessories } }],
+      message: 'Quítate el cubrebocas para continuar',
+      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'Quítate el cubrebocas para continuar', field: null, details: { accessories } }],
     }),
     422,
   );
+
+/** El reto del REGISTRO (decisión del dueño, 2026-10-07): siempre los cuatro movimientos de la cabeza, en orden al azar. */
+export const FOUR_MOVES: FaceChallenge = {
+  ...TWO_TURNS,
+  challenge_id: 'ch-enroll',
+  action: 'LOOK_UP',
+  instruction: 'Levanta un poco la barbilla y mira hacia arriba',
+  actions: ['LOOK_UP', 'TURN_RIGHT', 'LOOK_DOWN', 'TURN_LEFT'],
+  instructions: ['Levanta un poco la barbilla y mira hacia arriba', 'Gira la cabeza hacia tu derecha', 'Baja un poco la barbilla y mira hacia abajo', 'Gira la cabeza hacia tu izquierda'],
+};
+
+/** Las fotos del registro (una sola válida, del tamaño de la configuración) para las pruebas del flujo. */
+export const ENROLLMENT = { frontalFrames: 1, frontalPhoto: { maxSide: 640, gapMs: 10 } };
 
 /** Lo que el flujo entrega a la pantalla (envío) y sus errores no corregibles. */
 export const flow = {

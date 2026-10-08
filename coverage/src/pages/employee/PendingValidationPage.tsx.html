@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/11</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -139,7 +139,16 @@
 <a name='L74'></a><a href='#L74'>74</a>
 <a name='L75'></a><a href='#L75'>75</a>
 <a name='L76'></a><a href='#L76'>76</a>
-<a name='L77'></a><a href='#L77'>77</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -152,18 +161,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -217,19 +235,27 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { Check, Clock, RefreshCw, ScanFace, UserCheck } from 'lucide-react';
 import { useCallback } from 'react';
+import { EnrollmentStepper } from '../../components/EnrollmentStepper';
 import { FaceStatusBadge } from '../../components/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { StatusMark } from '../../components/ui/StatusMark';
 import { useAction } from '../../hooks/useAction';
 import { useAuth } from '../../hooks/useAuth';
 import { usePolling } from '../../hooks/usePolling';
+import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { t, useLocale } from '../../i18n';
 import { config } from '../../utils/config';
 &nbsp;
-/** Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. */
+/**
+ * Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. Arriba, los pasos del registro con los tres
+ * hechos en verde (adenda del dueño, 2026-10-07): esta pantalla solo llega cuando el servidor dejó el registro en
+ * validación (`face_status` PENDING_REVIEW en `user.screens`), así que lo verde es lo que el servidor procesó. El paso
+ * del video se muestra según la política de la empresa (la misma lectura compartida de las demás pantallas).
+ */
 export function PendingValidationPage() {
   useLocale(); // textos con `t` al dibujarse: un cambio de idioma los traduce
   const { user, refreshUser } = useAuth();
+  const { policy } = useVerificationPolicy();
   const { busy, run } = useAction();
 &nbsp;
   // Al aprobarse, el backend cambia las pantallas del empleado y la ruta lleva a su nuevo inicio.
@@ -242,6 +268,7 @@ export function PendingValidationPage() {
   return (
     &lt;div className="page page--narrow page-transition"&gt;
       &lt;div className="result-card"&gt;
+        &lt;EnrollmentStepper current="done" withVideo={policy.voice_verification} /&gt;
         &lt;StatusMark kind="pending" /&gt;
         &lt;div className="stack" style={{ gap: 8 }}&gt;
           &lt;span style={{ justifySelf: 'center' }}&gt;
@@ -298,7 +325,7 @@ export function PendingValidationPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:23.868Z
+                at 2026-10-08T07:13:13.955Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

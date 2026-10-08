@@ -1,4 +1,5 @@
 import type { AuthTokenResponse, DeviceSessionList, PageQuery, RememberedAccount, User } from '../types';
+import type { PasskeyAssertion } from '../types/passkeys';
 import { hasKeys, isNothing, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
 import type { DeviceProof } from '../utils/deviceKey';
@@ -36,12 +37,26 @@ export const authService = {
     });
   },
 
-  /** Renueva el access token (rota el refresh token de la cookie). */
+  /**
+   * Inicio de sesión fuerte con una llave de acceso (WebAuthn / passkey, antifraude fase 3): el reto sellado que dio
+   * `passkeyService.loginOptions` y la firma del dispositivo. Emite la MISMA sesión que la contraseña y respeta las
+   * mismas reglas (empresa suspendida, estado, dispositivo y ubicación de un validador: `proofs`).
+   */
+  loginWithPasskey(assertion: PasskeyAssertion, proofs: LoginProofs = {}): Promise<AuthTokenResponse> {
+    return apiRequest<AuthTokenResponse>('/auth/login/passkey', {
+      method: 'POST',
+      body: { ...assertion, ...proofs },
+      auth: false,
+      validate: isTokenResponse,
+    });
+  },
+
   /** ¿Hay una sesión vigente en este navegador? (lo sabe el backend por la cookie HttpOnly; no la renueva). */
   sessionStatus(): Promise<{ signed_in: boolean }> {
     return apiRequest<{ signed_in: boolean }>('/auth/session', { auth: false, validate: hasKeys<{ signed_in: boolean }>('signed_in') });
   },
 
+  /** Renueva el access token (rota el refresh token de la cookie). */
   refresh(): Promise<AuthTokenResponse> {
     return apiRequest<AuthTokenResponse>('/auth/refresh', { method: 'POST', auth: false, validate: isTokenResponse });
   },

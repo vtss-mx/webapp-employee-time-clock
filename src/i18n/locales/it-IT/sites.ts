@@ -1,0 +1,100 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/sites';
+
+/** Textos de sitios donde se checa en italiano (it-IT): las mismas llaves que es-MX. */
+export default {
+  list: {
+    title: 'Sedi di lavoro',
+    loadError: 'Impossibile caricare le sedi',
+    subtitle_one: '{count} sede · dove si timbra di persona e con quale raggio',
+    subtitle_other: '{count} sedi · dove si timbra di persona e con quale raggio',
+    new: 'Nuova sede',
+    searchPlaceholder: 'Cerca per nome',
+    searchLabel: 'Cerca sedi',
+    noun: { one: 'sede', other: 'sedi' },
+    columns: {
+      site: 'Sede',
+      address: 'Indirizzo',
+      radius: 'Raggio',
+      employees: 'Dipendenti oggi',
+      code: 'Codice',
+    },
+    kiosksOf_one: '{count} chiosco di {name}',
+    kiosksOf_other: '{count} chioschi di {name}',
+    noMatch: {
+      title: 'Nessun risultato',
+      description: "Prova con un'altra ricerca o un altro filtro.",
+    },
+    empty: {
+      title: 'Nessuna sede di lavoro',
+      description: 'Crea una sede per indicare dove timbra il tuo personale.',
+    },
+  },
+  form: {
+    loadError: 'Impossibile caricare la sede',
+    newTitle: 'Nuova sede',
+    editTitle: 'Modifica sede',
+    newSubtitle: 'Un luogo in cui il tuo personale timbra di persona: stabilimento, filiale, ufficio…',
+    create: 'Crea sede',
+    createError: 'Impossibile creare la sede',
+    saveError: 'Impossibile salvare la sede',
+    rule: 'Raggio per timbrare: {distance}.',
+    created: {
+      title: 'Sede creata',
+      text: '{name} si può ora aggiungere ai tuoi turni. {rule}',
+    },
+    updated: {
+      title: 'Sede aggiornata',
+      text: '{name} · {rule}',
+    },
+    sections: {
+      site: 'Sede',
+      location: 'Posizione',
+    },
+    name: 'Nome della sede',
+    nameExample: 'Stabilimento Hermosillo',
+    nameHint: 'Unico nella tua azienda: ad es. «Stabilimento Hermosillo»',
+    radius: 'Raggio per timbrare (metri)',
+    radiusHint: 'Tra {min} e {max} m: la dimensione del luogo più il margine del GPS.',
+    suggestedRadii: 'Raggi suggeriti',
+    onSiteNote: 'In sede si timbra con il volto e la posizione del telefono, entro questo raggio.',
+    locationIntro: 'Cerca il luogo o tocca la mappa. Il cerchio indica il raggio per timbrare.',
+    pointRequired: 'Segna sulla mappa il punto della sede',
+  },
+  fields: {
+    address: 'Indirizzo',
+    references: 'Riferimenti',
+    point: 'Punto sulla mappa',
+    radius: 'Raggio per timbrare',
+  },
+  confirm: {
+    createTitle: 'Creare la sede {name}?',
+    createMessage: 'Si potrà aggiungere ai tuoi turni; chi li ha timbrerà qui.',
+    willCreate: 'Verrà creata',
+    editTitle: 'Salvare le modifiche della sede {name}?',
+  },
+  status: {
+    title: 'Stato della sede',
+    activeMeaning: 'Si può aggiungere ai turni e chi li ha può timbrare qui.',
+    inactiveMeaning: 'Nessuno può timbrare in questa sede e non si può aggiungere a un turno.',
+    deactivateWarning: 'Nessuno potrà timbrare qui né aggiungerla a un turno finché non la attivi. I turni che la includono e ciò che è già registrato non cambiano.',
+    removeWarning: 'Si può eliminare solo se nessun turno la usa e nessuno vi ha timbrato. Se un turno la usa, toglila dal turno; se qualcuno vi ha già timbrato, disattivala.',
+    activateQuestion: 'Attivare la sede {name}?',
+    deactivateQuestion: 'Disattivare la sede {name}?',
+    removeQuestion: 'Eliminare la sede {name}?',
+    activated: 'Sede attivata',
+    deactivated: 'Sede disattivata',
+    removed: 'Sede eliminata',
+    inUse: 'La sede è in uso: disattivala',
+  },
+  trash: {
+    restoreTitle: 'Ripristinare la sede {name}?',
+    banner: 'Sede eliminata',
+  },
+  presence: {
+    label: 'Codice della sede',
+    hint: "Richiede all'entrata e all'uscita il codice mostrato dal chiosco della sede.",
+    on: 'Richiede il codice',
+    off: 'Senza codice',
+  },
+} satisfies Translation<typeof es>;

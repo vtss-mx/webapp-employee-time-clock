@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../../i18n/core';
 import { confirmation, page, person, press, production, renderAt } from '../../test/departments';
 import { apiFail, apiOk, liveCheck, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
@@ -217,6 +218,45 @@ describe('Departamentos: detalle', () => {
 describe('Departamentos: asignar y nombrar responsables', () => {
   const staff = [person(7, 'Ana Ruiz', { department_id: 3, department_name: 'Producción' }), person(11, 'Raúl Soto', { department_id: 4, department_name: 'Almacén' }), person(12, 'Iris Luna', { active: false })];
 
+  it('sin número de empleado (opcional): el detalle y las confirmaciones lo nombran solo por su nombre', async () => {
+    const unnumbered = { ...production, managers: [{ ...production.managers[0], employee_number: null }] };
+    mockFetch((call) => {
+      if (call.url.startsWith('/api/employees')) return apiOk(page([person(10, 'Juan Paz', { department_id: 3, employee_number: null })]));
+      return apiOk(unnumbered);
+    });
+    renderAt('/company/departments/:id', '/company/departments/3', <DepartmentDetailPage />);
+    const member = (await screen.findByText('Juan Paz')).closest('li') as HTMLElement;
+    expect(member).not.toHaveTextContent('No.');
+    expect(screen.getByText('Ana Ruiz').closest('li')).not.toHaveTextContent('No.');
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar a Ana Ruiz como responsable' }));
+    const manager = await confirmation('¿Retirar a Ana Ruiz como responsable de Producción?', 'alertdialog');
+    expect(within(manager).getByRole('region', { name: 'Detalles' })).toHaveTextContent(/^ResponsableAna Ruiz$/);
+    await press(manager, 'Cancelar');
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar a Juan Paz del departamento' }));
+    const removal = await confirmation('¿Quitar a Juan Paz de Producción?', 'alertdialog');
+    expect(within(removal).getByRole('region', { name: 'Detalles' })).toHaveTextContent(/^EmpleadoJuan Paz$/);
+  });
+
+  it('asignar a alguien sin número (opcional): dónde está y la confirmación, sin número', async () => {
+    const staff = [person(11, 'Raúl Soto', { department_id: 4, department_name: 'Almacén', employee_number: null }), person(12, 'Iris Luna', { employee_number: null })];
+    mockFetch((call) => apiOk(call.url.startsWith('/api/employees') ? page(staff) : production));
+    renderAt('/company/departments/:id/assign/:role', '/company/departments/3/assign/employees', <DepartmentAssignPage />);
+    expect(await screen.findByText('En Almacén')).toBeInTheDocument();
+    expect(screen.getByText('Iris Luna').closest('li')).not.toHaveTextContent('No.');
+    await userEvent.click(screen.getByRole('button', { name: 'Cambiar aquí: Raúl Soto' }));
+    const move = await confirmation('¿Cambiar a Raúl Soto a Producción?', 'alertdialog');
+    expect(within(move).getByRole('region', { name: 'Detalles' })).toHaveTextContent(/^EmpleadoRaúl Soto$/);
+  });
+
+  it('en inglés: dónde está cada candidato, con número y sin él', async () => {
+    await setLocale('en-US');
+    const staff = [person(11, 'Raúl Soto', { department_id: 4, department_name: 'Almacén' }), person(13, 'Luz Mar', { department_id: 4, department_name: 'Almacén', employee_number: null })];
+    mockFetch((call) => apiOk(call.url.startsWith('/api/employees') ? page(staff) : production));
+    renderAt('/company/departments/:id/assign/:role', '/company/departments/3/assign/employees', <DepartmentAssignPage />);
+    expect(await screen.findByText('No. EMP-11 · In Almacén')).toBeInTheDocument();
+    expect(screen.getByText('In Almacén')).toBeInTheDocument();
+  });
+
   it('empleados: asignar, cambiar desde otro departamento y ya asignado', async () => {
     const { calls } = mockFetch((call) => {
       if (call.url.startsWith('/api/employees')) return apiOk(page(staff));
@@ -289,7 +329,9 @@ describe('Departamentos: asignar y nombrar responsables', () => {
     renderAt('/company/departments/:id/assign/:role', '/company/departments/3/assign/employees', <DepartmentAssignPage />);
     const [retry] = await screen.findAllByRole('button', { name: /Reintentar/ });
     await userEvent.click(retry);
-    expect(await screen.findByRole('heading', { name: 'Asignar empleados' })).toBeInTheDocument();
+    // El respaldo de carga también lleva el título: se espera lo que solo tiene la página cargada (el buscador).
+    expect(await screen.findByRole('searchbox', { name: 'Buscar empleados' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Asignar empleados' })).toBeInTheDocument();
   });
 });
 

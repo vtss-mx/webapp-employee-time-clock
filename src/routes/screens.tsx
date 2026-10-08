@@ -9,6 +9,7 @@ import {
   Clock,
   FileText,
   Gauge,
+  IdCard,
   KeyRound,
   LayoutDashboard,
   MapPin,
@@ -20,6 +21,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Timer,
+  TrendingDown,
   UserCircle2,
   Users,
   Wallet,
@@ -66,6 +68,7 @@ import {
   CompanyEditPage,
   CompanySelectPage,
   DashboardPage,
+  DriftPage,
   ErrorDetailPage,
   ErrorsPage,
   FaceSecurityPage,
@@ -92,16 +95,23 @@ import {
   DepartmentsPage,
   EmployeeCreatePage,
   EmployeeDetailPage,
+  EmployeeDocumentUploadPage,
+  EmployeeDocumentsPage,
   EmployeeEditPage,
   EmployeeFacePage,
   EmployeesListPage,
+  EnrollmentCapturePage,
   EnrollmentPage,
+  EnrollmentPhotoPage,
+  EnrollmentVoicePage,
   FaceVerificationPage,
   MyQrPage,
   PendingValidationPage,
+  PasskeyFormPage,
   ProfilePage,
   ValidationReviewPage,
   ValidationsPage,
+  VerificationsPage,
   ValidatorDevicesPage,
   ValidatorPasswordPage,
   ReverifyAllPage,
@@ -163,6 +173,7 @@ export const SCREEN_VIEWS: Record<string, ScreenView> = {
     ],
   },
   ADMIN_FACE_SECURITY: { base: paths.admin.faceSecurity, routes: [{ path: paths.admin.faceSecurity, Page: FaceSecurityPage }] },
+  ADMIN_DRIFT: { base: paths.admin.drift, routes: [{ path: paths.admin.drift, Page: DriftPage }] },
   ADMIN_FRAUD_CASES: {
     base: paths.admin.fraudCases,
     routes: [
@@ -221,6 +232,10 @@ export const SCREEN_VIEWS: Record<string, ScreenView> = {
       { path: paths.company.editDepartment(':id'), Page: DepartmentFormPage },
       { path: paths.company.assignDepartment(':id', ':role'), Page: DepartmentAssignPage },
     ],
+  },
+  COMPANY_VERIFICATIONS: {
+    base: paths.company.verifications,
+    routes: [{ path: paths.company.verifications, Page: VerificationsPage }],
   },
   COMPANY_ATTENDANCE: {
     base: paths.company.attendance,
@@ -312,7 +327,22 @@ export const SCREEN_VIEWS: Record<string, ScreenView> = {
       { path: paths.employee.newAbsenceRequest, Page: AbsenceRequestFormPage },
     ],
   },
-  EMPLOYEE_ENROLL: { base: paths.employee.enroll, routes: [{ path: paths.employee.enroll, Page: EnrollmentPage }] },
+  EMPLOYEE_ENROLL: {
+    base: paths.employee.enroll,
+    routes: [
+      { path: paths.employee.enroll, Page: EnrollmentPage },
+      { path: paths.employee.enrollPhoto, Page: EnrollmentPhotoPage },
+      { path: paths.employee.enrollCapture, Page: EnrollmentCapturePage },
+      { path: paths.employee.enrollVoice, Page: EnrollmentVoicePage },
+    ],
+  },
+  EMPLOYEE_DOCUMENTS: {
+    base: paths.employee.documents,
+    routes: [
+      { path: paths.employee.documents, Page: EmployeeDocumentsPage },
+      { path: paths.employee.newDocument, Page: EmployeeDocumentUploadPage },
+    ],
+  },
   EMPLOYEE_PENDING: { base: paths.employee.pending, routes: [{ path: paths.employee.pending, Page: PendingValidationPage }] },
   EMPLOYEE_VERIFY: {
     base: paths.employee.dashboard,
@@ -324,7 +354,14 @@ export const SCREEN_VIEWS: Record<string, ScreenView> = {
   },
   EMPLOYEE_QR: { base: paths.employee.myQr, routes: [{ path: paths.employee.myQr, Page: MyQrPage }] },
   EMPLOYEE_SELECT_COMPANY: { base: paths.selectCompany, routes: [{ path: paths.selectCompany, Page: CompanySelectPage }], bare: true },
-  PROFILE: { base: paths.profile, routes: [{ path: paths.profile, Page: ProfilePage }] },
+  PROFILE: {
+    base: paths.profile,
+    routes: [
+      { path: paths.profile, Page: ProfilePage },
+      { path: paths.profilePasskeyNew, Page: PasskeyFormPage },
+      { path: paths.profilePasskeyRename(':id'), Page: PasskeyFormPage },
+    ],
+  },
 };
 
 /** Íconos que el backend puede nombrar (`catalog.screens.icon`); uno desconocido muestra un círculo. */
@@ -338,6 +375,7 @@ const ICONS: Record<string, LucideIcon> = {
   Clock,
   FileText,
   Gauge,
+  IdCard,
   KeyRound,
   LayoutDashboard,
   MapPin,
@@ -349,6 +387,7 @@ const ICONS: Record<string, LucideIcon> = {
   ShieldAlert,
   ShieldCheck,
   Timer,
+  TrendingDown,
   UserCircle2,
   Users,
   Wallet,

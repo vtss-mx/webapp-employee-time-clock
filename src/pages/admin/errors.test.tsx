@@ -258,7 +258,7 @@ describe('Errores del sistema: detalle y seguimiento', () => {
     renderDetail();
     const [retry] = await screen.findAllByRole('button', { name: /Reintentar/ });
     await userEvent.click(retry);
-    expect(await screen.findByText(/Sin stack trace/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sin traza de la pila/)).toBeInTheDocument();
     expect(screen.getByText('Controlado (sin excepción)')).toBeInTheDocument();
     expect(await screen.findByText('Sin ocurrencias recientes')).toBeInTheDocument();
     expect(within(document.body).queryByText(/Último traceId/)).not.toBeInTheDocument();

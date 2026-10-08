@@ -10,6 +10,8 @@ export default {
     approve: 'Aprobar',
     back: 'Volver',
     cancel: 'Cancelar',
+    pause: 'Pausar',
+    play: 'Reproducir',
     changeStatus: 'Cambiar estado',
     clear: 'Limpiar',
     close: 'Cerrar',

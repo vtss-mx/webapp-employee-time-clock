@@ -4,7 +4,7 @@ import { ApiError } from '../services/apiClient';
 
 export function useFeedback(): FeedbackApi {
   const context = useContext(FeedbackContext);
-  if (!context) throw new Error('useFeedback debe usarse dentro de <FeedbackProvider>');
+  if (!context) throw new Error('FEEDBACK_PROVIDER_MISSING');
   return context;
 }
 

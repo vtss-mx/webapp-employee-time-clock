@@ -116,6 +116,19 @@ describe('Empleados: «Eliminados»', () => {
     await waitFor(() => expect(calls.some((call) => call.url.includes('/qr'))).toBe(true));
   });
 
+  it('un eliminado sin número (opcional): su expediente dice «Sin capturar» y restaurarlo no lo menciona', async () => {
+    const unnumbered = { ...luis, employee_number: null };
+    server({ current: () => unnumbered });
+    renderPage('/company/employees/:id', '/company/employees/8', <EmployeeDetailPage />, { user: companyUser });
+    const banner = await screen.findByRole('status');
+    expect(document.querySelector('.badge--info.badge--plain')).toBeNull();
+    const row = screen.getByText('Número de empleado').closest('div') as HTMLElement;
+    expect(row).toHaveTextContent('Número de empleadoSin capturar');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restaurar Luis Paz' }));
+    const dialog = await screen.findByRole('dialog', { name: '¿Restaurar a Luis Paz?' });
+    expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent(/^Correoluis@empresa\.com$/);
+  });
+
   it('los turnos de un eliminado: el aviso y su expediente, sin pedir sus turnos', async () => {
     const { calls } = server();
     renderPage('/company/employees/:id/shifts', '/company/employees/8/shifts', <EmployeeShiftsPage />, { targets: { '/company/employees/:id': 'Expediente del empleado' } });

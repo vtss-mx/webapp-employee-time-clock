@@ -54,10 +54,11 @@ export default tseslint.config(
       // `allow`: nombres propios que se escriben igual en todo idioma (navegadores, sistemas y marcas).
       'i18n/no-hardcoded-text': [
         'error',
-        // 'IP Geolocation by DB-IP': la atribución que exige la licencia CC BY 4.0 de la base local de IP (decisión D8).
-        { allow: ['Android', 'Chrome', 'Chromium', 'Edge', 'Firefox', 'Google', 'Google Maps', 'iPad', 'iPhone', 'IP Geolocation by DB-IP', 'Linux', 'macOS', 'Opera', 'Safari', 'Samsung Internet', 'Windows'] },
+        { allow: ['Android', 'Chrome', 'Chromium', 'Edge', 'Firefox', 'Google', 'Google Maps', 'iPad', 'iPhone', 'Linux', 'macOS', 'Opera', 'Safari', 'Samsung Internet', 'Windows'] },
       ],
       'i18n/no-module-level-t': 'error',
+      // Regla 16: fechas, horas, números y comparaciones en el idioma ACTIVO (ni uno escrito ni el del navegador).
+      'i18n/no-hardcoded-locale': 'error',
     },
   },
   {

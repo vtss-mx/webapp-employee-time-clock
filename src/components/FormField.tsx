@@ -1,6 +1,7 @@
 import { CheckCircle2, Eye, EyeOff, Info, KeyRound, Loader2 } from 'lucide-react';
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type Ref, type TextareaHTMLAttributes } from 'react';
-import { useT } from '../i18n';
+import { useLocale, useT } from '../i18n';
+import { localizeServerText } from '../i18n/serverTexts';
 import type { FieldStatus } from '../types';
 
 interface FormFieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -91,18 +92,23 @@ export function FieldLabel({ htmlFor, label, required }: { htmlFor: string; labe
   );
 }
 
-/** Mensaje bajo el control: el error tiene prioridad sobre la ayuda. Compartido por todos los campos. */
+/**
+ * Mensaje bajo el control: el error tiene prioridad sobre la ayuda. Compartido por todos los campos. El error que
+ * puso el servidor (un duplicado, una regla de negocio) se guarda en el estado del formulario tal como llegó: aquí
+ * se dibuja en el idioma activo, así un cambio de idioma lo cambia sin perder lo escrito (`i18n/serverTexts.ts`).
+ */
 export function FieldMessage({ id, error, hint }: { id: string; error?: string; hint?: string }) {
+  useLocale();
   if (error) {
     return (
       <small id={`${id}-error`} className="field__error" role="alert">
-        {error}
+        {localizeServerText(error)}
       </small>
     );
   }
   return hint ? (
     <small id={`${id}-hint`} className="field__hint">
-      {hint}
+      {localizeServerText(hint)}
     </small>
   ) : null;
 }

@@ -39,6 +39,12 @@ export interface SelectProps<T extends string = string> {
   tone?: 'light' | 'dark';
   /** Ancho de la lista: el del control o el de su contenido. */
   menuWidth?: 'control' | 'content';
+  /** Ancho mínimo de la lista en píxeles (que su contenido quepa en una línea aunque el control sea angosto). */
+  menuMinWidth?: number;
+  /** Borde del control con el que se alinea la lista (`end` para un control pegado a la derecha de la pantalla). */
+  menuAlign?: 'start' | 'end';
+  /** Clase propia de la lista abierta (para personalizar sus opciones). */
+  menuClassName?: string;
   /** Contenido propio de cada opción (por omisión: ícono, texto, aclaración y palomita). */
   renderOption?: (option: SelectOption<T>, state: { selected: boolean; active: boolean }) => ReactNode;
   /** Búsqueda dentro de la lista (listas largas, p. ej. países): texto de ayuda y "sin resultados". */
@@ -227,6 +233,9 @@ export function Select<T extends string = string>(props: SelectProps<T>) {
           baseId={baseId}
           tone={props.tone ?? 'light'}
           matchWidth={(props.menuWidth ?? 'control') === 'control'}
+          minWidth={props.menuMinWidth}
+          align={props.menuAlign}
+          menuClassName={props.menuClassName}
           labelledBy={view.labelledBy}
           search={search}
           options={visible}
@@ -263,6 +272,9 @@ interface SelectListProps<T extends string> {
   baseId: string;
   tone: 'light' | 'dark';
   matchWidth: boolean;
+  minWidth?: number;
+  align?: 'start' | 'end';
+  menuClassName?: string;
   labelledBy?: string;
   options: ReadonlyArray<SelectOption<T>>;
   value: T;
@@ -279,7 +291,14 @@ interface SelectListProps<T extends string> {
 function SelectList<T extends string>(props: SelectListProps<T>) {
   const { options, value, active, baseId, renderOption } = props;
   return (
-    <Floating anchorRef={props.anchorRef} floatingRef={props.menuRef} className={`select__menu select__menu--${props.tone}`} matchWidth={props.matchWidth}>
+    <Floating
+      anchorRef={props.anchorRef}
+      floatingRef={props.menuRef}
+      className={`select__menu select__menu--${props.tone} ${props.menuClassName ?? ''}`}
+      matchWidth={props.matchWidth}
+      minWidth={props.minWidth}
+      align={props.align}
+    >
       {props.search}
       <ul
         ref={props.listRef}

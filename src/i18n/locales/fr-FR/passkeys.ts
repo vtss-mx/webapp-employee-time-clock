@@ -1,0 +1,77 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/passkeys';
+
+/** Clés d'accès (WebAuthn) en français (fr-FR) : les mêmes clés que es-MX. Glossaire §2 : « clé d'accès ». */
+export default {
+  title: "Clés d'accès",
+  intro: "Connectez-vous avec le visage, l'empreinte ou le code de votre appareil, sans saisir votre mot de passe. La clé privée ne quitte jamais votre appareil ni votre compte Apple ou Google.",
+  unsupported: "Ce navigateur ne prend pas en charge les clés d'accès. Utilisez Safari, Chrome ou Edge à jour.",
+  loadError: "Impossible de charger vos clés d'accès",
+  add: "Ajouter une clé d'accès",
+  empty: {
+    title: "Aucune clé d'accès",
+    description: "Ajoutez-en une pour vous connecter avec le visage, l'empreinte ou le code.",
+  },
+  noun: {
+    one: "clé d'accès",
+    other: "clés d'accès",
+  },
+  created: 'Créée le {date}',
+  lastUsed: 'Dernière utilisation : {date}',
+  neverUsed: 'Pas encore utilisée',
+  synced: 'Synchronisée dans le nuage',
+  deviceOnly: 'Sur un seul appareil',
+  rename: 'Renommer',
+  revoke: 'Révoquer',
+  actionLabel: '{action} : {name}',
+  revokeAsk: {
+    eyebrow: "Clé d'accès",
+    title: 'Révoquer « {name} » ?',
+    message: 'Cette clé ne permettra plus de vous connecter, sur aucun de vos appareils.',
+    note: "Cette action est irréversible. Vous pourrez en enregistrer une autre à tout moment.",
+    confirm: 'Révoquer la clé',
+  },
+  revoked: "Clé d'accès révoquée",
+  revokeFailed: "Impossible de révoquer la clé d'accès",
+  form: {
+    newTitle: "Ajouter une clé d'accès",
+    newSubtitle: 'Enregistrez cet appareil pour vous connecter sans mot de passe.',
+    renameTitle: "Renommer la clé d'accès",
+    renameSubtitle: 'Changez le nom sous lequel vous la reconnaissez.',
+    section: 'Nom de la clé',
+    intro: "À l'enregistrement, votre appareil demandera le visage, l'empreinte ou le code. Votre mot de passe continue de fonctionner.",
+    name: 'Nom',
+    nameHint: "Pour la reconnaître : « Mon téléphone », « Ordinateur du travail »",
+    nameRequired: 'Saisissez un nom',
+    nameTooLong: '{max} caractères au maximum',
+    submit: 'Enregistrer la clé',
+    renameSubmit: 'Enregistrer le nom',
+    back: 'Retour à Mon profil',
+    createAsk: {
+      eyebrow: "Clé d'accès",
+      title: "Enregistrer une clé d'accès sur cet appareil ?",
+      message: "Votre appareil demandera le visage, l'empreinte ou le code pour la créer.",
+      note: 'Vous pourrez la révoquer à tout moment depuis Mon profil.',
+      confirm: 'Enregistrer',
+    },
+    renameAsk: {
+      title: "Renommer la clé d'accès ?",
+    },
+    registered: "Clé d'accès enregistrée",
+    registeredText: "Vous pouvez désormais vous connecter avec elle depuis l'écran de connexion.",
+    registerFailed: "Impossible d'enregistrer la clé d'accès",
+    renamed: 'Nom enregistré',
+    renameFailed: "Impossible de renommer la clé d'accès",
+    noChanges: 'Aucune modification',
+  },
+  errors: {
+    unsupported: "Ce navigateur ne prend pas en charge les clés d'accès. Utilisez Safari, Chrome ou Edge à jour.",
+    failed: "Votre appareil n'a pas pu terminer l'opération. Réessayez.",
+  },
+  login: {
+    divider: 'ou',
+    button: "Se connecter avec une clé d'accès",
+    waiting: 'En attente de votre appareil…',
+    failed: "Impossible de se connecter avec la clé d'accès",
+  },
+} as const satisfies Translation<typeof es>;

@@ -71,6 +71,12 @@ export default {
     scopes: 'Permisos (solo lectura)',
     scopesIntro: 'Elige solo lo que el sistema necesita. Ninguna llave puede modificar datos ni ver fotos o datos biométricos.',
     scopesRequired: 'Elige al menos un permiso.',
+    /** Aviso del permiso de verificación (SDK móviles): la llave irá dentro de una aplicación. */
+    verificationWarning: {
+      title: 'Esta llave irá dentro de una aplicación móvil',
+      message: 'Una llave dentro de una aplicación se puede extraer. Úsala solo con el permiso «Verificación» y rótala si sospechas que se filtró.',
+      mixed: 'Una llave dentro de una aplicación se puede extraer: no la combines con permisos de lectura. Crea una llave solo con «Verificación» y otra para tu servidor.',
+    },
     lifetime: 'Vigencia',
     expiresIn: 'Vence en',
     lifetimeNote: 'Al vencer deja de funcionar. Antes puedes rotarla y conservar sus permisos.',

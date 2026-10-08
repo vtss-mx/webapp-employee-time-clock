@@ -7,6 +7,7 @@ import {
   advance,
   camera,
   CHECK_OK,
+  checkReporting,
   detail,
   detection,
   flow,
@@ -26,8 +27,8 @@ import { challengeActions, flowStatus, introFor, scannerView } from './liveFaceV
 
 /*
  * Flujo facial completo con la cámara y MediaPipe simulados (test/faceFlowMocks): escaneo frontal,
- * prueba de vida con giros (el destello y los demás movimientos: LiveFaceFlow.liveness.test.tsx),
- * accesorios, captura manual y cámara virtual.
+ * prueba de vida con giros (los cuatro movimientos del registro: LiveFaceFlow.liveness.test.tsx),
+ * captura manual y cámara virtual.
  */
 vi.mock('../hooks/useCamera', async () => (await import('../test/faceFlowMocks')).cameraModule());
 vi.mock('../hooks/useFaceDetection', async (original) => (await import('../test/faceFlowMocks')).detectionModule(await original()));
@@ -59,7 +60,7 @@ describe('LiveFaceFlow: escaneo frontal y envío', () => {
     expect(server.checks()).toBe(1);
     expect(message()).toHaveTextContent('Confirmando tu identidad...');
     expect(heading()).toHaveTextContent('Confirmando tu identidad');
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: camera.frames, camera: 'FaceTime HD Camera', telemetry: expect.any(String), accessoryReview: false });
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: camera.frames, camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
     const form = server.calls.find((c) => c.url.includes('/face/check'))?.init.body as FormData;
     expect(form.getAll('images')).toHaveLength(3);
     expect(form.get('allow_headwear')).toBe('false');
@@ -115,7 +116,7 @@ describe('LiveFaceFlow: escaneo frontal y envío', () => {
     expect(detection.options).toMatchObject({ mode: { kind: 'action', action: 'TURN_LEFT' } });
     await stable();
     const [, frontal, turn] = camera.frames;
-    expect(onSubmit).toHaveBeenLastCalledWith({ frontal: [frontal], challenge: { id: 'ch-up', images: [turn] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String), accessoryReview: false });
+    expect(onSubmit).toHaveBeenLastCalledWith({ frontal: [frontal], challenge: { id: 'ch-up', images: [turn] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
   });
 
   it('al salir mientras se valida o se envía, la respuesta (o su falla) ya no hace nada', async () => {
@@ -125,6 +126,15 @@ describe('LiveFaceFlow: escaneo frontal y envío', () => {
     await stable();
     leaving.unmount();
     await act(() => Promise.resolve().then(() => answer(apiOk(NO_LIVENESS))));
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    let check: (response: Response) => void = () => undefined;
+    serve({ check: () => new Promise((resolve) => (check = resolve)) });
+    const checking = renderFlow();
+    await stable();
+    checking.unmount();
+    await act(() => Promise.resolve().then(() => check(checkReporting(['GLASSES'])))); // las insignias ya no se dibujan
+    expect(document.querySelector('.accessory-badge')).toBeNull();
     expect(onSubmit).not.toHaveBeenCalled();
 
     let fail: (error: Error) => void = () => undefined;
@@ -153,7 +163,7 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     see({ moveProgress: 0.5 });
     expect(message()).toHaveTextContent('Un poco más');
     see({ guidance: 'too_far' });
-    expect(message()).toHaveTextContent('Acércate un poco');
+    expect(message()).toHaveTextContent('Acércate');
     see({ guidance: 'hold_still' });
     expect(message()).toHaveTextContent('Mantén la posición');
     expect(cue()).toBeNull();
@@ -162,9 +172,13 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     expect(screen.getByText('Vuelve a mirar al frente para el siguiente paso.')).toBeInTheDocument();
     expect(message()).toHaveTextContent('Listo para el siguiente paso');
     see({ guidance: 'move', moveProgress: 0 });
-    expect(message()).toHaveTextContent('Vuelve a mirar al frente');
-    expect(detection.options?.mode).toEqual({ kind: 'frontal' });
+    expect(message()).toHaveTextContent('Centra tu rostro');
+    see({ guidance: 'look_straight' });
+    expect(message()).toHaveTextContent('Mira al frente'); // la corrección precisa, cuando la hay
+    // De vuelta al frente se mide contra el rostro en reposo: la cabeza debe volver a su altura.
+    expect(detection.options?.mode).toEqual({ kind: 'frontal', baseline });
     expect(cue()).toBeNull();
+    see({ guidance: 'move' });
 
     await stable(); // ya al frente: el segundo giro
     expect(heading()).toHaveTextContent('Prueba de vida · paso 2 de 2');
@@ -174,7 +188,7 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
 
     await stable();
     const [frontal, left, right] = camera.frames;
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: [frontal], challenge: { id: 'ch-1', images: [left, right] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String), accessoryReview: false });
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: [frontal], challenge: { id: 'ch-1', images: [left, right] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
   });
 
   it('un solo giro con la cámara trasera sin espejo (y sin mínimo del servidor: el piso)', async () => {
@@ -214,7 +228,7 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     await advance(20_000);
     expect(message()).toHaveTextContent('No se completó la prueba de vida. El escaneo empezará de nuevo.');
     await advance(3_000);
-    expect(detection.options?.mode).toEqual({ kind: 'frontal' });
+    expect(detection.options?.mode).toEqual({ kind: 'frontal', baseline: null });
     expect(server.checks()).toBe(1); // los retos se repitieron sin volver a escanear
     expect(onFatal).not.toHaveBeenCalled();
   });
@@ -235,7 +249,7 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     await stable();
     await advance(23_000);
     expect(camera.capture).toHaveBeenCalledOnce(); // solo la frontal
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: [camera.frames[0]], camera: 'FaceTime HD Camera', telemetry: expect.any(String), accessoryReview: false });
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: [camera.frames[0]], camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
   });
 
   it('si la cámara no da imagen al capturar el giro (llamada entrante), espera y vuelve a empezar sin rendirse', async () => {
@@ -247,7 +261,7 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     expect(heading()).toHaveTextContent('Intenta de nuevo');
     expect(message()).toHaveTextContent('La cámara aún no está lista');
     await advance(3_000);
-    expect(detection.options?.mode).toEqual({ kind: 'frontal' });
+    expect(detection.options?.mode).toEqual({ kind: 'frontal', baseline: null });
     expect(onFatal).not.toHaveBeenCalled();
   });
 
@@ -274,39 +288,55 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
   });
 });
 
-describe('LiveFaceFlow: accesorios', () => {
-  it('tras dos intentos con el mismo accesorio ofrece enviar a revisión; con revisión pedida el accesorio ya no detiene', async () => {
-    let checks = 0;
-    serve({ check: () => (++checks <= 3 ? accessoriesFound(['GLASSES', 'SCARF']) : apiFail(422, 'TOO_DARK', 'Hay poca luz')) });
-    renderFlow({ allowAccessoryReview: true });
-    await stable();
-    expect(message()).toHaveTextContent('Retira tus accesorios');
-    expect(document.querySelector('.accessory-alert')).toHaveTextContent('LentesSCARF');
-    expect(screen.queryByRole('note')).toBeNull(); // un solo intento: aún no se ofrece
-    await advance(3_000);
-    await stable();
-    // El código desconocido se muestra tal cual (catálogo sin esa frase).
-    expect(screen.getByRole('note')).toHaveTextContent('¿No estás usando los lentes ni SCARF?');
-    fireEvent.click(screen.getByRole('button', { name: 'No uso los lentes ni SCARF · enviar a revisión' }));
-    expect(screen.queryByRole('note')).toBeNull();
-    expect(screen.getByText(/Tu registro se enviará a revisión de tu empresa/)).toBeInTheDocument();
+describe('LiveFaceFlow: insignias de accesorios (decisión del dueño, 2026-10-07: la insignia es el único aviso)', () => {
+  const badges = () => [...document.querySelectorAll('.accessory-badge')].map((badge) => badge.textContent?.trim());
 
-    await advance(3_000);
-    await stable(); // vuelve a detectar los lentes: ya no detiene
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ accessoryReview: true }));
-
-    await stable(); // otro problema (luz) sí detiene aunque se haya pedido revisión
-    expect(message()).toHaveTextContent('Hay poca luz');
+  it('un accesorio que el servidor informa sin bloquear se muestra como insignia y las fotos siguen normal', async () => {
+    serve({ check: () => checkReporting(['GLASSES']) });
+    renderFlow();
+    expect(badges()).toEqual([]);
+    await stable();
+    expect(badges()).toEqual(['Lentes']); // informativa: el envío ocurrió igual
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toMatch(/Quítate/);
   });
 
-  it('sin la opción de revisión (verificación), insistir en el accesorio no la ofrece', async () => {
-    serve({ check: () => accessoriesFound(['GLASSES']) });
+  it('dos accesorios bloqueados: dos insignias, la indicación de colocación (nunca el texto del servidor) y el escaneo se reanuda con las insignias a la vista hasta que una validación ya no las reporte', async () => {
+    let checks = 0;
+    serve({ check: () => (++checks === 1 ? accessoriesFound(['HEADWEAR', 'MASK']) : apiOk(CHECK_OK)) });
     renderFlow();
-    for (let i = 0; i < 3; i++) {
-      await stable();
-      await advance(3_000);
-    }
-    expect(screen.queryByRole('note')).toBeNull();
+    await stable();
+    expect(badges()).toEqual(['Gorra', 'Cubrebocas']);
+    expect(heading()).toHaveTextContent('Intenta de nuevo');
+    expect(message()).toHaveTextContent('Muestra tu rostro completo');
+    expect(document.body.textContent).not.toMatch(/Quítate/);
+    expect(onSubmit).not.toHaveBeenCalled();
+    await advance(3_000); // se reanuda: las insignias siguen mientras el servidor no diga otra cosa
+    expect(heading()).not.toHaveTextContent('Intenta de nuevo');
+    expect(badges()).toEqual(['Gorra', 'Cubrebocas']);
+    await stable(); // la siguiente validación ya no reporta accesorios: se retiran y se envía
+    expect(badges()).toEqual([]);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('un rechazo por otro motivo retira las insignias; el 422 del envío también las muestra', async () => {
+    let checks = 0;
+    serve({ check: () => (++checks === 1 ? checkReporting(['GLASSES']) : apiFail(422, 'TOO_DARK', 'Hay poca luz')) });
+    const error = new ApiError({
+      statusCode: 422,
+      code: 'ACCESSORIES_DETECTED',
+      message: 'Quítate el cubrebocas para continuar',
+      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'm', field: null, details: { accessories: ['MASK'] } }],
+    });
+    onSubmit.mockRejectedValueOnce(error);
+    renderFlow();
+    await stable(); // la validación previa informa lentes; el envío falla por cubrebocas: la insignia es la del envío
+    expect(badges()).toEqual(['Cubrebocas']);
+    expect(message()).toHaveTextContent('Muestra tu rostro completo');
+    await advance(3_000);
+    await stable(); // otro motivo (luz): el servidor validó y no reportó accesorios
+    expect(badges()).toEqual([]);
+    expect(message()).toHaveTextContent('Hay poca luz');
   });
 });
 
@@ -377,7 +407,7 @@ describe('LiveFaceFlow: textos del visor (reglas puras)', () => {
     expect(challengeActions(null)).toEqual([]);
     expect(introFor({ phase: 'challenge', stage: 'liveness', submittingMessage: 'Enviando...' })).toEqual({
       title: 'Prueba de vida',
-      text: 'Mueve la cabeza como se indique; la pantalla puede cambiar de color un instante.',
+      text: 'Mueve la cabeza como se indique hasta completar cada paso.',
       label: 'Prueba de vida',
     });
     const legacy = { ...TWO_TURNS, instructions: undefined as unknown as string[] }; // sin la lista: la instrucción del primero

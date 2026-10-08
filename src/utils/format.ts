@@ -6,9 +6,10 @@ import type { Locale } from '../types/i18n';
  * aplica con `setBusinessTimeZone`; todas las fechas y horas se muestran y "hoy" se calcula en
  * ella, no en la del dispositivo (un teléfono en Hermosillo ve la misma hora que la empresa).
  *
- * El IDIOMA de los formatos es el activo (`currentLocale()`): "10 may 2026, 07:55" en es-MX y
- * "May 10, 2026, 7:55 AM" en en-US. Los formatos se crean una vez por idioma, zona y opciones; al
- * cambiar el idioma la siguiente llamada ya usa el nuevo (nada se recarga).
+ * El IDIOMA de los formatos es el activo (`currentLocale()`): "10 may 2026, 07:55" en es-MX,
+ * "May 10, 2026, 7:55 AM" en en-US, "10 de mai. de 2026, 07:55" en pt-BR, "10.05.2026, 07:55" en de-DE...
+ * (`Intl` con el idioma activo; reloj de 12 horas solo en en-US). Los formatos se crean una vez por idioma,
+ * zona y opciones; al cambiar el idioma la siguiente llamada ya usa el nuevo (nada se recarga).
  */
 export const DEFAULT_TIME_ZONE = 'America/Mexico_City';
 
@@ -24,6 +25,9 @@ function cachedDateFormat(locale: string, options: Intl.DateTimeFormatOptions): 
   }
   return format;
 }
+
+/** Fecha numérica de calendario (día y mes de dos dígitos, año completo) en el orden y con el separador del idioma: `DateField` y las validaciones. */
+export const NUMERIC_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' };
 
 /**
  * Formato de fechas en el idioma activo (en caché). Para fechas de calendario ("YYYY-MM-DD") se
@@ -70,15 +74,15 @@ export function businessHour(now: Date = new Date()): number {
   return Number(machineHour().format(now));
 }
 
-/** Hora de un registro: "07:55" (24 h) en es-MX; "7:55 AM" (12 h) en en-US. */
-const TIME_STYLE: Record<Locale, Intl.DateTimeFormatOptions> = {
-  'es-MX': { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' },
-  'en-US': { hour: 'numeric', minute: '2-digit', hourCycle: 'h12' },
-};
+/** Hora de un registro: "07:55" (reloj de 24 horas) en todos los idiomas salvo en-US ("7:55 AM"). */
+const TWENTY_FOUR_HOURS: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+const TWELVE_HOURS: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hourCycle: 'h12' };
+/** Los idiomas que leen la hora en un reloj de 12 horas (los demás, 24: es, pt, fr, de, it). */
+const TWELVE_HOUR_LOCALES: ReadonlySet<Locale> = new Set<Locale>(['en-US']);
 
 /** Opciones de la hora en el idioma activo (también para quien arma su propio formato con hora). */
 export function timeStyle(): Intl.DateTimeFormatOptions {
-  return TIME_STYLE[currentLocale()];
+  return TWELVE_HOUR_LOCALES.has(currentLocale()) ? TWELVE_HOURS : TWENTY_FOUR_HOURS;
 }
 
 function parsed(value: string): Date | null {

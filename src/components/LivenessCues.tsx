@@ -1,7 +1,6 @@
 import { useId, type CSSProperties } from 'react';
 import type { FaceGuidance } from '../hooks/useFaceDetection';
 import { actionTarget, type ActionMode } from '../utils/facePose';
-import { AccessoryAlert } from './FaceGuide';
 import type { Phase } from './FaceScan';
 
 /*
@@ -11,7 +10,7 @@ import type { Phase } from './FaceScan';
  *    desliza hacia ese lado;
  *  - acercarse: ondas finas que salen del anillo hacia afuera (el rostro debe crecer) mientras el círculo "respira".
  * La indicación escrita (en vivo para lectores de pantalla) la da el mensaje bajo el círculo; esto es solo apoyo
- * visual. Todo es CSS (transformaciones y opacidad) y "reducir movimiento" lo deja quieto.
+ * visual. Sobre el rostro nunca va una insignia (decisión del dueño, 2026-10-07: fuera el aviso de accesorios).
  */
 
 /** Hacia dónde va el movimiento: el lado del anillo que se resalta. */
@@ -84,13 +83,10 @@ interface ScannerHintsProps {
   /** Movimiento en curso (solo mientras se pide; null al volver al frente o fuera del reto). */
   mode: ActionMode | null;
   mirrored: boolean;
-  /** Accesorios a retirar (bloqueo por accesorios). */
-  accessories: string[];
 }
 
-/** Indicaciones sobre el rostro: la señal del movimiento (reto) o los accesorios a retirar (bloqueo). */
-export function ScannerHints({ phase, guidance, mode, mirrored, accessories }: ScannerHintsProps) {
-  if (phase === 'blocked') return <AccessoryAlert items={accessories} />;
-  if (mode && guidance !== 'hold_still' && guidance !== 'ready') return <ActionCue mode={mode} mirrored={mirrored} />;
+/** Sobre el rostro solo la señal del movimiento del reto (mientras falta hacerlo); en un bloqueo, nada. */
+export function ScannerHints({ phase, guidance, mode, mirrored }: ScannerHintsProps) {
+  if (phase !== 'blocked' && mode && guidance !== 'hold_still' && guidance !== 'ready') return <ActionCue mode={mode} mirrored={mirrored} />;
   return null;
 }

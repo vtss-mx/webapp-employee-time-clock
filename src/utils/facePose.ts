@@ -10,6 +10,7 @@ import type { FaceBox } from './faceBurst';
  *
  * - yaw_ratio: desplazamiento horizontal de la nariz respecto al punto medio de los ojos / distancia
  *   entre ojos, en la imagen original (sin espejo). Positivo = la persona gira hacia SU izquierda.
+ * - roll_degrees: inclinación lateral (el ángulo de la línea de los ojos).
  * - pitch_ratio: posición vertical de la nariz entre la línea de los ojos (0) y la boca (1). Al mirar
  *   arriba la nariz sube en la imagen y el valor BAJA; al mirar abajo, sube.
  * - Acercarse: ancho del rostro / ancho de frente.
@@ -57,6 +58,15 @@ export function yawRatio(detection: Detection, video: HTMLVideoElement): number 
   return dist > 1 ? (kp[2].x * w - midX) / dist : null;
 }
 
+/** Inclinación lateral de la cabeza (grados, como `roll_degrees` del servidor: el ángulo de la línea de los ojos). */
+export function rollDegrees(detection: Detection, video: HTMLVideoElement): number | null {
+  const kp = detection.keypoints;
+  if (!kp || kp.length < 2) return null;
+  const [a, b] = [kp[0], kp[1]].sort((p, q) => p.x - q.x);
+  const dx = (b.x - a.x) * video.videoWidth;
+  return dx > 1 ? (Math.atan2((b.y - a.y) * video.videoHeight, dx) * 180) / Math.PI : null;
+}
+
 /** Posición vertical de la nariz entre ojos (0) y boca (1); null sin la boca o con ojos y boca encimados. */
 export function pitchRatio(detection: Detection, video: HTMLVideoElement): number | null {
   const kp = detection.keypoints;
@@ -70,6 +80,75 @@ export function pitchRatio(detection: Detection, video: HTMLVideoElement): numbe
 /** Lo que se guarda de un cuadro de frente (con la caja del rostro) para medir después. */
 export function faceSample(detection: Detection, box: { originX: number; originY: number; width: number; height: number }, video: HTMLVideoElement): FaceBaseline {
   return { pitch: pitchRatio(detection, video), width: box.width, box: { x: box.originX, y: box.originY, width: box.width, height: box.height } };
+}
+
+/** Centro y tamaño del rostro en un cuadro (para medir su quietud). */
+export interface FacePoint {
+  cx: number;
+  cy: number;
+  size: number;
+}
+
+export function facePoint(box: { originX: number; originY: number; width: number; height: number }): FacePoint {
+  return { cx: box.originX + box.width / 2, cy: box.originY + box.height / 2, size: Math.max(box.width, box.height) };
+}
+
+/**
+ * Suavizado de la quietud del rostro (decisión del dueño, 2026-10-07: el rechazo por «movimiento no solicitado» saltaba
+ * de más en el iPhone con la persona razonablemente quieta). El detector del navegador (BlazeFace) tiembla unos píxeles
+ * entre cuadros; comparar solo con la lectura anterior marcaba «Mantente quieto» por un pico de ruido. Aquí el
+ * desplazamiento (del centro, o el cambio de tamaño) se mide contra el PROMEDIO de una ventana corta de posiciones —un
+ * pico aislado apenas mueve el promedio— y solo se marca «en movimiento» cuando supera el umbral durante varios cuadros
+ * SEGUIDOS (histéresis). NO afloja la validez de posición ni de pose (centrado, dentro de la guía, de frente): solo mide
+ * la quietud.
+ */
+export interface SteadyWindow {
+  /** Posiciones recientes (la más nueva al final), a lo más `window` cuadros. */
+  points: FacePoint[];
+  /** Cuadros seguidos con el desplazamiento por encima del umbral (para la histéresis). */
+  over: number;
+}
+
+export const steadyStart = (): SteadyWindow => ({ points: [], over: 0 });
+
+/**
+ * Agrega la posición nueva a la ventana y decide si el rostro se MUEVE de verdad: el desplazamiento del centro, o el
+ * cambio de tamaño, respecto al promedio de la ventana (en partes del tamaño del rostro) debe superar `maxShift` durante
+ * `graceFrames` cuadros seguidos. `window` cuadros de promedio. Con la ventana vacía (el primer cuadro de frente, o justo
+ * tras salirse de la guía) no hay con qué comparar: quieto.
+ */
+export function steadyStep(state: SteadyWindow, point: FacePoint, opts: { window: number; maxShift: number; graceFrames: number }): { state: SteadyWindow; moving: boolean } {
+  let shift = 0;
+  if (state.points.length > 0) {
+    const n = state.points.length;
+    const avg = state.points.reduce((a, p) => ({ cx: a.cx + p.cx / n, cy: a.cy + p.cy / n, size: a.size + p.size / n }), { cx: 0, cy: 0, size: 0 });
+    const base = Math.max(1, avg.size);
+    shift = Math.max(Math.hypot(point.cx - avg.cx, point.cy - avg.cy), Math.abs(point.size - avg.size)) / base;
+  }
+  const over = shift > opts.maxShift ? state.over + 1 : 0;
+  const points = [...state.points, point].slice(-opts.window);
+  return { state: { points, over }, moving: over >= opts.graceFrames };
+}
+
+/**
+ * Veredicto de un cuadro de frente YA bien colocado (`hold_still`): ¿sirve, o el rostro se MUEVE (quietud suavizada) o
+ * está BORROSO (nitidez)? Regla pura extraída del ciclo de detección (`useFaceAutoCapture`) para no acumular condiciones
+ * allí. La quietud y la nitidez solo se evalúan de frente (`!moving`): en un movimiento del reto el movimiento es lo
+ * pedido y la nitidez no se exige. Devuelve también la ventana de quietud actualizada (sin tocar la que entra).
+ */
+export function holdStillGuidance(
+  box: { originX: number; originY: number; width: number; height: number } | null,
+  moving: boolean,
+  quality: ((box: { originX: number; originY: number; width: number; height: number }) => boolean | null) | undefined,
+  steady: SteadyWindow,
+  opts: { window: number; maxShift: number; graceFrames: number },
+): { guidance: 'hold_still' | 'moving' | 'blurry'; steady: SteadyWindow } {
+  const jitter = !moving && box ? steadyStep(steady, facePoint(box), opts) : null;
+  const nextSteady = jitter ? jitter.state : steady;
+  const sharp = !moving && box ? quality?.(box) : undefined;
+  if (jitter?.moving) return { guidance: 'moving', steady: nextSteady };
+  if (sharp === false) return { guidance: 'blurry', steady: nextSteady };
+  return { guidance: 'hold_still', steady: nextSteady };
 }
 
 /** Promedio de los cuadros estables de frente (undefined si no hubo ninguno). */

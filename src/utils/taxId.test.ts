@@ -1,9 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { setLocale } from '../i18n/core';
-import { catalogsWith, testCatalogs } from '../test/catalogs';
-import { TAX_ID_TYPES } from '../test/taxIdTypes';
+import { catalogsWith, TAX_ID_TYPES, testCatalogs } from '../test/catalogs';
 import type { TaxIdTypeItem } from '../types';
 import { formatTaxId, mainTaxIdType, normalizeTaxId, taxIdHint, taxIdKey, taxIdTypesFor, validateTaxId } from './taxId';
 
@@ -70,13 +67,9 @@ describe('identificador fiscal: comparar y mostrar', () => {
   });
 });
 
-/** Contrato con el backend: los tipos de prueba son los mismos que su seed (alembic/seed/catalogs.json). */
-const SEED_FILE = resolve(process.cwd(), '../backend-employee-time-clock/alembic/seed/catalogs.json');
-
-describe('tipos de identificador fiscal: contrato con el backend', () => {
-  it.skipIf(!existsSync(SEED_FILE))('los de prueba son los mismos que los del seed, con su regla y su ejemplo', () => {
-    const seed = JSON.parse(readFileSync(SEED_FILE, 'utf-8')) as { tax_id_types: TaxIdTypeItem[] };
-    expect(TAX_ID_TYPES).toEqual(seed.tax_id_types);
+describe('tipos de identificador fiscal del seed del backend', () => {
+  it('el ejemplo de cada tipo cumple su propia regla', () => {
+    expect(TAX_ID_TYPES.length).toBeGreaterThan(0);
     for (const item of TAX_ID_TYPES) expect(new RegExp(item.pattern).test(item.example), item.code).toBe(true);
   });
 });

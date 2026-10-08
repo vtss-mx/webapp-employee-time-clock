@@ -52,7 +52,8 @@ export const employeeService = {
   /** Alta de empleado + usuario EMPLOYEE + QR automático (el rostro lo registra el empleado). */
   create(payload: EmployeeCreatePayload): Promise<Employee> {
     const body = { ...payload };
-    (['first_name', 'last_name', 'employee_number', 'email'] as const).forEach((k) => (body[k] = body[k].trim()));
+    // Los opcionales (número, RFC, CURP, NSS) ya llegan limpios o en null (`optionalPayload`).
+    (['first_name', 'last_name', 'email'] as const).forEach((k) => (body[k] = body[k].trim()));
     return apiRequest<Employee>('/employees', { method: 'POST', body, validate: isEmployee });
   },
 

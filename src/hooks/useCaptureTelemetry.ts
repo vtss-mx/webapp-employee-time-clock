@@ -22,7 +22,16 @@ export function useCaptureTelemetry(camera: CameraController, blocked: readonly 
 
   const { videoTrack, devices } = camera;
   return useCallback(
-    () => JSON.stringify(captureTelemetry({ track: videoTrack(), devices, blocked, intervals: watcher.current?.intervals() ?? [] })),
+    () =>
+      JSON.stringify(
+        captureTelemetry({
+          track: videoTrack(),
+          devices,
+          blocked,
+          intervals: watcher.current?.intervals() ?? [],
+          clock: watcher.current?.clock() ?? 'render',
+        }),
+      ),
     [blocked, devices, videoTrack],
   );
 }

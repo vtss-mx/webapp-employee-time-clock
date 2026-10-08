@@ -45,9 +45,9 @@ const speedLabel = (kmh: number) => `${formatNumber(kmh)} km/h`;
 export type TuningKey = string;
 
 /**
- * Lo que se envía al elegir un valor y el aviso al guardarse (título y qué cambia); `warning`: lo que
- * la confirmación debe advertir antes (p. ej. exigir el destello sin calibrar). Los textos son
- * funciones: se traducen al dibujarse, así la confirmación y el aviso abiertos siguen al idioma activo.
+ * Lo que se envía al elegir un valor y el aviso al guardarse (título y qué cambia); `warning`: lo que la confirmación
+ * debe advertir antes (p. ej. exigir una prueba de presencia: qué preparar). Los textos son funciones: se traducen al
+ * dibujarse, así la confirmación y el aviso abiertos siguen al idioma activo.
  */
 export type TuningUpdate = { changes: AdminPolicyUpdate; title: () => string; detail: () => string; warning?: () => string };
 
@@ -141,22 +141,6 @@ function tuningsOf(policy: VerificationPolicy, { active, byCode, nameOf }: Catal
         changes: { liveness_timeout_seconds: Number(value) },
         title: () => t('policy.tuning.timeout.saved'),
         detail: () => t('policy.tuning.timeout.savedText', { time: secondsLabel(Number(value)) }),
-      }),
-    },
-    {
-      key: 'flash_liveness',
-      icon: <Palette size={20} />,
-      label: () => t('policy.tuning.flash.label'),
-      description: byCode('flash_modes', policy.flash_liveness)?.description ?? t('policy.tuning.flash.description'),
-      enabled: policy.liveness_challenge,
-      value: policy.flash_liveness,
-      options: catalogOptions(active('flash_modes')),
-      stricter: 'higher',
-      pick: (code) => ({
-        changes: { flash_liveness: code },
-        title: () => t('policy.tuning.flash.saved', { mode: nameOf('flash_modes', code) }),
-        detail: () => byCode('flash_modes', code)?.description ?? '',
-        warning: code === 'ENFORCE' ? () => t('policy.tuning.flash.warning') : undefined,
       }),
     },
     {
@@ -299,13 +283,33 @@ export function TuningRow({ tuning, saving, onSave }: { tuning: Tuning } & Omit<
  * no guarda nada todavía: `onSave` recibe qué cambia ("antes → después") para confirmarlo primero.
  */
 export function PolicyTuning({ policy, saving, onSave }: PolicyTuningProps) {
-  useT(); // redibuja los ajustes al cambiar el idioma
+  const t = useT(); // redibuja los ajustes al cambiar el idioma
   const catalogs = useCatalogs();
   return (
     <div className="stack">
       {tuningsOf(policy, catalogs).map((tuning) => (
         <TuningRow key={tuning.key} tuning={tuning} saving={saving} onSave={onSave} />
       ))}
+      <RetiredRow icon={<Palette size={20} />} label={t('policy.tuning.flash.label')} note={t('policy.tuning.flash.retired')} value={catalogs.nameOf('flash_modes', policy.flash_liveness)} />
+    </div>
+  );
+}
+
+/**
+ * Un ajuste RETIRADO por decisión del dueño del producto (2026-10-06, el destello de colores): se muestra con su valor
+ * fijo y la nota, sin control (nadie lo cambia desde la app; el servidor lo deja apagado en toda empresa).
+ */
+export function RetiredRow({ icon, label, note, value }: { icon: ReactNode; label: string; note: string; value: string }) {
+  return (
+    <div className="tuning-row tuning-row--retired">
+      <span className="switch-row__icon">{icon}</span>
+      <span className="switch-row__text">
+        <span className="switch-row__label">{label}</span>
+        <span className="switch-row__description">{note}</span>
+      </span>
+      <span className="tuning-row__control">
+        <span className="badge">{value}</span>
+      </span>
     </div>
   );
 }

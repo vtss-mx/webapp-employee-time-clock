@@ -3,6 +3,7 @@ import { t, useLocale } from '../i18n';
 import { localizedError } from '../i18n/lazy';
 import { deviceStore } from '../utils/deviceStore';
 import { cameraProblemText, CameraNotReadyError, describeCameraProblem, errorKind, type CameraProblem, type CameraProblemKind } from '../utils/cameraDiagnostics';
+import { canvasReadbackBlocked } from '../utils/canvasReadback';
 import {
   activeKind,
   cameraConstraints,
@@ -45,7 +46,10 @@ export interface CameraController {
   activeDeviceId: string | null;
   /** Nombre de la cámara abierta ("Cámara frontal", "Cámara trasera"...), para el visor. */
   activeLabel: string;
-  /** Nombre real que da el sistema a la cámara abierta (detecta cámaras virtuales; viaja con las capturas). */
+  /**
+   * Nombre real que da el sistema a la cámara abierta (detecta cámaras virtuales; viaja con las capturas). Es un dato,
+   * nunca un texto de la interfaz: para mostrarlo, `cameraName(trackLabel)` (`utils/cameraDevices.ts`) o `activeLabel`.
+   */
   trackLabel: string;
   isMirrored: boolean;
   start: (deviceId?: string) => Promise<void>;
@@ -163,6 +167,13 @@ export function useCamera({ facing, autoStart = true }: UseCameraOptions): Camer
 
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
         fail(window.isSecureContext ? 'unsupported' : 'insecure');
+        return;
+      }
+      // Un navegador que entrega imágenes falsas de los lienzos (protección contra huellas digitales) no deja ver el
+      // rostro ni el QR: se explica antes de abrir la cámara en lugar de dejar a la persona frente a un visor que no
+      // encuentra nada (utils/canvasReadback.ts).
+      if (canvasReadbackBlocked()) {
+        fail('canvas-blocked');
         return;
       }
 

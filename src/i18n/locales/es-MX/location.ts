@@ -27,7 +27,7 @@ export default {
   },
   /** Cómo volver a permitir la ubicación (los mismos pasos en cualquier pantalla). */
   permissionSteps: {
-    iphone: 'iPhone: Ajustes › Privacidad › Localización › Safari (o tu navegador) › «Al usar la app».',
+    iphone: 'iPhone: Ajustes › Privacidad › Localización › Safari (o tu navegador) › permite el acceso mientras usas la aplicación.',
     android: 'Android: toca el candado junto a la dirección › Permisos › Ubicación › Permitir.',
   },
   /** Permiso bloqueado: por qué se necesita y cómo seguir, según la pantalla que lo pidió. */
@@ -47,6 +47,10 @@ export default {
     checkpoint: {
       text: 'Este validador envía su ubicación en cada identificación y el permiso está bloqueado en este navegador.',
       next: 'Vuelve a abrir el punto de control.',
+    },
+    verification: {
+      text: 'Esta verificación necesita tu ubicación y el permiso está bloqueado en este navegador.',
+      next: 'Regresa aquí y toca «Reintentar».',
     },
   },
   /** Respuestas del servidor sobre la ubicación (el texto lo explica el servidor). */
@@ -81,7 +85,7 @@ export default {
       placeholder: 'Entre Juárez y Morelos, frente a la plaza',
     },
     /** El número interior dentro del domicilio de una línea: "Calle Dr. Paliza 71 Int. 2". */
-    interior: 'Int. {number}',
+    interior: 'Interior {number}',
     required: {
       country: 'Elige el país',
       state: 'Escribe el estado o provincia',

@@ -8,6 +8,7 @@ import { headcountBreakdown, priceText } from '../../utils/billing';
 import { BYTES_PER_MB, formatBytes, formatCount, formatDuration, formatMoney, formatRate, moneyValue } from '../../utils/numbers';
 import type { DayRange } from '../../utils/usage';
 import { FactList } from '../billing/AccountParts';
+import { Avatar } from '../ui/Avatar';
 import { BarList } from '../ui/BarList';
 import { EmptyState } from '../ui/EmptyState';
 import { ListResults } from '../ui/ListResults';
@@ -111,9 +112,12 @@ export function UsersTab({ companyId, range }: { companyId: number; range: DayRa
       renderCells={(user) => (
         <>
           <td className="table__primary">
-            <span className="person__info">
-              <strong className="truncate">{user.name ?? user.email ?? t('usage.users.unknown', { id: user.user_id })}</strong>
-              <small className="truncate">{user.name ? user.email : t('usage.users.notEmployee')}</small>
+            <span className="person">
+              <Avatar name={user.name ?? user.email ?? String(user.user_id)} src={user.avatar} decorative />
+              <span className="person__info">
+                <strong className="truncate">{user.name ?? user.email ?? t('usage.users.unknown', { id: user.user_id })}</strong>
+                <small className="truncate">{user.name ? user.email : t('usage.users.notEmployee')}</small>
+              </span>
             </span>
           </td>
           <td data-label={t('usage.users.role')}>{nameOf('roles', user.role, '—')}</td>

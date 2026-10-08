@@ -47,14 +47,23 @@ beforeEach(() => {
 });
 
 describe('LanguageSwitcher', () => {
-  it('nombra cada idioma en sí mismo y en el idioma activo; anónimo: cambia al instante y lo recuerda en el dispositivo', async () => {
+  it('cada idioma con su bandera, su nombre en sí mismo y su país; anónimo: cambia al instante y lo recuerda en el dispositivo', async () => {
     const reload = vi.spyOn(versionService, 'reloadApp'); // único lugar de la app que recarga la página
     renderWithProviders(<LanguageSwitcher variant="compact" tone="dark" />);
     expect(trigger()).toHaveAccessibleName(/Idioma.*Español \(México\)/);
+    expect(trigger().parentElement?.querySelector('.select__icon svg.locale-flag')).toHaveAttribute('data-country', 'MX'); // la bandera en el control
     await userEvent.click(trigger());
     const list = screen.getByRole('listbox');
-    expect(within(list).getByRole('option', { name: /English \(United States\).*Inglés de Estados Unidos/ })).toBeInTheDocument();
-    await userEvent.click(within(list).getByRole('option', { name: /English/ }));
+    const menu = list.closest('.floating') as HTMLElement;
+    expect(menu).toHaveClass('language-switcher__menu', 'select__menu--dark');
+    expect(menu.style.minWidth).toBe(''); // en escritorio la lista mide exactamente lo que el control
+    const english = within(list).getByRole('option', { name: /English.*United States/ });
+    expect(english.querySelector('svg.locale-flag')).toHaveAttribute('data-country', 'US');
+    expect(english.querySelector('small')).toHaveTextContent('United States');
+    expect(within(list).getByRole('option', { name: /Español.*México/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(list).getByRole('option', { name: /Español.*México/ }).querySelector('.select__check')).toBeInTheDocument();
+    expect(english.querySelector('.select__check')).toBeNull();
+    await userEvent.click(english);
 
     await waitFor(() => expect(currentLocale()).toBe('en-US'));
     expect(trigger()).toHaveAccessibleName(/Language.*English \(United States\)/);
@@ -63,9 +72,17 @@ describe('LanguageSwitcher', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  it('en teléfonos (control compacto solo con la bandera) la lista conserva un ancho mínimo', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined })));
+    renderWithProviders(<LanguageSwitcher variant="compact" tone="dark" />);
+    await userEvent.click(trigger());
+    expect(screen.getByRole('listbox').closest('.floating')).toHaveStyle({ minWidth: '264px' });
+    vi.unstubAllGlobals();
+  });
+
   it('elegir el idioma que ya está activo no hace nada', async () => {
     renderWithProviders(<LanguageSwitcher variant="compact" />);
-    await choose(/Español/);
+    await choose(/Español.*México/);
     expect(deviceStore.set).not.toHaveBeenCalled();
     expect(currentLocale()).toBe('es-MX');
   });

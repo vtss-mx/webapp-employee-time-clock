@@ -40,11 +40,11 @@ describe('telemetría de la toma (antifraude 1b)', () => {
   });
 
   it('resume el ritmo de los cuadros', () => {
-    expect(frameRhythm([])).toBeNull();
-    expect(frameRhythm([33])).toBeNull();
-    expect(frameRhythm([0, 0, 0])).toEqual({ count: 3, mean_ms: 0, cv: 0 });
-    const rhythm = frameRhythm([30, 36, 33, 33]);
-    expect(rhythm).toEqual({ count: 4, mean_ms: 33, cv: expect.closeTo(0.06428, 4) as number });
+    expect(frameRhythm([], 'presentation')).toBeNull();
+    expect(frameRhythm([33], 'presentation')).toBeNull();
+    expect(frameRhythm([0, 0, 0], 'render')).toEqual({ count: 3, mean_ms: 0, cv: 0, clock: 'render' });
+    const rhythm = frameRhythm([30, 36, 33, 33], 'presentation');
+    expect(rhythm).toEqual({ count: 4, mean_ms: 33, cv: expect.closeTo(0.06428, 4) as number, clock: 'presentation' });
   });
 
   it('describe la pantalla (sin puntos táctiles informados: 0)', () => {
@@ -59,29 +59,56 @@ describe('telemetría de la toma (antifraude 1b)', () => {
 
   it('arma la telemetría: navegador automatizado y una cámara virtual instalada (solo el indicador)', () => {
     onNavigator('webdriver', true);
-    const telemetry = captureTelemetry({ track: null, devices: [camera('FaceTime HD Camera'), camera('OBS Virtual Camera')], blocked: ['virtual', 'obs'], intervals: [33, 34] });
-    expect(telemetry).toMatchObject({ v: 1, webdriver: true, virtual_camera: true, track: null, frames: { count: 2 } });
+    const telemetry = captureTelemetry({ track: null, devices: [camera('FaceTime HD Camera'), camera('OBS Virtual Camera')], blocked: ['virtual', 'obs'], intervals: [33, 34], clock: 'presentation' });
+    expect(telemetry).toMatchObject({ v: 1, webdriver: true, virtual_camera: true, track: null, frames: { count: 2, clock: 'presentation' } });
     expect(JSON.stringify(telemetry)).not.toContain('FaceTime'); // nunca la lista de cámaras
-    expect(captureTelemetry({ track: null, devices: [camera('FaceTime HD Camera')], blocked: ['obs'], intervals: [] })).toMatchObject({ virtual_camera: false, frames: null });
+    expect(captureTelemetry({ track: null, devices: [camera('FaceTime HD Camera')], blocked: ['obs'], intervals: [], clock: 'render' })).toMatchObject({ virtual_camera: false, frames: null });
   });
 
-  it('mide el intervalo entre cuadros con requestVideoFrameCallback (los últimos `limit`) y se detiene', () => {
-    let pending: ((now: number) => void) | null = null;
+  /** Un video que entrega cuadros cuando la prueba quiere (con o sin el instante de llegada del navegador). */
+  function frameSource() {
+    let pending: ((now: number, metadata?: Partial<VideoFrameCallbackMetadata>) => void) | null = null;
     const video = {
-      requestVideoFrameCallback: vi.fn((callback: (now: number) => void) => {
+      requestVideoFrameCallback: vi.fn((callback: typeof pending) => {
         pending = callback;
         return 7;
       }),
       cancelVideoFrameCallback: vi.fn(),
     } as unknown as HTMLVideoElement;
+    return { video, frame: (now: number, presentationTime?: number) => pending!(now, presentationTime === undefined ? {} : { presentationTime }) };
+  }
+
+  it('mide el intervalo entre cuadros con el reloj de LLEGADA de cada cuadro (los últimos `limit`) y se detiene', () => {
+    const { video, frame } = frameSource();
     const watcher = watchFrames(video, 2);
-    for (const now of [100, 133, 167, 200]) pending!(now);
-    expect(watcher.intervals()).toEqual([34, 33]);
+    // El dibujo va alineado a la pantalla (33.3 ms exactos); la llegada de los cuadros, no: se mide la llegada.
+    [
+      [100, 98.1],
+      [133.3, 131.9],
+      [166.6, 163.2],
+      [199.9, 197.4],
+    ].forEach(([now, presented]) => frame(now, presented));
+    expect(watcher.intervals().map((ms) => Number(ms.toFixed(1)))).toEqual([31.3, 34.2]);
+    expect(watcher.clock()).toBe('presentation');
     watcher.stop();
     expect(video.cancelVideoFrameCallback).toHaveBeenCalledWith(7);
     // Un navegador sin la API: nada que medir.
     const plain = watchFrames({} as HTMLVideoElement, 5);
     expect(plain.intervals()).toEqual([]);
+    expect(plain.clock()).toBe('render');
     plain.stop();
+  });
+
+  it('sin el instante de llegada mide con el del dibujo y lo declara; si cambia de reloj, empieza de nuevo', () => {
+    const { video, frame } = frameSource();
+    const watcher = watchFrames(video, 5);
+    for (const now of [100, 133, 167]) frame(now);
+    expect(watcher.intervals()).toEqual([33, 34]);
+    expect(watcher.clock()).toBe('render');
+    frame(200, 199);
+    expect(watcher.intervals()).toEqual([]); // nunca se mezclan los dos relojes
+    frame(233, 231);
+    expect(watcher.intervals()).toEqual([32]);
+    expect(watcher.clock()).toBe('presentation');
   });
 });

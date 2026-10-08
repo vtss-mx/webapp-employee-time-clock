@@ -131,6 +131,17 @@ describe('Turnos del empleado', () => {
     expect(screen.queryByRole('link', { name: 'Asignar turno' })).toBeNull();
   });
 
+  it('un empleado sin número (opcional): sus turnos y asignarle uno lo nombran solo por su nombre', async () => {
+    mockFetch((call) => (call.url.includes('/shift-assignments') ? apiOk(page([])) : call.url.startsWith('/api/shifts') ? apiOk(page([])) : apiOk({ ...employee, employee_number: null })));
+    const { unmount } = renderAt('/company/shifts/employees/7');
+    expect(await screen.findByText('Sin turno asignado')).toBeInTheDocument();
+    expect(document.querySelector('.badge--info.badge--plain')).toBeNull();
+    unmount();
+    renderAt('/company/shifts/employees/7/assign');
+    expect(await screen.findByText('Ana Ruiz')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('Ana Ruiz ·');
+  });
+
   it('si sus turnos no cargan lo dice y se reintenta', async () => {
     let lists = 0;
     mockFetch((call) => {

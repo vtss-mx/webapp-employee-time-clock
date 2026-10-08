@@ -1,112 +1,11 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Link, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setLocale } from '../../i18n/core';
-import { apiFail, apiOk, liveCheck, mockFetch, type MockCall } from '../../test/http';
-import { renderWithProviders } from '../../test/render';
-import type { Employee } from '../../types';
-import { EmployeeCreatePage } from './EmployeeCreatePage';
-import { EmployeeEditPage } from './EmployeeEditPage';
-import { EmployeesListPage } from './EmployeesListPage';
-import { ReverifyIdentityPage } from './ReverifyIdentityPage';
-
-const ana: Employee = {
-  id: 7,
-  user_id: 70,
-  employee_number: 'EMP-7',
-  first_name: 'Ana',
-  last_name: 'Ruiz',
-  full_name: 'Ana Ruiz',
-  birth_date: '1990-01-01',
-  rfc: 'RUAA900101AB1',
-  curp: 'RUAA900101MSRRZL09',
-  nss: '12345678903',
-  phone: '+526621234567',
-  email: 'ana@empresa.com',
-  active: true,
-  headwear_exempt: false,
-  face_status: 'APPROVED',
-  face_rejection_reason: null,
-  latest_enrollment_id: 3,
-  has_face: true,
-  face_samples: 5,
-  department_id: 3,
-  department_name: 'Producción',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-10-01T10:00:00Z',
-};
-const luis: Employee = { ...ana, id: 8, employee_number: 'EMP-8', first_name: 'Luis', last_name: 'Paz', full_name: 'Luis Paz', email: 'luis@empresa.com', active: false, face_status: 'NOT_ENROLLED', department_id: null, department_name: null };
-
-const page = (items: Employee[]) => ({ items, total: items.length, page: 1, size: 10 });
-const posted = (calls: MockCall[], method: string) => {
-  const call = calls.find((c) => c.init.method === method);
-  return { url: call?.url, body: JSON.parse((call?.init.body as string | undefined) ?? 'null') as unknown };
-};
-
-/** Validación en vivo (respaldo HTTP): cada dato único responde según su campo. */
-function live(call: MockCall, codes: Record<string, string> = {}) {
-  const field = new URL(call.url, 'http://localhost').searchParams.get('field') ?? '';
-  return liveCheck(codes[field] ?? 'AVAILABLE', codes[field] === 'LINKABLE' ? 'Esta persona ya tiene cuenta en Employee Time Clock' : 'Disponible', field);
-}
-
-/** Pantallas de empleados con sus destinos (expediente y listado). */
-function renderEmployees(route: string) {
-  return renderWithProviders(
-    <Routes>
-      <Route path="/company/employees" element={<EmployeesListPage />} />
-      <Route path="/company/employees/new" element={<EmployeeCreatePage />} />
-      <Route path="/company/employees/:id/edit" element={<EmployeeEditPage />} />
-      <Route path="/company/employees/:id/reverify" element={<ReverifyIdentityPage />} />
-      <Route
-        path="/company/employees/:id"
-        element={
-          <>
-            <p>Expediente del empleado</p>
-            <Link to="/company/employees/7/edit">Ir a editar</Link>
-          </>
-        }
-      />
-    </Routes>,
-    { route },
-  );
-}
-
-const VALID = {
-  Nombres: 'Eva',
-  Apellidos: 'Sol',
-  CURP: 'RUAA900101MSRRZL09',
-  RFC: 'RUAA900101AB1',
-  'No. de Seguridad Social (NSS)': '12345678903',
-  'No. de empleado': 'EMP-9',
-  'Teléfono celular': '6621234567',
-  'Correo electrónico': 'eva@empresa.com',
-};
-
-/** Llena el alta como lo haría la persona (la contraseña solo si se pide). */
-async function fillEmployee({ password = true } = {}) {
-  for (const [label, value] of Object.entries(VALID)) await userEvent.type(screen.getByLabelText(label), value);
-  await userEvent.type(screen.getByLabelText('Fecha de nacimiento'), '01011990');
-  if (password) {
-    await userEvent.type(screen.getByLabelText('Contraseña'), 'Segura123');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Segura123');
-  }
-}
-
-const submitForm = (button: string) => {
-  const form = screen.getByRole('button', { name: button }).closest('form');
-  if (!form) throw new Error('sin formulario');
-  fireEvent.submit(form);
-};
+import { ana, answer, fillEmployee, luis, live, page, posted, renderEmployees, serveEmployee, submitForm, VALID } from '../../test/employees';
+import { apiFail, apiOk, mockFetch } from '../../test/http';
 
 afterEach(() => vi.unstubAllGlobals());
-
-/** Responde la confirmación previa al envío (crear, editar...) con el botón indicado. */
-async function answer(role: 'dialog' | 'alertdialog', title: string, button: string) {
-  const dialog = await screen.findByRole(role, { name: title });
-  await userEvent.click(within(dialog).getByRole('button', { name: button }));
-  return dialog;
-}
 
 describe('Empleados: listado', () => {
   it('muestra a cada empleado con su departamento, registro facial y estado; una fila abre su expediente', async () => {
@@ -256,12 +155,7 @@ describe('Empleados: alta', () => {
 });
 
 describe('Empleados: edición', () => {
-  function serve(current: Employee, onPut: () => Response = () => apiOk(current)) {
-    return mockFetch((call) => {
-      if (call.url.startsWith('/api/validation')) return live(call);
-      return call.init.method === 'PUT' ? onPut() : apiOk(current);
-    });
-  }
+  const serve = serveEmployee;
 
   it('llena el formulario; sin cambios no hay nada que guardar; guarda solo lo modificado', async () => {
     const { calls } = serve(ana);
@@ -438,6 +332,7 @@ describe('Empleados en inglés (en-US)', () => {
     renderEmployees('/company/employees/new');
     expect(screen.getByText('Optional · 13 characters. Must match the date of birth')).toBeInTheDocument();
     expect(screen.getByText('Optional · 11 digits, as registered with the IMSS')).toBeInTheDocument();
+    expect(screen.getByText('Optional · unique, with letters, numbers, hyphens, or underscores')).toBeInTheDocument();
     const english = { 'First names': 'Eva', 'Last names': 'Sol', CURP: VALID.CURP, RFC: VALID.RFC, 'Social Security No. (NSS)': VALID['No. de Seguridad Social (NSS)'], 'Employee No.': 'EMP-9', 'Mobile phone': '6621234567', Email: 'eva@empresa.com' };
     for (const [label, value] of Object.entries(english)) await userEvent.type(screen.getByLabelText(label), value);
     await userEvent.type(screen.getByLabelText('Date of birth'), '01011990');

@@ -10,7 +10,8 @@ import { EmployeeInfo } from './EmployeeInfo';
 export const employeeRestore = (employee: Employee): RestoreQuestion => ({
   title: t('employees.trash.restoreTitle', { name: employee.full_name }),
   details: [
-    { label: t('common.fields.employeeNumber'), value: employee.employee_number },
+    // El número es opcional: sin él, la persona se reconoce por su nombre y su correo.
+    ...(employee.employee_number ? [{ label: t('common.fields.employeeNumber'), value: employee.employee_number }] : []),
     { label: t('employees.email'), value: employee.email },
   ],
   note: t('ui.trash.faceAgain'),
@@ -27,7 +28,7 @@ export function DeletedEmployee({ employee, onRestored }: { employee: Employee; 
     <DeletedRecordPage
       record={employee}
       name={employee.full_name}
-      subtitle={<span className="badge badge--info badge--plain">{employee.employee_number}</span>}
+      subtitle={employee.employee_number ? <span className="badge badge--info badge--plain">{employee.employee_number}</span> : undefined}
       backTo={paths.company.employees}
       backLabel={t('employees.back')}
       banner={t('employees.trash.banner')}

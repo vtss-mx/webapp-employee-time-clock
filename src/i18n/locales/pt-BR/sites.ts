@@ -1,0 +1,100 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/sites';
+
+/** Textos de sitios donde se checa en portugués de Brasil (pt-BR): las mismas llaves que es-MX. */
+export default {
+  list: {
+    title: 'Locais de trabalho',
+    loadError: 'Não foi possível carregar os locais',
+    subtitle_one: '{count} local · onde se registra o ponto presencialmente e com qual raio',
+    subtitle_other: '{count} locais · onde se registra o ponto presencialmente e com qual raio',
+    new: 'Novo local',
+    searchPlaceholder: 'Pesquisar por nome',
+    searchLabel: 'Pesquisar locais',
+    noun: { one: 'local', other: 'locais' },
+    columns: {
+      site: 'Local',
+      address: 'Endereço',
+      radius: 'Raio',
+      employees: 'Funcionários hoje',
+      code: 'Código',
+    },
+    kiosksOf_one: '{count} quiosque de {name}',
+    kiosksOf_other: '{count} quiosques de {name}',
+    noMatch: {
+      title: 'Sem resultados',
+      description: 'Tente outra pesquisa ou filtro.',
+    },
+    empty: {
+      title: 'Sem locais de trabalho',
+      description: 'Crie um local para indicar onde sua equipe registra o ponto.',
+    },
+  },
+  form: {
+    loadError: 'Não foi possível carregar o local',
+    newTitle: 'Novo local',
+    editTitle: 'Editar local',
+    newSubtitle: 'Um lugar onde sua equipe registra o ponto presencialmente: fábrica, filial, escritório…',
+    create: 'Criar local',
+    createError: 'Não foi possível criar o local',
+    saveError: 'Não foi possível salvar o local',
+    rule: 'Raio para registrar o ponto: {distance}.',
+    created: {
+      title: 'Local criado',
+      text: '{name} já pode ser adicionado aos seus turnos. {rule}',
+    },
+    updated: {
+      title: 'Local atualizado',
+      text: '{name} · {rule}',
+    },
+    sections: {
+      site: 'Local',
+      location: 'Localização',
+    },
+    name: 'Nome do local',
+    nameExample: 'Fábrica Hermosillo',
+    nameHint: 'Único na sua empresa: por exemplo, “Fábrica Hermosillo”',
+    radius: 'Raio para registrar o ponto (metros)',
+    radiusHint: 'Entre {min} e {max} m: o tamanho do lugar mais a margem do GPS.',
+    suggestedRadii: 'Raios sugeridos',
+    onSiteNote: 'No local, o ponto é registrado com o rosto e a localização do celular, dentro deste raio.',
+    locationIntro: 'Pesquise o lugar ou toque no mapa. O círculo marca o raio para registrar o ponto.',
+    pointRequired: 'Marque no mapa o ponto do local',
+  },
+  fields: {
+    address: 'Endereço',
+    references: 'Referências',
+    point: 'Ponto no mapa',
+    radius: 'Raio para registrar o ponto',
+  },
+  confirm: {
+    createTitle: 'Criar o local {name}?',
+    createMessage: 'Poderá ser adicionado aos seus turnos; quem os tiver registrará o ponto aqui.',
+    willCreate: 'Será criado',
+    editTitle: 'Salvar as alterações do local {name}?',
+  },
+  status: {
+    title: 'Situação do local',
+    activeMeaning: 'Pode ser adicionado aos turnos e quem os tiver pode registrar o ponto aqui.',
+    inactiveMeaning: 'Ninguém pode registrar o ponto neste local e ele não pode ser adicionado a um turno.',
+    deactivateWarning: 'Ninguém poderá registrar o ponto aqui nem adicioná-lo a um turno até que você o ative. Os turnos que o incluem e o que já foi registrado não mudam.',
+    removeWarning: 'Só pode ser excluído se nenhum turno o usar e ninguém tiver registrado o ponto nele. Se um turno o usa, remova-o do turno; se já houve registro de ponto nele, desative-o.',
+    activateQuestion: 'Ativar o local {name}?',
+    deactivateQuestion: 'Desativar o local {name}?',
+    removeQuestion: 'Excluir o local {name}?',
+    activated: 'Local ativado',
+    deactivated: 'Local desativado',
+    removed: 'Local excluído',
+    inUse: 'O local está em uso: desative-o',
+  },
+  trash: {
+    restoreTitle: 'Restaurar o local {name}?',
+    banner: 'Local excluído',
+  },
+  presence: {
+    label: 'Código do local',
+    hint: 'Pede na entrada e na saída o código que o quiosque do local mostra.',
+    on: 'Pede código',
+    off: 'Sem código',
+  },
+} satisfies Translation<typeof es>;

@@ -4,7 +4,7 @@ import { useErrorPopup } from '../hooks/useFeedback';
 import { useRetryOnReconnect } from '../hooks/useRetryOnReconnect';
 import { t, useLocale } from '../i18n';
 import { catalogService } from '../services/catalogService';
-import { createCatalogApi, type CatalogApi } from '../utils/catalogs';
+import { createCatalogApi, publishCatalogs, type CatalogApi } from '../utils/catalogs';
 
 export type CatalogState =
   | { status: 'loading' }
@@ -28,20 +28,31 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [attempt, setAttempt] = useState(0);
   const locale = useLocale();
 
+  /**
+   * Los catálogos nuevos se publican ANTES de dibujarse con ellos (`publishCatalogs`): `nameOf`/`byCode` buscan
+   * siempre en los vigentes —también lo que guardó una búsqueda de una carga anterior, como un popup abierto, que
+   * así cambia de idioma— y lo que se dibuja fuera de este proveedor (los popups) se vuelve a dibujar.
+   */
+  const show = useCallback((next: CatalogApi | null) => {
+    publishCatalogs(next);
+    setCatalogs(next);
+  }, []);
+
   // Se carga al autenticarse, en cada reintento y al cambiar el idioma; al cerrar la sesión se cancela y se descarta.
   useEffect(() => {
     if (!isAuthenticated) {
-      setCatalogs(null);
+      show(null);
       setError(null);
       return;
     }
     const controller = new AbortController();
     catalogService
       .getAll(controller.signal)
-      .then((data) => !controller.signal.aborted && setCatalogs(createCatalogApi(data)))
+      .then((data) => !controller.signal.aborted && show(createCatalogApi(data)))
       .catch((cause: unknown) => !controller.signal.aborted && setError(cause));
     return () => controller.abort();
-  }, [isAuthenticated, attempt, locale]);
+  }, [isAuthenticated, attempt, locale, show]);
+  useEffect(() => () => publishCatalogs(null), []);
 
   const retry = useCallback(() => {
     setError(null);

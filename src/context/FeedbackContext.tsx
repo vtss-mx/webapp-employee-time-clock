@@ -1,8 +1,9 @@
 import { RefreshCw } from 'lucide-react';
-import { createContext, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MessageDialog, type MessageAction, type MessageInput, type MessageSource } from '../components/MessageDialog';
 import { t, useLocale } from '../i18n';
 import { resolveLazy, type Lazy, type LazyNode, type LazyText } from '../i18n/lazy';
+import { latestCatalogs, subscribeCatalogs } from '../utils/catalogs';
 import { describeError, isHandledGlobally } from '../utils/errorPresentation';
 import { ConfirmProvider } from './ConfirmContext';
 
@@ -71,10 +72,12 @@ const textKey = (text: ReactNode) => (typeof text === 'string' || typeof text ==
  * pasos o palomitas), contenido propio, acciones, nota al pie y si se puede cerrar.
  * Monta también las confirmaciones de crear, editar y eliminar (`ConfirmProvider`, `useConfirm`):
  * una sola instancia junto a los mensajes, en la app y en cada prueba que tenga mensajes.
- * Al cambiar el idioma se vuelve a dibujar: el popup abierto se arma de nuevo con su `source`.
+ * Al cambiar el idioma se vuelve a dibujar: el popup abierto se arma de nuevo con su `source`; también cuando
+ * llegan los catálogos del idioma nuevo (un popup que nombra registros de un catálogo los muestra en ese idioma).
  */
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   useLocale();
+  useSyncExternalStore(subscribeCatalogs, latestCatalogs);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const queueRef = useRef<QueuedMessage[]>([]);
   const nextId = useRef(1);

@@ -103,7 +103,7 @@ describe('useConfirm', () => {
 
   it('fuera del proveedor avisa con un error claro', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(() => renderHook(() => useConfirm())).toThrow('useConfirm debe usarse dentro de <FeedbackProvider>');
+    expect(() => renderHook(() => useConfirm())).toThrow('FEEDBACK_PROVIDER_MISSING');
   });
 });
 

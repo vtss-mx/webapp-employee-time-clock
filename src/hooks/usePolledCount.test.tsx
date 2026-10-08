@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setLocale } from '../i18n/core';
 import { usePolledCount } from './usePolledCount';
 
 const EVENT = 'tc:test-count-changed';
@@ -64,5 +65,20 @@ describe('usePolledCount', () => {
     await tick(60_000);
     expect(load).not.toHaveBeenCalled();
     expect(result.current).toBeNull();
+  });
+
+  it('al cambiar el idioma se consulta de nuevo en ese momento (lo que traiga texto del servidor llega en el nuevo); inactivo, no', async () => {
+    const load = vi.fn(() => Promise.resolve(3)).mockResolvedValueOnce(3).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { result, rerender } = renderHook(({ enabled }) => usePolledCount(load, { ...OPTIONS, enabled }), { initialProps: { enabled: true } });
+    await tick();
+    expect(load).toHaveBeenCalledOnce();
+    await act(() => setLocale('en-US'));
+    await tick();
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(result.current).toBe(3); // si esa consulta falla, se conserva lo que había
+    rerender({ enabled: false });
+    await act(() => setLocale('es-MX'));
+    await tick();
+    expect(load).toHaveBeenCalledTimes(2);
   });
 });

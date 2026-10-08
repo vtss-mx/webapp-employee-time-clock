@@ -41,7 +41,7 @@ vi.mock('../../../components/LiveFaceFlow', () => ({
     <div>
       <h1>{title}</h1>
       <p>{submittingMessage}</p>
-      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false }).catch(onFatal)}>capturar rostro</button>
+      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] }).catch(onFatal)}>capturar rostro</button>
       <button onClick={() => onFatal(new Error('No se pudo abrir la cámara'))}>falla de cámara</button>
       <button onClick={onCancel}>salir</button>
     </div>

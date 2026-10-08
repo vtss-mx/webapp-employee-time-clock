@@ -230,7 +230,7 @@ describe('Rendimiento: consultas de la base y alertas', () => {
     expect(row).toHaveTextContent('Respondió 200');
     expect(within(row).getByText('Abierta')).toHaveClass('badge--danger');
     expect(row).toHaveTextContent('14reabierta 1 vez');
-    expect(row).toHaveTextContent('1.8 sprom. 1.5 s · máx. 3.2 s');
+    expect(row).toHaveTextContent('1.8 spromedio 1.5 s · máx. 3.2 s');
     expect(row).toHaveTextContent('1 s');
     const other = await rowOf('POST /api/auth/login');
     expect(other).not.toHaveTextContent('Respondió');

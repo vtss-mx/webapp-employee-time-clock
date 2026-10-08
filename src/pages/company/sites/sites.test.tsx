@@ -80,7 +80,7 @@ describe('Sitios: listado', () => {
     );
     const row = (await screen.findByText('Planta Norte')).closest('tr') as HTMLElement;
     expect(within(row).getByText('Hermosillo')).toBeInTheDocument();
-    expect(within(row).getByText('Blvd. Kino 100 Int. B, Centro, 83150 Hermosillo, Sonora')).toBeInTheDocument();
+    expect(within(row).getByText('Blvd. Kino 100 Interior B, Centro, 83150 Hermosillo, Sonora')).toBeInTheDocument();
     expect(within(row).getByText('100 m')).toBeInTheDocument();
     expect(within(row).getByText('12')).toBeInTheDocument();
     expect(within(row).getByText('Activo')).toBeInTheDocument();

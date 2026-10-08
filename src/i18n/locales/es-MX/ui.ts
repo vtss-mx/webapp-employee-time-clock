@@ -135,4 +135,8 @@ export default {
     count_one: '{count} eliminado',
     count_other: '{count} eliminados',
   },
+  /** Reproductor de video propio (ui/VideoPlayer). */
+  video: {
+    position: 'Posición del video',
+  },
 } as const;

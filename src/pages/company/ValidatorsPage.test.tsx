@@ -62,7 +62,7 @@ describe('ValidatorsPage (COMPANY)', () => {
     server([{ ...sampleValidator, address: null }, guarded]);
     renderWithProviders(<ValidatorsPage />);
     expect(await screen.findByText(/Sin domicilio: edítalo para agregarlo/)).toBeInTheDocument();
-    expect(screen.getByText(/Calle Dr. Paliza 71 Int. B, Centro, 83000 Hermosillo, Sonora/)).toBeInTheDocument(); // con la colonia
+    expect(screen.getByText(/Calle Dr. Paliza 71 Interior B, Centro, 83000 Hermosillo, Sonora/)).toBeInTheDocument(); // con la colonia
     expect(screen.getByText('1,500 m')).toBeInTheDocument();
     expect(screen.getByText('2 dispositivos por autorizar')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Dispositivos de Comedor' })).toHaveAttribute('href', '/company/validators/4/devices');

@@ -8,6 +8,8 @@ import antifraud from './policy/antifraud';
 import tuning from './policy/tuning';
 
 export default {
+  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
+  retired: 'Desactivado por decisión del producto (2026-10-06).',
   loadError: 'No se pudo cargar la política de verificación',
   title: 'Política de verificación de identidad',
   saveError: 'No se pudo guardar',
@@ -66,9 +68,10 @@ export default {
       hint: 'Solo los validadores tienen restricciones; empleados y administradores usan cualquier dispositivo.',
     },
   },
-  /** Un interruptor por accesorio del catálogo: "Retirar los lentes" (`{phrase}` sale del catálogo). */
+  /** Un interruptor por accesorio del catálogo: "Retirar el cubrebocas" (`{phrase}` sale del catálogo). */
   accessories: {
     remove: 'Retirar {phrase}',
+    /** Apagado por omisión en toda empresa (decisión del dueño, 2026-10-07); el ADMIN lo enciende por empresa. */
     blockGlasses: {
       on: 'Se pedirá quitarse lentes (incluidos los de sol).',
       off: 'Se permite identificarse con lentes.',
@@ -90,7 +93,7 @@ export default {
       off: 'Sin reto de movimientos.',
     },
     antiSpoofing: {
-      label: 'Anti-spoofing',
+      label: 'Detección de suplantación',
       on: 'Detecta fotos impresas, pantallas y videos frente a la cámara.',
       off: 'No se analizan fotos ni pantallas.',
     },
@@ -179,6 +182,16 @@ export default {
       on: 'Se guardan unos fotogramas cifrados de cada intento sospechoso para revisar el caso; se borran solos al vencer.',
       off: 'Los casos se abren sin fotogramas: solo con lo que se midió.',
     },
+    voiceVerification: {
+      label: 'Verificación por voz y video en el registro',
+      on: 'Tras las fotos, el empleado responde en video tres preguntas sobre sus datos; la voz y el rostro se comparan en el servidor y la empresa revisa el video.',
+      off: 'El registro termina con las fotos.',
+    },
+    voiceGuidance: {
+      label: 'Guía por voz',
+      on: 'Las indicaciones del registro se leen en voz alta en el dispositivo.',
+      off: 'El registro no lee las indicaciones en voz alta.',
+    },
     validatorMobileOnly: {
       label: 'Validadores solo desde tableta o teléfono',
       on: 'Los validadores solo inician sesión en tabletas y teléfonos.',
@@ -194,6 +207,7 @@ export default {
     qrOnly: 'Quien tenga el teléfono de otro empleado podrá registrar su asistencia sin mostrar el rostro.',
     riskEngine: 'Las señales dejarán de sumarse: un intento con varios indicios de engaño pasará si ningún candado lo detiene solo.',
     captureProtocol: 'Un video preparado de antemano será más difícil de detectar.',
+    voiceVerification: 'Un registro con fotos de otra persona ya no tendrá la segunda comprobación de voz y rostro en video.',
   },
   /** Encender o apagar una regla: confirmación y aviso. */
   toggle: {
@@ -207,6 +221,20 @@ export default {
     deactivate: 'Desactivar',
     activated: '{label}: activado',
     deactivated: '{label}: desactivado',
+  },
+  /** Guía por voz del registro facial (decisión del dueño, 2026-10-08): encenderla y elegir la voz. */
+  voice: {
+    title: 'Guía por voz',
+    hint: 'Lee en voz alta las indicaciones del registro facial, con la síntesis del propio dispositivo.',
+    profile: {
+      label: 'Voz de la guía',
+      description: 'Voz con que se leen las indicaciones durante el registro.',
+      saved: 'Voz de la guía actualizada',
+      savedText: 'Las indicaciones se leerán con la voz «{name}».',
+      confirmTitle: '¿Usar la voz «{value}»?',
+      confirmLabel: 'Guardar voz',
+    },
+    preview: 'Probar voz',
   },
   tuning,
   ...antifraud,

@@ -322,7 +322,6 @@ describe('LoginPage en inglés (en-US) y cambio de idioma en caliente', () => {
     await setLocale('en-US');
     renderWithProviders(<LoginPage />, { auth: true });
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.getByText('Use your Employee Time Clock work account')).toBeInTheDocument();
     expect(screen.getByRole('banner')).toHaveTextContent('Attendance and work-hours tracking.');
     expect(screen.getByLabelText('Email')).toHaveAttribute('placeholder', 'you@company.com');
     expect(screen.getByRole('checkbox', { name: 'Remember my account' })).toHaveAccessibleDescription(/Do not use it on shared computers/);

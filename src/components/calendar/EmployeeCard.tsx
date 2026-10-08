@@ -13,16 +13,17 @@ interface EmployeeCardProps {
 }
 
 /**
- * Un registro de un empleado en las listas del calendario (ausencia, día laborable): avatar, nombre y número
+ * Un registro de un empleado en las listas del calendario (ausencia, día laborable): su foto (o sus iniciales), nombre y número
  * (con su marca si el empleado ya está en «Eliminados»: lo registrado no cambia).
  */
 export function EmployeeCard({ employee, badges, actions, children }: EmployeeCardProps) {
   return (
     <ShiftItem
-      lead={<Avatar name={employee.full_name} decorative />}
+      lead={<Avatar name={employee.full_name} src={employee.avatar} decorative />}
       title={
         <>
-          {employee.full_name} <span className="muted small">· {employee.employee_number}</span>
+          {employee.full_name}
+          {employee.employee_number && <> <span className="muted small">· {employee.employee_number}</span></>}
           <DeletedMark deleted={employee.deleted} />
         </>
       }

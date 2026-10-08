@@ -3,20 +3,21 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useDismissOnOutsidePointer } from '../../hooks/useDismissOnOutsidePointer';
 import { useSyncOnChange } from '../../hooks/useSyncOnChange';
 import { useT } from '../../i18n';
-import { businessDate, localeDateFormat } from '../../utils/format';
+import { businessDate, localeDateFormat, NUMERIC_DATE } from '../../utils/format';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
 import { Floating } from './Floating';
 
 /**
  * Campo de fecha propio (no el nativo del navegador): mismo alto y estilo que los demás
- * controles, la fecha se escribe en el orden del idioma activo ("dd/mm/aaaa" en es-MX,
- * "mm/dd/yyyy" en en-US) y el calendario personalizado (nombres de meses y días del idioma)
- * tiene selección rápida de mes y año, límites (min/max) y navegación con teclado.
+ * controles, la fecha se escribe en el orden y con el separador del idioma activo ("dd/mm/aaaa" en
+ * es-MX, "mm/dd/yyyy" en en-US, "TT.MM.JJJJ" en de-DE; lo dice `Intl`, `dateLayout`) y el calendario
+ * personalizado (nombres de meses y días del idioma) tiene selección rápida de mes y año, límites
+ * (min/max) y navegación con teclado. Al teclear se aceptan «/», «.» y «-» y se normalizan al del idioma.
  *
  * El valor es ISO "aaaa-mm-dd" (como un <input type="date">) en cualquier idioma. Mientras se
  * escribe una fecha incompleta el valor es "" y, si está completa pero no existe (31/02), se
  * entrega el texto tal cual para que la validación del formulario la marque como inválida. Al
- * cambiar el idioma, la fecha elegida se vuelve a escribir en el orden del idioma nuevo.
+ * cambiar el idioma, la fecha elegida se vuelve a escribir en el orden y con el separador del idioma nuevo.
  */
 interface DateFieldProps {
   label: string;
@@ -38,10 +39,28 @@ const pad = (n: number) => String(n).padStart(2, '0');
 /** Orden en que se escriben el día y el mes: "dd/mm/aaaa" (es-MX) o "mm/dd/yyyy" (en-US). */
 export type DateOrder = 'dmy' | 'mdy';
 
-/** El orden de la fecha corta del idioma activo (lo dice `Intl`, no una lista de idiomas). */
+/** Cómo escribe el idioma activo una fecha numérica: el orden de día y mes y el separador («/», o «.» en alemán). */
+export interface DateLayout {
+  order: DateOrder;
+  separator: string;
+}
+
+/** Separadores que se aceptan al teclear una fecha (se normalizan al del idioma). */
+const ANY_SEPARATOR = /[/.-]/;
+
+/** El orden y el separador de la fecha corta del idioma activo (lo dice `Intl`, no una lista de idiomas). */
+export function dateLayout(): DateLayout {
+  const parts = localeDateFormat(NUMERIC_DATE).formatToParts(0);
+  const order = parts.findIndex((part) => part.type === 'month') < parts.findIndex((part) => part.type === 'day') ? 'mdy' : 'dmy';
+  return { order, separator: parts.filter((part) => part.type === 'literal')[0].value.trim() };
+}
+
 export function dateOrder(): DateOrder {
-  const parts = localeDateFormat({ day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).formatToParts(0);
-  return parts.findIndex((part) => part.type === 'month') < parts.findIndex((part) => part.type === 'day') ? 'mdy' : 'dmy';
+  return dateLayout().order;
+}
+
+export function dateSeparator(): string {
+  return dateLayout().separator;
 }
 
 /** Primera letra en mayúscula: `Intl` da los meses y los días del español en minúsculas ("junio" → "Junio" en un título). */
@@ -68,23 +87,26 @@ export function parseIso(value: string | undefined): Date | null {
   return date.getMonth() === Number(match[2]) - 1 ? date : null;
 }
 
-/** ISO → lo que se ve en el campo, en el orden del idioma ("" si no es una fecha). */
-export function isoToDisplay(value: string, order: DateOrder = dateOrder()): string {
+/** ISO → lo que se ve en el campo, en el orden y con el separador del idioma ("" si no es una fecha). */
+export function isoToDisplay(value: string, { order, separator }: DateLayout = dateLayout()): string {
   const date = parseIso(value);
   if (!date) return '';
   const [day, month] = [pad(date.getDate()), pad(date.getMonth() + 1)];
-  return `${order === 'mdy' ? `${month}/${day}` : `${day}/${month}`}/${date.getFullYear()}`;
+  return [...(order === 'mdy' ? [month, day] : [day, month]), String(date.getFullYear())].join(separator);
 }
 
-/** Aplica la máscara mientras se escribe (dd/mm/aaaa y mm/dd/yyyy tienen la misma forma: 2/2/4 dígitos). */
-export function maskDate(text: string): string {
+/**
+ * Aplica la máscara mientras se escribe (dd/mm/aaaa, mm/dd/yyyy y TT.MM.JJJJ tienen la misma forma: 2/2/4 dígitos):
+ * solo cuentan los dígitos, así que un «/», «.» o «-» tecleado se cambia por el separador del idioma.
+ */
+export function maskDate(text: string, separator: string = dateSeparator()): string {
   const digits = text.replace(/\D/g, '').slice(0, 8);
-  return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean).join('/');
+  return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean).join(separator);
 }
 
-/** Lo escrito (en el orden del idioma) → ISO; "" si está incompleta; el texto si está completa pero no existe. */
+/** Lo escrito (en el orden del idioma, con cualquier separador) → ISO; "" si está incompleta; el texto si está completa pero no existe. */
 export function displayToValue(text: string, order: DateOrder = dateOrder()): string {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
+  const match = /^(\d{2})[/.-](\d{2})[/.-](\d{4})$/.exec(text);
   if (!match) return '';
   const [day, month] = order === 'mdy' ? [match[2], match[1]] : [match[1], match[2]];
   const iso = `${match[3]}-${month}-${day}`;
@@ -320,9 +342,9 @@ function Calendar({ selected, initial: openTo, min, max, onSelect, onClose }: Ca
 
 export function DateField({ label, value, onChange, min, max, error, hint, disabled = false, required, name, openTo }: DateFieldProps) {
   const t = useT();
-  const order = dateOrder();
+  const layout = dateLayout();
   const id = useId();
-  const [text, setText] = useState(() => isoToDisplay(value, order) || value);
+  const [text, setText] = useState(() => isoToDisplay(value, layout) || value);
   const [open, setOpen] = useState(false);
   const controlRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -331,11 +353,11 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
 
   // Cambios externos (p. ej. al cargar el empleado a editar).
   useSyncOnChange(value, (next) => {
-    if (displayToValue(text, order) !== next) setText(isoToDisplay(next, order) || (next.includes('/') ? next : ''));
+    if (displayToValue(text, layout.order) !== next) setText(isoToDisplay(next, layout) || (ANY_SEPARATOR.test(next) ? next : ''));
   });
-  // Cambio de idioma en caliente: la fecha elegida se escribe en el orden nuevo (el valor ISO no
-  // cambia); lo que se está escribiendo a medias se conserva tal cual.
-  useSyncOnChange(order, (next) => setText((current) => isoToDisplay(value, next) || current));
+  // Cambio de idioma en caliente: la fecha elegida se escribe en el orden y con el separador nuevos (el valor ISO no
+  // cambia); lo que se está escribiendo a medias se conserva, solo con el separador del idioma nuevo.
+  useSyncOnChange(`${layout.order}${layout.separator}`, () => setText((current) => isoToDisplay(value, layout) || maskDate(current, layout.separator)));
 
   useDismissOnOutsidePointer([controlRef, calendarRef], open, () => setOpen(false));
 
@@ -359,9 +381,9 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy(id, error, hint)}
           onChange={(e) => {
-            const masked = maskDate(e.target.value);
+            const masked = maskDate(e.target.value, layout.separator);
             setText(masked);
-            onChange(displayToValue(masked, order));
+            onChange(displayToValue(masked, layout.order));
           }}
         />
         <button
@@ -384,7 +406,7 @@ export function DateField({ label, value, onChange, min, max, error, hint, disab
               onClose={() => setOpen(false)}
               onSelect={(date) => {
                 const iso = toIso(date);
-                setText(isoToDisplay(iso, order));
+                setText(isoToDisplay(iso, layout));
                 onChange(iso);
                 setOpen(false);
               }}

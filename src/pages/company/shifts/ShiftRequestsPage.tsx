@@ -84,10 +84,11 @@ function RequestItem({ request }: { request: ShiftRequest }) {
   const { full_name: name, employee_number: number } = request.employee;
   return (
     <ShiftItem
-      lead={<Avatar name={name} decorative />}
+      lead={<Avatar name={name} src={request.employee.avatar} decorative />}
       title={
         <>
-          {name} <span className="muted small">· {number}</span>
+          {name}
+          {number && <> <span className="muted small">· {number}</span></>}
           <DeletedMark deleted={request.employee.deleted} />
         </>
       }

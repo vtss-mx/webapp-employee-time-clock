@@ -1,7 +1,7 @@
 import { ApiError } from '../services/apiClient';
-import type { FaceChallenge } from '../types';
+import type { FaceChallenge, FaceCheckResult } from '../types';
 import { isRecord } from './guards';
-import { CameraNotReadyError } from './cameraDiagnostics';
+import { CameraNotReadyError, CameraTurnedError } from './cameraDiagnostics';
 import type { CatalogApi } from './catalogs';
 import { config } from './config';
 
@@ -21,12 +21,12 @@ export function isTransientFaceError(error: unknown): boolean {
 }
 
 /**
- * Error que la persona puede corregir y reintentar (calidad, pose, accesorios, prueba de vida...):
- * lo dice el catálogo face_errors (`retryable`); además, sin conexión, servidor saturado o la cámara
- * sin imagen en ese momento.
+ * Error que la persona puede corregir y reintentar (calidad, pose, cubrebocas, prueba de vida...):
+ * lo dice el catálogo face_errors (`retryable`); además, sin conexión, servidor saturado, la cámara
+ * sin imagen en ese momento o girada a media toma.
  */
 export function isRetryableFaceError(error: unknown, catalogs: Pick<CatalogApi, 'byCode'>): boolean {
-  if (error instanceof CameraNotReadyError) return true;
+  if (error instanceof CameraNotReadyError || error instanceof CameraTurnedError) return true;
   if (!(error instanceof ApiError)) return false;
   return isTransientFaceError(error) || catalogs.byCode('face_errors', error.code)?.retryable === true;
 }
@@ -48,11 +48,16 @@ export function faceResumeDelayMs(error: unknown): number {
   return Math.max(config.faceResumeAfterBlockMs, hinted);
 }
 
-/** Códigos del catálogo de accesorios que el servidor detectó en la captura. */
+/** Códigos del catálogo de accesorios que un 422 del servidor trae en `details.accessories` (vacío si no es por eso). */
 export function detectedAccessories(error: unknown): string[] {
   if (!(error instanceof ApiError) || error.code !== 'ACCESSORIES_DETECTED') return [];
   const list = (error.details as { accessories?: unknown } | null)?.accessories;
   return Array.isArray(list) ? list.filter((code): code is string => typeof code === 'string') : [];
+}
+
+/** Códigos de accesorios que informa una validación previa aceptada (bloqueados o no: solo la insignia). */
+export function reportedAccessories(result: Pick<FaceCheckResult, 'accessories'>): string[] {
+  return (result.accessories ?? []).filter((code): code is string => typeof code === 'string');
 }
 
 /**

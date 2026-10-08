@@ -1,0 +1,77 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/passkeys';
+
+/** Chiavi di accesso (WebAuthn) in italiano (it-IT): le stesse chiavi di es-MX. Glossario §2: «chiave di accesso». */
+export default {
+  title: 'Chiavi di accesso',
+  intro: "Accedi con il volto, l'impronta o il PIN del tuo dispositivo, senza digitare la password. La chiave privata non lascia mai il tuo dispositivo né il tuo account Apple o Google.",
+  unsupported: 'Questo browser non supporta le chiavi di accesso. Usa Safari, Chrome o Edge aggiornati.',
+  loadError: 'Impossibile caricare le tue chiavi di accesso',
+  add: 'Aggiungi chiave di accesso',
+  empty: {
+    title: 'Nessuna chiave di accesso',
+    description: "Aggiungine una per accedere con il volto, l'impronta o il PIN.",
+  },
+  noun: {
+    one: 'chiave di accesso',
+    other: 'chiavi di accesso',
+  },
+  created: 'Creata il {date}',
+  lastUsed: 'Ultimo utilizzo: {date}',
+  neverUsed: 'Non ancora usata',
+  synced: 'Sincronizzata con il tuo account',
+  deviceOnly: 'Solo su un dispositivo',
+  rename: 'Rinomina',
+  revoke: 'Revoca',
+  actionLabel: '{action}: {name}',
+  revokeAsk: {
+    eyebrow: 'Chiave di accesso',
+    title: 'Revocare «{name}»?',
+    message: 'Quella chiave non servirà più per accedere, su nessuno dei tuoi dispositivi.',
+    note: "L'operazione non può essere annullata. Puoi registrarne un'altra quando vuoi.",
+    confirm: 'Revoca chiave',
+  },
+  revoked: 'Chiave di accesso revocata',
+  revokeFailed: 'Impossibile revocare la chiave di accesso',
+  form: {
+    newTitle: 'Aggiungi chiave di accesso',
+    newSubtitle: 'Registra questo dispositivo per accedere senza password.',
+    renameTitle: 'Rinomina chiave di accesso',
+    renameSubtitle: 'Cambia il nome con cui la riconosci.',
+    section: 'Nome della chiave',
+    intro: "Alla registrazione il tuo dispositivo chiederà il volto, l'impronta o il PIN. La tua password continua a funzionare.",
+    name: 'Nome',
+    nameHint: 'Per riconoscerla: «Il mio telefono», «Computer del lavoro»',
+    nameRequired: 'Scrivi un nome',
+    nameTooLong: 'Massimo {max} caratteri',
+    submit: 'Registra chiave',
+    renameSubmit: 'Salva nome',
+    back: 'Torna a Il mio profilo',
+    createAsk: {
+      eyebrow: 'Chiave di accesso',
+      title: 'Registrare una chiave di accesso su questo dispositivo?',
+      message: "Il tuo dispositivo chiederà il volto, l'impronta o il PIN per crearla.",
+      note: 'Potrai revocarla quando vuoi da Il mio profilo.',
+      confirm: 'Registra',
+    },
+    renameAsk: {
+      title: 'Rinominare la chiave di accesso?',
+    },
+    registered: 'Chiave di accesso registrata',
+    registeredText: 'Ora puoi accedere con essa dalla schermata di accesso.',
+    registerFailed: 'Impossibile registrare la chiave di accesso',
+    renamed: 'Nome salvato',
+    renameFailed: 'Impossibile rinominare la chiave di accesso',
+    noChanges: 'Nessuna modifica',
+  },
+  errors: {
+    unsupported: 'Questo browser non supporta le chiavi di accesso. Usa Safari, Chrome o Edge aggiornati.',
+    failed: "Il tuo dispositivo non è riuscito a completare l'operazione. Riprova.",
+  },
+  login: {
+    divider: 'oppure',
+    button: 'Accedi con chiave di accesso',
+    waiting: 'In attesa del tuo dispositivo…',
+    failed: 'Impossibile accedere con la chiave di accesso',
+  },
+} as const satisfies Translation<typeof es>;

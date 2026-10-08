@@ -114,6 +114,9 @@ export function FlashObservationPanel({ overview }: { overview: FaceSecurityOver
   ];
   return (
     <>
+      <p className="small">
+        <strong>{t('faceSecurity.flash.retired')}</strong>
+      </p>
       <p className="muted small">
         {t('faceSecurity.flash.window', { count: window_days })} {t('faceSecurity.flash.explain')}
       </p>

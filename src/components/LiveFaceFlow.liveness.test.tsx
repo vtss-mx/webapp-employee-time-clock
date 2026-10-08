@@ -1,158 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { advance, camera, detection, flow, heading, message, renderFlow, resetFaceFlow, see, serve, stable, TWO_TURNS } from '../test/faceFlow';
+import { act, screen } from '@testing-library/react';
+import { advance, camera, detection, ENROLLMENT, flow, FOUR_MOVES, heading, message, renderFlow, resetFaceFlow, see, serve, stable, TWO_TURNS } from '../test/faceFlow';
 import { apiOk } from '../test/http';
-import type { FaceChallenge } from '../types';
 import { config } from '../utils/config';
-import { CameraNotReadyError } from '../utils/cameraDiagnostics';
 
 /*
- * Prueba de vida reforzada: destello de colores (una captura por color, antes de los movimientos),
- * los cinco movimientos (girar, mirar arriba, mirar abajo, acercarse) con su señal y el vencimiento
- * del reto que dice el servidor (`expires_in`).
+ * Prueba de vida: el vencimiento del reto que dice el servidor (`expires_in`) frente al tiempo de cada movimiento; la
+ * pantalla nunca se pinta de colores aunque un reto todavía traiga colores (el destello se retiró de la experiencia por
+ * decisión del dueño del producto, 2026-10-06); y la prueba de vida COMPLETA del registro (decisión del dueño,
+ * 2026-10-07): los cuatro movimientos de la cabeza, la vuelta al frente después de cada uno y el final centrado.
  */
 vi.mock('../hooks/useCamera', async () => (await import('../test/faceFlowMocks')).cameraModule());
 vi.mock('../hooks/useFaceDetection', async (original) => (await import('../test/faceFlowMocks')).detectionModule(await original()));
 
-const settle = config.faceFlashSettleMs;
-const COLORS = ['#FF0000', '#00FF00', '#0000FF'];
-const FLASHING: FaceChallenge = {
-  ...TWO_TURNS,
-  challenge_id: 'ch-f',
-  action: 'LOOK_UP',
-  instruction: 'Levanta un poco la barbilla y mira hacia arriba',
-  actions: ['LOOK_UP', 'LOOK_DOWN', 'MOVE_CLOSER'],
-  instructions: ['Levanta un poco la barbilla y mira hacia arriba', 'Baja un poco la barbilla y mira hacia abajo', 'Acerca tu rostro a la cámara'],
-  flash: COLORS,
-};
-const overlay = () => document.querySelector<HTMLElement>('.flash');
-const flashColor = () => overlay()?.style.getPropertyValue('--flash-color') ?? null;
-const currentFill = () => document.querySelector<HTMLElement>('.faceid__progress .is-current')?.style.getPropertyValue('--fill');
-const baseline = { pitch: 0.5, width: 200 };
-const { onSubmit, onFatal } = flow;
-
-function setVisibility(state: DocumentVisibilityState) {
-  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
-}
-
 beforeEach(resetFaceFlow);
-afterEach(() => {
-  setVisibility('visible');
-  vi.useRealTimers();
-});
-
-describe('LiveFaceFlow: destello de colores', () => {
-  it('pinta cada color, captura uno por color y sigue con los movimientos; envía todo en orden', async () => {
-    const server = serve({ challenge: () => apiOk(FLASHING) });
-    renderFlow();
-    await stable(baseline);
-
-    // Destello: la pantalla se pinta del primer color; la detección se pausa.
-    expect(flashColor()).toBe('#FF0000');
-    expect(overlay()).toHaveTextContent('Mantén tu rostro frente a la pantalla');
-    expect(heading()).toHaveTextContent('Prueba de vida · destello');
-    expect(message()).toHaveTextContent('Mantén tu rostro frente a la pantalla');
-    expect(detection.options?.enabled).toBe(false);
-    expect(currentFill()).toMatch(/^0\.33/);
-    expect(camera.capture).toHaveBeenCalledOnce(); // solo la frontal: aún no se ve el color
-    await advance(settle);
-    expect(camera.capture).toHaveBeenCalledTimes(2);
-    expect(flashColor()).toBe('#00FF00');
-    await advance(settle);
-    expect(flashColor()).toBe('#0000FF');
-    await advance(settle);
-    expect(overlay()).toBeNull();
-
-    // Mirar arriba (contra el rostro en reposo de las frontales).
-    expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 3');
-    expect(detection.options?.mode).toEqual({ kind: 'action', action: 'LOOK_UP', minimum: 0.09, baseline });
-    see({ guidance: 'move' });
-    expect(message()).toHaveTextContent('Levanta un poco la barbilla y mira hacia arriba');
-    expect(document.querySelector('.ring-cue--up')).not.toBeNull();
-    await stable();
-    await stable(); // de vuelta al frente
-
-    // Mirar abajo.
-    expect(detection.options?.mode).toMatchObject({ action: 'LOOK_DOWN', minimum: 0.09 });
-    expect(document.querySelector('.ring-cue--down')).not.toBeNull();
-    await stable();
-    await stable();
-
-    // Acercarse: las ondas del anillo llegan hasta donde debe crecer el rostro.
-    expect(heading()).toHaveTextContent('Prueba de vida · paso 3 de 3');
-    expect(detection.options?.mode).toEqual({ kind: 'action', action: 'MOVE_CLOSER', minimum: 1.3, baseline });
-    expect(Number(document.querySelector<HTMLElement>('.ring-cue--closer')?.style.getPropertyValue('--closer-scale'))).toBeCloseTo(1.3 + config.faceCloserMargin);
-    await stable();
-
-    const [frontal, red, green, blue, up, down, closer] = camera.frames;
-    expect(onSubmit).toHaveBeenCalledWith({
-      frontal: [frontal],
-      challenge: { id: 'ch-f', images: [up, down, closer] },
-      flash: [red, green, blue],
-      camera: 'FaceTime HD Camera',
-      telemetry: expect.any(String),
-      accessoryReview: false,
-    });
-    expect(server.checks()).toBe(1);
-  });
-
-  it('si la cámara falla durante el destello y solo se mide, sigue sin él (no envía capturas del destello)', async () => {
-    serve({ challenge: () => apiOk({ ...FLASHING, actions: ['TURN_LEFT'], instructions: ['Gira a tu izquierda'] }) });
-    renderFlow();
-    await stable();
-    camera.capture.mockRejectedValueOnce(new CameraNotReadyError());
-    await advance(settle);
-    expect(overlay()).toBeNull();
-    expect(detection.options?.mode).toMatchObject({ kind: 'action', action: 'TURN_LEFT' });
-    await stable();
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: [camera.frames[0]], challenge: { id: 'ch-f', images: [camera.frames[1]] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String), accessoryReview: false });
-  });
-
-  it('obligatorio: si la pantalla deja de verse se explica y se pide otro reto (con colores nuevos) sin volver a escanear', async () => {
-    let issued = 0;
-    const server = serve({ challenge: () => apiOk({ ...FLASHING, flash_required: true, challenge_id: `ch-${++issued}`, flash: issued === 1 ? COLORS : ['#FFFF00', '#00FFFF'] }) });
-    renderFlow();
-    await stable();
-    setVisibility('hidden');
-    await advance(settle);
-    expect(overlay()).toBeNull();
-    expect(heading()).toHaveTextContent('Intenta de nuevo');
-    expect(message()).toHaveTextContent('No se pudo completar el destello de colores. Mantén la pantalla encendida y tu rostro frente a ella.');
-    setVisibility('visible');
-    await advance(config.faceResumeAfterBlockMs);
-    expect(server.challenges()).toBe(2);
-    expect(flashColor()).toBe('#FFFF00');
-    await advance(settle * 2);
-    expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 3');
-    expect(server.checks()).toBe(1);
-    expect(onFatal).not.toHaveBeenCalled();
-  });
-
-  it('obligatorio y fallando una y otra vez: tras los retos permitidos reinicia todo el flujo', async () => {
-    const server = serve({ challenge: () => apiOk({ ...FLASHING, flash_required: true }) });
-    renderFlow();
-    await stable();
-    setVisibility('hidden');
-    await advance(settle); // primer reto: falla
-    await advance(config.faceResumeAfterBlockMs + settle); // segundo
-    await advance(config.faceResumeAfterBlockMs + settle); // tercero
-    expect(server.challenges()).toBe(3);
-    expect(message()).toHaveTextContent('No se completó la prueba de vida. El escaneo empezará de nuevo.');
-    await advance(config.faceResumeAfterBlockMs);
-    expect(detection.options?.mode).toEqual({ kind: 'frontal' });
-    expect(onFatal).not.toHaveBeenCalled();
-  });
-
-  it('al salir a medio destello no se captura ni se envía nada más', async () => {
-    serve({ challenge: () => apiOk(FLASHING) });
-    const view = renderFlow();
-    await stable();
-    view.unmount();
-    await advance(settle * 3);
-    expect(camera.capture).toHaveBeenCalledOnce();
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(onFatal).not.toHaveBeenCalled();
-  });
-});
+afterEach(() => vi.useRealTimers());
 
 describe('LiveFaceFlow: vencimiento del reto (expires_in)', () => {
   it('el reto completo vence antes que el tiempo de cada movimiento: se pide otro a tiempo para enviarlo', async () => {
@@ -177,5 +39,109 @@ describe('LiveFaceFlow: vencimiento del reto (expires_in)', () => {
     expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 2');
     await advance(1);
     expect(heading()).toHaveTextContent('Intenta de nuevo');
+  });
+});
+
+describe('LiveFaceFlow: el destello se retiró (decisión del dueño, 2026-10-06)', () => {
+  it('un reto que aún trae colores o el destello dictado se responde sin pintar nada: directo a los movimientos', async () => {
+    serve({ challenge: () => apiOk({ ...TWO_TURNS, flash: ['#FF0000', '#00FF00'], flash_required: true, flash_pace: { token: 't0', total: 2, window_ms: 2000 } }) });
+    renderFlow();
+    await stable();
+    expect(document.querySelector('.flash')).toBeNull();
+    expect(document.querySelector('[class*="flash"]')).toBeNull();
+    expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 2');
+    await stable();
+    await stable();
+    await stable();
+    const { onSubmit } = await import('../test/faceFlow').then((m) => m.flow);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('flash');
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('flashReceipt');
+  });
+});
+
+describe('LiveFaceFlow: la prueba de vida completa del registro (decisión del dueño, 2026-10-07)', () => {
+  it('pide el reto del registro, hace los cuatro movimientos con la vuelta al frente tras cada uno y termina centrado', async () => {
+    const server = serve({ challenge: () => apiOk(FOUR_MOVES) });
+    renderFlow(ENROLLMENT);
+    const baseline = { pitch: 0.55, width: 200 };
+    await stable(baseline);
+    await advance(20);
+    // El reto es el del registro (los cuatro movimientos); una verificación no lleva el propósito.
+    expect(server.calls.find((call) => call.url.includes('/face/challenge'))?.url).toContain('purpose=ENROLLMENT');
+    expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 4');
+    expect(detection.options?.mode).toMatchObject({ kind: 'action', action: 'LOOK_UP', baseline });
+    for (let step = 1; step <= 4; step++) {
+      await stable(); // el movimiento, capturado: SIEMPRE de vuelta al frente, también tras el último
+      expect(detection.options?.mode).toEqual({ kind: 'frontal', baseline });
+      if (step < 4) {
+        expect(heading()).toHaveTextContent(`Prueba de vida · paso ${step + 1} de 4`);
+        expect(screen.getByText('Vuelve a mirar al frente para el siguiente paso.')).toBeInTheDocument();
+        see({ guidance: 'off_center' });
+        expect(message()).toHaveTextContent('Centra tu rostro');
+        see({ guidance: 'hold_still' });
+        await stable(); // de vuelta al frente (con detección real): el siguiente movimiento
+        expect(detection.options?.mode).toMatchObject({ kind: 'action', action: FOUR_MOVES.actions[step] });
+      }
+    }
+    // Tras el cuarto: la vuelta al frente final («paso 4 de 4», «Centra tu rostro para terminar.») y, centrado, el envío.
+    expect(heading()).toHaveTextContent('Prueba de vida · paso 4 de 4');
+    expect(screen.getByText('Centra tu rostro para terminar.')).toBeInTheDocument();
+    see({ guidance: 'move' });
+    expect(message()).toHaveTextContent('Centra tu rostro');
+    see({ guidance: 'ready' });
+    expect(message()).toHaveTextContent('Rostro centrado');
+    expect(flow.onSubmit).not.toHaveBeenCalled();
+    await stable();
+    expect(flow.onSubmit).toHaveBeenCalledTimes(1);
+    const [, frontalPhoto, ...moves] = camera.frames; // la inicial, la válida y una captura por movimiento, en orden
+    expect(flow.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ frontal: [frontalPhoto], challenge: { id: 'ch-enroll', images: moves } }));
+    expect(moves).toHaveLength(4);
+  });
+
+  it('una verificación pide el reto de la política (sin propósito) y envía tras el último movimiento, sin vuelta al frente final', async () => {
+    const server = serve({ challenge: () => apiOk(TWO_TURNS) });
+    renderFlow();
+    await stable();
+    expect(server.calls.find((call) => call.url.includes('/face/challenge'))?.url).not.toContain('purpose');
+    await stable(); // primer giro → de vuelta al frente
+    await stable(); // al frente → segundo giro
+    await stable(); // segundo giro: se envía
+    expect(flow.onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('si el reto venció mientras se reunían las fotos válidas, se pide otro conservándolas, sin aviso ni reintento', async () => {
+    let issued = 0;
+    const server = serve({ challenge: () => apiOk({ ...FOUR_MOVES, challenge_id: `ch-${++issued}`, expires_in: 10 }) });
+    renderFlow({ ...ENROLLMENT, frontalFrames: 2 });
+    see({ guidance: 'off_center' }); // la persona tarda en colocarse
+    await stable();
+    await advance(6_000); // 10 s de vida menos el margen de 5 s: el primer reto ya venció
+    expect(server.challenges()).toBe(1);
+    see({ guidance: 'hold_still' });
+    await advance(100);
+    expect(server.challenges()).toBe(2); // el reto nuevo, con las mismas fotos
+    expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 4');
+    expect(heading()).not.toHaveTextContent('Intenta de nuevo');
+    expect(camera.capture).toHaveBeenCalledTimes(3); // inicial + las dos válidas: no se repitió nada
+    expect(detection.options?.mode).toMatchObject({ kind: 'action', action: 'LOOK_UP' });
+  });
+
+  it('si la pantalla se cierra mientras llega el reto nuevo (el anterior venció), la respuesta ya no hace nada', async () => {
+    let issued = 0;
+    let answer: (response: Response) => void = () => undefined;
+    serve({
+      challenge: () => (++issued === 1 ? apiOk({ ...FOUR_MOVES, challenge_id: 'ch-1', expires_in: 10 }) : new Promise((resolve) => (answer = resolve))),
+    });
+    const view = renderFlow(ENROLLMENT);
+    see({ guidance: 'off_center' });
+    await stable();
+    await advance(6_000); // el primer reto venció mientras la persona se colocaba
+    see({ guidance: 'hold_still' });
+    await advance(100); // la foto válida: se pide otro reto, aún en camino
+    view.unmount();
+    await act(() => Promise.resolve().then(() => answer(apiOk(FOUR_MOVES))));
+    expect(flow.onSubmit).not.toHaveBeenCalled();
+    expect(flow.onFatal).not.toHaveBeenCalled();
   });
 });

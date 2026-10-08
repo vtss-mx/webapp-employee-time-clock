@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>24/24</span>
+                <span class='fraction'>25/25</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>21/21</span>
+                <span class='fraction'>22/22</span>
             </div>
         
             
@@ -108,7 +108,15 @@
 <a name='L43'></a><a href='#L43'>43</a>
 <a name='L44'></a><a href='#L44'>44</a>
 <a name='L45'></a><a href='#L45'>45</a>
-<a name='L46'></a><a href='#L46'>46</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -126,34 +134,43 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3415x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">965x</span>
-<span class="cline-any cline-yes">965x</span>
-<span class="cline-any cline-yes">965x</span>
-<span class="cline-any cline-yes">965x</span>
-<span class="cline-any cline-yes">965x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">885x</span>
-<span class="cline-any cline-yes">77x</span>
-<span class="cline-any cline-yes">962x</span>
-<span class="cline-any cline-yes">965x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
-<span class="cline-any cline-yes">3508x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6192x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">2063x</span>
+<span class="cline-any cline-yes">2063x</span>
+<span class="cline-any cline-yes">2063x</span>
+<span class="cline-any cline-yes">2063x</span>
+<span class="cline-any cline-yes">2063x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1960x</span>
+<span class="cline-any cline-yes">100x</span>
+<span class="cline-any cline-yes">2060x</span>
+<span class="cline-any cline-yes">2063x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
+<span class="cline-any cline-yes">6306x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocale } from '../i18n';
 import type { LazyText } from '../i18n/lazy';
 import { useErrorPopup } from './useFeedback';
 import { useRetryOnReconnect } from './useRetryOnReconnect';
@@ -169,12 +186,19 @@ import { useRetryOnReconnect } from './useRetryOnReconnect';
  * el servidor) y lo que responda tarde ya no toca el estado. `loading` dice si hay una petición en
  * curso (p. ej. el botón "Actualizar" mientras se vuelve a pedir; los datos anteriores se conservan).
  * `errorTitle` como función (`() =&gt; t('…')`): el popup abierto sigue al idioma activo.
+ *
+ * **Cambio de idioma en caliente** (regla 16): el idioma es parte de la llave de los datos. Al cambiarlo se
+ * vuelven a pedir en su lugar —los textos del servidor (nombres de catálogos dentro de los datos, motivos,
+ * `StoredText`...) llegan en el idioma nuevo— y, mientras llegan, se siguen viendo los anteriores: la pantalla
+ * no se vacía, no pierde su desplazamiento ni su estado. Un formulario que se llenó con estos datos no se pisa
+ * (se llena por valores, `useLoadValues`).
  */
 export function useResource&lt;T&gt;(fetch: (signal: AbortSignal) =&gt; Promise&lt;T&gt;, key: string | number, errorTitle: LazyText) {
   const [data, setData] = useState&lt;T | null&gt;(null);
   const [error, setError] = useState&lt;unknown&gt;(null);
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
+  const locale = useLocale();
   const fetchRef = useRef(fetch);
   useLayoutEffect(() =&gt; {
     fetchRef.current = fetch;
@@ -191,7 +215,7 @@ export function useResource&lt;T&gt;(fetch: (signal: AbortSignal) =&gt; Promise&
       .catch((err: unknown) =&gt; !signal.aborted &amp;&amp; setError(err))
       .finally(() =&gt; !signal.aborted &amp;&amp; setLoading(false));
     return () =&gt; controller.abort();
-  }, [key, reload]);
+  }, [key, reload, locale]);
 &nbsp;
   const retry = useCallback(() =&gt; setReload((n) =&gt; n + 1), []);
   useErrorPopup(error, { title: errorTitle, retry });
@@ -205,7 +229,7 @@ export function useResource&lt;T&gt;(fetch: (signal: AbortSignal) =&gt; Promise&
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:24.187Z
+                at 2026-10-08T07:13:14.472Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

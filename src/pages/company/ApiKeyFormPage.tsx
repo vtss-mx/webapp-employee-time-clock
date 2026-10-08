@@ -1,4 +1,4 @@
-import { CalendarClock, History, KeyRound, ScanLine, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import { CalendarClock, History, KeyRound, ScanFace, ScanLine, ShieldCheck, TriangleAlert, Users, type LucideIcon } from 'lucide-react';
 import { useId, useState, type SubmitEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FieldLabel, FormField } from '../../components/FormField';
@@ -18,7 +18,34 @@ import type { ApiScope } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
 
 /** Ícono de cada permiso; los permisos (código, nombre y qué permiten) vienen del catálogo api_scopes. */
-const SCOPE_ICONS: Partial<Record<string, LucideIcon>> = { EMPLOYEES_READ: Users, ATTENDANCE_READ: History, VALIDATORS_READ: ScanLine };
+const SCOPE_ICONS: Partial<Record<string, LucideIcon>> = {
+  EMPLOYEES_READ: Users,
+  ATTENDANCE_READ: History,
+  VALIDATORS_READ: ScanLine,
+  VERIFICATION: ScanFace,
+};
+
+/** El permiso de la verificación facial desde la aplicación móvil de la empresa (SDK): su llave irá dentro de la app. */
+const VERIFICATION_SCOPE: ApiScope = 'VERIFICATION';
+
+/**
+ * Aviso al marcar «Verificación»: una llave dentro de una aplicación se puede extraer. Con otros permisos, pide separarla
+ * (una llave SOLO con ese permiso para la app y otra para el servidor).
+ */
+function VerificationWarning({ mixed }: { mixed: boolean }) {
+  const t = useT();
+  return (
+    <div className="callout" role="note">
+      <span className="icon-tile icon-tile--warning">
+        <TriangleAlert size={22} />
+      </span>
+      <div className="callout__body">
+        <strong>{t('apiKeys.form.verificationWarning.title')}</strong>
+        <p className="muted small">{t(mixed ? 'apiKeys.form.verificationWarning.mixed' : 'apiKeys.form.verificationWarning.message')}</p>
+      </div>
+    </div>
+  );
+}
 
 /** Vigencias que se ofrecen (el backend acepta de 1 a 730 días o sin vencimiento) y el texto de cada una. */
 const LIFETIMES = {
@@ -136,6 +163,7 @@ export function ApiKeyFormPage() {
               />
             );
           })}
+          {scopes.includes(VERIFICATION_SCOPE) && <VerificationWarning mixed={scopes.length > 1} />}
           {touched && scopes.length === 0 && <p className="field__error">{t('apiKeys.form.scopesRequired')}</p>}
         </PanelSection>
         <PanelSection title={t('apiKeys.form.lifetime')} icon={<CalendarClock size={20} />}>

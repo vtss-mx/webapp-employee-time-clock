@@ -6,6 +6,7 @@ import { notifyShiftRequestsChanged } from '../../../hooks/usePendingShiftReques
 import { t as translate, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { shiftService } from '../../../services/shiftService';
+import { employeeLabel } from '../../../utils/employeeLabel';
 import { formatDate } from '../../../utils/format';
 
 /** Rechazar un cambio de turno (/company/shifts/requests/:id/reject): conserva su turno y ve la nota. */
@@ -19,7 +20,7 @@ export function ShiftRequestRejectPage() {
       {(request) => (
         <RejectRequestPanel
           title={t('shifts.requests.reject.title')}
-          subtitle={`${request.employee.full_name} · ${request.employee.employee_number}`}
+          subtitle={employeeLabel(request.employee)}
           backTo={paths.company.shiftRequests}
           intro={t('shifts.requests.reject.intro', { shift: request.shift.name, date: formatDate(request.valid_from) })}
           placeholder={t('shifts.requests.reject.placeholder')}

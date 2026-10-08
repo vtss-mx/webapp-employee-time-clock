@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -66,6 +66,24 @@ describe('CameraCapture: visor de la cámara', () => {
     expect(screen.queryByRole('button', { name: 'Cambiar cámara' })).toBeNull(); // una sola cámara
   });
 
+  it('escribe en el visor la relación de aspecto real del flujo (--video-ar) al conocerla y si cambia; sin imagen no escribe nada', () => {
+    const { container } = renderCamera(cameraIn());
+    const box = container.firstChild as HTMLElement;
+    const video = screen.getByLabelText('Vista previa de la cámara');
+    Object.defineProperty(video, 'videoWidth', { value: 0, configurable: true });
+    Object.defineProperty(video, 'videoHeight', { value: 0, configurable: true });
+    fireEvent.loadedMetadata(video);
+    expect(box.style.getPropertyValue('--video-ar')).toBe(''); // aún sin imagen: el CSS usa su valor por omisión
+    Object.defineProperty(video, 'videoWidth', { value: 1280, configurable: true });
+    Object.defineProperty(video, 'videoHeight', { value: 720, configurable: true });
+    fireEvent.loadedMetadata(video);
+    expect(box.style.getPropertyValue('--video-ar')).toBe('1.7778'); // computadora portátil: 16:9 horizontal
+    Object.defineProperty(video, 'videoWidth', { value: 720, configurable: true });
+    Object.defineProperty(video, 'videoHeight', { value: 1280, configurable: true });
+    fireEvent(video, new Event('resize')); // el teléfono giró: el flujo ahora es vertical
+    expect(box.style.getPropertyValue('--video-ar')).toBe('0.5625');
+  });
+
   it.each([
     ['user', 'La cámara frontal se usará unos segundos para verificar tu identidad.'],
     ['environment', 'La cámara se usará unos segundos para leer el código QR.'],
@@ -102,7 +120,7 @@ describe('CameraCapture: visor de la cámara', () => {
     expect(camera.switchCamera).toHaveBeenCalled();
     const select = screen.getByRole('button', { name: /Seleccionar cámara/ });
     expect(select).toHaveTextContent('Cámara frontal');
-    expect(select).toHaveAttribute('title', 'Front Camera');
+    expect(select).toHaveAttribute('title', 'Cámara frontal'); // nunca el nombre en crudo del sistema (otro idioma)
     await userEvent.click(select);
     await userEvent.click(screen.getByRole('option', { name: /Cámara trasera/ }));
     expect(camera.selectCamera).toHaveBeenCalledWith('cam-2');
@@ -204,6 +222,7 @@ describe('CameraCapture en inglés (en-US) y cambio de idioma en caliente', () =
     expect(screen.getByLabelText('Camera preview')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Switch camera' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Select camera/ })).toHaveTextContent('Front camera');
+    expect(screen.getByRole('button', { name: /Select camera/ })).toHaveAttribute('title', 'Front camera');
   });
 
   it('conexión no segura en inglés: abrir la versión segura', async () => {

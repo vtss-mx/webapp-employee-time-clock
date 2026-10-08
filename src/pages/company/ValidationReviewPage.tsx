@@ -1,8 +1,10 @@
-import { AlertTriangle, Camera, Check, CheckCircle2, ImageOff, ShieldCheck, UserCheck, Users, UserX } from 'lucide-react';
-import { useEffect } from 'react';
+import { AlertTriangle, Camera, Check, CheckCircle2, IdCard, ImageOff, ShieldCheck, UserCheck, Users, UserX, Video } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { EnrollmentBadge } from '../../components/StatusBadge';
+import { EmployeeDocumentsReview } from '../../components/employeeDocuments/EmployeeDocumentsReview';
+import { Avatar } from '../../components/ui/Avatar';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonRows } from '../../components/ui/Skeleton';
 import { useAction, type SuccessNotice } from '../../hooks/useAction';
@@ -15,8 +17,10 @@ import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { enrollmentService } from '../../services/enrollmentService';
 import type { FaceEnrollmentDetail } from '../../types';
+import { VoiceReviewSection } from '../../components/enrollments/VoiceReviewSection';
 import type { ConfirmInput } from '../../types/confirm';
 import type { CatalogApi } from '../../utils/catalogs';
+import { employeeLabel } from '../../utils/employeeLabel';
 import { ageFrom, formatDate, formatDateTime, formatPercent } from '../../utils/format';
 
 /** Marcas del análisis automático (catálogo enrollment_flags): nombre corto y explicación para el revisor. */
@@ -36,7 +40,7 @@ function approveConfirm(item: FaceEnrollmentDetail, flagNames: string[]): Confir
     eyebrow: t('enrollments.review.approve.eyebrow'),
     title: t('enrollments.review.approve.title', { name: item.full_name }),
     message: t('enrollments.review.approve.message'),
-    details: [{ label: t('common.fields.employee'), value: `${item.full_name} · ${item.employee_number}` }, ...flagNames.map((flag) => t('enrollments.review.approve.check', { flag }))],
+    details: [{ label: t('common.fields.employee'), value: employeeLabel(item) }, ...flagNames.map((flag) => t('enrollments.review.approve.check', { flag }))],
     confirmLabel: t('enrollments.review.approve.confirm'),
     confirmIcon: <UserCheck size={18} />,
   };
@@ -77,15 +81,16 @@ export function ValidationReviewPage() {
   const accessoryFlagged = flags.some((code) => catalogs.byCode('accessories', code));
   const spoofFlag = flags.includes('SPOOF');
 
-  // Alertas del análisis automático: se avisan en un popup al abrir una solicitud pendiente.
+  // Alertas del análisis automático: se avisan en un popup al abrir una solicitud pendiente. Se arma al dibujarse
+  // (`feedback.show` con una función): al cambiar el idioma, sus motivos se ven en el nuevo.
+  // Una sola vez por solicitud: volver a pedirla al cambiar el idioma no lo abre de nuevo si ya se cerró.
+  const warned = useRef<number | null>(null);
   useEffect(() => {
-    if (item?.status !== 'PENDING') return;
-    const reasons = describeFlags(item.flagged_accessories ?? [], catalogs).map((flag) => flag.detail);
-    if (reasons.length === 0) return;
-    void feedback.warning(flagsTitle, flagsText, {
-      details: reasons,
-      key: `review-flags-${item.id}`,
-    });
+    if (item?.status !== 'PENDING' || warned.current === item.id) return;
+    const reasons = () => describeFlags(item.flagged_accessories ?? [], catalogs).map((flag) => flag.detail);
+    if (reasons().length === 0) return;
+    warned.current = item.id;
+    void feedback.show(() => ({ variant: 'warning', title: flagsTitle(), text: flagsText(), details: reasons(), key: `review-flags-${item.id}` }));
   }, [item, feedback, catalogs]);
 
   const approve = (enrollment: FaceEnrollmentDetail) =>
@@ -179,12 +184,17 @@ export function ValidationReviewPage() {
             <dl className="details">
               <div>
                 <dt>{t('enrollments.review.fullName')}</dt>
-                <dd>{item.full_name}</dd>
+                <dd className="person">
+                  <Avatar name={item.full_name} src={item.avatar} size="sm" decorative />
+                  <span className="truncate">{item.full_name}</span>
+                </dd>
               </div>
-              <div>
-                <dt>{t('common.fields.employeeNumber')}</dt>
-                <dd>{item.employee_number}</dd>
-              </div>
+              {item.employee_number && (
+                <div>
+                  <dt>{t('common.fields.employeeNumber')}</dt>
+                  <dd>{item.employee_number}</dd>
+                </div>
+              )}
               <div>
                 <dt>{t('employees.fields.birthDate')}</dt>
                 <dd>{t('enrollments.review.birthDate', { date: formatDate(item.birth_date), age: ageFrom(item.birth_date) })}</dd>
@@ -222,13 +232,23 @@ export function ValidationReviewPage() {
                   {item.similar.map((person) => (
                     <li key={person.employee_id} className="checklist__warn">
                       <AlertTriangle size={18} />
+                      <Avatar name={person.full_name} src={person.avatar} size="xs" decorative />
                       <Link to={paths.company.employee(person.employee_id)}>
-                        {person.full_name} · {person.employee_number}
+                        {employeeLabel(person)}
                       </Link>
                       <span className="small muted">{t('enrollments.review.similar.similarity', { value: formatPercent(person.similarity) })}</span>
                     </li>
                   ))}
                 </ul>
+              </>
+            )}
+
+            {item.voice && (
+              <>
+                <h3 className="panel__section-title">
+                  <Video size={20} /> {t('enrollments.review.voice.title')}
+                </h3>
+                <VoiceReviewSection enrollmentId={item.id} voice={item.voice} />
               </>
             )}
 
@@ -252,6 +272,11 @@ export function ValidationReviewPage() {
             )}
           </PanelSection>
         </PanelGrid>
+
+        <PanelSection title={t('employeeDocuments.review.title')} icon={<IdCard size={20} />}>
+          <p className="muted small inline-note">{t('employeeDocuments.review.subtitle')}</p>
+          <EmployeeDocumentsReview employeeId={item.employee_id} />
+        </PanelSection>
 
         {pending && (
           <PanelFooter>

@@ -4,8 +4,9 @@ Reglas obligatorias para cualquier cambio (personas o agentes). Si una petición
 se señala el conflicto antes de escribir código; no se "rodean".
 
 Stack: React 19 · TypeScript 6 estricto · Vite 8 · React Router 7 · Vitest + Testing Library. Idioma:
-identificadores en inglés; comentarios y documentación en **español**; la interfaz, **bilingüe** (es-MX y
-en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/locales` (ver §7).
+identificadores en inglés; comentarios y documentación en **español**; la interfaz, en **siete idiomas** (es-MX por
+omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus textos viven en los diccionarios de
+`src/i18n/locales` (ver §7).
 
 ## 1. El frontend no decide permisos: dibuja lo que envía el backend
 
@@ -47,10 +48,13 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
   `useFormState`; listas desplegables solo con `Select` (lista propia, nunca `<select>` nativo).
   Código repetido se extrae.
 - **Componentes altamente personalizados, nunca controles nativos** (decisión del dueño del
-  producto): nada de la apariencia del navegador o del sistema operativo. Fechas con `DateField`,
-  horas con `TimeField`, números con `NumberField` (botones − y +, unidad, mínimo, máximo, paso y
+  producto): nada de la apariencia del navegador o del sistema operativo. Fechas con `DateField` (orden y separador
+  del idioma activo con `Intl`, `dateLayout`: «dd/mm/aaaa», «mm/dd/yyyy», «TT.MM.JJJJ» en alemán; al teclear se aceptan
+  «/», «.» y «-» y se normalizan al del idioma; el marcador de posición y `ui.dateField.invalid` del diccionario usan
+  el mismo separador, `DateField.locales.test.tsx` lo exige), horas con `TimeField`, números con `NumberField` (botones − y +, unidad, mínimo, máximo, paso y
   `decimals` para dinero o porcentajes), casillas con `Checkbox`, opciones excluyentes con
-  `RadioCard`/`ChoiceGroup`, listas con `Select`, archivos con `FilePicker`, deslizadores con `Slider`
+  `RadioCard`/`ChoiceGroup`, listas con `Select`, archivos con `FilePicker`, video con `VideoPlayer` (sin `controls`
+  nativos), deslizadores con `Slider`
   (input nativo transparente encima del dibujo; o propios como `ConfidenceSlider`). Prohibido `<input type="time|date|number|range|
   checkbox|radio|file|color">` visible, `<select>` y `accent-color` como sustituto de un diseño: el
   input nativo, si se usa por accesibilidad, queda oculto y el componente dibuja su propio control.
@@ -64,7 +68,15 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
   (`useAvatarImage` → `avatarService.image` → URL `blob:` local), solo cuando el avatar se ve, y una vez por página
   (`utils/avatarCache.ts`: cuenta quién la usa, cancela lo que ya nadie espera, libera lo que no se muestra con
   tope `config.avatarCacheEntries` y se vacía al cerrar sesión). Si no llega, se quedan las iniciales sin popup
-  (es accesoria). El ADMIN nunca recibe fotos de empleados (el backend no las envía).
+  (es accesoria). **Toda tabla, lista o tarjeta que muestra a una persona usa `Avatar` con su `src`** (decisión del
+  dueño, 2026-10-06, que reemplaza «el ADMIN nunca recibe fotos de empleados» y «empleado inactivo sin foto»): cada
+  persona de una respuesta trae `avatar` (`WithAvatar` de `types/avatar.ts`: `EmployeeRef`, `Employee`,
+  `CompanyEmployee`, `CompanyAdmin`, `DepartmentPerson`, `Validator`, `FaceEnrollment`, `SimilarEmployee`,
+  `CheckpointEmployee`, `CheckpointEvent`, `VerificationResult`, `UserUsage`; `ErrorOccurrence.user_avatar`) y el
+  backend decide quién la ve (la empresa a su gente, el ADMIN a todos, el empleado la suya); sin ella, las iniciales.
+  También en teléfono (las tarjetas de las tablas usan la misma celda). Un componente de persona recibe la ruta
+  (`PersonItem avatar`, `EmployeeCard`, `FraudSubject`) y nunca la arma. Una empresa no es una persona: su logotipo
+  sigue siendo sus iniciales (`company-row__logo`).
 - **Cambiar la foto de perfil solo con `AvatarUploader`** (Mi perfil → `ProfilePhotoSection`): `FilePicker` (tipo y
   tamaño en MB revisados antes de subir, solo como ayuda) y `AvatarCropper` (arrastrar, pellizcar, rueda, `Slider`
   y teclado; la imagen se coloca en porcentajes con `utils/avatarCrop.ts`, sin medir), avance mientras sube y
@@ -144,66 +156,220 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
   depender del motivo escrito) pide la confirmación ANTES de enviar (cancelar deja el formulario
   disponible). Rechazar una solicitud del empleado (cambio de turno, vacaciones o permiso) es
   `RejectRequestPanel` (nota obligatoria con `validateRejectNote` y la misma confirmación).
-- El círculo del rostro se ajusta al dispositivo con unidades de contenedor (`.camera` es
-  `container-type: size`; `--face-d` diámetro, `--face-cy` centro, `--msg-space` lugar del mensaje y `--ring-r` la línea
-  media del anillo, de la ✓ y de las señales): nunca con medidas fijas ni `matchMedia`. En un teléfono mide el 80 % del
-  ancho (la silueta, lo que un rostro en una selfie a la distancia del brazo); en escritorio, a lo más 64cqh. En el
-  escáner el centro del video queda en el centro del círculo (`.faceid .camera__video`): sentado frente a la cámara, el
-  rostro aparece centrado, como lo mide el detector.
+- **El círculo del rostro se ajusta al dispositivo, 100 % adaptativo** (decisión del dueño, 2026-10-07: «los contenedores
+  de foto/video/grabaciones deben variar su tamaño dependiendo de dónde se estén ejecutando»), con unidades de contenedor
+  (`.camera` es `container-type: size`; `--face-d` diámetro, `--face-cy` centro, `--top-space` la franja del rótulo y los
+  controles de la cámara, `--msg-space` lugar del mensaje, `--face-d-max` el tope y `--ring-r` la línea media del anillo,
+  de la ✓ y de las señales): nunca con medidas fijas (salvo mínimos de accesibilidad) ni `matchMedia`.
+  - **Área de captura por el espacio disponible, no por el ancho de la tarjeta**: el diámetro es el menor de lo que
+    permite el ancho (80 %: la silueta, lo que un rostro en una selfie a la distancia del brazo) y lo que permite el alto
+    (menos la franja de arriba, el mensaje y un aire), con tope `--face-d-max` (640 px: más grande no da más detalle) y
+    nunca más de 64cqh. En escritorio y en tabletas horizontales la tarjeta mide lo que necesitan sus dos columnas,
+    centrada, y el panel de la cámara envuelve al círculo con un margen moderado: la tarjeta estima el diámetro con la
+    MISMA cuenta en unidades de la pantalla (`--fi-view-h` alto del visor, `--fi-msg`, `--fi-top`, `--fi-d`) y da al panel
+    `--fi-view-ratio` (1.3) diámetros de ancho (las unidades de contenedor no miran hacia el padre; si la cuenta
+    difiere, solo cambia el margen: el círculo siempre lo mide el visor real). Dos columnas (cámara y textos) solo
+    donde el ancho lo permite (≥ 1024 px, horizontal ≥ 900 px y teléfonos horizontales de alto corto, con la franja y el
+    mensaje reducidos); apilado si no. Ningún flujo deja medio visor vacío ni recorta el círculo.
+  - **El video se escala respecto al CÍRCULO, no al visor** (`.faceid .camera__video`): su lado CORTO mide `--face-fov`
+    (1.3) diámetros, con la relación de aspecto REAL del flujo (`--video-ar`, que `CameraCapture` escribe en el visor al
+    conocer el flujo y cuando cambia, `loadedmetadata`/`resize`; `max()` elige el lado corto sea horizontal o vertical),
+    centrado en el centro del círculo y recortado por el visor y el fondo opaco: el campo visual dentro de la guía es el
+    mismo en una computadora portátil (16:9), un teléfono (3:4, 9:16) o una cámara web (4:3), y un rostro a la distancia
+    del brazo o sentado frente a la computadora cabe en la guía con aire. El detector mide con la geometría real del
+    `<video>` (`getBoundingClientRect`, transformación incluida), así `guideTarget` y lo que se dibuja siguen siendo lo
+    mismo. Los clips de la revisión (`ui/VideoPlayer`) conservan la relación de aspecto del clip con alto máximo relativo
+    a la pantalla (`60dvh`) y ancho al del panel.
 - **Capturas faciales solo con `LiveFaceFlow`** y se envían como `FaceCaptures` (frontales, una
-  captura por movimiento del reto, una por color del destello —`flash`, en orden— y el nombre de la
+  captura por movimiento del reto, la ráfaga si el reto la pide y el nombre de la
   cámara) con `postFaceCaptures`. La app no captura con una cámara virtual (`isVirtualCamera` con la
-  lista de la política).
-  - **Visor (decisión del dueño, 2026-10-06; estilo de una selfie guiada con la marca propia; afinado el mismo día:
-    «más delicado, fluido y profesional»)**: tarjeta CLARA (`.faceid`, tokens `--fi-*`: el blanco del área de trabajo, el
-    azul de la marca para la interfaz y el verde solo para el avance y el éxito). `FaceGuide` dibuja la cámara en un
-    círculo (fuera de él, el fondo opaco de la tarjeta: `--scan-backdrop`), la silueta de cabeza y hombros (SVG propio,
-    trazo fino de 1.6 px; la cabeza es amplia para que un rostro de selfie —o de laptop, más grande— quede DENTRO, sin
-    líneas sobre la boca o la barbilla; blanca suave en reposo, verde con el rostro bien colocado:
-    `--scan-idle`/`--scan-ok`/`--scan-warn`; se atenúa al tomar las fotos y en los movimientos y se retira al confirmar),
-    UN anillo fino y continuo (`components/ui/ProgressRing`: arco con puntas redondas y degradado `--ring-from` →
-    `--ring-to` sobre la pista `--ring-track`; el `stroke-dashoffset` y el giro de la punta van a su destino con una
-    transición larga y suave que parte de donde va si llega otro valor: una ráfaga de fotos no lo hace saltar;
-    `capturing` enciende una luz que late en la punta) y, al enviar (`complete`), el anillo se llena y DESPUÉS aparece la
-    marca ✓ (verde con la palomita blanca, montada al pie del anillo). Debajo, UNA indicación grande y sin globo
-    (`camera__message--face`) que cambia con un fundido cruzado (`components/ui/CrossfadeText`: recibe una función que
-    se escribe al dibujarse, nunca texto guardado) y, mientras se toman las fotos, la cuenta «Foto 12 de 36» aparte
-    (`detail`, cifras de ancho fijo y sin anunciarse en cada foto: la indicación no cambia con cada una). En un teléfono,
-    arriba solo va el rótulo de la etapa (`introFor().label`: «Escaneo», «Prueba de vida · paso 1 de 2»): el título y
-    su texto, que repetirían la indicación, solo se ven con la columna lateral; la barra de etapas es el contador
-    («Etapa 3 de 5» para lectores de pantalla; sin números a la vista). Todo se anima con CSS (transformaciones,
-    opacidad y el trazo del anillo): ninguna animación vuelve a dibujar en React (0 dibujos de `LiveFaceFlow` con el
-    rostro quieto o una señal animada; uno por foto en la ráfaga) y "reducir movimiento" deja los estados al instante.
-    Nada se copia de otra marca (ni logotipos ni dibujos ajenos).
+  lista de la política: palabra completa, sin distinguir mayúsculas ni acentos en los dos lados con `foldText` de
+  `utils/text.ts`, como el backend; «Câmera virtual», «Caméra virtuelle», «Virtuelle Kamera», «Fotocamera virtuale»
+  quedan bloqueadas y «Câmera frontal», «Caméra avant», «Vordere Kamera», «Fotocamera anteriore» no; decisión D-C4).
+  - **Visor (decisión del dueño, 2026-10-06; estilo de una selfie guiada con la marca propia; el mismo día pidió «algo más
+    enterprise»: sin fondos de colores, sin transiciones ni animaciones)**: tarjeta CLARA (`.faceid`, tokens `--fi-*`: el
+    blanco del área de trabajo, el azul de la marca para la interfaz y el verde solo para el avance). `FaceGuide` dibuja la
+    cámara en un círculo (fuera de él, el fondo opaco de la tarjeta: `--scan-backdrop`), la **guía del rostro** (decisión
+    del dueño, 2026-10-07: «que se pinte algo así… para que el usuario ponga bien su rostro»: un contorno con forma de
+    rostro real —óvalo con el mentón más angosto, línea del cabello y hombros—, SVG propio en `faceGuideShape.ts`, trazo
+    blanco de 3.5 px (`--scan-stroke`) con un halo oscuro de 1 px a baja opacidad (`--scan-halo`) para verse sobre
+    cualquier fondo; blanca en reposo, verde con el rostro bien colocado y color de aviso cuando no lo está:
+    `--scan-idle`/`--scan-ok`/`--scan-warn`; nunca se oculta durante las fotos ni los movimientos, apenas más tenue, y
+    se retira solo al confirmar; la MISMA guía en registro, verificación, asistencia, validador y el video con preguntas)
+    y UN anillo fino y continuo (`components/ui/ProgressRing`: arco con puntas redondas de
+    un solo color `--ring-from`/`--ring-to` sobre la pista `--ring-track`). **Estados fijos**: el anillo cambia su
+    `stroke-dashoffset` AL INSTANTE (sin transición, sin luz en la punta, sin brillo ni `active`), la silueta, la ventana y
+    el fondo cambian sin fundidos, no hay insignia, marca ✓, pulso ni destello de «capturando»; al enviar (`complete`) el
+    anillo lleno es la señal. Debajo, UNA indicación grande y sin globo (`camera__message--face`, `CrossfadeText` sin
+    transición: recibe una función que se escribe al dibujarse) y, mientras se toman las fotos, la cuenta aparte
+    (`detail`: «Capturas válidas: 24/32» en el registro, «Foto 2 de 3» en una verificación; cifras de ancho fijo y sin
+    anunciarse en cada foto). En un teléfono, arriba solo va el rótulo de la etapa (`introFor().label`); la barra de
+    etapas es el contador («Etapa 3 de 5» para lectores de pantalla). Nada vuelve a dibujar en React por cuadro (0
+    dibujos de `LiveFaceFlow` con el rostro quieto; uno por foto). `global.css` no tiene `transition` ni `animation` en
+    `.face-scan*`, `.progress-ring*`, `.flash*` ni `.enroll-steps*`: una animación nueva ahí choca con esta decisión.
+    Nada se copia de otra marca (ni logotipos ni dibujos ajenos). **Accesorios: la insignia es el único aviso**
+    (decisión del dueño, 2026-10-07: «las insignias deben aparecer sí o sí y considera todas»; lo que se quitó por
+    completo fue el texto «Quítate los lentes para continuar»): `AccessoryBadges` (en `FaceGuide.tsx`, estados fijos)
+    dibuja un chip por accesorio que el servidor reportó —ícono de `components/accessories.ts` y nombre del catálogo
+    `accessories` en el idioma activo— en fila bajo el rostro (nunca sobre los ojos), en TODOS los flujos. Aparece con
+    cada validación del servidor que los reporte (`faceService.check` aceptada: `accessories`, todos los detectados; un
+    422 `ACCESSORIES_DETECTED` de la validación previa o del envío: `details.accessories`, los bloqueados;
+    `reportedAccessories`/`detectedAccessories` de `utils/faceErrors.ts`) y permanece hasta la siguiente validación que
+    ya no los reporte (`LiveFaceFlow.accessories`). **Detección CONTINUA** (decisión del dueño, 2026-10-07: «en cualquier
+    momento del flujo… si trae cubrebocas/lentes, que aparezca la insignia»): en el registro, mientras se alinea (foto
+    inicial) y durante las capturas, `useAccessoryWatch` revalida un cuadro en el servidor cada
+    `config.faceAccessoryCheckIntervalMs` (throttleado, sin solaparse, para no spamear ni disparar la alerta de peticiones
+    lentas), reutilizando la última captura durante la toma (`frontal.last()`: no agrega cuadros ni cambia la resolución) y
+    tomando uno chico (`faceAccessoryCheckPx`) al alinear; una falla de calidad/pose/red deja las insignias como están.
+    Ninguna frase de la app pide retirar algo: un rechazo por accesorio (`Blocked.reason = null`, `blockedByAccessory`)
+    muestra la indicación de colocación «Muestra tu rostro completo» y nunca el mensaje del servidor; el escaneo se reanuda
+    con la insignia a la vista. `ScannerHints` solo dibuja la señal del movimiento del reto.
+  - **Borde rojo/verde al tomar las fotos** (decisión del dueño, 2026-10-07: «marca en rojo si no está enfocada y en
+    verde cuando esté enfocada… usa los bordes»): durante la toma de fotos del registro (foto inicial y las 32 capturas),
+    el borde de la guía (`FaceGuide`, token `--scan-*`) va en VERDE con el cuadro válido (enfocado + en la guía + de
+    frente + con luz + quieto) y en ROJO (`--scan-bad`, `captureTone` de `liveFaceView.ts`) con un rostro que todavía no
+    sirve (borroso, fuera de posición, en movimiento); sin rostro, neutro. En los demás flujos el aviso sigue en ámbar
+    (`guidanceTone`). La nitidez/enfoque la decide el detector (`useFaceAutoCapture` con `quality`: `faceFrameSharpness`,
+    varianza del Laplaciano ≥ `enrollmentMinSharpness`); un cuadro borroso es la guía `blurry` (borde rojo, no cuenta).
+  - **Lo que se dibuja es lo que se exige** (decisión del dueño, 2026-10-07): la validez del encuadre se mide CONTRA la
+    guía. `faceGuideShape.guideTarget` lleva la caja objetivo del dibujo (`TARGET_BOX`: donde cae la caja del detector
+    —de las cejas al mentón— cuando el rostro llena el contorno; medida con un rostro real en el harness) a píxeles del
+    video con la geometría real de la página (`getBoundingClientRect` del círculo, `guideRef` de `FaceGuide`, y del
+    `<video>` con `object-fit: cover`; sin geometría, el círculo inscrito). `useFaceAutoCapture` exige: dentro del cuadro
+    de la cámara (`cut_off`), llenado entre `config.faceGuideMinFill` y `faceGuideMaxFill` (`too_far`/`too_close`),
+    centro a menos de `faceCenterTolerance` del de la guía (`off_center`; el doble en un movimiento y 1.3 veces más de
+    llenado al acercarse), de frente estricto (`look_straight`: giro ≤ `faceFrontalMaxYaw`, inclinación ≤
+    `faceFrontalMaxRollDegrees`, cabeceo en `faceFrontalPitchMin`-`faceFrontalPitchMax` y, con rostro en reposo, deriva
+    ≤ `faceFrontalPitchDrift`: mirar abajo NO es válido), luz, nitidez (`blurry`) y quietud. La QUIETUD es SUAVIZADA
+    (decisión del dueño, 2026-10-07: el rechazo por «movimiento no solicitado» saltaba de más en el iPhone;
+    `facePose.steadyStep`): el desplazamiento se mide contra el PROMEDIO de una ventana de `faceSteadyWindow` cuadros y
+    solo se marca `moving` si supera `faceSteadyMaxShift` durante `faceSteadyGraceFrames` cuadros SEGUIDOS (un pico de
+    ruido del detector no rechaza). Afloja solo la quietud: la posición y la pose NO se relajan. Todos más estrictos que
+    el servidor (MediaPipe y YuNet miden distinto) y calibrados con un rostro real (`.env`, README). Los ojos no se
+    evalúan (BlazeFace no da apertura ocular). Una guía nueva se agrega al `FaceGuidance`, a `GUIDANCE_KEYS` (texto en
+    siete idiomas) y a `PREPARING` si es de la etapa de preparación.
   - **Un solo anillo para todo el proceso, contado en fotos** (`scanProgress` → `capturePlan` + `captureProgress` de
     `liveFaceView.ts`): las fotos de frente (y, en una verificación, las ligeras del tramo quieto de la ráfaga, que
-    `useSyncExternalStore` lee de `FaceBurstRecorder.subscribe/held`), una por color del destello y los movimientos
+    `useSyncExternalStore` lee de `FaceBurstRecorder.subscribe/held`) y los movimientos
     (sigue a la cabeza en el que va). Por eso **el reto se pide al empezar el escaneo**, en paralelo a las fotos (su
     vida corre desde que llega: `challengeDeadline(reto, llegada)`), y el de un escaneo que se detuvo no cambia el anillo
     del siguiente (`scanRef`). Al enviar queda completo con la ✓.
-  - **Registro facial: 36 fotos completas** (decisión del dueño: «por lo menos 36»): las páginas de registro pasan
-    `{...enrollmentCapture()}` (`frontalFrames` = `config.enrollmentFrames` y `frontalPhoto` con
-    `config.enrollmentPhotoPx` y `config.enrollmentPhotoGapMs`); `useFrontalCapture` las toma una tras otra, cada una
-    de un cuadro NUEVO del video (`utils/videoFrames.ts`: `requestVideoFrameCallback` con tope; sin él no espera). El
-    servidor elige las mejores como referencia y descarta las demás; la validación previa solo revisa las 3 primeras.
-    Una verificación toma sus 3 capturas de siempre y las 36 fotos LIGERAS de la ráfaga.
-  - **Prueba de vida** (el reto lo decide el servidor, `FaceChallenge`): primero el **destello**
-    (`useScreenFlash` + `FlashOverlay`: capa a pantalla completa en un portal, sobre todo, con una
-    ventana circular sobre el círculo y su anillo —medida al empezar, con cada color y en el cuadro siguiente: el visor
-    puede acomodarse un instante después—; cada color espera `config.faceFlashSettleMs` y captura un cuadro; el color
-    cambia al instante también con "reducir movimiento"). Si la cámara falla o la pantalla se oculta,
-    sin `flash_required` se sigue sin él y con él se pide otro reto. **Durante el destello el visor alrededor del
-    círculo pasa al instante a un gris oscuro NEUTRO** (`flash` → `.face-scan--flash`; al terminar regresa suave al
-    blanco): por la ventana solo llega a la cara la luz del color que se mide, nunca el blanco de la tarjeta (el anillo
-    blanco junto al círculo sería ≈ 5 % de la pantalla); entre un color y otro sigue el anterior (nunca blanco) y la
-    cápsula de la indicación es oscura y neutra. El blanco del resto del proceso no estorba a la medición (el servidor
-    compara los cuadros del destello entre sí, `photometry.py`) y ayuda con poca luz (ilumina el rostro y la
-    exposición queda con margen: ningún color satura un canal). Luego cada **movimiento**
-    (`TURN_LEFT`, `TURN_RIGHT`, `LOOK_UP`, `LOOK_DOWN`, `MOVE_CLOSER`) con su señal delicada (`LivenessCues`, del
-    tamaño y en el lugar del anillo, sin insignias: girar y mirar arriba/abajo, un arco azul que respira por fuera del
-    anillo de ese lado y una punta fina con contorno blanco dentro del círculo que se desliza hacia él; acercarse, ondas
-    finas que salen del anillo hasta el tamaño objetivo, `--closer-scale` con tope, mientras el círculo respira) y
-    regreso al frente entre uno y otro.
+  - **Registro facial en un orden fijo (decisión del dueño, 2026-10-06, que no se altera): foto inicial válida → 32 capturas
+    VÁLIDAS con los movimientos → video con tres preguntas → listo.** Las páginas de registro pasan `{...enrollmentCapture()}`
+    (`frontalFrames` = `config.enrollmentValidPhotos`, `frontalPhoto` con `config.enrollmentPhotoPx` y
+    `config.enrollmentPhotoGapMs`) y el indicador de pasos fijo de su pantalla (`EnrollmentStepper`: Foto inicial →
+    Capturas → Video → Listo; sin el paso del video cuando la política no lo exige; estados fijos).
+    - **Tres opciones independientes y retomables** (decisión del dueño, 2026-10-07: «una opción para tomar la foto, otra
+      para el enrolamiento y otra para tomar el video y contestar las preguntas»; el orden lo exige el SERVIDOR). La pantalla
+      `EMPLOYEE_ENROLL` (sin cambios en `catalog.screens`) tiene su índice y una ruta hija por paso, registradas en la misma
+      entrada de `SCREEN_VIEWS` (`paths.employee.enroll`, `enrollPhoto`, `enrollCapture`, `enrollVoice`):
+      - Índice (`EnrollmentPage` + `components/enrollments/EnrollmentSteps`): el estado de cada paso lo dice el servidor
+        (`enrollmentService.progress` con `useResource`: pendiente, completado con su fecha, bloqueado con lo que falta,
+        vencido, intentos agotados, «2 de 3 respondidas»); `enrollmentStepRules.ts` solo lo traduce a etiqueta, aviso y
+        botón (`enrollmentStepViews`; nada se calcula: un estado nuevo va primero al backend). Cada botón confirma ANTES de
+        abrir la cámara (`enrollmentStepConfirm`: «Repetir foto» dice que reemplaza la anterior; un registro rechazado o
+        una nueva verificación, que reemplaza el registro anterior) y navega con `state.confirmed`. **Lo hecho, completo
+        en verde** (adenda del dueño, 2026-10-07: «se debe marcar todo en verde siempre y cuando se haya procesado de
+        manera correcta»): un paso cuyo estado del SERVIDOR es «hecho» se dibuja entero en verde (`.enroll-index__step--done`:
+        palomita en lugar del número, ícono, título, etiqueta «Completado · fecha», borde y fondo `--success-soft`,
+        contraste AA) y su acción secundaria («Repetir foto») queda neutra, nunca el azul de la acción principal, que
+        conserva solo un paso pendiente; uno bloqueado va en gris. Nunca verde por un estado local u optimista: solo por
+        lo que responde `GET /enrollment/progress` (al volver de un paso el índice lo pide de nuevo antes de pintar). La
+        misma regla en `EnrollmentStepper` (pasos hechos en verde con palomita, el activo en azul, los demás en gris) y en
+        «En validación» (`PendingValidationPage`: `current="done"`, los tres hechos; el paso del video según la política).
+      - Pantallas de los pasos (`pages/employee/EnrollmentStepPages.tsx`, `StepGate`): vuelven a pedir el estado; si el paso
+        no toca (`enrollmentStepBlock`: falta el anterior, ya se hizo, intentos agotados, sin video en la política) lo dicen
+        con su `EmptyState` y «Volver al registro» en lugar de abrir la cámara; abiertas a mano (sin `state.confirmed`:
+        un enlace, recargar) piden la confirmación con «Abrir cámara» (nunca un popup al montar: StrictMode lo cancelaría).
+        Al terminar, cancelar o fallar regresan al índice (`replace`), que pide el estado de nuevo; el último paso deja el
+        registro en validación (`useFinished`: releer el usuario con `refreshWithRetry`, aviso y «En validación»).
+      - Paso 1, `LiveFaceFlow enrollmentStep="photo"`: la foto inicial se toma a MANO (decisión del dueño, 2026-10-07: «debe
+        haber una opción para tomar la foto»): un obturador «Tomar foto» (`FlowActions` `shutter`, ≥ 44 px) que solo se
+        habilita con el cuadro VÁLIDO (borde verde; `isSteadyGuidance`, sin relajar la posición/pose/nitidez) y, al
+        presionarlo, toma UNA foto (`onPhotoStable` → `shot()`) y la envía con `enrollmentService.photo` (`POST /enrollment/photo`:
+        la valida y SE PROCESA después; rechazada —borrosa, oscura, accesorio bloqueado…— muestra el mensaje del servidor y
+        deja volver a tomarla, con las insignias de accesorios continuas). Sin reto ni `/face/check` previo; cuatro etapas;
+        `onStable` NO se auto-dispara en este paso. Paso 2, `enrollmentStep="captures"`: las fotos válidas y los cuatro
+        movimientos SIN la foto inicial (ya guardada) con `enrollmentService.submit`, AUTOMÁTICO (es una secuencia). Sin
+        `enrollmentStep` (el registro en persona de la empresa) el flujo de siempre: foto inicial validada y, en la misma
+        toma, capturas y movimientos (auto).
+      - Paso 3: la pantalla pide su sesión con `enrollmentService.startVoice()` (`POST /enrollment/voice/start`, una vez:
+        `useAction` en un efecto con marca) y la responde con `VoiceVerificationFlow`; una sesión vencida o inválida se
+        avisa y se pide otra (las respuestas aceptadas se conservan: llegan solo las que faltan y la cuenta sigue, «Pregunta
+        2 de 3» = `answered` + la actual de `total`); intentos agotados o sin registro pendiente regresan al índice.
+    - **Foto inicial** (`LiveFaceFlow.photographs`, el registro en persona; el propio la toma en su paso 1, arriba): con el
+      rostro estable se toma UNA foto (`shot()`) y se valida en el servidor (`faceService.check`) ANTES de las demás; rechazada (borrosa, oscura, quemada, sin rostro o con un
+      accesorio que la empresa bloquea: los códigos del catálogo `face_errors`), se explica con el mensaje del servidor
+      (`blocked`) —salvo los accesorios, cuyo aviso es la insignia— y se vuelve a pedir sin tomar ninguna más; aceptada,
+      sus `accessories` se dibujan como insignias informativas y las fotos siguen. En una verificación la validación
+      previa sigue siendo la de siempre (las primeras 3 ya tomadas).
+    - **32 fotos VÁLIDAS, no 32 intentos, y nunca se repite el proceso** (`useFrontalCapture` con `FrontalPhoto.valid`,
+      que arma `useEnrollmentPhotoPlan`; decisión del dueño, 2026-10-07: «las fotos se deben tomar únicamente si son
+      factibles… lo verde se debe ir marcando única y exclusivamente si se tienen fotos válidas, de lo contrario no se
+      debe repetir»): un cuadro cuenta solo si el detector lo ve en ese instante dentro de la guía, centrado, completo, de
+      frente estricto, quieto y ENFOCADO (`isSteadyGuidance`: la nitidez y la quietud ya las decide el detector, no
+      `useFrontalCapture`; `useFaceAutoCapture` con `quality` = `faceFrameSharpness` —varianza del Laplaciano sobre el
+      rostro en gris a 96 px ≥ `config.enrollmentMinSharpness` y brillo medio 40-225, los límites del servidor; un lienzo
+      bloqueado contra huellas no descarta nada— y la quietud suavizada; el detector sigue leyendo durante las fotos sin
+      disparar nada, contra el rostro en reposo: `continuous`, `detectionMode` con `baseline`, `detectorActive`). Un cuadro
+      inválido NO cuenta, NO toma foto y NO reinicia nada: la indicación grande sigue a la guía (`photosStatus`: «Centra tu
+      rostro», «Mira al frente», «Acércate», «Aléjate», «Más luz», «Mantente quieto», «Muestra tu rostro completo») con el
+      borde de la guía en ROJO, y en verde «Mantente quieto» cuando sirve;
+      `photos` cuenta solo válidas (el anillo y la cuenta). No hay tope de intentos (`VITE_FACE_ENROLLMENT_MAX_ATTEMPTS`
+      y `CaptureAttemptsExhaustedError` se eliminaron): la toma espera a la persona y se detiene sola al cerrar la pantalla
+      o empezar otro escaneo (`generation`); si el reto vence mientras se reúnen las fotos, `onFrontalStable` pide otro
+      conservándolas (`challengeExpired`), sin aviso ni reintento. Cada foto es de un cuadro NUEVO del video
+      (`utils/videoFrames.ts`). Todos los candados se conservan: misma resolución por toma (`shot()`), Exif, geometría,
+      ráfaga, llave del dispositivo, telemetría.
+    - **Video con tres preguntas** (`VoiceVerificationFlow`; la sesión la pide la pantalla del paso 3): el mismo encabezado de la
+      tarjeta del escáner (`ScanHeader` de `FaceScan.tsx`: título, nombre de la app, pasos y «Cancelar»; vive una sola vez),
+      la cámara ya abierta en su
+      círculo (`FaceGuide` con `stage="voice"`), la pregunta grande (texto del catálogo `voice_questions` por su código, en el
+      idioma activo), «Responde ahora», el medidor del micrófono (`MicLevel`, `useMicLevel`: solo él se redibuja) y, al
+      grabar, un indicador fijo «Grabando» con los segundos y el anillo contra `config.voiceMaxAnswerSeconds`. Grabación
+      solo con `useAnswerRecorder` (`MediaRecorder` con la pista de video de `useCamera().videoTrack()` y el micrófono pedido
+      con el aviso NATIVO, formato `pickMimeType` —MP4 en WebKit, WebM en Blink y Gecko—, termina sola tras
+      `config.voiceSilenceStopMs` de silencio después de `config.voiceMinSpeechMs` de voz, con «Listo» o al tope); sin
+      `MediaRecorder` o sin micrófono se explica (`voice.unsupported`, `voice.micDenied`) y se regresa a la bienvenida,
+      nunca se omite la etapa. Cada clip va con `enrollmentService.answerVoice(token, posición, clip)`: aceptado, el token
+      renovado y la siguiente pregunta; 422, la MISMA pregunta con el mensaje del servidor (`localizeServerText`), los
+      intentos que quedan (`details.attempts_left`) y el token renovado (`details.token`); `VOICE_RETRIES_EXHAUSTED`,
+      `VOICE_SESSION_EXPIRED`/`INVALID`, `VOICE_NOT_PENDING` o `ENROLLMENT_NOT_FOUND` → `onRestart` (la pantalla avisa y pide
+      otra sesión o regresa al índice); 5xx, 429, 0 o 408 repiten la pregunta sin tirar nada; lo demás → `onFatal`. La
+      pantalla del paso 3 solo da el registro por terminado (`useFinished`: releer el usuario, popup, «En validación») tras
+      `onDone`.
+    - **Revisión de la empresa** (`ValidationReviewPage` → `components/enrollments/VoiceReviewSection`): cada respuesta con su
+      pregunta, intentos, duración, «Se oyó: …» y los parecidos; el video se pide SOLO al tocar «Reproducir video»
+      (`enrollmentService.voiceClip`: base64 por la API → URL `blob:` local, liberada al salir; nunca una URL del bucket) y
+      se reproduce con `ui/VideoPlayer` (conserva la relación de aspecto del clip, alto máximo `60dvh`, ancho al del panel,
+      sin medidas fijas); un 404 dice que ya venció, otra falla abre el popup y se puede reintentar.
+    - La política `voice_verification` se cambia solo en `CompanyPolicyPage` (sección de seguridad, con su advertencia:
+      apagarla relaja → regla de dos personas); `useVerificationPolicy` la trae en `STRICT_RULES` como encendida.
+  - **Destello de colores: RETIRADO de la experiencia** (decisión del dueño del producto, 2026-10-06; README «Destello de
+    colores retirado»): la pantalla NUNCA se pinta de un color, ni completa ni parcial, en ningún flujo (registro,
+    verificación, asistencia, validador). No existen `FlashOverlay`, `useScreenFlash`, `flashPacingService` ni la fase
+    `flash` del flujo (código eliminado, no excluido); el plan del anillo no cuenta colores; el envío no lleva
+    `flash_image` ni comprobante; un reto que aún traiga `flash`, `flash_required` o `flash_pace` se responde sin ellos
+    (`LiveFaceFlow.liveness.test.tsx` lo exige; la política de toda empresa está en OFF y el servidor no los pide). En la
+    política del ADMIN «Destello de colores» (`PolicyTuning` → `RetiredRow`) y «Destello dictado por el servidor»
+    (`CompanyPolicyPage`, `Section.retired`) se muestran apagados y sin control con `policy.retired` /
+    `policy.tuning.flash.retired`; Seguridad facial conserva su panel de mediciones (históricas) con
+    `faceSecurity.flash.retired`. Lo que cubre los ataques de presentación sin el destello: la ráfaga, los movimientos,
+    las señales del servidor (paralaje, moiré, ruido) y la verificación por voz y video. Una capa de color nueva en el
+    visor choca con esta decisión.
+  - **Prueba de vida** (el reto lo decide el servidor, `FaceChallenge`; `faceService.getChallenge(purpose)`): cada
+    **movimiento** (`TURN_LEFT`, `TURN_RIGHT`, `LOOK_UP`, `LOOK_DOWN`, `MOVE_CLOSER`) con su señal delicada
+    (`LivenessCues`, del tamaño y en el lugar del anillo, sin insignias: girar y mirar arriba/abajo, un arco azul por
+    fuera del anillo de ese lado y una punta fina con contorno blanco dentro del círculo que se desliza hacia él;
+    acercarse, ondas finas que salen del anillo hasta el tamaño objetivo, `--closer-scale` con tope) y regreso al frente
+    entre uno y otro; estados fijos, sin transiciones. **El registro pide la prueba de vida COMPLETA** (decisión del dueño,
+    2026-10-07: «que mueva su cabeza a la derecha, izquierda, arriba, abajo y que centre su cara»): el flujo pide el reto
+    con `purpose: 'ENROLLMENT'` (siempre los cuatro movimientos de la cabeza, en el orden que decida el servidor), tras
+    CADA movimiento vuelve al frente con detección real (`recenter` contra el rostro en reposo: «Centra tu rostro» o la
+    corrección precisa; «Mira al frente» mientras la cabeza siga arriba o abajo) y, tras el último, la vuelta al frente
+    FINAL («Centra tu rostro para terminar.», `finalRecenter`, el anillo ya lleno) antes de enviar (`finish`). El anillo
+    (`capturePlan`) cuenta los cuatro movimientos y el rótulo dice «Prueba de vida · paso 2 de 4». La verificación, la
+    asistencia y el validador no cambian: su reto es el de la política y envían tras el último movimiento.
   - Las medidas son las del servidor (`utils/facePose.ts`: giro, altura de la nariz entre ojos y boca,
     ancho del rostro) contra el rostro "en reposo" que `useFaceAutoCapture` entrega al quedar estable de
     frente (`onStable(sample)`), más el margen de la app (`faceTurnMargin`, `facePitchMargin`,
@@ -216,22 +382,36 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
     `useCaptureTelemetry` (en `LiveFaceFlow`) arma con `utils/captureTelemetry.ts` el JSON `telemetry` que viaja con
     las capturas: automatización del navegador, si hay una cámara virtual instalada (solo el indicador, NUNCA la
     lista de cámaras), lo que la pista reporta frente a lo que dice poder (`useCamera().videoTrack()`), el ritmo de
-    los cuadros (`requestVideoFrameCallback`, últimos `config.faceFrameRhythmSamples`) y la pantalla. Solo números y
-    banderas (≈400 bytes). Un dato nuevo va primero al contrato del backend (`schemas/capture.py`, que rechaza campos
-    de más).
-  - **Protocolo de captura** (antifraude 2a; lo pide el reto, nunca la app): el destello lo pinta
-    `useScreenFlash().play(reto, captura)`. Con `flash_pace`, cada color llega por el canal en vivo
-    (`services/flashPacingService.ts`: `step(token, huella)` con `sha256Hex` de la captura) y el comprobante viaja en
-    `flashReceipt`; sin canal (o si se corta), los colores de respaldo (`fallbackColors`) y el destello de siempre: el
-    servidor solo lo anota, nunca se avisa nada. Cada color se ve al menos `faceFlashSettleMs` (≥ 340 ms, WCAG 2.3.1).
-    La ráfaga la toma `useFaceBurst` (`utils/faceBurstRecorder.ts`, reglas puras en `utils/faceBurst.ts`): desde el rostro
-    estable de frente (tramo quieto; antes del destello se espera, con tope `faceBurstHoldWaitMs`, a completarlo) y en el
-    primer movimiento. Cada recorte es un `drawImage` a un lienzo de espera al ritmo de `requestVideoFrameCallback` (sin
-    él, un temporizador) y la hoja se arma y codifica una sola vez al enviar (`OffscreenCanvas.convertToBlob` o
-    `toBlob`): nada de `getImageData` ni trabajo pesado en el hilo de la interfaz (iPhone sin congelarse). Lo que pide
-    (lado, cuántos, calidad, margen, tope en bytes, mínimo) viene del reto (`burst`); la hoja vive solo en memoria y se
-    descarta al enviar. Sus interruptores (`flash_paced`, `capture_burst`) están en la sección «Protocolo de captura»
-    de la política del ADMIN (`CompanyPolicyPage`); apagarlos relaja la seguridad (regla de dos personas).
+    los cuadros (`requestVideoFrameCallback`, últimos `config.faceFrameRhythmSamples`, con el reloj de LLEGADA de cada
+    cuadro, `metadata.presentationTime`, declarado en `frames.clock`; el `now` es el del dibujo, alineado al refresco de
+    la pantalla, y una cámara real en fase daría intervalos idénticos) y la pantalla. Solo números y banderas (≈400
+    bytes). Un dato nuevo va primero al contrato del backend (`schemas/capture.py`, que rechaza campos de más).
+  - **Compatibilidad universal** (decisión del dueño, 2026-10-06; `docs/rd/compatibilidad-biometria.md`): toda función
+    biométrica (cámara, detección, capturas, ráfaga, telemetría, llave del dispositivo, ubicación, QR, grabación de video
+    y micrófono) declara
+    en ese documento (§2) su soporte en Blink, WebKit y Gecko y en cada sistema, y su RESPALDO, en el mismo cambio. Reglas:
+    - Una API se detecta antes de usarse (`typeof`, `in`) y su ausencia tiene respaldo o un problema de cámara con su
+      ayuda traducida (`cameraDiagnostics`: `in-app` para un navegador integrado, `canvas-blocked` para un lienzo alterado
+      contra huellas, `utils/canvasReadback.ts`); nunca un visor que espera para siempre.
+    - Lo que el navegador no puede medir viaja como «sin medir» (`null`, el reloj declarado), nunca como un valor que
+      parezca sospechoso; el servidor decide.
+    - Todas las capturas de una toma salen del MISMO tamaño (`useFrontalCapture().shot()`): el servidor exige una sola
+      resolución por intento; si la imagen cambia de tamaño a media toma (el teléfono giró), `CameraTurnedError` la
+      repite sin enviar.
+    - WebCrypto e IndexedDB con tiempo límite (`withinTime` de `utils/waits.ts`, `config.deviceKeyTimeoutMs`): tarde =
+      sin llave.
+    - Un cambio que toque los bytes o las APIs del navegador se prueba en el banco de motores (Playwright con
+      Chromium, Firefox y WebKit; el documento, §1 y §9) además de las pruebas unitarias.
+  - **Protocolo de captura** (antifraude 2a; lo pide el reto, nunca la app): la ráfaga la toma `useFaceBurst`
+    (`utils/faceBurstRecorder.ts`, reglas puras en `utils/faceBurst.ts`): desde el rostro estable de frente (tramo quieto;
+    antes del reto se espera, con tope `faceBurstHoldWaitMs`, a completarlo) y en el primer movimiento. Cada recorte es un
+    `drawImage` a un lienzo de espera al ritmo de `requestVideoFrameCallback` (sin él, un temporizador) y la hoja se arma y
+    codifica una sola vez al enviar (`OffscreenCanvas.convertToBlob` o `toBlob`): nada de `getImageData` ni trabajo pesado
+    en el hilo de la interfaz (iPhone sin congelarse). Lo que pide (lado, cuántos, calidad, margen, tope en bytes, mínimo)
+    viene del reto (`burst`); la hoja vive solo en memoria y se descarta al enviar. Su interruptor (`capture_burst`) está en
+    la sección «Protocolo de captura» de la política del ADMIN (`CompanyPolicyPage`); apagarlo relaja la seguridad (regla de
+    dos personas). El destello dictado por el servidor se retiró con el destello (arriba): `sha256Hex` (la huella de una
+    captura para la firma del validador) vive en `utils/digest.ts`.
 - **QR del empleado: dinámico y de un solo uso.** Se muestra solo con `useDynamicQr` +
   `DynamicQrCode` (se renueva al vencer, al usarse y bajo demanda; pausa con la pantalla oculta).
   El anillo de vigencia es una animación CSS y solo `QrCountdown` se redibuja cada segundo: nada
@@ -244,16 +424,28 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
 - **La política de verificación la configura el ADMIN** para cada empresa (`CompanyPolicyPage`, desde
   la ficha de la empresa). La empresa y su personal solo la leen (`settingsService`,
   `useVerificationPolicy`); ninguna pantalla de la empresa la modifica. Sus ajustes de la prueba de
-  vida (`PolicyTuning`): movimientos (1 a 3), tiempo del reto y destello (`flash_modes` del catálogo);
-  exigir el destello lleva la advertencia `warning` de `TuningSave` (calibrar antes).
+  vida (`PolicyTuning`): movimientos de una verificación (1 a 3; el registro pide siempre los cuatro) y tiempo del reto;
+  el destello (`flash_modes` del catálogo) se muestra retirado (`RetiredRow`, decisión del dueño, 2026-10-06). Los tres
+  accesorios del catálogo son interruptores (`CompanyPolicyPage.faceSection` sobre `ruledAccessories` de
+  `components/accessories.ts`, el mismo módulo de la insignia); «Retirar los lentes» nace apagado en toda empresa
+  (decisión del dueño, 2026-10-07; `STRICT_RULES.block_glasses = false`) y ningún nivel lo enciende.
 - **Seguridad facial** (`ADMIN_FACE_SECURITY`, `FaceSecurityPage`, `faceSecurityService`, secciones en
   `components/faceSecurity`, reglas puras en `utils/faceSecurity.ts`): solo dibuja lo que la
   plataforma calibró sola (cada umbral con `RangeMeter` entre su mínimo y su tope), las empresas
-  reforzadas por ataques y lo medido del destello con su veredicto (`flashReadiness`: cuándo conviene
-  exigirlo). "Recalcular ahora" pregunta con `useAction({ confirm })` y avisa el mensaje del servidor.
+  reforzadas por ataques y lo medido del destello con su veredicto (`flashReadiness`; mediciones históricas: el
+  destello se retiró el 2026-10-06 y el panel lo dice con `faceSecurity.flash.retired`). "Recalcular ahora" pregunta con `useAction({ confirm })` y avisa el mensaje del servidor.
   El protocolo de captura (antifraude 2a) tiene su sección (`CaptureProtocolPanel`, `protocolReadiness`: destellos
   dictados, a tiempo y con ráfaga) y un umbral que es un máximo (`upper`: el moiré) se dibuja con sus extremos «Lo más
   estricto» y «De partida».
+- **Deriva de señales** (`ADMIN_DRIFT`, `pages/admin/drift/DriftPage.tsx`, piezas en `components/drift/DriftParts.tsx`,
+  reglas puras en `utils/drift.ts`, `driftService`, tipos en `types/drift.ts`, textos en el espacio `drift`; antifraude
+  fase 3): solo dibuja lo que el mantenimiento calculó (resumen con `useResource`; pestañas Señales / Empresas / Versiones
+  en `?tab=` con `Tabs` + `useQueryOption`; tablas con `useSearchList`/`usePagedList` + `ListResults`, paginadas en el
+  servidor; filtros de semana, plataforma y estado con `Select`). Los estados (`STATUS_TONE`, `COMPANY_TONE`) y la cola
+  vigilada (`tailKey`: el 10 % más bajo o, en un máximo, el más alto) son presentación; ningún umbral se calcula en la app
+  (`psi_alert`, `tail_drop_alert`, `min_samples` vienen del resumen). «Calcular ahora» pregunta con `useAction({ confirm })`
+  y avisa con el mensaje del servidor. Un componente nuevo de la bitácora del motor se muestra tal cual (su código es un
+  dato; los conocidos, `COMPONENT_KEYS`).
 - **Antifraude** (backend: motor de riesgo, casos de fraude y regla de dos personas; tipos en `types/fraud.ts` y
   `types/policy.ts`; textos en `fraud`, `policy` (`policy/antifraud.ts`) y `attendance.review`):
   - **Política del ADMIN** (`CompanyPolicyPage` + `components/policy`): `PolicyPresets` (Estándar, Alto, Máximo del
@@ -373,6 +565,18 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
   `postFaceCaptures`, campos `device_key`/`device_nonce`/`device_signature`; antifraude 1b, decisión D2). Si la llave
   no está disponible (ventana privada, sin IndexedDB) se envía sin ella: el servidor lo mide, nunca se rechaza ni se
   avisa. Nunca de otra forma.
+- **Llaves de acceso (WebAuthn / passkeys)** solo con `utils/webauthn.ts` (sin librerías: `navigator.credentials` y un
+  base64url propio; `passkeysSupported()` detecta `PublicKeyCredential`; `createPasskey`/`getPasskey` devuelven `null` si
+  la persona cancela el aviso del sistema —no es una falla, no se avisa— y `PasskeyError` (`unsupported` | `failed`, con
+  su texto del diccionario) si el dispositivo no pudo). Piezas: `components/passkeys/PasskeysSection` (Mi perfil →
+  «Llaves de acceso»: lista paginada, revocar con `useAction({ confirm })`), `pages/PasskeyFormPage` (registrar y
+  renombrar como pantallas con `FormFooter`; `useAction` y no `useSubmit` para que cancelar el aviso del sistema deje el
+  formulario disponible; renombrar toma la llave de `location.state` o la pide al servidor si la URL se abrió a mano) y
+  `components/auth/PasskeyLogin` (botón «Entrar con llave de acceso» solo con soporte; `useAuth().loginWithPasskey`
+  reutiliza el mismo flujo del login —dispositivo del validador, `remember`, ubicación— con `loginWithProofs`). El reto
+  sellado del servidor vive solo en memoria mientras dura la ceremonia. Los términos por idioma están en el glosario
+  («llave de acceso», *passkey*, «chave de acesso», «clé d'accès», «Zugangsschlüssel», «chiave di accesso», «clave de
+  acceso»).
 - **Prohibido `localStorage` y `sessionStorage`** (el lint los bloquea): cualquier script los lee,
   no caducan y no se cifran. Los datos de la persona viven en el backend (preferencias, cuenta
   recordada). Si hay sesión que restaurar se pregunta con `authService.sessionStatus()`
@@ -384,6 +588,13 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
   (`CompanyEmployeesPage`) es de solo lectura (`ListResults` sin `onOpen`: filas sin clic); su única
   acción es "Olvidar" lo aprendido del rostro (con confirmación), porque el aprendizaje lo administra
   el ADMIN. El acceso a Integraciones se cambia con un interruptor (darlo y quitarlo se confirman).
+- **Llaves de la API: el permiso «Verificación»** (SDK móviles, migración `0084` del backend; contrato
+  `docs/sdk/contrato-verificacion.md`): los permisos se dibujan desde el catálogo `api_scopes` (nada fijo), y al marcar
+  `VERIFICATION` el formulario (`ApiKeyFormPage` → `VerificationWarning`, un `callout` con `role="note"`) advierte que una
+  llave dentro de una aplicación se puede extraer; si además se marcó un permiso de lectura, pide una llave SOLO con
+  «Verificación» para la app y otra para el servidor. Textos en los siete idiomas (`apiKeys.form.verificationWarning`).
+  La bitácora puede traer el método `API_FACE` (`VerificationMethod`); su nombre viene del catálogo
+  `verification_methods`, nunca escrito en la app.
 - **Validadores por empresa** (decisión del dueño; el backend decide, la app solo lo refleja):
   - El ADMIN fija el límite de validadores ACTIVOS en el alta y la edición de la empresa, junto al «Límite de
     empleados» (`CompanyForm` → `ValidatorLimitField`: `NumberField` con su unidad, de 0 a `VALIDATORS_MAX`, la
@@ -600,9 +811,12 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
     identifica una fila de personas no se interrumpe). Lo que abre la cámara para crear un dato
     (registro facial, registro de asistencia) se confirma ANTES de abrirla. Cerrar sesión tiene su
     propio popup (`useConfirmLogout`).
-- **Documentos opcionales** (RFC, CURP y NSS del empleado; identificador fiscal de la empresa): sin `required` (sin
-  asterisco), con la ayuda «Opcional · …», validación del cliente solo con valor y en vivo solo completo; vacío viaja como
-  `null` (`documentsPayload`, `companyBody`) y borrarlo al editar se confirma «antes → Sin capturar».
+- **Datos opcionales** (número, RFC, CURP y NSS del empleado —`OPTIONAL_FIELDS`—; identificador fiscal de la empresa):
+  sin `required` (sin asterisco), con la ayuda «Opcional · …», validación del cliente solo con valor y en vivo solo con
+  valor (los documentos, completos); vacío viaja como `null` (`optionalPayload`, `companyBody`) y borrarlo al editar se
+  confirma «antes → Sin capturar». El número de empleado puede faltar (`string | null` en todos los tipos): una persona
+  se nombra solo con `employeeLabel` / `employeeNumberLabel` (`utils/employeeLabel.ts`: «Ana Ruiz · EMP-7» o solo el
+  nombre, nunca «· null»), lo que mostraba el número como dato secundario lo omite y el expediente dice «Sin capturar».
 - **Identificador fiscal de la empresa** (cualquier país; decisión del dueño, 2026-10-06; backend `0074`): solo con
   `TaxIdFields` (en `CompanyDataFields`) y las reglas de `utils/taxId.ts`. País fiscal (`Select` con búsqueda, los países
   de `useCountryOptions`, México por omisión), tipo (`taxIdTypesFor`: los del país y «Otro» del catálogo `tax_id_types`;
@@ -687,7 +901,7 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
   reintentos (solo un 401 lleva al login); el canal en vivo cae a HTTP y cierra sockets a medias.
 - **Despliegues sin pantallas rotas**: una pantalla diferida que no carga se reintenta una vez y la
   app solo se recarga si hay una versión nueva (una vez, con marca de tiempo: sin bucles).
-- **Servida por el gateway** (`docker/nginx.conf`, que también reparte `/api` entre las réplicas del backend):
+- **Servida por el gateway** (`docker/nginx.conf.template`, que también reparte `/api` entre las réplicas del backend; es una plantilla: `docker/15-gateway-config.sh` escribe al arrancar los `NGINX_*` de `docker-compose.yml` —procesos, conexiones, keepalive hacia la API, tiempos límite, reintentos, cuerpo máximo—, con sus valores en el `.env` de la raíz; un parámetro nuevo que dependa de las réplicas o del equipo se agrega ahí, en `docker-compose.yml` y en ese `.env`, nunca fijo en la plantilla):
   `/assets/*` con caché de un año `immutable` (nombres con hash de Vite), `index.html` y `version.json` sin
   caché (así una publicación nueva se ve y se detecta), `.gz` hechos al construir la imagen (`gzip_static`) y
   un `/assets` inexistente es 404 (nunca `index.html`). Lista para una CDN. Un archivo de `public/` no lleva
@@ -710,10 +924,17 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
 - Cada pantalla, hook o servicio nuevo lleva prueba (incluidos errores y estados vacíos).
 - Calidad global de ambos proyectos: script de la raíz del repositorio (ver
   `../scripts/quality/README.md`).
-- **Dependencias al día sin romper nada**: cada actualización mayor se prueba antes de adoptarse
-  (TypeScript se queda en la versión más nueva que soporta typescript-eslint: hoy 6.x, no 7). Con
-  TypeScript 6 los tipos globales se declaran en `tsconfig` (`types`), y con React 19 una referencia
-  de `useRef(null)` es `RefObject<T | null>` y el envío de un formulario es `SubmitEvent`.
+- **Dependencias al día sin romper nada** (regla 11 de la raíz): cada actualización mayor se prueba antes de adoptarse.
+  Versiones que se retienen a propósito (revisadas el 2026-10-07; se vuelven a revisar en cada limpieza):
+  - **TypeScript se queda en la versión más nueva que soporta typescript-eslint**: hoy `~6.0.x`, no 7.0.2
+    (typescript-eslint 8.71.1 declara `typescript >=4.8.4 <6.1.0`). Con TypeScript 6 los tipos globales se declaran en
+    `tsconfig` (`types`), y con React 19 una referencia de `useRef(null)` es `RefObject<T | null>` y el envío de un
+    formulario es `SubmitEvent`.
+  - **`@types/node` sigue a la versión de Node de la imagen** (`Dockerfile`: `node:24-alpine`): 24.x, no 26.
+  - **`@mediapipe/tasks-vision` en 1.0.1**: la 1.1.0 (publicada el 2026-10-06) pesa un 10 % más (40.6 MB contra 36.8 MB
+    desempaquetados; su WASM se sirve al navegador desde `public/mediapipe`) y toca el detector facial, así que solo
+    entra tras pasar el banco de motores de `docs/rd/compatibilidad-biometria.md` §9 (Playwright con los tres motores,
+    fuera del repositorio) y comparar el tamaño servido; pendiente de esa corrida.
 - **No usar prettier ni otros formateadores**: el estilo es el existente (comillas simples, líneas
   largas, imports ordenados por el lint).
 
@@ -759,11 +980,14 @@ en-US, regla 16 de la raíz): sus textos viven en los diccionarios de `src/i18n/
   variables. Vacío = valor por defecto.
 - Las `VITE_*` se incrustan en el bundle: son públicas, nunca un secreto del servidor.
 
-## 7. Idiomas: es-MX y en-US (regla 16 de la raíz)
+## 7. Idiomas: siete idiomas (regla 16 de la raíz)
 
-Decisión del dueño del producto: **todo lo que se programa existe en español de México (`es-MX`, por
-omisión) y en inglés de Estados Unidos (`en-US`)**, con **ortografía verificada** en los dos y un **cambio de
-idioma en caliente**. Ningún cambio se da por terminado si falta un idioma.
+Decisión del dueño del producto (2026-10-06): **todo lo que se programa existe en los siete idiomas de la plataforma**
+—español de México (`es-MX`, por omisión), inglés de Estados Unidos (`en-US`), portugués de Brasil (`pt-BR`), francés de
+Francia (`fr-FR`), alemán de Alemania (`de-DE`), italiano de Italia (`it-IT`) y español de España (`es-ES`)—, con
+**ortografía verificada** en cada uno y un **cambio de idioma en caliente**. Ningún cambio se da por terminado si falta
+un idioma. El registro de cada idioma, el glosario por término y el vocabulario de España: `docs/i18n/glosario.md`
+(obligatorio al traducir; ahí también está «cómo agregar un idioma»).
 
 ### 7.1 Cómo está hecho (`src/i18n/`)
 - Capa propia y pequeña, sin librerías (`core.ts`): un estado por pestaña con el idioma activo y su
@@ -784,11 +1008,21 @@ idioma en caliente**. Ningún cambio se da por terminado si falta un idioma.
     usando `t('ns.llave', { count })` (`count` se muestra con separador de miles; las demás variables
     numéricas, tal cual). Las llaves tienen tipo: una llave que no existe o una variable que falta no compila.
 - Diccionarios: `src/i18n/locales/es-MX/<espacio>.ts` (`as const`, fuente de las llaves) y
-  `src/i18n/locales/en-US/<espacio>.ts` (`satisfies Translation<typeof es>`), un espacio por área
-  (`common`, `auth`, `layout`, `ui`, `shifts`, `attendance`, `location`...), llaves en camelCase agrupadas por
-  pantalla o componente (`shifts.form.title`); el `_` solo para la forma del plural. Un archivo de más de 450
-  líneas se parte en subarchivos que su espacio importa (igual en los dos idiomas). Cada idioma es un archivo
-  diferido (`import()`): el que no se usa no viaja en la carga inicial.
+  `src/i18n/locales/<idioma>/<espacio>.ts` (`satisfies Translation<typeof es>`) para en-US, pt-BR, fr-FR, de-DE e
+  it-IT, un espacio por área (`common`, `auth`, `layout`, `ui`, `shifts`, `attendance`, `location`...), llaves en
+  camelCase agrupadas por pantalla o componente (`shifts.form.title`); el `_` solo para la forma del plural. Un archivo
+  de más de 450 líneas se parte en subarchivos que su espacio importa (igual en cada idioma). **es-ES deriva de es-MX**
+  (`derive(es, {...})`, `src/i18n/derive.ts`): un archivo por espacio, sin subcarpetas, con SOLO las llaves cuyo texto
+  cambia en España (glosario §3: fichar, móvil, ordenador, mascarilla, gafas, clave, añadir, importe…); el español común
+  no se duplica (regla 6) y la lista de diferencias queda escrita en el código. El `index.ts` de cada idioma que no es la
+  fuente arma su diccionario con `assemble` (`src/i18n/assemble.ts`) desde los archivos de su carpeta
+  (`import.meta.glob(['./*.ts', '!./index.ts'], { eager: true, import: 'default' })`): la lista de espacios vive solo en
+  es-MX, un espacio nuevo entra con crear su archivo en cada idioma y los subarchivos de un espacio van en una subcarpeta
+  (`billing/account.ts`, `shifts/form.ts`), nunca sueltos junto a los espacios. Cada idioma es un archivo diferido
+  (`import()`, `LOADERS` en `core.ts`): el que no se usa no viaja en la carga inicial.
+- Plurales por idioma con `Intl.PluralRules`: todos usan `_one`/`_other` (y `_zero` donde es-MX la tiene); en pt-BR y
+  fr-FR el cero cae en `_one` (CLDR: «0 dia», «0 jour»), así que esa forma debe servir para 0 y 1; `many` (millones en
+  es, fr, it, pt) cae en `_other` y no se escribe. `dictionaries.test.ts` lo verifica con las categorías de cada idioma.
 - `common` reúne lo que significa lo mismo en cualquier pantalla (Guardar, Cancelar, Activo, Correo
   electrónico...); si en un área el texto cambia de género, número o sentido ("Activa" para una empresa), va en
   el espacio de esa área.
@@ -799,23 +1033,42 @@ idioma en caliente**. Ningún cambio se da por terminado si falta un idioma.
   popups, estados vacíos y errores que arma la app. El lint `i18n/no-hardcoded-text` (`eslint-rules/i18n.js`,
   con sus pruebas) lo impide en JSX, en propiedades de texto (`title`, `message`, `label`, `hint`...), en lo
   que devuelve una función y en constantes; no marca códigos, identificadores, unidades sueltas ni símbolos, y
-  solo permite los nombres propios de su lista (navegadores, sistemas, marcas). Lo que el lint no ve (un
-  `new Error('…')` que llega a un popup) también va al diccionario: se revisa a mano.
-- **Agregar un texto**: la llave en `es-MX` (el texto en español) y la misma en `en-US` (inglés natural de
-  Estados Unidos, en el mismo cambio), con las mismas variables y formas de plural. `src/i18n/dictionaries.test.ts`
-  falla si los dos idiomas no tienen exactamente las mismas llaves, variables y plurales (y los tipos no
-  compilan si a en-US le falta una llave).
+  solo permite los nombres propios de su lista (navegadores, sistemas, marcas). Lo que siempre se ve o se lee (`title`,
+  `placeholder`, `alt`, los `aria-*` hablados) se marca aunque sea una palabra en minúsculas o un ejemplo
+  («nombre@empresa.com» también es español). El texto de un error (`new Error('…')`) también se marca: si puede llegar a
+  la persona va con `localizedError(() => t('…'))`; uno interno (un proveedor que falta, el canal en vivo) lleva un
+  código en mayúsculas (`'FEEDBACK_PROVIDER_MISSING'`, `'REALTIME_TIMEOUT'`).
+- **Nunca se mezclan idiomas** (regla 16 de la raíz): la ÚNICA excepción es la marca «Employee Time Clock»; fuera de ella
+  solo nombres propios reales y siglas de `cspell-words.txt` y el nombre de cada idioma y su país en sí mismos
+  (`ENDONYMS`). Un préstamo del inglés («app», «backend», «bucket», «stack trace», «anti-spoofing», «laptops») se escribe
+  en el idioma («aplicación», «servidor», «almacenamiento», «traza de la pila», «detección de suplantación»,
+  «computadoras portátiles»; en portugués «aplicativo», en francés «application»…); solo se admite el anglicismo que el
+  diccionario del propio idioma reconoce («App», «Laptop», «Tablet» en alemán; «password», «app» en italiano). Lo que nombra el sistema operativo tampoco se muestra tal cual: el nombre de una cámara pasa por
+  `cameraName` (`utils/cameraDevices.ts`: las cámaras del equipo, que el sistema nombra en SU idioma —«Front Camera»,
+  «Back Ultra Wide Camera», «camera2 1, facing front», «FaceTime HD Camera», «Integrated Webcam», en inglés, español,
+  portugués, francés, alemán o italiano—, salen con el texto de la app y su lente; un modelo con marca, «Logitech BRIO»,
+  es un nombre propio). `rawLabel` conserva el original solo para las reglas (cámara virtual), nunca para mostrarse.
+- **Agregar un texto**: la llave en `es-MX` (el texto en español) y la misma en los otros seis idiomas EN EL MISMO
+  CAMBIO (en es-ES solo si su texto cambia), con las mismas variables y formas de plural, con el registro y el glosario
+  de `docs/i18n/glosario.md`. `src/i18n/dictionaries.test.ts` descubre los diccionarios por carpeta y falla si alguno no
+  tiene exactamente las mismas llaves, variables y plurales que es-MX (y los tipos no compilan si a un idioma le falta
+  una llave).
 - **Lo que envía el backend nunca se traduce en la app**: llega en el idioma de la petición
   (`Accept-Language` en cada petición de `apiClient`, `?lang=` en el canal en vivo): `message`,
   `errors[].message`, los textos de los catálogos (`name`, `description`, `message`, `phrase`, `instruction`)
   y los nombres de pantallas y módulos del menú. Los códigos no cambian.
 - **Formatos solo con los ayudantes del idioma activo** (nunca `toLocaleString('es-MX')` ni
-  `new Intl.*('es-MX')`): `utils/format.ts` (`formatDate`, `formatDateTime`, `formatTime` —12 h en en-US—,
+  `new Intl.*('es-MX')`, y tampoco sin idioma —`toLocaleDateString()`, `new Intl.DateTimeFormat()`, `a.localeCompare(b)`—,
+  que usa el del NAVEGADOR: lint `i18n/no-hardcoded-locale`): `utils/format.ts` (`formatDate`, `formatDateTime`, `formatTime` —reloj de 12 h solo en en-US; 24 h en los demás—,
   `timeAgo`, `formatMinutes`, `formatConfidence`, `localeDateFormat(opciones)` con `timeZone: 'UTC'` para
   fechas de calendario o `businessTimeZone()` para instantes, `timeStyle()`) y `utils/numbers.ts`
   (`formatNumber`, `formatCount`, `formatRate`, `formatMoney(monto, moneda)` con el código ISO que envía el
   backend, `formatDistance` en metros/kilómetros, `formatList`, `localeNumberFormat`). Siempre en la zona
   horaria del negocio (§2).
+- **Un nombre de catálogo dentro de una frase** («Registrar {action}», «Quítate {name}», «por {period}») pasa por
+  `inSentence(nombre)` (`utils/text.ts`): minúsculas con las reglas del idioma activo, salvo en alemán, donde los
+  sustantivos conservan su mayúscula («Kommen erfassen», «pro Monat»). Nunca `nombre.toLowerCase()`: el guardián de
+  de-DE lo señala («pro monat» no es una palabra).
 
 ### 7.3 Cambio de idioma en caliente
 - **Se aplica al instante en toda la app sin recargar ni refrescar la página por ninguna razón y sin perder
@@ -836,34 +1089,80 @@ idioma en caliente**. Ningún cambio se da por terminado si falta un idioma.
   redibuja, `CatalogProvider` vuelve a pedir los catálogos (mientras llegan se ven los anteriores) y
   `LocaleSync` vuelve a pedir el usuario (nombres del menú). El canal en vivo abre una conexión nueva con el
   idioma nuevo en su siguiente consulta.
+- **Todo en caliente, también lo que envía el servidor** (regla 16 de la raíz). Un mecanismo por tipo de dato:
+  - **Datos de una pantalla**: el idioma es parte de la llave de `useResource`, `usePagedList` (y `useSearchList`) y
+    `usePolledValue`: al cambiarlo se vuelven a pedir EN SU LUGAR (la misma página, tamaño y filtros; mientras llegan se
+    ven los anteriores, sin esqueletos ni desplazamiento perdido). `useAvailability` vuelve a verificar lo escrito. Un
+    formulario de edición se llena con `useLoadValues(valores, cargar)` (por valores, no por el objeto: volver a pedir el
+    registro no pisa lo escrito); nunca `useLayoutEffect(() => cargar(datos), [datos])`.
+  - **Catálogos**: `CatalogProvider` publica los vigentes ANTES de dibujar con ellos (`publishCatalogs` en
+    `utils/catalogs.ts`) y `byCode`/`nameOf`/`active` buscan SIEMPRE en los vigentes, como `t()`: una función guardada
+    con una carga anterior (la confirmación o el popup abiertos) nombra en el idioma nuevo; `FeedbackProvider` se
+    suscribe (`subscribeCatalogs`) y vuelve a dibujar el popup abierto al llegar los catálogos. Un control que guarda un
+    registro de un catálogo guarda su código y lo nombra al dibujarse (`PhoneField`: `directory.current(país)`).
+  - **Textos del servidor ya copiados** (un popup abierto con el error de una escritura, el error de un campo en el
+    estado de un formulario, el aviso de una restauración, el resultado de checar): el sobre trae en `i18n` sus textos en
+    cada idioma (regla 3; solo en errores y escrituras). `ApiError.message` y `errors[].message` se leen en el idioma
+    vigente y `i18n/serverTexts.ts` recuerda los textos recientes (tope 500) para `localizeServerText(texto)`, que usan
+    los puntos por donde pasan: `MessageDialog`, `FieldMessage`, `AttendanceResultCard`, `VerificationResultCard` y
+    `BulkResultSummary`. Un texto del servidor que se dibuje en otro lugar pasa por `localizeServerText`.
+  - **Un aviso que se abre solo** (las marcas de una solicitud de registro) se abre una vez por registro (referencia
+    con su id): volver a pedirlo al cambiar el idioma no lo reabre.
 - El mapa de Google se carga una vez por página con el idioma de ese momento: sus controles no cambian (la app
   no recarga), pero la búsqueda de lugares y la geocodificación sí usan el idioma activo.
 
 ### 7.4 De dónde sale el idioma y dónde se guarda
 - Al abrir la app (`main.tsx` → `initialLocale()` en `i18n/device.ts`): la última elección de este dispositivo
-  (IndexedDB, `deviceStore` llave `locale`, con tiempo límite) → los idiomas del navegador (`es*` → es-MX,
-  `en*` → en-US) → es-MX. Se descarga ese diccionario antes de dibujar; si no llega ni reintentando, una
-  versión nueva recarga una vez y, si fue la red, `index.html` muestra un aviso bilingüe con "Reintentar" que
-  vuelve a arrancar sin recargar.
-- Con sesión manda el idioma de la cuenta: `user.preferences.locale` (`'es-MX' | 'en-US' | null`), aplicado
+  (IndexedDB, `deviceStore` llave `locale`, con tiempo límite) → los idiomas del navegador (`matchLocale` en `core.ts`:
+  `es-ES`, `es-EA` e `es-IC` → es-ES; cualquier otro `es*` → es-MX; `en*` → en-US; `pt*` → pt-BR; `fr*` → fr-FR;
+  `de*` → de-DE; `it*` → it-IT; la misma tabla que el backend, glosario §5) → es-MX. Se descarga ese diccionario antes
+  de dibujar; si no llega ni reintentando, una versión nueva recarga una vez y, si fue la red, `index.html` muestra el
+  aviso SOLO en el idioma del dispositivo (cada idioma tiene su bloque con su «Reintentar»; nunca dos a la vez) que
+  vuelve a arrancar sin recargar. La negociación con el navegador vive en `i18n/negotiation.ts` (módulo PURO, sin
+  importaciones en tiempo de ejecución: `matchLocale`, `firstLocale`, `DEFAULT_LOCALE`; `core.ts` los reexporta) porque
+  también la usa el **aviso «Actualiza tu navegador»** (decisión D-C1, `docs/rd/compatibilidad-biometria.md` §7):
+  `index.html` trae ese aviso en los siete idiomas (bloques `lang`, con la marca intacta; cspell lo revisa) y el guion
+  `src/compat/browserSupport.ts` —que `vite.config.ts` (`browserSupportNotice`) compila aparte a ES2015 con una
+  compilación anidada de Vite e inserta en línea al final del `<body>`— sondea por CAPACIDAD (`noModule`, `container-type`,
+  `Array.prototype.at`, `structuredClone`, *lookbehind*) antes de que el módulo principal intente interpretarse; si falta
+  algo muestra SOLO el bloque del idioma del navegador y oculta la raíz; si no, no toca nada. Ese guion se escribe con
+  sintaxis conservadora (nada de `at`, `structuredClone` ni expresiones regulares literales con *lookbehind*; la
+  compilación falla si aparece una) y solo puede importar `i18n/negotiation.ts`. Sus pruebas usan el `index.html` real
+  (`src/compat/browserSupport.test.ts`).
+- Con sesión manda el idioma de la cuenta: `user.preferences.locale` (uno de `LOCALES` o `null`), aplicado
   por `LocaleSync` (también si cambió desde otro dispositivo) y recordado en el dispositivo.
 - El selector (`components/LanguageSwitcher.tsx` + `i18n/useLanguage.ts`, lista propia `Select`) está en la
-  barra del inicio de sesión (`variant="compact"`) y en Mi perfil → Idioma. Cambia en caliente, lo recuerda
-  en el dispositivo y, con sesión, lo guarda en la cuenta (`PATCH /users/me/preferences {locale}`); si el
-  servidor no lo guarda, regresa al idioma anterior y lo avisa. No se confirma: es una preferencia de la
-  interfaz. `document.documentElement.lang`, el título y la descripción de la pestaña siguen al idioma.
+  barra del inicio de sesión y el kiosco (`variant="compact"`) y en Mi perfil → Idioma. Decisión del dueño del producto
+  (2026-10-06): cada opción muestra la **bandera** del país (`components/ui/LocaleFlag.tsx`: SVG plano dibujado por la
+  app, 20 × 14, decorativo; nunca emoji, que cada sistema dibuja distinto), el **idioma en sí mismo** y debajo su
+  **país** también en ese idioma (`ENDONYMS` en `i18n/endonyms.ts`: `{ language, country, flag }`); el control cerrado
+  dice «Español (México)» con su bandera (en teléfonos, en la barra del inicio de sesión, solo la bandera). La lista
+  mide EXACTAMENTE lo que el control: el compacto es tan ancho como el nombre más largo («English (United States)»,
+  `min-width` en CSS) y solo en teléfonos, donde muestra solo la bandera, la lista conserva un ancho mínimo alineada a
+  su borde derecho (`useMediaQuery`; `Select`: `menuWidth`, `menuMinWidth`, `menuAlign="end"`, `menuClassName`;
+  `Floating`: `minWidth`, `align`, sin salir de la pantalla), con los tokens `--select-*` de todas las listas (la fila
+  elegida con fondo de acento y palomita, filas de 44 px). Sobre la barra azul la lista toma la paleta de la propia
+  barra (`.select__menu--dark`: el azul marino del fondo translúcido y desenfocado, borde a baja opacidad, el acento de
+  la marca en la fila elegida, la palomita y el anillo de foco; contraste AA), nunca un color ajeno. Cambia en caliente, lo recuerda en el
+  dispositivo y, con sesión, lo guarda en la cuenta (`PATCH /users/me/preferences {locale}`); si el servidor no lo
+  guarda, regresa al idioma anterior y lo avisa. No se confirma: es una preferencia de la interfaz.
+  `document.documentElement.lang`, el título, la descripción de la pestaña y el manifiesto de la aplicación instalable
+  (`public/site.webmanifest` para es-MX y `public/site.<idioma>.webmanifest` para los demás, `MANIFESTS` en `core.ts`)
+  siguen al idioma. El mapa de Google recibe el código de idioma de cada uno (`MAPS_LANGUAGES`).
 
 ### 7.5 Ortografía (cspell) y pruebas
-- `npm run spell` (también dentro de `npm run lint` y en `scripts/quality.mjs`): cspell revisa los diccionarios
-  (es-MX solo contra el diccionario de español `@cspell/dict-es-es`, en-US solo contra el de inglés de Estados
-  Unidos; distingue mayúsculas y acentos: "informacion" es un error), `src/i18n/endonyms.ts`, `index.html` y el
-  manifiesto; revisa las cadenas (comillas simples, dobles e invertidas), no los comentarios. Cualquier palabra
-  desconocida falla. Listas de palabras propias, revisadas: `cspell-words.txt` (comunes a los dos idiomas:
-  marcas, lugares, siglas de México como RFC, CURP, NSS, IMSS, IVA), `cspell-words.es-MX.txt` (solo español:
-  mexicanismos como *checar* o *cubrebocas*, imperativos con pronombre como *muéstralo* que el diccionario no
-  trae) y `cspell-words.en-US.txt` (solo inglés). Una palabra se agrega solo después de confirmar que está
-  bien escrita y en la lista de su idioma, nunca para silenciar un error (lo que no es una palabra se
-  reescribe: "503 reintentable" pasó a "503: se puede reintentar").
+- `npm run spell` (también dentro de `npm run lint` y en `scripts/quality.mjs`): cspell revisa cada diccionario SOLO
+  contra el diccionario de su idioma (`@cspell/dict-es-es` para es-MX y es-ES, `dict-en_us`, `dict-pt-br`, `dict-fr-fr`,
+  `dict-de-de`, `dict-it-it`; distingue mayúsculas y acentos: "informacion" es un error), `src/i18n/endonyms.ts`,
+  `index.html` y los manifiestos; revisa las cadenas (comillas simples, dobles e invertidas), no los comentarios.
+  Cualquier palabra desconocida falla. Listas de palabras propias, revisadas: `cspell-words.txt` (comunes a todos los
+  idiomas: marcas, lugares, siglas de México como RFC, CURP, NSS, IMSS, IVA, nombres propios de lugares que todos los
+  idiomas conservan) y una por idioma, `cspell-words.<idioma>.txt` (es-MX: mexicanismos como *checar* o *cubrebocas* e
+  imperativos con pronombre como *muéstralo*; es-ES: las formas de España que el diccionario no trae, sin ningún
+  mexicanismo; pt-BR, fr-FR, de-DE, it-IT: términos del dominio y compuestos que su diccionario no trae). Una palabra se
+  agrega solo después de confirmar que está bien escrita y en la lista de su idioma, nunca para silenciar un error (lo
+  que no es una palabra se reescribe: "503 reintentable" pasó a "503: se puede reintentar"); jamás una palabra del
+  inglés en la lista de otro idioma.
 - **Las listas y la instalación de cspell son de toda la plataforma**: el backend revisa con ellas sus mensajes y los
   textos de sus catálogos (`backend-employee-time-clock/cspell.json`, en `./scripts/quality.sh --only=backend`), sin
   copiarlas. Por eso las listas traen también palabras de esos textos (los países del catálogo, los códigos de moneda,
@@ -873,12 +1172,42 @@ idioma en caliente**. Ningún cambio se da por terminado si falta un idioma.
   probar en inglés: `await setLocale('en-US')` antes de dibujar, o `await act(() => setLocale('en-US'))` con
   la pantalla montada para probar el cambio en caliente. Cada área tiene pruebas en en-US; `src/i18n/hotSwitch.test.tsx`
   cambia de idioma con un formulario lleno y un popup abierto y verifica que nada se reinicia ni se recarga.
-- La cobranza y el consumo ya viven en los espacios `billing` (con sus subarchivos `billingPlan` y
-  `billingAccount`) y `usage`: no queda ninguna excepción del lint de textos.
+- La cobranza y el consumo ya viven en los espacios `billing` (con sus subarchivos `billing/plan` y
+  `billing/account`) y `usage`: no queda ninguna excepción del lint de textos.
+- **cspell ESTRICTO** (`cspell.json`: `loadDefaultConfiguration: false`): sin los diccionarios de programación que cspell
+  carga por omisión (con ellos «Save», «Retry» o «Front» pasaban en un texto en español). La marca se reconoce solo como
+  frase completa (`ignoreRegExpList`); «Employee» o «Clock» sueltos fallan.
+- **Guardianes del idioma** (fallan con la pantalla, el texto y la palabra; definición de terminado de la raíz):
+  - `src/test/language.ts`: el revisor estricto (cspell-lib con los MISMOS diccionarios y listas, para los siete
+    idiomas): una palabra que el idioma no conoce **falla**; si además la conoce el diccionario de otro de los idiomas se
+    señala como «del otro idioma» (`foreign`, lo más probable es que se coló sin traducir) y si ninguno la conoce, como
+    «desconocida» (`unknown`). `foreignWordsInList` cuida las listas: ninguna palabra del inglés en la lista propia de
+    otro idioma (ni al revés); con siete idiomas no se exige más, porque una palabra legítima del portugués que el
+    español también tiene («validador») no es una mezcla. No revisa la marca, correos, direcciones, `{variables}`,
+    rutas, cabeceras ni códigos con dígitos.
+  - `src/i18n/dictionaryLanguage.test.ts`: cada texto de cada diccionario está solo en su idioma (los diccionarios se
+    descubren por carpeta) y cada lista propia pasa `foreignWordsInList`.
+  - `src/i18n/unusedKeys.test.ts`: ninguna llave de es-MX sobra: cada una la nombra el código, literal o por una plantilla
+    (`` `face.stages.${x}.name` ``). Una llave que ya nadie usa se elimina en los siete idiomas, no se traduce.
+  - `src/i18n/screensLanguage.test.tsx`: CADA ruta de `SCREEN_VIEWS` se dibuja con la app completa (sesión, menú,
+    catálogos y la pantalla) en CADA idioma de `LOCALES` contra el backend falso de `src/test/fakeApi` (responde según
+    `Accept-Language`, con las traducciones reales de los catálogos del backend y sus textos de prueba en los siete
+    idiomas, `say({...})`); se revisa todo lo que se ve o se lee (texto, `aria-label`, `title`, `placeholder`, `alt`, el
+    título de la pestaña), sin lo que escribió una persona (lo que el backend devuelve igual en todos los idiomas). Una
+    petición sin ruta en el backend falso también falla: una pantalla nueva agrega sus rutas ahí (`admin.ts`,
+    `company.ts`, `people.ts`).
+  - `src/i18n/screensHotSwitch.test.tsx`: en CADA ruta, con algo escrito y un popup abierto (la confirmación o el aviso
+    del formulario, el error que respondió el servidor al guardar —con su `i18n`— o «Cerrar sesión»), el idioma cambia a
+    en-US, a uno de los otros cinco idiomas (cada ruta uno distinto, por turnos: los siete participan sin multiplicar
+    por siete el tiempo de la suite) y de regreso a es-MX: nada del otro idioma queda (tampoco los datos del servidor
+    ni el popup), el mismo popup sigue abierto, lo escrito sigue ahí, la ruta es la misma y no hay recarga.
+  - `src/i18n/backendLanguage.test.ts`: los textos del backend (mensajes y catálogos de los siete idiomas) con el mismo
+    revisor.
+  - Tiempo medido de las dos suites de pantallas con los siete idiomas: ≈82 s para 776 pruebas (672 de `screensLanguage`, 96 de `screensHotSwitch` y 8 de `backendLanguage`; con dos idiomas eran 288 pruebas en 44 s) en el equipo de desarrollo, con los dos archivos en paralelo.
 
 ### 7.6 Estilo de los textos (mensajes simples pero profesionales)
 Decisión del dueño del producto: todo texto se lee de un vistazo. Un mensaje largo no se lee y esconde lo que
-importa; uno breve y preciso se entiende y genera confianza. Rige para cada texto nuevo o cambiado, en los dos idiomas.
+importa; uno breve y preciso se entiende y genera confianza. Rige para cada texto nuevo o cambiado, en los siete idiomas.
 - **Estados vacíos** (decisión del dueño del producto, 2026-10-06: en toda lista o tabla, ícono + título + una
   descripción corta; reemplaza la regla anterior de no llevar descripción):
   - Ícono de lucide acorde a la entidad y al de la pantalla (`Building2` empresas, `Users` empleados, `Trash2`
@@ -910,5 +1239,8 @@ importa; uno breve y preciso se entiende y genera confianza. Rige para cada text
 - **en-US**: inglés natural y conciso de Estados Unidos, no una traducción literal: "Couldn't …", "Try again.",
   "This can't be undone.", "No results", "All caught up"; términos *check in*, *workday*, *site*, *face enrollment*,
   *liveness check*.
+- **Los demás idiomas**: el registro y el glosario de `docs/i18n/glosario.md` (pt-BR «você», fr-FR «vous», de-DE «Sie»,
+  it-IT «tu», es-ES «tú» con el vocabulario de España), el mismo término para la misma cosa en toda la app y en los
+  mensajes del backend, y la misma guía de estilo que es-MX.
 - No cambian por estilo: llaves, `{marcadores}`, formas de plural, códigos, textos legales o de privacidad (aviso de
   privacidad, consentimiento, atribuciones de licencias) ni el sentido de una regla. Se acorta; no se inventa.

@@ -56,6 +56,7 @@ export default {
     attempts_other: '{count} attempts',
   },
   flash: {
+    retired: 'Flash retired by product decision (2026-10-06): these measurements are historical.',
     ready: 'Ready to require',
     calibrating: 'Calibrating',
     window_one: 'Successful attempts from the last day.',

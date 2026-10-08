@@ -11,9 +11,9 @@ export default {
   relaxes: 'Este valor protege menos contra la suplantación de identidad.',
   confirmLabel: 'Guardar ajuste',
   antiSpoofing: {
-    label: 'Sensibilidad del anti-spoofing',
+    label: 'Sensibilidad de la detección de suplantación',
     description: 'Qué tan estricto es al detectar fotos, pantallas y videos.',
-    saved: 'Anti-spoofing: nivel {level}',
+    saved: 'Detección de suplantación: nivel {level}',
   },
   steps: {
     label: 'Movimientos de la prueba de vida',
@@ -30,17 +30,13 @@ export default {
   },
   timeout: {
     label: 'Tiempo para la prueba de vida',
-    description: 'Para el destello y los movimientos; si se acaba, se pide otro reto sin repetir el escaneo.',
+    description: 'Para los movimientos de la prueba de vida; si se acaba, se pide otro reto sin repetir el escaneo.',
     saved: 'Tiempo de la prueba de vida actualizado',
     savedText: 'Cada reto vencerá a los {time}.',
   },
   flash: {
     label: 'Destello de colores',
-    description: 'La pantalla destella colores y el rostro real debe reflejarlos.',
-    saved: 'Destello de colores: {mode}',
-    /** Exigir el destello sin calibrar puede pedir repetir a personas reales. */
-    warning:
-      'Hazlo después de calibrar con capturas reales (Seguridad facial › Destello de colores). Con luz del sol directa puede pedir repetir la prueba.',
+    retired: 'Desactivado por decisión del producto (2026-10-06): la pantalla ya no destella colores. La prueba de vida la cubren los movimientos, la ráfaga y la verificación por voz.',
   },
   quality: {
     label: 'Calidad mínima de la captura',

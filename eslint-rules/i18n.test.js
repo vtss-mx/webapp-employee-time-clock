@@ -24,7 +24,9 @@ tester.run('no-hardcoded-text', i18n.rules['no-hardcoded-text'], {
     { code: 'const a = <p>  —  </p>;' },
     { code: 'const a = <dt>RFC</dt>;' },
     { code: 'const a = <Button variant="primary" className="btn btn--ghost" type="button" data-label="Nombre" aria-hidden="true" />;' },
-    { code: 'const a = <Field label={t(\'x\')} placeholder="nombre@empresa.com" autoComplete="current-password" />;' },
+    { code: 'const a = <Field label={t(\'x\')} autoComplete="current-password" inputMode="email" />;' },
+    { code: "throw new Error('SESSION_RENEW_FAILED'); const e = TypeError(code);" },
+    { code: "const e = localizedError(() => t('errors.unexpected'));" },
     { code: 'const a = <path d="M12 2 L 4 5 Z" transform="rotate(45 12 12)" />;' },
     { code: "const a = { title: t('x'), code: 'TURN_LEFT', variant: 'primary', unit: 'km' };" },
     { code: "const zone = 'America/Mexico_City'; const key = 'Escape';" },
@@ -50,6 +52,25 @@ tester.run('no-hardcoded-text', i18n.rules['no-hardcoded-text'], {
     { code: "const f = () => 'Sin turno';", errors: error() },
     { code: "const EMPTY = 'Sin capturar';", errors: error() },
     { code: "const a = { label: 'Teléfono' };", errors: error() },
+    // Lo que siempre se ve o se lee, aunque sea una palabra en minúsculas o un ejemplo.
+    { code: 'const a = <input placeholder="nombre@empresa.com" title="buscar" aria-label="cerrar" alt="foto" />;', errors: error(4) },
+    // El texto de un error que puede llegar a un popup.
+    { code: "throw new Error('No se pudo leer el archivo'); const e = TypeError('Respuesta inesperada del servidor');", errors: error(2) },
+  ],
+});
+
+tester.run('no-hardcoded-locale', i18n.rules['no-hardcoded-locale'], {
+  valid: [
+    { code: 'const a = n.toLocaleString(currentLocale()); const b = new Intl.NumberFormat(locale, options);' },
+    { code: "const c = a.localeCompare(b, currentLocale()); const d = date.toLocaleDateString(locale, { month: 'short' });" },
+    { code: 'const e = name.toLocaleUpperCase(); const f = Intl.getCanonicalLocales(tag); const g = other.format(); const h = n.toString();' },
+  ],
+  invalid: [
+    { code: "const a = n.toLocaleString('es-MX');", errors: [{ messageId: 'literal' }] },
+    { code: "const b = new Intl.DateTimeFormat('en-US', { month: 'short' });", errors: [{ messageId: 'literal' }] },
+    { code: "const c = Intl.NumberFormat(['es-MX']);", errors: [{ messageId: 'literal' }] },
+    { code: 'const d = date.toLocaleDateString(); const e = new Intl.RelativeTimeFormat();', errors: [{ messageId: 'missing' }, { messageId: 'missing' }] },
+    { code: "const f = a.localeCompare(b); const g = word.toLocaleUpperCase('tr');", errors: [{ messageId: 'missing' }, { messageId: 'literal' }] },
   ],
 });
 

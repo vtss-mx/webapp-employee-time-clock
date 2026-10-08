@@ -19,6 +19,7 @@ const company: CompanyDetail = {
   active: true,
   max_employees: null,
   api_enabled: false,
+  require_employee_documents: false,
   max_validators: 0,
   active_validators: 0,
   employee_count: 2,
@@ -96,6 +97,15 @@ describe('CompanyEmployeesPage (el ADMIN consulta el personal de una empresa)', 
 
     const list = calls.find((c) => c.url.includes('/employees'));
     expect(list?.url).toContain('/api/admin/companies/4/employees?');
+  });
+
+  it('sin número de empleado (opcional): la fila y la confirmación lo nombran solo por su nombre', async () => {
+    renderPage(() => page([{ ...ana, employee_number: null }]));
+    const row = (await screen.findByText('Ana López')).closest('tr') as HTMLElement;
+    expect(row.querySelector('.person__info small')).toBeNull();
+    await userEvent.click(within(row).getByRole('button', { name: 'Olvidar' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Olvidar lo aprendido de Ana López?' });
+    expect(within(dialog).getByRole('region', { name: 'Se borrará' })).toHaveTextContent(/EmpleadoAna LópezLo aprendido/);
   });
 
   it('el ADMIN olvida lo aprendido de un empleado (con confirmación) y la fila se actualiza', async () => {

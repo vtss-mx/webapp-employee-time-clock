@@ -4,8 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { FormField, TextAreaField } from '../../components/FormField';
 import { FormFooter } from '../../components/FormFooter';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { RetryState } from '../../components/ui/RetryState';
-import { SkeletonCard } from '../../components/ui/Skeleton';
+import { ResourceFallback } from '../../components/ui/ResourceFallback';
 import { liveFeedback, useAvailability } from '../../hooks/useAvailability';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useFormState } from '../../hooks/useFormState';
@@ -83,18 +82,7 @@ export function DepartmentFormPage() {
 
   if (departmentId === null) return <DepartmentForm original={null} />;
   if (!original) {
-    return error ? (
-      <div className="page">
-        <Panel>
-          <PanelHeader title={t('departments.form.editTitle')} backTo={paths.company.departments} backLabel={t('departments.back')} />
-          <PanelSection>
-            <RetryState onRetry={retry} />
-          </PanelSection>
-        </Panel>
-      </div>
-    ) : (
-      <SkeletonCard lines={4} />
-    );
+    return <ResourceFallback error={error} retry={retry} lines={4} header={{ title: t('departments.form.editTitle'), backTo: paths.company.departments, backLabel: t('departments.back') }} />;
   }
   return <DepartmentForm key={original.id} original={original} />;
 }

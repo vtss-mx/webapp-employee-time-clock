@@ -13,11 +13,13 @@ export const SEED_SCREENS: Screen[] = [
   { code: 'ADMIN_BILLING', name: 'Cobranza', short_name: null, path: '/admin/billing', icon: 'Receipt', badge: null, module: 'BUSINESS' },
   { code: 'ADMIN_USAGE', name: 'Consumo', short_name: null, path: '/admin/usage', icon: 'Gauge', badge: null, module: 'BUSINESS' },
   { code: 'ADMIN_PERFORMANCE', name: 'Rendimiento', short_name: null, path: '/admin/performance', icon: 'Timer', badge: 'OPEN_SLOW_ALERTS', module: 'OPERATIONS' },
+  { code: 'ADMIN_DRIFT', name: 'Deriva de señales', short_name: 'Deriva', path: '/admin/drift', icon: 'TrendingDown', badge: null, module: 'OPERATIONS' },
   { code: 'COMPANY_DASHBOARD', name: 'Panel', short_name: 'Inicio', path: '/company/dashboard', icon: 'LayoutDashboard', badge: null, module: 'OVERVIEW' },
   { code: 'COMPANY_EMPLOYEES', name: 'Empleados', short_name: null, path: '/company/employees', icon: 'Users', badge: null, module: 'PEOPLE' },
   { code: 'COMPANY_DEPARTMENTS', name: 'Departamentos', short_name: 'Áreas', path: '/company/departments', icon: 'Network', badge: null, module: 'PEOPLE' },
   { code: 'COMPANY_VALIDATIONS', name: 'Validaciones', short_name: 'Validar', path: '/company/validations', icon: 'ClipboardCheck', badge: 'PENDING_ENROLLMENTS', module: 'PEOPLE' },
   { code: 'COMPANY_ATTENDANCE', name: 'Tablero del día', short_name: 'Tablero', path: '/company/attendance', icon: 'Clock', badge: 'PENDING_ATTENDANCE_REVIEWS', module: 'ATTENDANCE' },
+  { code: 'COMPANY_VERIFICATIONS', name: 'Verificaciones', short_name: null, path: '/company/verifications', icon: 'MapPin', badge: null, module: 'ATTENDANCE' },
   { code: 'COMPANY_SHIFTS', name: 'Turnos', short_name: null, path: '/company/shifts', icon: 'CalendarClock', badge: 'PENDING_SHIFT_REQUESTS', module: 'ATTENDANCE' },
   { code: 'COMPANY_CALENDAR', name: 'Calendario', short_name: null, path: '/company/calendar', icon: 'CalendarDays', badge: 'PENDING_ABSENCE_REQUESTS', module: 'ATTENDANCE' },
   { code: 'COMPANY_SITES', name: 'Sitios de trabajo', short_name: 'Sitios', path: '/company/sites', icon: 'MapPin', badge: null, module: 'ATTENDANCE' },
@@ -32,6 +34,7 @@ export const SEED_SCREENS: Screen[] = [
   { code: 'EMPLOYEE_QR', name: 'Mi código QR', short_name: 'Mi QR', path: '/employee/qr', icon: 'QrCode', badge: null, module: 'IDENTITY' },
   { code: 'EMPLOYEE_SELECT_COMPANY', name: 'Cambiar de empresa', short_name: 'Empresa', path: '/select-company', icon: 'Building2', badge: null, module: 'ACCOUNT' },
   { code: 'PROFILE', name: 'Mi perfil', short_name: 'Perfil', path: '/profile', icon: 'UserCircle2', badge: null, module: 'ACCOUNT' },
+  { code: 'EMPLOYEE_DOCUMENTS', name: 'Documentos', short_name: 'Mis documentos', path: '/employee/documents', icon: 'IdCard', badge: null, module: 'IDENTITY' },
 ];
 
 /** Módulos del menú (catalog.menu_modules), en su orden. */
@@ -50,7 +53,7 @@ export const SEED_MODULES: MenuModule[] = [
 ];
 
 export const SEED_GRANTS: Record<Role, string[]> = {
-  ADMIN: ['ADMIN_DASHBOARD', 'ADMIN_COMPANIES', 'ADMIN_ERRORS', 'ADMIN_FACE_SECURITY', 'ADMIN_FRAUD_CASES', 'ADMIN_BILLING', 'ADMIN_USAGE', 'ADMIN_PERFORMANCE', 'PROFILE'],
+  ADMIN: ['ADMIN_DASHBOARD', 'ADMIN_COMPANIES', 'ADMIN_ERRORS', 'ADMIN_FACE_SECURITY', 'ADMIN_FRAUD_CASES', 'ADMIN_BILLING', 'ADMIN_USAGE', 'ADMIN_PERFORMANCE', 'ADMIN_DRIFT', 'PROFILE'],
   COMPANY: [
     'COMPANY_DASHBOARD',
     'COMPANY_EMPLOYEES',
@@ -58,6 +61,7 @@ export const SEED_GRANTS: Record<Role, string[]> = {
     'COMPANY_VALIDATIONS',
     'COMPANY_VALIDATORS',
     'COMPANY_ATTENDANCE',
+    'COMPANY_VERIFICATIONS',
     'COMPANY_SHIFTS',
     'COMPANY_CALENDAR',
     'COMPANY_SITES',
@@ -66,7 +70,7 @@ export const SEED_GRANTS: Record<Role, string[]> = {
     'PROFILE',
   ],
   VALIDATOR: ['VALIDATOR_CHECKPOINT', 'PROFILE'],
-  EMPLOYEE: ['EMPLOYEE_ATTENDANCE', 'EMPLOYEE_ENROLL', 'EMPLOYEE_PENDING', 'EMPLOYEE_VERIFY', 'EMPLOYEE_QR', 'EMPLOYEE_SELECT_COMPANY', 'PROFILE'],
+  EMPLOYEE: ['EMPLOYEE_ATTENDANCE', 'EMPLOYEE_ENROLL', 'EMPLOYEE_PENDING', 'EMPLOYEE_VERIFY', 'EMPLOYEE_QR', 'EMPLOYEE_SELECT_COMPANY', 'PROFILE', 'EMPLOYEE_DOCUMENTS'],
 };
 
 /** Mismas reglas de disponibilidad que el backend (app/services/navigation_service.py). */
@@ -83,6 +87,11 @@ function available(code: string, user: Pick<User, 'employee' | 'memberships'>): 
       return status === 'APPROVED';
     case 'EMPLOYEE_SELECT_COMPANY':
       return (user.memberships?.length ?? 0) > 1;
+    case 'EMPLOYEE_DOCUMENTS':
+      // El backend (`navigation_service._requires_documents`) solo la muestra a un empleado cuya empresa pide
+      // documentos de identidad; el usuario de la webapp no trae esa bandera, así que el espejo la aproxima con
+      // «tiene empleado» (sin empleado nunca aplica: un usuario que aún elige empresa va a «Cambiar de empresa»).
+      return Boolean(user.employee);
     default:
       return true;
   }

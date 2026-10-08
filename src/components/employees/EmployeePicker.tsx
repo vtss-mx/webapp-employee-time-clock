@@ -10,6 +10,7 @@ import { employeeService } from '../../services/employeeService';
 import type { Employee } from '../../types';
 import type { ConfirmDetail } from '../../types/confirm';
 import { namesSummary } from '../../utils/changes';
+import { employeeNumberLabel } from '../../utils/employeeLabel';
 import { formatCount } from '../../utils/numbers';
 import { FieldMessage } from '../FormField';
 import { StatusBadge } from '../StatusBadge';
@@ -153,7 +154,7 @@ export function EmployeePicker({ value, onChange, single = false, disabled = fal
                 disabled={disabled}
                 label={employee.full_name}
                 icon={<Avatar name={employee.full_name} src={employee.avatar} size="sm" decorative />}
-                description={[t('employees.number', { number: employee.employee_number }), employee.department_name].filter(Boolean).join(' · ')}
+                description={[employeeNumberLabel(employee.employee_number), employee.department_name].filter(Boolean).join(' · ')}
                 aside={employee.active ? undefined : <StatusBadge active={false} />}
               />
             ))}

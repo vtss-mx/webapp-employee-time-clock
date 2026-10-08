@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraProblemText, describeCameraProblem, detectPlatform, errorKind, secureUrlFor, type CameraProblemKind, type Platform } from './cameraDiagnostics';
+import { CameraTurnedError, cameraProblemText, describeCameraProblem, detectPlatform, errorKind, isInAppBrowser, secureUrlFor, type CameraProblemKind, type Platform } from './cameraDiagnostics';
 
 /** Los textos del problema en el idioma activo (es-MX en las pruebas). */
 const textOf = (...args: [CameraProblemKind, Platform?, Parameters<typeof describeCameraProblem>[2]?]) => cameraProblemText(describeCameraProblem(...args));
@@ -131,5 +131,47 @@ describe('describeCameraProblem', () => {
   it('error desconocido y valores por defecto', () => {
     expect(describeCameraProblem('unknown', mac, local).kind).toBe('unknown');
     expect(textOf('unknown').title).toContain('cámara');
+  });
+});
+
+describe('navegadores integrados de otras aplicaciones y lienzos alterados', () => {
+  const IN_APP = {
+    instagramIos: `${UA.iphone} Instagram 350.0.0.30.85 (iPhone15,2; iOS 18_0; es_MX)`,
+    facebookAndroid: 'Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/480.0]',
+    tiktok: `${UA.android} musical_ly_2023 BytedanceWebview/d8a21c6`,
+    linkedin: `${UA.iphone} LinkedInApp/9.30`,
+    whatsappIos: `${UA.iphone} WAiOS/24.20`,
+    webView: 'Mozilla/5.0 (Linux; Android 13; SM-A135F; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0 Mobile Safari/537.36',
+  };
+
+  it('reconoce los navegadores integrados; Safari, Chrome, Edge y Firefox (también en iOS) no lo son', () => {
+    Object.values(IN_APP).forEach((ua) => expect(isInAppBrowser(ua)).toBe(true));
+    [UA.iphone, UA.iphoneChrome, UA.android, UA.macSafari, UA.winEdge, UA.linux].forEach((ua) => expect(isInAppBrowser(ua)).toBe(false));
+    expect(isInAppBrowser()).toBe(false); // el navegador de las pruebas
+  });
+
+  it('si la cámara ya falló dentro de uno, la ayuda es abrir la página en el navegador del teléfono', () => {
+    const ios: Platform = { os: 'ios', browser: 'safari' };
+    const android: Platform = { os: 'android', browser: 'chrome' };
+    (['denied', 'unsupported', 'unknown'] as const).forEach((kind) => expect(describeCameraProblem(kind, ios, local, true).kind).toBe('in-app'));
+    // Lo que no se arregla cambiando de navegador conserva su ayuda; sin conexión segura, también.
+    (['busy', 'not-found', 'insecure'] as const).forEach((kind) => expect(describeCameraProblem(kind, ios, local, true).kind).toBe(kind));
+    const onIphone = cameraProblemText(describeCameraProblem('denied', ios, local, true));
+    expect(onIphone.title).toBe('Abre esta página en tu navegador');
+    expect(onIphone.steps[0]).toContain('Abrir en Safari');
+    expect(onIphone.steps[1]).toContain('copia el enlace');
+    expect(cameraProblemText(describeCameraProblem('denied', android, local, true)).steps[0]).toContain('Abrir en Chrome');
+  });
+
+  it('un lienzo alterado explica cómo permitirlo o cambiar de navegador', () => {
+    const text = textOf('canvas-blocked', mac, local);
+    expect(text.title).toBe('Tu navegador oculta la imagen de la cámara');
+    expect(text.steps).toHaveLength(2);
+  });
+
+  it('la cámara girada a media toma se explica en el idioma activo', () => {
+    const error = new CameraTurnedError();
+    expect(error.name).toBe('CameraTurnedError');
+    expect(error.message).toBe('La cámara cambió de orientación. Mantén el teléfono en la misma posición.');
   });
 });

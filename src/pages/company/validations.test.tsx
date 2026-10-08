@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -149,11 +149,21 @@ describe('Validaciones: revisión de identidad', () => {
     window.removeEventListener('tc:enrollments-changed', changed);
   });
 
+  it('el aviso de las marcas sale una sola vez: cerrado, volver a pedir la solicitud al cambiar el idioma no lo abre de nuevo', async () => {
+    const { calls } = mockFetch(apiOk(request({ flagged_accessories: ['GLASSES'] })));
+    renderAt('/company/validations/5');
+    const warning = await screen.findByRole('alertdialog', { name: 'Revisa la fotografía con atención' });
+    await userEvent.click(within(warning).getByRole('button', { name: 'Entendido' }));
+    await act(() => setLocale('en-US'));
+    await waitFor(() => expect(calls.filter((call) => call.url.includes('/enrollments/5'))).toHaveLength(2));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
   it('sin marcas no hay aviso y todo se verificó; cancelar la aceptación no envía nada', async () => {
     const { calls } = mockFetch(apiOk(request({ liveness_passed: false })));
     renderAt('/company/validations/5');
     expect(await screen.findByText('Sin accesorios que cubran el rostro (según la política)')).toBeInTheDocument();
-    expect(screen.getByText('Rostro real frente a la cámara (anti-spoofing)')).toBeInTheDocument();
+    expect(screen.getByText('Rostro real frente a la cámara (sin fotos ni pantallas)')).toBeInTheDocument();
     expect(screen.getByText('5 muestras consistentes entre sí')).toBeInTheDocument();
     expect(screen.queryByText(/Prueba de vida superada/)).toBeNull();
     expect(screen.queryByRole('alertdialog')).toBeNull();
@@ -173,6 +183,22 @@ describe('Validaciones: revisión de identidad', () => {
     expect(screen.getByRole('link', { name: 'Juan Pérez · EMP-9' })).toHaveAttribute('href', '/company/employees/9');
     expect(screen.getByText('Parecido: 62%')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aceptar usuario' })).toBeEnabled();
+  });
+
+  it('sin número de empleado (opcional): la bandeja, la revisión, los parecidos y las confirmaciones usan su nombre', async () => {
+    const item = request({ employee_number: null, flagged_accessories: ['POSSIBLE_DUPLICATE'], similar: [{ employee_id: 9, full_name: 'Juan Pérez', employee_number: null, similarity: 0.62 }] });
+    mockFetch((call) => (call.url.startsWith('/api/enrollments?') ? apiOk(page([item])) : apiOk(item)));
+    renderAt('/company/validations');
+    const row = (await screen.findByText('Ana Ruiz')).closest('tr') as HTMLElement;
+    expect(row.querySelector('.person__info small')).toBeNull();
+    await userEvent.click(screen.getByText('Ana Ruiz'));
+    expect(await screen.findByRole('link', { name: 'Juan Pérez' })).toHaveAttribute('href', '/company/employees/9');
+    expect(screen.queryByText('Número de empleado')).toBeNull();
+    const approve = screen.getByRole('button', { name: 'Aceptar usuario' });
+    await userEvent.click(approve);
+    const confirm = await screen.findByRole('dialog', { name: '¿Aceptar a Ana Ruiz?' });
+    expect(confirm).toHaveTextContent('EmpleadoAna Ruiz');
+    expect(confirm).not.toHaveTextContent('·');
   });
 
   it('una respuesta sin el campo de marcas (servidor anterior) se revisa igual, sin avisos', async () => {
@@ -205,6 +231,27 @@ describe('Validaciones: revisión de identidad', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull(); // las marcas solo se avisan en pendientes
   });
 
+  it('con verificación por voz: la sección «Video de verificación» con sus respuestas (el video solo al pedirlo)', async () => {
+    const { calls } = mockFetch(
+      apiOk(
+        request({
+          voice: {
+            required: true,
+            passed_at: '2026-10-01T10:05:00Z',
+            failed_attempts: 1,
+            answers: [{ id: 11, position: 0, question: 'FULL_NAME', attempts: 2, transcript: 'ana ruiz', similarity: 0.93, face_similarity: 0.88, duration_ms: 2100, created_at: '2026-10-01T10:04:00Z', has_clip: true }],
+          },
+        }),
+      ),
+    );
+    renderAt('/company/validations/5');
+    expect(await screen.findByText('Video de verificación')).toBeInTheDocument();
+    expect(screen.getByText('¿Cuál es tu nombre completo?')).toBeInTheDocument();
+    expect(screen.getByText('1 respuesta no pasó')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reproducir video' })).toBeInTheDocument();
+    expect(calls.filter((call) => call.url.includes('/clip'))).toHaveLength(0);
+  });
+
   it('aceptada sin revisor registrado ni motivo', async () => {
     mockFetch(apiOk(request({ status: 'APPROVED', reviewed_at: '2026-10-02T10:00:00Z' })));
     renderAt('/company/validations/5');
@@ -228,6 +275,13 @@ describe('Validaciones: rechazar (pantalla)', () => {
     renderAt('/company/validations/5/reject');
     await userEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
     expect(await screen.findByRole('button', { name: 'Aceptar usuario' })).toBeInTheDocument();
+  });
+
+  it('rechazar a alguien sin número (opcional): el subtítulo y la confirmación usan su nombre', async () => {
+    mockFetch(apiOk(request({ employee_number: null })));
+    renderAt('/company/validations/5/reject');
+    expect(await screen.findByText('Ana Ruiz')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('Ana Ruiz ·');
   });
 
   it('una solicitud ya revisada no se puede rechazar', async () => {

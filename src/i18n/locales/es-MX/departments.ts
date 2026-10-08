@@ -1,7 +1,5 @@
 /** Textos de departamentos y responsables (es-MX). */
 export default {
-  /** Una persona en las listas y confirmaciones ("Ana Ruiz · No. EMP-7"). */
-  person: '{name} · No. {number}',
   loadError: 'No se pudo cargar el departamento',
   back: 'Departamentos',
   noun: { one: 'departamento', other: 'departamentos' },
@@ -104,7 +102,7 @@ export default {
     back: 'Departamento',
     section: 'Empleados de tu empresa',
     done: 'Listo',
-    elsewhere: 'No. {number} · En {department}',
+    elsewhere: 'En {department}',
     actionLabel: '{action}: {name}',
     noMatch: 'Prueba con otra búsqueda o filtro.',
     empty: 'Registra a tu personal en Empleados para asignarlo.',

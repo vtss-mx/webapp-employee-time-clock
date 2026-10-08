@@ -158,12 +158,12 @@ describe('Casos de fraude: detalle', () => {
     expect(screen.getByText(/1\.02/)).toBeInTheDocument(); // medido sin umbral
     expect(screen.getAllByText(/sin puntos/).length).toBe(1);
     expect(screen.getByText('tablet')).toBeInTheDocument();
-    expect(screen.getByText(/Cámara: Cámara FaceTime HD/)).toBeInTheDocument();
+    expect(screen.getByText(/Cámara: Cámara frontal/)).toBeInTheDocument(); // el nombre que dio el sistema, con el de la app
     expect(screen.getByText(/Sin nombre de cámara/)).toBeInTheDocument();
     // La explicación de cada señal y la red de la IP con su atribución (base local DB-IP, CC BY 4.0).
     expect(screen.getByText('El anti-spoofing pasó, pero quedó cerca de su umbral.')).toBeInTheDocument();
     expect(screen.getByText(/Red: US · AS16509 · Amazon.com, Inc. · nube o centro de datos/)).toBeInTheDocument();
-    const credits = screen.getAllByRole('link', { name: 'IP Geolocation by DB-IP' });
+    const credits = screen.getAllByRole('link', { name: 'Geolocalización de IP por DB-IP' });
     expect(credits).toHaveLength(2); // también el intento cuya IP no está en la base (red desconocida)
     expect(credits[0]).toHaveAttribute('href', 'https://db-ip.com');
     expect(screen.getByText('Se muestran 2 de 3')).toBeInTheDocument();

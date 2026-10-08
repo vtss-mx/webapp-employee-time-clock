@@ -169,6 +169,11 @@ export default {
       hint: 'Los validadores que requieren ubicación la envían en cada identificación.',
       enforceWarning: 'Se rechaza una identificación sin ubicación o fuera del lugar del validador.',
     },
+    verificationLocation: {
+      label: 'Ubicación de la verificación',
+      hint: 'Cada verificación facial (empleado, validador y la API) envía dónde se hizo; la empresa la ve en el mapa.',
+      enforceWarning: 'Sin una ubicación válida, la verificación no se completa.',
+    },
     siteCodes: {
       label: 'Código de sitio',
       hint: 'En los sitios que lo activen, la entrada y la salida llevan el código del kiosco.',

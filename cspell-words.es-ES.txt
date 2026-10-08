@@ -1,0 +1,80 @@
+# Palabras propias revisadas SOLO del español de España (ortografía de los diccionarios es-ES, regla 16).
+# es-ES deriva de es-MX (docs/i18n/glosario.md §3): comparte el diccionario de español (@cspell/dict-es-es) pero NO la
+# lista de mexicanismos. Aquí van las formas correctas en España que el diccionario no trae (imperativos con pronombre
+# como «inténtalo», términos del dominio). Antes de agregar una se confirma que está bien escrita; una palabra del
+# inglés nunca va aquí (la prueba src/i18n/dictionaryLanguage.test.ts lo rechaza). Una por renglón, tal como se escribe.
+
+# Imperativos y formas con pronombre enclítico (correctos en todo el español; los mismos de cspell-words.es-MX.txt)
+actívalo
+acércala
+actualízala
+ajústalo
+asígnale
+asígnalo
+asígnalos
+cancélala
+cancélalo
+configúrala
+configurarlo
+confírmalo
+cópialo
+desactívala
+desactívalo
+descartarlo
+edítalo
+escanéalo
+escríbelo
+márcalo
+muéstralo
+pégalo
+quítalo
+quítalos
+recházalo
+restáuralo
+restáuralos
+revócala
+rotarla
+rótala
+# Términos válidos que el diccionario no trae (DLE: biométrico, telemetría, paginación; recalcular y reintentar son
+# derivados regulares; autocalibración, compuesto con auto-)
+autocalibración
+biométrico
+biométricos
+paginación
+recalcula
+recalcular
+recalculan
+recalculados
+reintentando
+telemetría
+# Antifraude (prefijo anti- unido, como lo escribe la RAE)
+antifraude
+# Máscara de fecha del RFC y la CURP (año, mes y día con dos dígitos)
+aammdd
+# Geovalla: zona delimitada en un mapa («geofence»; en México, geocerca), término del glosario §2 para España
+geovalla
+# Backend: países y territorios con su nombre en español (catálogo countries, los mismos de es-MX)
+Aland
+Chequia
+Esuatini
+Feroe
+Guernesey
+Miquelón
+Sáhara
+Taiwán
+Tristán
+# Backend: términos válidos que el diccionario no trae (RAE: biometría, geolocalización, sobreexpuesto, megapíxel)
+biometría
+Geolocalización
+geolocalización
+megapíxeles
+sobreexpuesta
+# Backend: imperativos y formas con pronombre enclítico
+céntralo
+identifícate
+inclinarla
+reasígnalos
+regístralo
+suspéndela
+confírmalos
+enciéndelo

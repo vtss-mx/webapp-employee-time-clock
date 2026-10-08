@@ -9,6 +9,7 @@ export const isPolicy = hasKeys<VerificationPolicy>(
   'liveness_challenge',
   'anti_spoofing',
   'qr_enabled',
+  'voice_guidance_enabled',
 );
 
 /**

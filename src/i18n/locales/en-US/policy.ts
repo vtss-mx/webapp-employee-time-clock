@@ -5,6 +5,8 @@ import tuning from './policy/tuning';
 
 /** Textos de política de verificación y ajustes de la prueba de vida de una empresa en inglés (en-US): las mismas llaves que es-MX. */
 export default {
+  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
+  retired: 'Turned off by product decision (2026-10-06).',
   loadError: "Couldn't load the verification policy",
   title: 'Identity verification policy',
   saveError: "Couldn't save",
@@ -170,6 +172,16 @@ export default {
       on: 'A few encrypted frames of each suspicious attempt are kept to review the case; they’re deleted automatically when they expire.',
       off: 'Cases open without frames: only with what was measured.',
     },
+    voiceVerification: {
+      label: 'Voice and video check at enrollment',
+      on: 'After the photos, the employee answers three questions about their data on video; voice and face are compared on the server and the company reviews the video.',
+      off: 'Enrollment ends with the photos.',
+    },
+    voiceGuidance: {
+      label: 'Voice guidance',
+      on: 'Enrollment prompts are read aloud on the device.',
+      off: "The enrollment doesn't read the prompts aloud.",
+    },
     validatorMobileOnly: {
       label: 'Validators on tablet or phone only',
       on: 'Validators sign in only on tablets and phones.',
@@ -184,6 +196,7 @@ export default {
     qrOnly: 'Anyone holding another employee’s phone will be able to record their attendance without showing a face.',
     riskEngine: 'Signals will no longer add up: an attempt with several signs of spoofing will pass if no single lock stops it.',
     captureProtocol: 'Video prepared in advance will be harder to detect.',
+    voiceVerification: 'An enrollment with someone else\'s photos will no longer get the second voice-and-face check on video.',
   },
   toggle: {
     eyebrow: 'Verification policy',
@@ -196,6 +209,19 @@ export default {
     deactivate: 'Turn off',
     activated: '{label}: on',
     deactivated: '{label}: off',
+  },
+  voice: {
+    title: 'Voice guidance',
+    hint: 'Reads the face enrollment prompts aloud, using the device’s own speech synthesis.',
+    profile: {
+      label: 'Guidance voice',
+      description: 'Voice that reads the prompts during enrollment.',
+      saved: 'Guidance voice updated',
+      savedText: 'Prompts will be read with the “{name}” voice.',
+      confirmTitle: 'Use the “{value}” voice?',
+      confirmLabel: 'Save voice',
+    },
+    preview: 'Test voice',
   },
   tuning,
   ...antifraud,

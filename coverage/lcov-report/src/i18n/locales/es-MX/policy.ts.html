@@ -276,7 +276,63 @@
 <a name='L211'></a><a href='#L211'>211</a>
 <a name='L212'></a><a href='#L212'>212</a>
 <a name='L213'></a><a href='#L213'>213</a>
-<a name='L214'></a><a href='#L214'>214</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -499,6 +555,8 @@ import antifraud from './policy/antifraud';
 import tuning from './policy/tuning';
 &nbsp;
 export default {
+  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
+  retired: 'Desactivado por decisión del producto (2026-10-06).',
   loadError: 'No se pudo cargar la política de verificación',
   title: 'Política de verificación de identidad',
   saveError: 'No se pudo guardar',
@@ -557,9 +615,10 @@ export default {
       hint: 'Solo los validadores tienen restricciones; empleados y administradores usan cualquier dispositivo.',
     },
   },
-  /** Un interruptor por accesorio del catálogo: "Retirar los lentes" (`{phrase}` sale del catálogo). */
+  /** Un interruptor por accesorio del catálogo: "Retirar el cubrebocas" (`{phrase}` sale del catálogo). */
   accessories: {
     remove: 'Retirar {phrase}',
+    /** Apagado por omisión en toda empresa (decisión del dueño, 2026-10-07); el ADMIN lo enciende por empresa. */
     blockGlasses: {
       on: 'Se pedirá quitarse lentes (incluidos los de sol).',
       off: 'Se permite identificarse con lentes.',
@@ -581,7 +640,7 @@ export default {
       off: 'Sin reto de movimientos.',
     },
     antiSpoofing: {
-      label: 'Anti-spoofing',
+      label: 'Detección de suplantación',
       on: 'Detecta fotos impresas, pantallas y videos frente a la cámara.',
       off: 'No se analizan fotos ni pantallas.',
     },
@@ -670,6 +729,16 @@ export default {
       on: 'Se guardan unos fotogramas cifrados de cada intento sospechoso para revisar el caso; se borran solos al vencer.',
       off: 'Los casos se abren sin fotogramas: solo con lo que se midió.',
     },
+    voiceVerification: {
+      label: 'Verificación por voz y video en el registro',
+      on: 'Tras las fotos, el empleado responde en video tres preguntas sobre sus datos; la voz y el rostro se comparan en el servidor y la empresa revisa el video.',
+      off: 'El registro termina con las fotos.',
+    },
+    voiceGuidance: {
+      label: 'Guía por voz',
+      on: 'Las indicaciones del registro se leen en voz alta en el dispositivo.',
+      off: 'El registro no lee las indicaciones en voz alta.',
+    },
     validatorMobileOnly: {
       label: 'Validadores solo desde tableta o teléfono',
       on: 'Los validadores solo inician sesión en tabletas y teléfonos.',
@@ -685,6 +754,7 @@ export default {
     qrOnly: 'Quien tenga el teléfono de otro empleado podrá registrar su asistencia sin mostrar el rostro.',
     riskEngine: 'Las señales dejarán de sumarse: un intento con varios indicios de engaño pasará si ningún candado lo detiene solo.',
     captureProtocol: 'Un video preparado de antemano será más difícil de detectar.',
+    voiceVerification: 'Un registro con fotos de otra persona ya no tendrá la segunda comprobación de voz y rostro en video.',
   },
   /** Encender o apagar una regla: confirmación y aviso. */
   toggle: {
@@ -699,6 +769,20 @@ export default {
     activated: '{label}: activado',
     deactivated: '{label}: desactivado',
   },
+  /** Guía por voz del registro facial (decisión del dueño, 2026-10-08): encenderla y elegir la voz. */
+  voice: {
+    title: 'Guía por voz',
+    hint: 'Lee en voz alta las indicaciones del registro facial, con la síntesis del propio dispositivo.',
+    profile: {
+      label: 'Voz de la guía',
+      description: 'Voz con que se leen las indicaciones durante el registro.',
+      saved: 'Voz de la guía actualizada',
+      savedText: 'Las indicaciones se leerán con la voz «{name}».',
+      confirmTitle: '¿Usar la voz «{value}»?',
+      confirmLabel: 'Guardar voz',
+    },
+    preview: 'Probar voz',
+  },
   tuning,
   ...antifraud,
 } as const;
@@ -709,7 +793,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:24.187Z
+                at 2026-10-08T07:13:14.472Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

@@ -161,8 +161,8 @@ describe('validación y formato del domicilio', () => {
 
   it('una línea para listados (con la colonia, sin las referencias) y el punto con 5 decimales', () => {
     const address = { ...addressFromParts(HERMOSILLO), interior_number: '2', reference_notes: 'Frente a la plaza' };
-    expect(addressLine(address)).toBe('Calle Dr. Paliza 71 Int. 2, Centro, 83000 Hermosillo, Sonora');
-    expect(addressLine({ ...address, neighborhood: null })).toBe('Calle Dr. Paliza 71 Int. 2, 83000 Hermosillo, Sonora'); // guardado antes de pedir la colonia
+    expect(addressLine(address)).toBe('Calle Dr. Paliza 71 Interior 2, Centro, 83000 Hermosillo, Sonora');
+    expect(addressLine({ ...address, neighborhood: null })).toBe('Calle Dr. Paliza 71 Interior 2, 83000 Hermosillo, Sonora'); // guardado antes de pedir la colonia
     expect(addressLine({ city: 'Mérida', state: 'Mérida', country_code: 'MX' }, { withCountry: true })).toBe('Mérida, MX');
     expect(addressLine(null)).toBe('');
     expect(formatPoint({ lat: 29.0729, lng: -110.9559 })).toBe('29.07290, -110.95590');

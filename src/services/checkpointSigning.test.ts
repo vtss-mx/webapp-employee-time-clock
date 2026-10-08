@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { identifiedResult, sampleCheckpoint } from '../test/fixtures';
 import { apiOk, jsonResponse, mockFetch, envelope, type MockCall } from '../test/http';
 import { checkpointService } from './checkpointService';
-import { sha256Hex } from './flashPacingService';
+import { sha256Hex } from '../utils/digest';
 import { signingNonce } from './http/requestSigning';
 
 // La firma real se prueba en `utils/deviceKey.test.ts`; aquí, qué firma cada identificación y qué viaja con ella.

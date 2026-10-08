@@ -1,0 +1,77 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/passkeys';
+
+/** Chaves de acesso (WebAuthn) em português do Brasil (pt-BR): as mesmas chaves que es-MX. Glossário §2. */
+export default {
+  title: 'Chaves de acesso',
+  intro: 'Entre com o rosto, a digital ou o PIN do seu dispositivo, sem digitar a senha. A chave privada nunca sai do seu dispositivo nem da sua conta Apple ou Google.',
+  unsupported: 'Este navegador não aceita chaves de acesso. Use o Safari, o Chrome ou o Edge atualizados.',
+  loadError: 'Não foi possível carregar suas chaves de acesso',
+  add: 'Adicionar chave de acesso',
+  empty: {
+    title: 'Sem chaves de acesso',
+    description: 'Adicione uma para entrar com o rosto, a digital ou o PIN.',
+  },
+  noun: {
+    one: 'chave de acesso',
+    other: 'chaves de acesso',
+  },
+  created: 'Criada em {date}',
+  lastUsed: 'Último uso: {date}',
+  neverUsed: 'Ainda não usada',
+  synced: 'Sincronizada na nuvem',
+  deviceOnly: 'Somente em um dispositivo',
+  rename: 'Renomear',
+  revoke: 'Revogar',
+  actionLabel: '{action}: {name}',
+  revokeAsk: {
+    eyebrow: 'Chave de acesso',
+    title: 'Revogar «{name}»?',
+    message: 'Essa chave deixará de servir para entrar, em todos os seus dispositivos.',
+    note: 'Isso não pode ser desfeito. Você pode cadastrar outra quando quiser.',
+    confirm: 'Revogar chave',
+  },
+  revoked: 'Chave de acesso revogada',
+  revokeFailed: 'Não foi possível revogar a chave de acesso',
+  form: {
+    newTitle: 'Adicionar chave de acesso',
+    newSubtitle: 'Cadastre este dispositivo para entrar sem senha.',
+    renameTitle: 'Renomear chave de acesso',
+    renameSubtitle: 'Mude o nome pelo qual você a reconhece.',
+    section: 'Nome da chave',
+    intro: 'Ao cadastrá-la, seu dispositivo pedirá o rosto, a digital ou o PIN. Sua senha continua funcionando.',
+    name: 'Nome',
+    nameHint: 'Para reconhecê-la: «Meu celular», «Computador do trabalho»',
+    nameRequired: 'Digite um nome',
+    nameTooLong: 'No máximo {max} caracteres',
+    submit: 'Cadastrar chave',
+    renameSubmit: 'Salvar nome',
+    back: 'Voltar a Meu perfil',
+    createAsk: {
+      eyebrow: 'Chave de acesso',
+      title: 'Cadastrar uma chave de acesso neste dispositivo?',
+      message: 'Seu dispositivo pedirá o rosto, a digital ou o PIN para criá-la.',
+      note: 'Você poderá revogá-la quando quiser em Meu perfil.',
+      confirm: 'Cadastrar',
+    },
+    renameAsk: {
+      title: 'Renomear a chave de acesso?',
+    },
+    registered: 'Chave de acesso cadastrada',
+    registeredText: 'Você já pode entrar com ela na tela de entrada.',
+    registerFailed: 'Não foi possível cadastrar a chave de acesso',
+    renamed: 'Nome salvo',
+    renameFailed: 'Não foi possível renomear a chave de acesso',
+    noChanges: 'Sem alterações',
+  },
+  errors: {
+    unsupported: 'Este navegador não aceita chaves de acesso. Use o Safari, o Chrome ou o Edge atualizados.',
+    failed: 'Seu dispositivo não conseguiu concluir a operação. Tente novamente.',
+  },
+  login: {
+    divider: 'ou',
+    button: 'Entrar com chave de acesso',
+    waiting: 'Aguardando seu dispositivo…',
+    failed: 'Não foi possível entrar com a chave de acesso',
+  },
+} as const satisfies Translation<typeof es>;

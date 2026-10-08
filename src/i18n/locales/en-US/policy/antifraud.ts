@@ -163,6 +163,11 @@ export default {
       hint: 'Validators that require location send it with each identification.',
       enforceWarning: 'An identification without a location or outside the validator’s place is rejected.',
     },
+    verificationLocation: {
+      label: 'Verification location',
+      hint: 'Each face verification (employee, validator, and the API) sends where it happened; the company sees it on the map.',
+      enforceWarning: 'Without a valid location, the verification doesn’t complete.',
+    },
     siteCodes: {
       label: 'Site code',
       hint: 'At sites that turn it on, check-in and check-out include the kiosk code.',

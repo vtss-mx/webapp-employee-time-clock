@@ -1,0 +1,20 @@
+# Palabras propias revisadas SOLO del portugués de Brasil (ortografía de los diccionarios pt-BR, regla 16).
+# El diccionario de portugués de cspell (@cspell/dict-pt-br) no trae algunos términos del dominio ni ciertas formas
+# verbales con pronombre, que son correctas. Antes de agregar una se confirma que está bien escrita; una palabra del
+# inglés nunca va aquí (la prueba src/i18n/dictionaryLanguage.test.ts lo rechaza). Una por renglón, tal como se escribe.
+
+# Máscara de fecha del RFC y la CURP: ano, mês e dia con dos dígitos (aammdd), igual que en español
+aammdd
+
+# Prefijo auto- escrito junto a la palabra (Acordo Ortográfico de 1990: solo lleva guion ante «o» y «h»):
+# la autocalibración de los umbrales del reconocimiento facial
+autocalibração
+
+# Backend: países con su nombre corto de CLDR en portugués que el diccionario pt-BR no trae (catálogo countries)
+Azerbaijão
+Tchéquia
+Essuatíni
+Aland
+Faroé
+Mianmar
+Miquelão

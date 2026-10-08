@@ -1,8 +1,10 @@
 import { CircleCheck, CircleMinus, CircleSlash } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { t as translate, useT } from '../i18n';
+import { localizeServerText } from '../i18n/serverTexts';
 import type { BulkOutcome, BulkResult, BulkResultCode } from '../types';
 import type { MessageInput } from './MessageDialog';
+import { Avatar } from './ui/Avatar';
 import { DeletedMark } from './ui/DeletedMark';
 
 /** Nombres que se muestran por grupo; del resto solo se dice cuántos más son. */
@@ -36,9 +38,13 @@ function Group({ code, title, outcomes }: { code: BulkResultCode; title: string;
       <ul className="bulk-result__list">
         {shown.map((outcome) => (
           <li key={outcome.employee.id}>
-            <strong>{outcome.employee.full_name}</strong> <small className="muted">{t('dialogs.bulk.employeeNumber', { number: outcome.employee.employee_number })}</small>
-            <DeletedMark deleted={outcome.employee.deleted} />
-            {outcome.message && <span className="bulk-result__reason">{outcome.message}</span>}
+            <Avatar name={outcome.employee.full_name} src={outcome.employee.avatar} size="xs" decorative />
+            <span className="bulk-result__who">
+              <strong>{outcome.employee.full_name}</strong>
+              {outcome.employee.employee_number && <> <small className="muted">{t('dialogs.bulk.employeeNumber', { number: outcome.employee.employee_number })}</small></>}
+              <DeletedMark deleted={outcome.employee.deleted} />
+              {outcome.message && <span className="bulk-result__reason">{localizeServerText(outcome.message)}</span>}
+            </span>
           </li>
         ))}
         {rest > 0 && <li className="muted">{t('dialogs.bulk.more', { count: rest })}</li>}

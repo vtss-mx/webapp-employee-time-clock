@@ -232,7 +232,7 @@ describe('AppLayout: menú lateral contraíble', () => {
     expect(within(sidebar).getByRole('button', { name: 'Plataforma' })).toHaveAttribute('aria-expanded', 'true');
     // "Operación" (errores del sistema, seguridad facial, casos de fraude y rendimiento) se abre a demanda; un submenú a la vez.
     await userEvent.click(within(sidebar).getByRole('button', { name: /Operación/ }));
-    await waitFor(() => expect(labels()).toEqual(['Errores del sistema3', 'Seguridad facial', 'Casos de fraude4', 'Rendimiento2', 'Mi perfil']));
+    await waitFor(() => expect(labels()).toEqual(['Errores del sistema3', 'Seguridad facial', 'Casos de fraude4', 'Rendimiento2', 'Deriva de señales', 'Mi perfil']));
     // Casos de fraude por revisar: una consulta periódica, que se repite al avisar una revisión.
     const fraud = () => mocked.calls.filter((c) => c.url.endsWith('/admin/fraud-cases/count')).length;
     const asked = fraud();

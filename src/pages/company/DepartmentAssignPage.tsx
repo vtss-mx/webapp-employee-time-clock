@@ -6,12 +6,12 @@ import { Button, ButtonLink } from '../../components/ui/Button';
 import { ListToolbar } from '../../components/ui/ListControls';
 import { PagedItems } from '../../components/ui/PagedItems';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { RetryState } from '../../components/ui/RetryState';
-import { SkeletonCard } from '../../components/ui/Skeleton';
+import { ResourceFallback } from '../../components/ui/ResourceFallback';
 import { useAction, type SuccessNotice } from '../../hooks/useAction';
 import { useResource } from '../../hooks/useResource';
 import { useSearchList } from '../../hooks/useSearchList';
 import { t, useT } from '../../i18n';
+import { employeeLabel, employeeNumberLabel } from '../../utils/employeeLabel';
 import { paths } from '../../routes/paths';
 import { departmentService } from '../../services/departmentService';
 import { employeeService } from '../../services/employeeService';
@@ -25,7 +25,7 @@ type Role = 'employees' | 'managers';
  * deja (cada empleado está en uno solo), así que se resalta como un cambio de departamento.
  */
 function assignConfirm(role: Role, department: Department, employee: Employee): ConfirmInput {
-  const person = { label: t('common.fields.employee'), value: t('departments.person', { name: employee.full_name, number: employee.employee_number }) };
+  const person = { label: t('common.fields.employee'), value: employeeLabel(employee, { prefixed: true }) };
   const names = { name: employee.full_name, department: department.name };
   if (role === 'managers') {
     return {
@@ -86,18 +86,7 @@ export function DepartmentAssignPage() {
   const { busy, run } = useAction<number>();
 
   if (!department) {
-    return error ? (
-      <div className="page">
-        <Panel>
-          <PanelHeader title={t(`departments.assign.${role}.title`)} backTo={paths.company.department(departmentId)} backLabel={t('departments.assign.back')} />
-          <PanelSection>
-            <RetryState onRetry={retry} />
-          </PanelSection>
-        </Panel>
-      </div>
-    ) : (
-      <SkeletonCard lines={6} />
-    );
+    return <ResourceFallback error={error} retry={retry} lines={6} header={{ title: t(`departments.assign.${role}.title`), backTo: paths.company.department(departmentId), backLabel: t('departments.assign.back') }} />;
   }
 
   const Icon = ICONS[role];
@@ -172,11 +161,13 @@ function Candidate({ employee, department, role, busy, locked, onAssign }: Candi
   const t = useT();
   const here = role === 'managers' ? department.managers.some((m) => m.employee_id === employee.id) : employee.department_id === department.id;
   const elsewhere = role === 'employees' && !here && employee.department_name;
-  const detail = elsewhere ? t('departments.assign.elsewhere', { number: employee.employee_number, department: elsewhere }) : t('employees.number', { number: employee.employee_number });
+  // «No. EMP-7 · En Producción»; sin número, solo dónde está (o nada).
+  const detail = [employeeNumberLabel(employee.employee_number), elsewhere ? t('departments.assign.elsewhere', { department: elsewhere }) : ''].filter(Boolean).join(' · ');
   const label = elsewhere ? t('departments.assign.employees.move') : t(`departments.assign.${role}.action`);
   return (
     <PersonItem
       name={employee.full_name}
+      avatar={employee.avatar}
       detail={detail}
       badges={employee.active ? null : <StatusBadge active={false} />}
       actions={

@@ -1,6 +1,6 @@
 import { t } from '../i18n/core';
 import { config } from './config';
-import { businessDate, localeDateFormat } from './format';
+import { businessDate, localeDateFormat, NUMERIC_DATE } from './format';
 
 export type FieldErrors<T> = Partial<Record<keyof T, string>>;
 
@@ -73,9 +73,10 @@ export function validateBirthDate(value: string): string | undefined {
   return undefined;
 }
 
+/** El número de empleado es opcional: vacío no es un error; con valor, su formato (el backend revisa que sea único). */
 export function validateEmployeeNumber(value: string): string | undefined {
-  if (!value.trim()) return t('forms.validation.employeeNumber.required');
-  if (!EMPLOYEE_NUMBER_RE.test(value.trim())) return t('forms.validation.employeeNumber.format');
+  const number = value.trim();
+  if (number && !EMPLOYEE_NUMBER_RE.test(number)) return t('forms.validation.employeeNumber.format');
   return undefined;
 }
 
@@ -99,7 +100,7 @@ function rfcDateIsValid(yy: number, mm: number, dd: number): boolean {
  */
 function numericDate(year: string, month: string, day: string): string {
   const parts = { year, month, day } as Partial<Record<Intl.DateTimeFormatPartTypes, string>>;
-  return localeDateFormat({ day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
+  return localeDateFormat(NUMERIC_DATE)
     .formatToParts(0)
     .map((part) => parts[part.type] ?? part.value)
     .join('');

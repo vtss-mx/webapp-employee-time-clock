@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/auth/AuthLayout';
 import { loginRuleMessage } from '../components/auth/loginMessages';
+import { PasskeyLogin } from '../components/auth/PasskeyLogin';
 import { FormField } from '../components/FormField';
 import type { MessageInput } from '../components/MessageDialog';
 import { BrandLogo } from '../components/ui/BrandLogo';
@@ -13,8 +14,8 @@ import { useFeedback } from '../hooks/useFeedback';
 import { useRememberedAccount } from '../hooks/useRememberedAccount';
 import { t, useT } from '../i18n';
 import { isOutdated, reloadApp } from '../services/versionService';
-import { config } from '../utils/config';
 import { homeForUser, needsCompanySelection } from '../routes/paths';
+import type { User } from '../types';
 import { validateEmail } from '../utils/validation';
 
 /** Qué falta para entrar, con los mensajes en el idioma activo (se calculan al dibujarse). */
@@ -50,6 +51,8 @@ export function LoginPage() {
   const canSubmit = !live.email && !live.password;
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  // El dispositivo responde a una llave de acceso: el resto del formulario espera.
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const feedback = useFeedback();
 
   // Sesión cerrada por el sistema (expiró, se revocó, se cambió la contraseña): se explica al llegar.
@@ -58,6 +61,14 @@ export function LoginPage() {
   }, [logoutReason, feedback]);
 
   // Con sesión iniciada, GuestOnlyRoute lleva al inicio del rol (no se llega aquí).
+
+  /** A dónde va la persona ya con sesión: a donde iba (si es de su área) o a su inicio. */
+  const enter = (loggedUser: User) => {
+    const from = (location.state as { from?: string } | null)?.from;
+    const home = homeForUser(loggedUser);
+    const resume = !needsCompanySelection(loggedUser) && from?.startsWith(home.split('/').slice(0, 2).join('/'));
+    void navigate(resume && from ? from : home, { replace: true });
+  };
 
   const onSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
@@ -77,11 +88,7 @@ export function LoginPage() {
     }
     try {
       // El servidor recuerda (o deja de recordar) la cuenta en este dispositivo según la casilla.
-      const loggedUser = await login(email, password, remember, { onLocating: () => setLocating(true) });
-      const from = (location.state as { from?: string } | null)?.from;
-      const home = homeForUser(loggedUser);
-      const resume = !needsCompanySelection(loggedUser) && from?.startsWith(home.split('/').slice(0, 2).join('/'));
-      void navigate(resume && from ? from : home, { replace: true });
+      enter(await login(email, password, remember, { onLocating: () => setLocating(true) }));
     } catch (err) {
       setLoading(false);
       setLocating(false);
@@ -116,7 +123,6 @@ export function LoginPage() {
         <div className="auth-card__head">
           <BrandLogo size={76} />
           <h1>{t('auth.login.title')}</h1>
-          <p className="muted">{t('auth.login.subtitle', { app: config.appName })}</p>
         </div>
 
         <form onSubmit={onSubmit} noValidate className="stack">
@@ -177,12 +183,13 @@ export function LoginPage() {
             size="lg"
             block
             loading={loading}
-            disabled={!canSubmit}
+            disabled={!canSubmit || passkeyBusy}
             title={canSubmit ? undefined : t('auth.login.submitDisabled')}
             icon={<LogIn size={20} />}
           >
             {locating ? t('auth.login.locating') : t('auth.login.submit')}
           </Button>
+          <PasskeyLogin remember={remember} disabled={loading} onLoggedIn={enter} onBusy={setPasskeyBusy} />
         </form>
       </div>
     </AuthLayout>

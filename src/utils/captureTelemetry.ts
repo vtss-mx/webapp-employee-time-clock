@@ -19,11 +19,20 @@ export interface TrackTelemetry {
   device_id: boolean;
 }
 
+/**
+ * Con qué reloj se midió el ritmo: `presentation`, cuándo LLEGÓ cada cuadro (`metadata.presentationTime` de
+ * `requestVideoFrameCallback`: Chrome, Safari y Firefox); `render`, el `now` de la llamada, que es el instante de dibujar
+ * y va alineado al refresco de la pantalla (una cámara real de 30 cuadros en fase con una pantalla de 60 Hz da
+ * intervalos idénticos en él). El servidor solo juzga el ritmo con `presentation` (lo otro no se puede medir).
+ */
+export type FrameClock = 'presentation' | 'render';
+
 export interface FrameTelemetry {
   count: number;
   mean_ms: number;
   /** Coeficiente de variación del intervalo entre cuadros (desviación / media). */
   cv: number;
+  clock: FrameClock;
 }
 
 export interface ScreenTelemetry {
@@ -90,12 +99,12 @@ export function trackTelemetry(track: MediaStreamTrack | null): TrackTelemetry |
   };
 }
 
-/** El ritmo de los cuadros: cuántos intervalos, su media y cuánto varían (con menos de dos, nada que decir). */
-export function frameRhythm(intervals: readonly number[]): FrameTelemetry | null {
+/** El ritmo de los cuadros: cuántos intervalos, su media, cuánto varían y con qué reloj (con menos de dos, nada que decir). */
+export function frameRhythm(intervals: readonly number[], clock: FrameClock): FrameTelemetry | null {
   if (intervals.length < 2) return null;
   const mean = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
   const variance = intervals.reduce((sum, value) => sum + (value - mean) ** 2, 0) / intervals.length;
-  return { count: intervals.length, mean_ms: round(mean, 3), cv: mean > 0 ? round(Math.sqrt(variance) / mean, 5) : 0 };
+  return { count: intervals.length, mean_ms: round(mean, 3), cv: mean > 0 ? round(Math.sqrt(variance) / mean, 5) : 0, clock };
 }
 
 /** Pantalla y entrada del dispositivo (px CSS). */
@@ -115,17 +124,19 @@ interface TelemetryInput {
   devices: readonly CameraDevice[];
   blocked: readonly string[];
   intervals: readonly number[];
+  /** El reloj con que se midieron los intervalos. */
+  clock: FrameClock;
 }
 
 /** La telemetría de la toma, lista para enviarse. */
-export function captureTelemetry({ track, devices, blocked, intervals }: TelemetryInput): CaptureTelemetry {
+export function captureTelemetry({ track, devices, blocked, intervals, clock }: TelemetryInput): CaptureTelemetry {
   return {
     v: 1,
     webdriver: navigator.webdriver === true,
     automation: automationTraces(window, document, navigator.userAgent),
     virtual_camera: devices.some((device) => isVirtualCamera(device.rawLabel, blocked)),
     track: trackTelemetry(track),
-    frames: frameRhythm(intervals),
+    frames: frameRhythm(intervals, clock),
     screen: screenTelemetry(),
   };
 }
@@ -133,29 +144,43 @@ export function captureTelemetry({ track, devices, blocked, intervals }: Telemet
 /** Quien mide el ritmo de los cuadros de un video. */
 export interface FrameWatcher {
   intervals: () => number[];
+  /** El reloj de los intervalos que lleva. */
+  clock: () => FrameClock;
   stop: () => void;
 }
 
 /**
- * Mide el intervalo entre cuadros de un `<video>` con `requestVideoFrameCallback` (los últimos `limit`). Sin la API
- * (navegadores antiguos) no mide nada: la telemetría va sin ritmo.
+ * Mide el intervalo entre cuadros de un `<video>` con `requestVideoFrameCallback` (los últimos `limit`), con el reloj de
+ * LLEGADA de cada cuadro (`metadata.presentationTime`) y, si el navegador no lo da, con el del dibujo (`now`), declarado
+ * como tal. Si un cuadro cambia de reloj se empieza de nuevo: nunca se mezclan. Sin la API (navegadores antiguos) no
+ * mide nada: la telemetría va sin ritmo.
  */
 export function watchFrames(video: HTMLVideoElement, limit: number): FrameWatcher {
   const intervals: number[] = [];
-  if (typeof video.requestVideoFrameCallback !== 'function') return { intervals: () => [], stop: () => undefined };
+  let clock: FrameClock = 'render';
+  if (typeof video.requestVideoFrameCallback !== 'function') return { intervals: () => [], clock: () => clock, stop: () => undefined };
   let previous: number | null = null;
   let handle = 0;
-  const onFrame = (now: number) => {
+  const onFrame = (now: number, metadata?: Partial<VideoFrameCallbackMetadata>) => {
+    const presented = typeof metadata?.presentationTime === 'number';
+    const frameClock: FrameClock = presented ? 'presentation' : 'render';
+    const at = presented ? (metadata.presentationTime as number) : now;
+    if (frameClock !== clock) {
+      clock = frameClock;
+      intervals.length = 0;
+      previous = null;
+    }
     if (previous !== null) {
-      intervals.push(now - previous);
+      intervals.push(at - previous);
       if (intervals.length > limit) intervals.shift();
     }
-    previous = now;
+    previous = at;
     handle = video.requestVideoFrameCallback(onFrame);
   };
   handle = video.requestVideoFrameCallback(onFrame);
   return {
     intervals: () => [...intervals],
+    clock: () => clock,
     stop: () => video.cancelVideoFrameCallback(handle),
   };
 }

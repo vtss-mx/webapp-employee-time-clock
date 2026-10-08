@@ -32,8 +32,12 @@ export function createSurface(width: number, height: number): Surface {
   return canvas;
 }
 
+/**
+ * Su contexto 2D, pedido según el tipo de lienzo: `getContext('2d')` sobre la unión de los dos tipos depende del orden en
+ * que TypeScript resuelve sus sobrecargas (otro módulo que usa `OffscreenCanvas` antes lo llevaba a la firma genérica).
+ */
 function context(surface: Surface): Context | null {
-  return surface.getContext('2d');
+  return 'convertToBlob' in surface ? surface.getContext('2d') : surface.getContext('2d');
 }
 
 /** El lienzo como JPEG (null si el navegador no pudo codificarlo). */

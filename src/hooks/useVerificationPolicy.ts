@@ -7,7 +7,7 @@ import type { VerificationPolicy, VerificationRules } from '../types';
  * confianza ni de calidad: solo los evalúa el servidor (los configura el ADMIN en la política).
  */
 export const STRICT_RULES: VerificationRules = {
-  block_glasses: true,
+  block_glasses: false, // apagado por omisión (decisión del dueño, 2026-10-07); el ADMIN lo enciende por empresa
   block_headwear: true,
   block_mask: true,
   liveness_challenge: true,
@@ -29,6 +29,16 @@ export const STRICT_RULES: VerificationRules = {
   validator_device_approval: true,
   qr_lifetime_seconds: 30,
   adaptive_learning: true,
+  // Registro facial con las preguntas en video (decisión del dueño, 2026-10-06): lo más estricto mientras carga.
+  voice_verification: true,
+  // Guía por voz del registro (decisión del dueño, 2026-10-08): es NEUTRAL, no un candado; mientras carga se asume
+  // apagada (no se dicta nada hasta conocer la política real de la empresa). El perfil por omisión del contrato.
+  voice_guidance_enabled: false,
+  voice_profile: 'FEMALE_WARM',
+  // Ubicación de la verificación: a diferencia de los candados no se puede "asumir estricta" (ENFORCE) mientras carga,
+  // porque eso abriría el aviso nativo de ubicación antes de conocer el modo real de la empresa. Se asume OFF (no se
+  // pide) hasta que llega la política; una vez cargada rige el modo real y el servidor es quien exige en ENFORCE.
+  verification_location: 'OFF',
   // Sin la lista del servidor no se bloquea ninguna en pantalla (el backend la exige igual).
   blocked_cameras: [],
 };

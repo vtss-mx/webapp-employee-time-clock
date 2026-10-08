@@ -21,6 +21,7 @@ const panificadora: Company = {
   active: true,
   max_employees: 50,
   api_enabled: false,
+  require_employee_documents: false,
   max_validators: 0,
   active_validators: 0,
   employee_count: 3,

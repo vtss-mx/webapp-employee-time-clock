@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocale } from '../i18n';
 import { usePolling } from './usePolling';
 
 interface Options {
@@ -12,6 +13,8 @@ interface Options {
  * Un valor que se consulta periódicamente y al avisar que cambió: la base de los contadores del menú
  * (validaciones pendientes, errores pendientes) y del resumen de alertas lentas (contador y aviso en vivo con
  * UNA sola consulta). `load` debe ser estable (función de módulo). null: aún no se sabe o no está activo.
+ * Al cambiar el idioma se consulta de nuevo en ese momento (lo que traiga texto del servidor llega en el idioma
+ * nuevo; regla 16, en caliente).
  */
 export function usePolledValue<T>(load: (signal?: AbortSignal) => Promise<T>, { enabled, intervalMs, changedEvent }: Options): T | null {
   const [value, setValue] = useState<T | null>(null);
@@ -25,6 +28,14 @@ export function usePolledValue<T>(load: (signal?: AbortSignal) => Promise<T>, { 
   }, [load]);
 
   usePolling(refresh, { intervalMs, enabled });
+
+  const locale = useLocale();
+  const shownLocale = useRef(locale);
+  useEffect(() => {
+    if (shownLocale.current === locale) return;
+    shownLocale.current = locale;
+    if (enabled) void refresh().catch(() => undefined);
+  }, [enabled, locale, refresh]);
 
   useEffect(() => {
     if (!enabled) return;

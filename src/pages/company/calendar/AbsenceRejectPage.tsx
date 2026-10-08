@@ -15,7 +15,9 @@ import { t, useT } from '../../../i18n';
 import { ApiError } from '../../../services/apiClient';
 import { calendarService, isAbsence } from '../../../services/calendarService';
 import type { Absence } from '../../../types';
+import { employeeLabel } from '../../../utils/employeeLabel';
 import { isRecord } from '../../../utils/guards';
+import { inSentence } from '../../../utils/text';
 
 /** Pendientes por página al buscarla (la página más grande de la API) y tope de páginas: nunca sin límite. */
 const SEARCH_SIZE = 50;
@@ -45,7 +47,7 @@ export async function pendingAbsence(id: number, passed: Absence | null, signal:
 /** La confirmación del rechazo: qué se rechaza y qué pasa (se arma al dibujarse: sigue al idioma activo). */
 function rejectQuestion(absence: Absence, typeName: string): RejectQuestion {
   return {
-    title: t('calendar.reject.confirmTitle', { kind: typeName.toLowerCase(), name: absence.employee.full_name }),
+    title: t('calendar.reject.confirmTitle', { kind: inSentence(typeName), name: absence.employee.full_name }),
     eyebrow: t('calendar.reject.title'),
     message: t('calendar.reject.confirmMessage'),
     facts: absenceFacts(absence, typeName),
@@ -90,9 +92,9 @@ function RejectForm({ absence }: { absence: Absence }) {
   return (
     <RejectRequestPanel
       title={t('calendar.reject.title')}
-      subtitle={`${absence.employee.full_name} · ${absence.employee.employee_number}`}
+      subtitle={employeeLabel(absence.employee)}
       backTo={calendarPath('requests')}
-      intro={t('calendar.reject.intro', { kind: kind.toLowerCase(), range: rangeText(absence.starts_on, absence.ends_on), days: daysText(absence.days) })}
+      intro={t('calendar.reject.intro', { kind: inSentence(kind), range: rangeText(absence.starts_on, absence.ends_on), days: daysText(absence.days) })}
       placeholder={t('calendar.reject.placeholder')}
       question={() => rejectQuestion(absence, kind)}
       onSend={async (note) => {

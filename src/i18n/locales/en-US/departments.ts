@@ -3,7 +3,6 @@ import type es from '../es-MX/departments';
 
 /** Textos de departamentos y responsables en inglés (en-US): las mismas llaves que es-MX. */
 export default {
-  person: '{name} · No. {number}',
   loadError: "Couldn't load the department",
   back: 'Departments',
   noun: { one: 'department', other: 'departments' },
@@ -105,7 +104,7 @@ export default {
     back: 'Department',
     section: "Your company's employees",
     done: 'Done',
-    elsewhere: 'No. {number} · In {department}',
+    elsewhere: 'In {department}',
     actionLabel: '{action}: {name}',
     noMatch: 'Try another search or filter.',
     empty: 'Add your staff in Employees to assign them.',

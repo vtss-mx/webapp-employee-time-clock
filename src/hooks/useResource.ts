@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocale } from '../i18n';
 import type { LazyText } from '../i18n/lazy';
 import { useErrorPopup } from './useFeedback';
 import { useRetryOnReconnect } from './useRetryOnReconnect';
@@ -14,12 +15,19 @@ import { useRetryOnReconnect } from './useRetryOnReconnect';
  * el servidor) y lo que responda tarde ya no toca el estado. `loading` dice si hay una petición en
  * curso (p. ej. el botón "Actualizar" mientras se vuelve a pedir; los datos anteriores se conservan).
  * `errorTitle` como función (`() => t('…')`): el popup abierto sigue al idioma activo.
+ *
+ * **Cambio de idioma en caliente** (regla 16): el idioma es parte de la llave de los datos. Al cambiarlo se
+ * vuelven a pedir en su lugar —los textos del servidor (nombres de catálogos dentro de los datos, motivos,
+ * `StoredText`...) llegan en el idioma nuevo— y, mientras llegan, se siguen viendo los anteriores: la pantalla
+ * no se vacía, no pierde su desplazamiento ni su estado. Un formulario que se llenó con estos datos no se pisa
+ * (se llena por valores, `useLoadValues`).
  */
 export function useResource<T>(fetch: (signal: AbortSignal) => Promise<T>, key: string | number, errorTitle: LazyText) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
+  const locale = useLocale();
   const fetchRef = useRef(fetch);
   useLayoutEffect(() => {
     fetchRef.current = fetch;
@@ -36,7 +44,7 @@ export function useResource<T>(fetch: (signal: AbortSignal) => Promise<T>, key: 
       .catch((err: unknown) => !signal.aborted && setError(err))
       .finally(() => !signal.aborted && setLoading(false));
     return () => controller.abort();
-  }, [key, reload]);
+  }, [key, reload, locale]);
 
   const retry = useCallback(() => setReload((n) => n + 1), []);
   useErrorPopup(error, { title: errorTitle, retry });

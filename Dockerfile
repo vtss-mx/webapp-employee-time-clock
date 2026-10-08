@@ -15,12 +15,16 @@ RUN find dist -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.css' -o -name
 # ---------- Runtime ----------
 FROM nginx:1.30-alpine
 RUN apk add --no-cache openssl
-COPY docker/nginx.main.conf /etc/nginx/nginx.conf
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+# La configuración de Nginx son PLANTILLAS: docker/15-gateway-config.sh las escribe al arrancar con los NGINX_* de
+# docker-compose.yml (procesos, conexiones, keepalive hacia la API, tiempos límite...). Van en una carpeta propia, no en
+# /etc/nginx/templates: el envsubst de la imagen oficial las pondría todas en conf.d (la principal no va ahí).
+COPY docker/nginx.main.conf.template docker/nginx.conf.template /etc/nginx/gateway-templates/
 COPY docker/proxy-headers.conf /etc/nginx/proxy-headers.conf
 COPY docker/generate-cert.sh /docker-entrypoint.d/05-generate-cert.sh
 COPY docker/10-trusted-proxies.sh /docker-entrypoint.d/10-trusted-proxies.sh
-RUN chmod +x /docker-entrypoint.d/05-generate-cert.sh /docker-entrypoint.d/10-trusted-proxies.sh
+COPY docker/15-gateway-config.sh /docker-entrypoint.d/15-gateway-config.sh
+RUN chmod +x /docker-entrypoint.d/05-generate-cert.sh /docker-entrypoint.d/10-trusted-proxies.sh \
+      /docker-entrypoint.d/15-gateway-config.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80 443
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \

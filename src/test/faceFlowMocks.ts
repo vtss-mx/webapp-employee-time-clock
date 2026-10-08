@@ -49,6 +49,8 @@ export interface AutoCaptureOptions {
   mode?: DetectionMode;
   stableFrames?: number;
   onStable?: (sample?: FaceBaseline) => void | Promise<void>;
+  /** Nitidez del cuadro (el registro la pasa): la prueba del flujo no mide píxeles, pero sí ejercita el callback. */
+  quality?: (box: { originX: number; originY: number; width: number; height: number }) => boolean | null;
 }
 
 export interface Reading {
@@ -89,6 +91,9 @@ export function detectionModule(original: Record<string, unknown>) {
     useFaceDetector: () => ({ detector: detection.detector, failed: detection.failed, loading: !detection.detector && !detection.failed }),
     useFaceAutoCapture: (options: AutoCaptureOptions) => {
       detection.options = options;
+      // El registro pasa `quality` (nitidez del cuadro): se ejercita con la caja del rostro simulado para que el flujo
+      // lo cubra (la medición real de píxeles vive en `frameQuality`/`useFaceDetection`).
+      options.quality?.({ originX: 220, originY: 188, width: 200, height: 200 });
       return useSyncExternalStore(detection.subscribe, detection.read);
     },
   };

@@ -1,5 +1,5 @@
 import { t } from '../i18n/core';
-import type { CompanyFormValues, EmployeeFormValues, OptionalDocument, OptionalDocuments, TaxIdTypeItem } from '../types';
+import type { CompanyFormValues, EmployeeFormValues, OptionalField, OptionalFields, TaxIdTypeItem } from '../types';
 import { validatePhone } from './phone';
 import { validateTaxId } from './taxId';
 import {
@@ -33,14 +33,14 @@ export const emptyEmployeeForm: EmployeeFormValues = {
 };
 
 /**
- * RFC, CURP y NSS del empleado son opcionales (decisión del dueño del producto: la plataforma se abre a otros
- * países). Vacíos no se validan ni se consultan en vivo y viajan como null.
+ * Datos opcionales del empleado (decisiones del dueño del producto): RFC, CURP y NSS (la plataforma se abre a otros
+ * países) y el número de empleado. Sin asterisco; vacíos no se validan ni se consultan en vivo y viajan como null.
  */
-export const OPTIONAL_DOCUMENTS: readonly OptionalDocument[] = ['rfc', 'curp', 'nss'];
+export const OPTIONAL_FIELDS: readonly OptionalField[] = ['employee_number', 'rfc', 'curp', 'nss'];
 
-/** Los documentos como los recibe el backend al registrar: lo escrito, o null si quedó vacío (sin capturar). */
-export function documentsPayload({ rfc, curp, nss }: Pick<EmployeeFormValues, OptionalDocument>): OptionalDocuments {
-  return { rfc: rfc.trim() || null, curp: curp.trim() || null, nss: nss.trim() || null };
+/** Los datos opcionales como los recibe el backend al registrar: lo escrito, o null si quedó vacío (sin capturar). */
+export function optionalPayload(values: Pick<EmployeeFormValues, OptionalField>): OptionalFields {
+  return Object.fromEntries(OPTIONAL_FIELDS.map((field) => [field, values[field].trim() || null])) as OptionalFields;
 }
 
 /**

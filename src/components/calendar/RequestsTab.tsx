@@ -12,6 +12,7 @@ import { Button, ButtonLink } from '../ui/Button';
 import { PagedItems } from '../ui/PagedItems';
 import { AbsenceItem } from './AbsenceItem';
 import { absenceFacts, isStale, rangeText } from './calendarRules';
+import { inSentence } from '../../utils/text';
 
 /** Aprobar una solicitud: qué se aprueba y qué pasa (se arma al dibujarse: sigue al idioma activo). */
 function approveConfirm(absence: Absence, typeName: string): ConfirmInput {
@@ -19,7 +20,7 @@ function approveConfirm(absence: Absence, typeName: string): ConfirmInput {
     tone: 'success',
     icon: <Check size={30} />,
     eyebrow: t('calendar.requests.approveConfirm.eyebrow'),
-    title: t('calendar.requests.approveConfirm.title', { kind: typeName.toLowerCase(), name: absence.employee.full_name }),
+    title: t('calendar.requests.approveConfirm.title', { kind: inSentence(typeName), name: absence.employee.full_name }),
     message: t('calendar.requests.approveConfirm.message'),
     details: absenceFacts(absence, typeName),
     confirmLabel: t('common.actions.approve'),

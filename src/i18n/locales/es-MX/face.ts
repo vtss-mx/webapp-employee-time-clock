@@ -8,6 +8,16 @@ export default {
       back: 'Cámara trasera',
       unknown: 'Cámara',
     },
+    /** Lente de una cámara del equipo (el sistema la nombra en su idioma: «Back Ultra Wide Camera»). */
+    lenses: {
+      wide: 'gran angular',
+      ultraWide: 'ultra gran angular',
+      telephoto: 'teleobjetivo',
+      dual: 'dual',
+      triple: 'triple',
+    },
+    /** Cámara del equipo con su lente: "Cámara trasera (ultra gran angular)". */
+    withLens: '{camera} ({lens})',
     /** Varias cámaras del mismo tipo: "Cámara trasera 2". */
     numbered: '{name} {number}',
     preview: 'Vista previa de la cámara',
@@ -25,6 +35,8 @@ export default {
     notReady: 'La cámara aún no está lista',
     processFailed: 'No se pudo procesar la imagen',
     captureFailed: 'No se pudo capturar la imagen',
+    /** El teléfono giró a media toma: la imagen cambió de tamaño y el servidor exige una sola toma (se repite). */
+    turned: 'La cámara cambió de orientación. Mantén el teléfono en la misma posición.',
   },
   /** Por qué no se pudo abrir la cámara y cómo resolverlo (cameraDiagnostics). */
   cameraHelp: {
@@ -74,7 +86,7 @@ export default {
       macNoBuiltIn:
         'En Mac mini, Mac Studio o una MacBook con la tapa cerrada no hay cámara integrada disponible: conecta una cámara USB o usa la cámara de Continuidad del iPhone.',
       windowsDevices: 'Revisa el Administrador de dispositivos → Cámaras (debe aparecer sin errores).',
-      windowsSwitch: 'Algunas laptops tienen un interruptor o una tecla (F8, F10 o con ícono de cámara) que la apaga.',
+      windowsSwitch: 'Algunas computadoras portátiles tienen un interruptor o una tecla (F8, F10 o con ícono de cámara) que la apaga.',
       generic: 'Verifica que el dispositivo tenga una cámara conectada y habilitada.',
     },
     busy: {
@@ -89,17 +101,34 @@ export default {
       reload: 'Recarga la página y pulsa "Reintentar".',
       otherBrowser: 'Si continúa, prueba con otro navegador.',
     },
+    /** El navegador integrado de otra aplicación (Facebook, Instagram, TikTok...) no deja usar la cámara. */
+    inApp: {
+      title: 'Abre esta página en tu navegador',
+      message: 'El navegador integrado de esta aplicación no permite usar la cámara.',
+      ios: 'Toca el menú (⋯ o el ícono de compartir) y elige «Abrir en Safari» o «Abrir en el navegador».',
+      android: 'Toca el menú (⋮) y elige «Abrir en Chrome» o «Abrir en el navegador».',
+      copyLink: 'Si no aparece esa opción, copia el enlace y pégalo en tu navegador.',
+    },
+    /** El navegador altera la imagen de los lienzos para evitar el rastreo (utils/canvasReadback.ts). */
+    canvasBlocked: {
+      title: 'Tu navegador oculta la imagen de la cámara',
+      message: 'Su protección contra el rastreo cambia la imagen y no se puede verificar tu rostro.',
+      allow: 'Permite que este sitio lea los datos del lienzo en la configuración de privacidad de tu navegador.',
+      otherBrowser: 'O abre la aplicación en Chrome, Edge, Safari o Firefox con su configuración normal.',
+    },
   },
   /** Guía de la detección en vivo sobre la cámara (useFaceDetection). */
   guidance: {
     loading: 'Preparando la detección facial…',
-    noFace: 'Coloca tu rostro dentro de la silueta',
+    noFace: 'Coloca tu rostro en la guía',
     multiple: 'Solo una persona frente a la cámara',
-    tooFar: 'Acércate un poco',
-    tooClose: 'Aléjate un poco',
-    offCenter: 'Centra tu rostro en la silueta',
-    lookStraight: 'Mira directamente a la cámara',
-    tooDark: 'Busca un lugar con más luz',
+    /** El rostro asoma fuera del cuadro (o lo tapa algo): no está completo. */
+    cutOff: 'Muestra tu rostro completo',
+    tooFar: 'Acércate',
+    tooClose: 'Aléjate',
+    offCenter: 'Centra tu rostro',
+    lookStraight: 'Mira al frente',
+    tooDark: 'Más luz',
     tooBright: 'Evita la luz directa',
     move: 'Haz el movimiento que se indica',
     holdStill: 'Mantente quieto',
@@ -118,7 +147,7 @@ export default {
     align: {
       name: 'Alineación',
       title: 'Centra tu rostro',
-      text: 'Colócalo dentro de la silueta y mira a la cámara.',
+      text: 'Colócalo dentro de la guía y mira a la cámara.',
     },
     scan: {
       name: 'Escaneo',
@@ -128,7 +157,7 @@ export default {
     liveness: {
       name: 'Prueba de vida',
       title: 'Sigue la indicación',
-      text: 'Mueve la cabeza como se indique; la pantalla puede cambiar de color un instante.',
+      text: 'Mueve la cabeza como se indique hasta completar cada paso.',
     },
     confirm: {
       name: 'Confirmación',
@@ -149,46 +178,45 @@ export default {
     analyzing: 'Analizando…',
     retry: 'Intenta de nuevo',
     nextStepReady: 'Listo para el siguiente paso',
-    lookFront: 'Vuelve a mirar al frente',
+    /** De vuelta al frente entre movimientos (y al final del registro, que termina centrado). */
+    lookFront: 'Centra tu rostro',
+    centered: 'Rostro centrado',
     manualOnly: 'Detección automática no disponible. Usa «Capturar».',
     virtualCamera: 'Cámara virtual no permitida: elige la cámara del dispositivo',
     blockedText: 'Corrige lo que se indica en la cámara; el escaneo se reanuda solo.',
-    /** `name`: el nombre de la etapa ("Prueba de vida"). */
-    flashTitle: '{name} · destello',
-    flashText: 'Mantén tu rostro frente a la pantalla mientras cambia de color.',
     stepTitle: '{name} · paso {current} de {total}',
     recenterText: 'Vuelve a mirar al frente para el siguiente paso.',
+    recenterEndText: 'Centra tu rostro para terminar.',
     timeout: 'No se completó el movimiento a tiempo. Hazlo despacio hasta llenar el anillo.',
-    flashFailed: 'No se pudo completar el destello de colores. Mantén la pantalla encendida y tu rostro frente a ella.',
     challengeRestart: 'No se completó la prueba de vida. El escaneo empezará de nuevo.',
     capture: 'Capturar',
     /** Anillo de las fotos (lectores de pantalla): `percent` ya trae su formato («33 %»). */
     ring: 'Captura al {percent}',
     /** Marca ✓ bajo el círculo: se tomaron todas las fotos. */
     captureDone: 'Captura completa',
+    /** La cuenta del registro facial: solo las fotos VÁLIDAS (decisión del dueño, 2026-10-06). */
+    validPhotos: 'Capturas válidas: {percent}',
   },
-  /** Destello de colores de la prueba de vida (FlashOverlay). */
-  flash: {
-    hint: 'Mantén tu rostro frente a la pantalla',
-    progress: 'Color {current} de {total}',
-    interrupted: 'El destello de colores se interrumpió',
+  /** Guía por voz del registro facial (decisión del dueño, 2026-10-08): lo que se lee en voz alta en cada paso. */
+  speak: {
+    position: 'Coloca tu rostro dentro de la guía y mira al frente.',
+    recenter: 'Vuelve a mirar al frente.',
+    done: 'Listo. Procesando.',
+    /** Aviso del botón de silencio del encabezado (lectores de pantalla). */
+    mute: 'Silenciar la guía por voz',
+    unmute: 'Activar la guía por voz',
+    /** Lo que lee «Probar voz» en la política del ADMIN. */
+    sample: 'Así se oye la guía por voz.',
   },
-  /** El sistema insiste en un accesorio que el empleado no usa: enviar el registro a revisión. */
-  review: {
-    /** Une las frases de los accesorios del catálogo: "los lentes ni la gorra". */
-    nor: 'ni',
-    question: '¿No estás usando {names}?',
-    explanation: 'Puede deberse a la luz o al encuadre. Si estás seguro, envía tu registro a revisión: tu empresa revisará tu fotografía.',
-    confirm: 'No uso {names} · enviar a revisión',
-    sent: 'Tu registro se enviará a revisión de tu empresa.',
-  },
-  /** Lo que exige la empresa antes de la captura (FaceRequirements). */
+  /** Recordatorio antes de la captura (FaceRequirements): nunca pide retirar un accesorio (decisión del dueño, 2026-10-07). */
   requirements: {
     label: 'Requisitos para la captura',
-    /** `name`: el accesorio del catálogo, en minúsculas. */
-    without: 'Sin {name}',
     lighting: 'Buena iluminación',
     realFace: 'Tu rostro real, sin fotos',
+  },
+  /** Insignias sobre el rostro con los accesorios que el servidor detectó (el único aviso de un accesorio). */
+  accessories: {
+    detected: 'Accesorios detectados',
   },
   /** Nivel de confianza del reconocimiento facial (ConfidenceSlider). */
   confidence: {

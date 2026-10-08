@@ -149,7 +149,7 @@ describe('Errores del sistema en inglés', () => {
   it('bandeja: columnas, filtros y "Mark as resolved" con su confirmación en inglés', async () => {
     mockFetch(inbox);
     renderWithProviders(<ErrorsPage />, { route: '/admin/errors' });
-    expect(await screen.findByText(/^2 pending · backend and web app failures/)).toBeInTheDocument();
+    expect(await screen.findByText(/^2 pending · server and web app failures/)).toBeInTheDocument();
     for (const column of ['Error', 'Severity', 'Where', 'Times', 'Last seen', 'Follow-up']) expect(screen.getByRole('columnheader', { name: column })).toBeInTheDocument();
     expect(screen.getAllByText('1,234')).toHaveLength(2);
     expect(screen.getAllByText('· reopened 1×', { exact: false })).toHaveLength(2);
@@ -166,7 +166,7 @@ describe('Errores del sistema en inglés', () => {
   it('detalle: origen, ocurrencias, seguimiento y su confirmación en inglés', async () => {
     mockFetch((call) => (call.url.includes('/occurrences') ? apiOk({ items: [], total: 0, page: 1, size: 10 }) : apiOk(report)));
     renderAt('/admin/errors/:id', '/admin/errors/9', <ErrorDetailPage />);
-    expect(await screen.findByText('Backend process (background or internal)')).toBeInTheDocument();
+    expect(await screen.findByText('Server process (background or internal)')).toBeInTheDocument();
     expect(screen.getByText('1,234 · reopened 1 time')).toBeInTheDocument();
     expect(screen.getByText('Handled (no exception)')).toBeInTheDocument();
     expect(screen.getByText(/^Last change: root@plataforma.com, /)).toBeInTheDocument();

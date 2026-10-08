@@ -12,6 +12,7 @@ import { NumberField } from '../ui/NumberField';
 import { RadioCard } from '../ui/RadioCard';
 import { Switch } from '../ui/Switch';
 import { CurrencyField } from './CurrencyField';
+import { inSentence } from '../../utils/text';
 
 interface PlanFieldsProps {
   form: PlanForm;
@@ -108,7 +109,7 @@ export function PlanFields({ form, disabled = false, currencyLocked = false }: P
   const { values, set, touch, errors } = form;
   const periods = catalogOptions(active('price_periods'));
   const perUser = values.pricing_mode === 'PER_USER';
-  const period = nameOf('price_periods', values.price_period).toLowerCase();
+  const period = inSentence(nameOf('price_periods', values.price_period));
   return (
     <div className="plan-fields stack">
       <ChoiceGroup label={t('billing.plan.labels.mode')} radio className="plan-fields__choices">

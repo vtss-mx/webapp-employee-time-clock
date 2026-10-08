@@ -155,10 +155,10 @@ describe('CatalogProvider: catálogos en memoria, una carga por sesión', () => 
   });
 
   it('useCatalogs exige el proveedor y los catálogos ya cargados', () => {
-    expect(() => renderHook(() => useCatalogs())).toThrow('useCatalogs debe usarse dentro de <CatalogProvider>');
+    expect(() => renderHook(() => useCatalogs())).toThrow('CATALOG_PROVIDER_MISSING');
     const loading = ({ children }: { children: ReactNode }) => (
       <CatalogContext.Provider value={{ status: 'loading' }}>{children}</CatalogContext.Provider>
     );
-    expect(() => renderHook(() => useCatalogs(), { wrapper: loading })).toThrow(/aún no se cargan/);
+    expect(() => renderHook(() => useCatalogs(), { wrapper: loading })).toThrow('CATALOGS_NOT_READY');
   });
 });

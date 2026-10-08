@@ -43,7 +43,7 @@ describe('LocaleSync', () => {
   });
 
   it('sin idioma en la cuenta (o uno desconocido) conserva el del dispositivo y no pide nada', async () => {
-    for (const locale of [null, 'fr-FR', 'es-MX']) {
+    for (const locale of [null, 'ja-JP', 'es-MX']) {
       session.user = withLocale(locale); // 'es-MX': el mismo que ya se ve
       renderWithProviders(<LocaleSync />).unmount();
     }

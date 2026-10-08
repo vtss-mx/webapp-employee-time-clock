@@ -48,6 +48,12 @@ const SECTIONS = [
         '10',
         `Espera máxima que se respeta de un Retry-After del servidor antes de reintentar. ${range(1, 60, ' s')}`,
       ],
+      [
+        'VITE_DEVICE_KEY_TIMEOUT_SECONDS',
+        '5',
+        'Espera máxima de la llave del dispositivo (WebCrypto e IndexedDB); tarde = se sigue sin llave y el servidor lo ' +
+          `mide (nada se queda colgado). ${range(1, 30, ' s')}`,
+      ],
     ],
   ],
   [
@@ -120,10 +126,16 @@ const SECTIONS = [
     'Reconocimiento facial',
     [
       [
-        'VITE_FACE_ENROLLMENT_FRAMES',
-        '36',
-        'Fotos completas del registro facial (el servidor elige las mejores como referencia y descarta las demás; ' +
-          `acepta hasta FACE_ENROLL_MAX_PHOTOS). ${range(1, 36)}`,
+        'VITE_FACE_ENROLLMENT_VALID_PHOTOS',
+        '32',
+        'Fotos VÁLIDAS del registro facial (solo cuentan las que pasan la revisión en vivo: rostro dentro de la guía, ' +
+          'centrado, de frente y quieto, nítida y con luz; sin tope de intentos; el servidor las vuelve a validar y ' +
+          `elige las mejores). ${range(1, 36)}`,
+      ],
+      [
+        'VITE_FACE_ENROLLMENT_MIN_SHARPNESS',
+        '12',
+        `Nitidez mínima de una foto válida (varianza del Laplaciano sobre el rostro, 96 px). ${range(0, 500)}`,
       ],
       [
         'VITE_FACE_ENROLLMENT_PHOTO_PX',
@@ -135,6 +147,23 @@ const SECTIONS = [
         '100',
         `Pausa mínima entre fotos del registro (cada una espera además un cuadro nuevo del video). ${range(40, 1000, ' ms')}`,
       ],
+      [
+        'VITE_VOICE_MAX_ANSWER_SECONDS',
+        '12',
+        `Verificación por voz: duración máxima de la grabación de una respuesta. ${range(2, 60, ' s')}`,
+      ],
+      [
+        'VITE_VOICE_SILENCE_STOP_MS',
+        '1200',
+        `Silencio tras la voz que da la respuesta por terminada. ${range(300, 5000, ' ms')}`,
+      ],
+      ['VITE_VOICE_MIN_SPEECH_MS', '600', `Voz mínima antes de contar el silencio final. ${range(100, 5000, ' ms')}`],
+      [
+        'VITE_VOICE_VIDEO_BITRATE_KBPS',
+        '600',
+        `Tasa de bits del video grabado (con 600, ≈ 0.4 MB por respuesta de 5 s). ${range(100, 4000, ' kbps')}`,
+      ],
+      ['VITE_VOICE_LEVEL_FULL_SCALE', '0.25', `RMS (0-1) del micrófono que llena el medidor. ${range(0.05, 1)}`],
       ['VITE_FACE_VERIFICATION_FRAMES', '3', `Capturas frontales de cada verificación. ${range(1, 3)}`],
       ['VITE_FACE_FRAME_GAP_MS', '380', `Pausa entre capturas consecutivas. ${range(100, 2000, ' ms')}`],
       [
@@ -153,12 +182,6 @@ const SECTIONS = [
         `Margen antes de que venza el reto (lo que tarda en subir el envío). ${range(0, 30, ' s')}`,
       ],
       [
-        'VITE_FACE_FLASH_SETTLE_MS',
-        '400',
-        'Destello de colores: espera tras pintar cada color antes de capturar (≈ 2.3 cambios por segundo, bajo el ' +
-          `límite de 3 destellos por segundo de WCAG 2.3.1; por eso el mínimo es 340). ${range(340, 1000, ' ms')}`,
-      ],
-      [
         'VITE_FACE_DETECTOR_TIMEOUT_SECONDS',
         '20',
         `Tiempo límite para cargar el detector de rostros (MediaPipe). ${range(5, 120, ' s')}`,
@@ -168,6 +191,60 @@ const SECTIONS = [
         'VITE_FACE_DETECTION_INTERVAL_MS',
         '110',
         `Cada cuánto se analiza un cuadro de la cámara. ${range(50, 1000, ' ms')}`,
+      ],
+      [
+        'VITE_FACE_FRONTAL_MAX_YAW',
+        '0.1',
+        'Validez de un cuadro de frente contra la guía dibujada (una foto se toma solo si es factible). Giro máximo ' +
+          `(yaw_ratio; el servidor acepta 0.15). ${range(0.02, 0.3)}`,
+      ],
+      ['VITE_FACE_FRONTAL_MAX_ROLL_DEGREES', '12', `Inclinación lateral máxima en grados (el servidor acepta 15). ${range(2, 30)}`],
+      [
+        'VITE_FACE_FRONTAL_PITCH_MIN',
+        '0.4',
+        'Cabeceo de frente (nariz entre los ojos, 0, y la boca, 1): de 0.51 a 0.59 en un rostro real; fuera de esta ' +
+          `banda se pide «Mira al frente» (el servidor acepta 0.20 a 0.85). ${range(0, 1)}`,
+      ],
+      ['VITE_FACE_FRONTAL_PITCH_MAX', '0.72', `Tope de la banda del cabeceo de frente. ${range(0, 1)}`],
+      [
+        'VITE_FACE_FRONTAL_PITCH_DRIFT',
+        '0.06',
+        'Cuánto puede subir o bajar la cabeza respecto al rostro en reposo durante las fotos (menos que el 0.08 con ' +
+          `que el servidor da por hecho «mirar abajo»). ${range(0.01, 0.3)}`,
+      ],
+      ['VITE_FACE_GUIDE_MIN_FILL', '0.6', `Cuánto debe llenar el rostro la caja objetivo de la guía: menos, «Acércate». ${range(0.2, 1)}`],
+      ['VITE_FACE_GUIDE_MAX_FILL', '1.15', `Más que esto, «Aléjate»: el rostro cabe dentro del contorno. ${range(1, 2)}`],
+      [
+        'VITE_FACE_CENTER_TOLERANCE',
+        '0.15',
+        `Cuánto puede alejarse el centro del rostro del centro de la guía (parte del tamaño de la caja objetivo). ${range(0.02, 0.5)}`,
+      ],
+      [
+        'VITE_FACE_STEADY_MAX_SHIFT',
+        '0.08',
+        'Quietud suavizada (decisión del dueño, 2026-10-07): desplazamiento máximo respecto al promedio de la ventana, ' +
+          `como parte del tamaño del rostro, antes de «Mantente quieto». ${range(0.01, 0.5)}`,
+      ],
+      [
+        'VITE_FACE_STEADY_WINDOW',
+        '4',
+        `Cuántos cuadros promedia la ventana de quietud (un pico de ruido del detector apenas mueve el promedio). ${range(2, 12)}`,
+      ],
+      [
+        'VITE_FACE_STEADY_GRACE_FRAMES',
+        '2',
+        `Cuántos cuadros seguidos por encima del umbral antes de marcar «Mantente quieto» (histéresis). ${range(1, 8)}`,
+      ],
+      [
+        'VITE_FACE_ACCESSORY_CHECK_INTERVAL_MS',
+        '2500',
+        'Cada cuántos ms se valida un cuadro en el servidor para las insignias de accesorios (cubrebocas, lentes), de ' +
+          `forma continua mientras hay rostro; throttleado para no spamear ni disparar la alerta de peticiones lentas. ${range(1000, 15000)}`,
+      ],
+      [
+        'VITE_FACE_ACCESSORY_CHECK_PX',
+        '480',
+        `Lado del cuadro que se valida para las insignias de accesorios (chico: basta y pesa poco). ${range(240, 1280)} px.`,
       ],
       [
         'VITE_FACE_TURN_MARGIN',
@@ -208,7 +285,7 @@ const SECTIONS = [
       [
         'VITE_FACE_BURST_HOLD_WAIT_MS',
         '1200',
-        `Espera máxima para completar el tramo quieto antes del destello. ${range(0, 5000, ' ms')}`,
+        `Espera máxima para completar el tramo quieto antes del primer movimiento. ${range(0, 5000, ' ms')}`,
       ],
       [
         'VITE_MEDIAPIPE_WASM_URL',
@@ -407,6 +484,12 @@ const SECTIONS = [
         '20',
         'Documentos de una empresa: tamaño máximo antes de subirlo (solo ayuda; el backend valida con ' +
           `COMPANY_DOCUMENT_MAX_MB, que debe ser el mismo). ${range(1, 25, ' MB')}`,
+      ],
+      [
+        'VITE_EMPLOYEE_DOCUMENT_MAX_MB',
+        '15',
+        'Documentos de identidad del empleado (onboarding con OCR): tamaño máximo antes de subirlo (solo ayuda; el ' +
+          `backend valida con EMPLOYEE_DOCUMENT_MAX_MB, que debe ser el mismo). ${range(1, 25, ' MB')}`,
       ],
       [
         'VITE_PAGE_SIZES',

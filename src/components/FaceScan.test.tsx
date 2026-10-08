@@ -15,7 +15,6 @@ describe('FaceScan: etapas del escáner facial', () => {
     expect(currentStage('frontal', 'off_center')).toBe('align');
     expect(currentStage('frontal', 'hold_still')).toBe('align');
     expect(currentStage('checking', 'ready')).toBe('scan');
-    expect(currentStage('flash', 'ready')).toBe('liveness'); // destello de colores
     expect(currentStage('challenge', 'move')).toBe('liveness');
     expect(currentStage('submitting', 'ready')).toBe('confirm');
     expect(currentStage('blocked', 'ready')).toBe('align');

@@ -35,4 +35,25 @@ export default {
     nounOther: 'intentos',
     confidence: 'Confianza {value}',
   },
+  /** Mapa de solo lectura de dónde se hizo una verificación (VerificationMap). */
+  map: {
+    label: 'Mapa de verificaciones',
+    pin: 'Lugar de la verificación',
+    loading: 'Cargando el mapa…',
+    failed: 'El mapa no está disponible.',
+  },
+  /** Pantalla «Verificaciones» de la empresa (lista con el mapa). */
+  company: {
+    title: 'Verificaciones',
+    subtitle: 'Dónde y cuándo se verificó la identidad de tu gente.',
+    loadError: 'No se pudieron cargar las verificaciones',
+    mapHint: 'Elige una verificación con ubicación para verla en el mapa.',
+    notIdentified: 'No identificado',
+    noun: { one: 'verificación', other: 'verificaciones' },
+    filters: { all: 'Todas', success: 'Exitosas', failed: 'Fallidas', from: 'Desde', to: 'Hasta' },
+    columns: { when: 'Fecha y hora', result: 'Resultado', method: 'Método', place: 'Lugar' },
+    place: { show: 'Ver en el mapa', none: 'Sin ubicación', accuracy: 'Precisión {distance}' },
+    empty: { title: 'Sin verificaciones', description: 'Aquí verás dónde se hizo cada verificación.' },
+    noMatch: { title: 'Sin resultados', description: 'Prueba con otro filtro o rango de fechas.' },
+  },
 } as const;

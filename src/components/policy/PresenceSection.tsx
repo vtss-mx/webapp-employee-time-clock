@@ -1,4 +1,4 @@
-import { FileSignature, LocateFixed, MapPinCheck, QrCode } from 'lucide-react';
+import { FileSignature, LocateFixed, MapPinCheck, MapPinned, QrCode } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { t, useT } from '../../i18n';
@@ -13,6 +13,7 @@ type PresenceField = keyof typeof PRESENCE_FIELDS;
 const ICONS: Record<PresenceField, ReactNode> = {
   validator_signing: <FileSignature size={20} />,
   validator_location: <LocateFixed size={20} />,
+  verification_location: <MapPinned size={20} />,
   site_codes: <QrCode size={20} />,
 };
 

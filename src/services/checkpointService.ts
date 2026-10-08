@@ -2,7 +2,7 @@ import type { CheckpointEmployee, CheckpointEventList, CheckpointProfile, PageQu
 import { hasKeys, isPage } from '../utils/guards';
 import { locationFormFields, locationJson, type LocationTake } from '../utils/locationPayload';
 import { apiRequest } from './apiClient';
-import { sha256Hex } from './flashPacingService';
+import { sha256Hex } from '../utils/digest';
 import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 import { sendSigned, signingNonce } from './http/requestSigning';
 

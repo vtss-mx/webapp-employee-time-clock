@@ -1,13 +1,13 @@
 import { Activity, Bug, CheckCheck, ClipboardList, Code2, ListChecks } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { CatalogStatusBadge } from '../../components/StatusBadge';
+import { Avatar } from '../../components/ui/Avatar';
 import { Button } from '../../components/ui/Button';
 import { OccurrenceContext } from '../../components/errors/OccurrenceContext';
 import { CopyField } from '../../components/ui/CopyField';
 import { PagedItems } from '../../components/ui/PagedItems';
 import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { RetryState } from '../../components/ui/RetryState';
-import { SkeletonCard } from '../../components/ui/Skeleton';
+import { ResourceFallback } from '../../components/ui/ResourceFallback';
 import { useAction } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { usePagedList } from '../../hooks/usePagedList';
@@ -21,6 +21,7 @@ import type { ConfirmInput } from '../../types/confirm';
 import { formatDateTime } from '../../utils/format';
 import { formatCount } from '../../utils/numbers';
 import { whereOf } from './ErrorsPage';
+import { inSentence } from '../../utils/text';
 
 /** De dónde vino el error (código del backend → su texto); uno desconocido se muestra tal cual. */
 const SOURCES: Partial<Record<string, 'http' | 'log' | 'websocket' | 'client'>> = { HTTP: 'http', LOG: 'log', WEBSOCKET: 'websocket', CLIENT: 'client' };
@@ -37,7 +38,7 @@ function statusConfirm(report: ErrorReportDetail, status: ErrorStatus, current: 
     tone: resolved ? 'success' : 'primary',
     icon: resolved ? <CheckCheck size={30} /> : <ListChecks size={30} />,
     eyebrow: t('systemErrors.detail.confirmEyebrow'),
-    title: t('systemErrors.detail.confirmTitle', { code: report.code, status: next.toLowerCase() }),
+    title: t('systemErrors.detail.confirmTitle', { code: report.code, status: inSentence(next) }),
     message: t(resolved ? 'systemErrors.detail.confirmResolved' : 'systemErrors.detail.confirmMessage'),
     changes: [{ label: t('systemErrors.list.status'), before: current, after: next }],
     details: [
@@ -45,7 +46,7 @@ function statusConfirm(report: ErrorReportDetail, status: ErrorStatus, current: 
       { label: t('systemErrors.list.where'), value: whereOf(report) },
       { label: t('systemErrors.detail.occurrences'), value: formatCount(report.occurrences) },
     ],
-    confirmLabel: t('systemErrors.detail.markAs', { status: next.toLowerCase() }),
+    confirmLabel: t('systemErrors.detail.markAs', { status: inSentence(next) }),
     confirmIcon: resolved ? <CheckCheck size={18} /> : <ListChecks size={18} />,
   };
 }
@@ -69,18 +70,7 @@ export function ErrorDetailPage() {
   const { busy, run } = useAction<ErrorStatus>();
 
   if (!report) {
-    return error ? (
-      <div className="page">
-        <Panel>
-          <PanelHeader title={t('systemErrors.detail.title')} backTo={paths.admin.errors} backLabel={t('systemErrors.title')} />
-          <PanelSection>
-            <RetryState onRetry={retry} />
-          </PanelSection>
-        </Panel>
-      </div>
-    ) : (
-      <SkeletonCard lines={8} />
-    );
+    return <ResourceFallback error={error} retry={retry} lines={8} header={{ title: t('systemErrors.detail.title'), backTo: paths.admin.errors, backLabel: t('systemErrors.title') }} />;
   }
 
   const mark = (status: ErrorStatus, name: string) =>
@@ -122,7 +112,7 @@ export function ErrorDetailPage() {
               .filter((s) => s.code !== report.status)
               .map((s) => (
                 <Button key={s.code} variant={s.code === 'RESOLVED' ? 'success' : 'secondary'} loading={busy === s.code} disabled={busy !== null} onClick={() => void mark(s.code, s.name)}>
-                  {t('systemErrors.detail.markAs', { status: s.name.toLowerCase() })}
+                  {t('systemErrors.detail.markAs', { status: inSentence(s.name) })}
                 </Button>
               ))}
           </div>
@@ -180,7 +170,8 @@ export function ErrorDetailPage() {
                 {items.map((o) => (
                   <li key={o.id}>
                     <strong>{formatDateTime(o.occurred_at)}</strong>
-                    <span className="small muted">
+                    <span className="small muted log-list__who">
+                      {o.user_label && <Avatar name={o.user_label} src={o.user_avatar} size="xs" decorative />}
                       {[o.user_label ?? t('systemErrors.detail.noSession'), o.company_name, o.trace_id && t('systemErrors.detail.trace', { id: o.trace_id })]
                         .filter(Boolean)
                         .join(' · ')}

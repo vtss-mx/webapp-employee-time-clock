@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>12/12</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -131,18 +131,10 @@
 <a name='L66'></a><a href='#L66'>66</a>
 <a name='L67'></a><a href='#L67'>67</a>
 <a name='L68'></a><a href='#L68'>68</a>
-<a name='L69'></a><a href='#L69'>69</a>
-<a name='L70'></a><a href='#L70'>70</a>
-<a name='L71'></a><a href='#L71'>71</a>
-<a name='L72'></a><a href='#L72'>72</a>
-<a name='L73'></a><a href='#L73'>73</a>
-<a name='L74'></a><a href='#L74'>74</a>
-<a name='L75'></a><a href='#L75'>75</a>
-<a name='L76'></a><a href='#L76'>76</a>
-<a name='L77'></a><a href='#L77'>77</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L69'></a><a href='#L69'>69</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-yes">21x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -156,10 +148,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">248x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">586x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -173,18 +162,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
+<span class="cline-any cline-yes">579x</span>
+<span class="cline-any cline-yes">579x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-yes">241x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">579x</span>
+<span class="cline-any cline-yes">579x</span>
+<span class="cline-any cline-yes">579x</span>
+<span class="cline-any cline-yes">579x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -221,12 +205,10 @@
 const TURN = 360;
 &nbsp;
 interface ProgressRingProps {
-  /** Avance 0..1 (se acota): el arco crece de forma continua hasta él. */
+  /** Avance 0..1 (se acota): el arco llega a él al instante. */
   value: number;
   /** Grosor del trazo en unidades del dibujo (el anillo mide 100 × 100: crece con el círculo que rodea). */
   thickness?: number;
-  /** Algo se está tomando ahora: una luz suave late en la punta del arco (se apaga con "reducir movimiento"). */
-  active?: boolean;
   /** Texto para lectores de pantalla; sin él, el anillo es decorativo (lo explica el texto que lo acompaña). */
   label?: string;
   className?: string;
@@ -238,24 +220,22 @@ export function ringValue(value: number): number {
 }
 &nbsp;
 /**
- * Anillo de avance continuo (componente propio, regla 12): una pista fina con `--ring-track` y un arco con puntas
- * redondas y el degradado de `--ring-from` a `--ring-to` (tokens del tema; cada pantalla los personaliza). Empieza
- * arriba y avanza en el sentido del reloj.
+ * Anillo de avance (componente propio, regla 12): una pista fina con `--ring-track` y un arco con puntas redondas del
+ * color `--ring-from` → `--ring-to` (hoy un solo color; tokens del tema que cada pantalla personaliza). Empieza arriba y
+ * avanza en el sentido del reloj.
  *
- * Fluido y barato en un teléfono: el avance solo cambia el `stroke-dashoffset` del arco y el giro de su punta; el CSS
- * los lleva a su destino con una transición larga y suave que, si llega otro valor a medio camino (una ráfaga de fotos),
- * parte de donde va: el arco nunca salta. Nada se vuelve a dibujar en React por cuadro y "reducir movimiento" deja los
- * estados al instante.
+ * Decisión del dueño del producto (2026-10-06, «algo más enterprise»): estados fijos. El avance solo cambia el
+ * `stroke-dashoffset` del arco y se ve AL INSTANTE: sin transiciones, sin luces en la punta ni brillos. Nada se vuelve
+ * a dibujar en React por cuadro.
  */
-export function ProgressRing({ value, thickness = 1.2, active = false, label, className }: ProgressRingProps) {
+export function ProgressRing({ value, thickness = 1.2, label, className }: ProgressRingProps) {
   // `useId` puede traer caracteres que no sirven dentro de `url(#…)`: se dejan solo letras, números, - y _.
   const id = `ring-${useId().replace(/[^\w-]/g, '')}`;
   const ratio = ringValue(value);
-  // Una unidad libre por fuera: la luz de la punta y el suavizado del borde caben en el dibujo.
+  // Una unidad libre por fuera: el suavizado del borde cabe en el dibujo.
   const radius = 49 - thickness / 2;
   const arc = { strokeDashoffset: TURN - ratio * TURN } as CSSProperties;
-  const head = { transform: `rotate(${ratio * TURN}deg)` } as CSSProperties;
-  const classes = ['progress-ring', ratio &gt; 0 &amp;&amp; 'progress-ring--started', active &amp;&amp; 'progress-ring--active', className].filter(Boolean).join(' ');
+  const classes = ['progress-ring', ratio &gt; 0 &amp;&amp; 'progress-ring--started', className].filter(Boolean).join(' ');
   return (
     &lt;svg
       className={classes}
@@ -283,10 +263,6 @@ export function ProgressRing({ value, thickness = 1.2, active = false, label, cl
           stroke={`url(#${id}-fill)`}
           style={arc}
         /&gt;
-        &lt;g className="progress-ring__head" style={head}&gt;
-          &lt;circle className="progress-ring__glow" cx={50 + radius} cy="50" r={thickness * 1.7} /&gt;
-          &lt;circle className="progress-ring__spark" cx={50 + radius} cy="50" r={thickness * 0.42} /&gt;
-        &lt;/g&gt;
       &lt;/g&gt;
     &lt;/svg&gt;
   );
@@ -298,7 +274,7 @@ export function ProgressRing({ value, thickness = 1.2, active = false, label, cl
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:24.187Z
+                at 2026-10-08T07:13:14.472Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

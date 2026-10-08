@@ -24,6 +24,8 @@ export const CATALOG_KEYS = [
   'flash_modes',
   'face_errors',
   'enrollment_flags',
+  'voice_questions',
+  'voice_profiles',
   'work_modes',
   'attendance_actions',
   'work_session_statuses',
@@ -56,6 +58,7 @@ export const CATALOG_KEYS = [
   'fraud_case_statuses',
   'fraud_case_event_kinds',
   'company_document_types',
+  'employee_document_types',
 ] as const satisfies readonly CatalogKey[];
 
 const isItemList = isArrayOf<CatalogItem[]>(hasKeys('code', 'name', 'sort_order', 'active'));
@@ -87,23 +90,62 @@ export interface CatalogApi extends Catalogs {
   active: <K extends CatalogKey>(key: K) => Catalogs[K];
 }
 
+/** Búsquedas propias de una carga (por código y activos), sin pasar por los catálogos vigentes. */
+const OWN = Symbol('own-lookups');
+interface OwnLookups {
+  find: (key: CatalogKey, code: string) => CatalogItem | undefined;
+  actives: Record<CatalogKey, readonly CatalogItem[]>;
+}
+type IndexedCatalogs = CatalogApi & { [OWN]: OwnLookups };
+
+/*
+ * Los catálogos VIGENTES (los del idioma activo): `CatalogProvider` los publica cada vez que llegan. Como `t()`, que
+ * traduce siempre en el idioma vigente, `byCode`, `nameOf` y `active` buscan SIEMPRE en los vigentes, también los de
+ * una carga anterior que guardó una función (la confirmación o el popup abiertos, un `useCallback`): al cambiar el
+ * idioma, un popup abierto nombra los registros en el idioma nuevo en cuanto llegan sus catálogos (regla 16, en
+ * caliente). Sin catálogos publicados (las pruebas con catálogos fijos), cada carga busca en los suyos.
+ */
+let latest: IndexedCatalogs | null = null;
+const listeners = new Set<() => void>();
+
+/** Publica los catálogos vigentes (null al cerrar la sesión) y avisa a quien los muestra fuera de su proveedor. */
+export function publishCatalogs(catalogs: CatalogApi | null): void {
+  if (latest === catalogs) return;
+  latest = catalogs as IndexedCatalogs | null;
+  listeners.forEach((listener) => listener());
+}
+
+/** Avisa cada vez que cambian los catálogos vigentes (lo usa `useSyncExternalStore`, p. ej. los popups). */
+export function subscribeCatalogs(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function latestCatalogs(): CatalogApi | null {
+  return latest;
+}
+
 /** Índices por código y listas de activos, calculados una vez por carga. */
 export function createCatalogApi(catalogs: Catalogs): CatalogApi {
   const lists: Record<CatalogKey, readonly CatalogItem[]> = catalogs;
   const perCatalog = <T>(build: (list: readonly CatalogItem[]) => T) =>
     Object.fromEntries(CATALOG_KEYS.map((key) => [key, build(lists[key])])) as Record<CatalogKey, T>;
   const index = perCatalog((list) => new Map(list.map((item) => [item.code, item])));
-  const actives = perCatalog((list) => list.filter((item) => item.active));
+  const own: OwnLookups = { find: (key, code) => index[key].get(code), actives: perCatalog((list) => list.filter((item) => item.active)) };
+  // Los vigentes si hay; si no, los de esta carga.
+  const lookups = () => (latest ?? api)[OWN];
 
   const byCode = <K extends CatalogKey>(key: K, code: string | null | undefined) =>
-    (code ? index[key].get(code) : undefined) as CatalogEntry<K> | undefined;
+    (code ? lookups().find(key, code) : undefined) as CatalogEntry<K> | undefined;
 
-  return {
+  const api: IndexedCatalogs = {
     ...catalogs,
     byCode,
     nameOf: (key, code, fallback = '') => byCode(key, code)?.name ?? (code || fallback),
-    active: <K extends CatalogKey>(key: K) => actives[key] as Catalogs[K],
+    active: <K extends CatalogKey>(key: K) => lookups().actives[key] as Catalogs[K],
+    [OWN]: own,
   };
+  return api;
 }
 
 /** Registros de un catálogo como opciones de una lista (`Select`): su código, nombre y aclaración. */

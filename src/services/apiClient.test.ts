@@ -127,23 +127,19 @@ describe('utilidades de transporte', () => {
     expect(delay).toBeLessThanOrEqual(12500);
     expect(retryDelay(2, null)).toBeGreaterThanOrEqual(1200);
   });
-  it('arma el multipart facial', () => {
-    const flash = [new Blob(['rojo']), new Blob(['verde']), new Blob(['azul'])];
+  it('arma el multipart facial (sin capturas de colores: el destello se retiró)', () => {
     const form = buildFaceForm(
-      { frontal: [new Blob(['a']), new Blob(['b'])], challenge: { id: 'c1', images: [new Blob(['l']), new Blob(['r'])] }, flash, camera: 'Cámara '.repeat(40) },
+      { frontal: [new Blob(['a']), new Blob(['b'])], challenge: { id: 'c1', images: [new Blob(['l']), new Blob(['r'])] }, camera: 'Cámara '.repeat(40) },
       { qr_content: 'TCQR1:x' },
     );
     expect(form.getAll('images')).toHaveLength(2);
     expect(form.get('challenge_id')).toBe('c1');
     expect(form.getAll('challenge_image')).toHaveLength(2);
-    // Una captura por color, en el orden en que se pintaron (el servidor compara cada una con su color).
-    expect((form.getAll('flash_image') as File[]).map((f) => f.name)).toEqual(['flash-1.jpg', 'flash-2.jpg', 'flash-3.jpg']);
-    expect(form.getAll('flash_image').map((f) => (f as File).size)).toEqual([4, 5, 4]);
+    expect(form.getAll('flash_image')).toEqual([]);
     expect((form.get('camera_label') as string).length).toBe(200); // acotado
     expect(form.get('qr_content')).toBe('TCQR1:x');
-    const bare = buildFaceForm({ frontal: [new Blob(['a'])], flash });
+    const bare = buildFaceForm({ frontal: [new Blob(['a'])] });
     expect(bare.get('challenge_id')).toBeNull();
-    expect(bare.getAll('flash_image')).toEqual([]); // el destello solo viaja con su reto
     expect(bare.get('camera_label')).toBeNull();
   });
 });

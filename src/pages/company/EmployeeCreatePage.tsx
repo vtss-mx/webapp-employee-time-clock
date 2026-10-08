@@ -13,7 +13,7 @@ import { employeeService } from '../../services/employeeService';
 import type { Employee, EmployeeFormValues } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
 import { describeValues } from '../../utils/changes';
-import { documentsPayload } from '../../utils/formRules';
+import { optionalPayload } from '../../utils/formRules';
 
 /** Antes de registrar: a quién y con qué datos (al vincular, que conserva su cuenta y su contraseña). */
 function createConfirm(values: EmployeeFormValues, headwearExempt: boolean, linking: boolean): ConfirmInput {
@@ -59,7 +59,7 @@ export function EmployeeCreatePage() {
       const { password_confirm: _confirm, ...data } = values;
       const employee = await employeeService.create({
         ...data,
-        ...documentsPayload(values), // RFC, CURP y NSS opcionales: vacíos viajan como null
+        ...optionalPayload(values), // número, RFC, CURP y NSS opcionales: vacíos viajan como null
         password: linking ? undefined : values.password,
         headwear_exempt: headwearExempt,
       });

@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>18/18</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
@@ -169,10 +169,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">453x</span>
+<span class="cline-any cline-yes">453x</span>
+<span class="cline-any cline-yes">453x</span>
+<span class="cline-any cline-yes">453x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -207,7 +207,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">527x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -229,13 +230,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">105x</span>
-<span class="cline-any cline-yes">105x</span>
-<span class="cline-any cline-yes">105x</span>
-<span class="cline-any cline-yes">105x</span>
-<span class="cline-any cline-yes">12x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-yes">2298x</span>
+<span class="cline-any cline-yes">2298x</span>
+<span class="cline-any cline-yes">2298x</span>
+<span class="cline-any cline-yes">2298x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">527x</span>
 <span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">7x</span>
@@ -259,8 +259,8 @@ import { describeDevice } from '../../utils/userAgent';
 import type { MessageInput } from '../MessageDialog';
 import { Avatar } from '../ui/Avatar';
 &nbsp;
-/** La cuenta que se cierra: quién es, en qué empresa y desde qué dispositivo. */
-function LogoutCard({ user, role }: { user: User; role: string }) {
+/** La cuenta que se cierra: quién es, en qué empresa y desde qué dispositivo. `role` se pide al dibujarse. */
+function LogoutCard({ user, role }: { user: User; role: () =&gt; string }) {
   const t = useT();
   const name = user.employee?.full_name ?? user.email;
   const device = describeDevice(navigator.userAgent);
@@ -271,7 +271,7 @@ function LogoutCard({ user, role }: { user: User; role: string }) {
         &lt;span className="logout-card__identity"&gt;
           &lt;strong className="truncate"&gt;{name}&lt;/strong&gt;
           {name !== user.email &amp;&amp; &lt;span className="muted small truncate"&gt;{user.email}&lt;/span&gt;}
-          &lt;span className="logout-card__role"&gt;{[role, user.company?.name].filter(Boolean).join(' · ')}&lt;/span&gt;
+          &lt;span className="logout-card__role"&gt;{[role(), user.company?.name].filter(Boolean).join(' · ')}&lt;/span&gt;
         &lt;/span&gt;
       &lt;/div&gt;
       &lt;dl className="logout-card__session"&gt;
@@ -296,9 +296,10 @@ function LogoutCard({ user, role }: { user: User; role: string }) {
 &nbsp;
 /**
  * Popup "¿Cerrar sesión?" con la cuenta y lo que implica salir según el
- * rol, en el idioma activo (quien lo abre lo pide al dibujarse para que siga al idioma).
+ * rol, en el idioma activo (quien lo abre lo pide al dibujarse para que siga al idioma). `role` es una función: el
+ * nombre del rol sale de los catálogos vigentes al dibujarse (al cambiar el idioma, en el nuevo).
  */
-export function logoutMessage(user: User, role: string): MessageInput {
+export function logoutMessage(user: User, role: () =&gt; string): MessageInput {
   return {
     variant: 'warning',
     icon: &lt;LogOut size={30} /&gt;,
@@ -326,8 +327,7 @@ export function useConfirmLogout() {
   const { nameOf } = useCatalogs();
   return useCallback(async () =&gt; {
     if (!user) return;
-    const role = nameOf('roles', user.role);
-    const choice = await feedback.show(() =&gt; logoutMessage(user, role));
+    const choice = await feedback.show(() =&gt; logoutMessage(user, () =&gt; nameOf('roles', user.role)));
     if (choice === 'logout') {
       await logout();
     } else if (choice === 'everywhere') {
@@ -346,7 +346,7 @@ export function useConfirmLogout() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:24.187Z
+                at 2026-10-08T07:13:14.472Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

@@ -6,11 +6,11 @@ import { config } from '../utils/config';
 import { Button } from './ui/Button';
 
 /**
- * Fases internas del flujo facial (lo que hace el sistema). flash: la pantalla destella los colores
- * del reto; challenge: un movimiento de la prueba de vida; recenter: entre dos movimientos, la
- * persona vuelve a mirar al frente.
+ * Fases internas del flujo facial (lo que hace el sistema). challenge: un movimiento de la prueba de vida; recenter:
+ * entre dos movimientos, la persona vuelve a mirar al frente. (El destello de colores se retiró de la experiencia por
+ * decisión del dueño del producto, 2026-10-06: ya no hay fase que pinte la pantalla.)
  */
-export type Phase = 'frontal' | 'checking' | 'blocked' | 'flash' | 'challenge' | 'recenter' | 'submitting';
+export type Phase = 'frontal' | 'checking' | 'blocked' | 'challenge' | 'recenter' | 'submitting';
 
 /** Etapas que ve la persona (lo que debe hacer): una barra de progreso por etapa. */
 export type ScanStage = 'prepare' | 'align' | 'scan' | 'liveness' | 'confirm';
@@ -35,7 +35,8 @@ const STAGE_ICONS: Record<ScanStage, LucideIcon> = {
   confirm: ShieldCheck,
 };
 
-/** Guías que indican que la persona aún no está frente a la cámara (etapa de preparación). */
+/** Guías que indican que la persona aún no está frente a la cámara (etapa de preparación); las demás (centrar, mirar
+ *  al frente, el rostro cortado o en movimiento) son de la alineación. */
 const PREPARING: ReadonlySet<FaceGuidance> = new Set(['loading', 'no_face', 'multiple', 'too_far', 'too_close', 'too_dark', 'too_bright']);
 
 /** Etapas del flujo según la política (sin prueba de vida son cuatro). */
@@ -48,7 +49,6 @@ export function currentStage(phase: Phase, guidance: FaceGuidance): ScanStage {
   switch (phase) {
     case 'checking':
       return 'scan';
-    case 'flash':
     case 'challenge':
     case 'recenter':
       return 'liveness';
@@ -61,8 +61,7 @@ export function currentStage(phase: Phase, guidance: FaceGuidance): ScanStage {
   }
 }
 
-/** Avance (0..1) dentro de la etapa actual: alimenta su segmento de la barra. */
-/** `moveProgress`: avance del movimiento en curso (o de los colores, durante el destello). */
+/** Avance (0..1) dentro de la etapa actual: alimenta su segmento de la barra. `moveProgress`: el del movimiento en curso. */
 export function stageFill(stage: ScanStage, input: { progress: number; moveProgress: number; capture?: { current: number; total: number } | null }): number {
   if (stage === 'align') return input.progress;
   if (stage === 'scan') return input.capture ? input.capture.current / input.capture.total : 1;
@@ -134,11 +133,35 @@ interface ScanCardProps {
   intro: { title: string; text: string; label?: string };
   /** Visor de la cámara con sus capas. */
   viewport: ReactNode;
-  /** Solo lo que aparece cuando hace falta (p. ej. enviar el registro a revisión por accesorios). */
-  extras?: ReactNode;
   /** Acciones (otra forma de identificarse, captura manual). */
   actions?: ReactNode;
   onCancel: () => void;
+  /** Registro facial: el indicador de los cuatro pasos (`EnrollmentStepper`), dentro de la tarjeta para que siempre se vea. */
+  steps?: ReactNode;
+  /** Control del encabezado junto a «Cancelar» (el silencio de la guía por voz). */
+  headerAction?: ReactNode;
+}
+
+/**
+ * Encabezado común de la tarjeta del escáner y de la etapa de voz del registro: título, nombre de la app, el indicador de
+ * pasos (cuando es un registro) y «Cancelar». Vive una sola vez para que las dos tarjetas se vean y se lean igual.
+ * `action`: un control opcional junto a «Cancelar» (el silencio de la guía por voz; solo el escáner lo pasa).
+ */
+export function ScanHeader({ titleId, title, steps, onCancel, action }: { titleId: string; title: string; steps?: ReactNode; onCancel: () => void; action?: ReactNode }) {
+  const t = useT();
+  return (
+    <header className="faceid__head">
+      <div className="faceid__titles">
+        <h1 id={titleId}>{title}</h1>
+        <p>{config.appName}</p>
+        {steps}
+      </div>
+      <div className="faceid__head-actions">
+        {action}
+        <Button variant="ghost" iconOnly icon={<X size={20} />} onClick={onCancel} aria-label={t('common.actions.cancel')} title={t('common.actions.cancel')} />
+      </div>
+    </header>
+  );
 }
 
 /**
@@ -147,19 +170,12 @@ interface ScanCardProps {
  * (UNA a la vez); bajo la cámara solo aparecen acciones o avisos cuando hacen falta. En tabletas horizontales y en el
  * escritorio el visor ocupa la columna izquierda.
  */
-export function ScanCard({ title, stages, stage, fill, intro, viewport, extras, actions, onCancel }: ScanCardProps) {
-  const t = useT();
+export function ScanCard({ title, stages, stage, fill, intro, viewport, actions, onCancel, steps, headerAction }: ScanCardProps) {
   const titleId = useId();
   const index = stages.indexOf(stage);
   return (
     <section className={`faceid faceid--${stage}`} aria-labelledby={titleId}>
-      <header className="faceid__head">
-        <div className="faceid__titles">
-          <h1 id={titleId}>{title}</h1>
-          <p>{config.appName}</p>
-        </div>
-        <Button variant="ghost" iconOnly icon={<X size={20} />} onClick={onCancel} aria-label={t('common.actions.cancel')} title={t('common.actions.cancel')} />
-      </header>
+      <ScanHeader titleId={titleId} title={title} steps={steps} onCancel={onCancel} action={headerAction} />
       <ScanProgress stages={stages} current={index} fill={fill} />
       <div key={`${stage}:${intro.title}`} className="faceid__intro">
         <p className="faceid__eyebrow">{intro.label ?? intro.title}</p>
@@ -168,7 +184,6 @@ export function ScanCard({ title, stages, stage, fill, intro, viewport, extras, 
       </div>
       <div className="faceid__viewport">{viewport}</div>
       {actions && <div className="faceid__actions">{actions}</div>}
-      {extras && <div className="faceid__extras">{extras}</div>}
     </section>
   );
 }

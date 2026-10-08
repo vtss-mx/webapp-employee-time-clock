@@ -9,6 +9,8 @@ export default {
     approve: 'Approve',
     back: 'Back',
     cancel: 'Cancel',
+    pause: 'Pause',
+    play: 'Play',
     changeStatus: 'Change status',
     clear: 'Clear',
     close: 'Close',

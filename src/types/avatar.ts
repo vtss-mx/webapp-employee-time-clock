@@ -13,6 +13,16 @@ export interface AvatarCrop {
   size: number;
 }
 
+/**
+ * Una persona en una respuesta con su foto de perfil (decisión del dueño, 2026-10-06: toda tabla, lista o tarjeta que
+ * muestra a alguien carga su foto o, sin ella, sus iniciales): la ruta versionada dentro de la API
+ * (`/users/{id}/avatar?v=…`), null o ausente sin foto, en «Eliminados» o si quien lee no puede verla. Se dibuja solo
+ * con `Avatar` (`src`).
+ */
+export interface WithAvatar {
+  avatar?: string | null;
+}
+
 /** La foto vigente tras subirla o quitarla (`avatar` null = sin foto). */
 export interface AvatarRead {
   avatar: string | null;

@@ -6,6 +6,7 @@ import { EmployeeDevices } from '../components/devices/EmployeeDevices';
 import { ProfilePhotoSection } from '../components/ProfilePhotoSection';
 import { Avatar } from '../components/ui/Avatar';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { PasskeysSection } from '../components/passkeys/PasskeysSection';
 import { SessionsPanel } from '../components/SessionsPanel';
 import { FaceStatusBadge, StatusBadge } from '../components/StatusBadge';
 import { Button } from '../components/ui/Button';
@@ -20,8 +21,9 @@ import { useConfirmLogout } from '../components/auth/logoutConfirm';
 
 /**
  * Mi perfil: la cuenta, su foto de perfil (de la persona: la ve en el menú y su empresa en sus listas), el idioma
- * de la aplicación (cambia en caliente y se guarda en la cuenta), la contraseña, las sesiones abiertas y, si tiene un
- * empleo, los dispositivos desde los que checa (solo lectura: los aprueba o revoca su empresa).
+ * de la aplicación (cambia en caliente y se guarda en la cuenta), la contraseña, sus llaves de acceso (WebAuthn), las
+ * sesiones abiertas y, si tiene un empleo, los dispositivos desde los que checa (solo lectura: los aprueba o revoca su
+ * empresa).
  */
 export function ProfilePage() {
   // Redibuja al cambiar el idioma; los textos salen de `t` (también el del popup, que se arma al dibujarse).
@@ -64,7 +66,7 @@ export function ProfilePage() {
                 <dt>{t('common.fields.email')}</dt>
                 <dd>{user.email}</dd>
               </div>
-              {employee && (
+              {employee?.employee_number && (
                 <div>
                   <dt>{t('common.fields.employeeNumber')}</dt>
                   <dd>{employee.employee_number}</dd>
@@ -109,6 +111,7 @@ export function ProfilePage() {
           <PanelSection title={t('profile.language.title')} icon={<Languages size={20} />}>
             <LanguageSwitcher />
           </PanelSection>
+          <PasskeysSection />
           {employee && (
             <PanelSection title={t('devices.mineTitle')} icon={<MonitorSmartphone size={20} />}>
               <p className="muted small">{t('devices.mineIntro')}</p>

@@ -199,6 +199,25 @@ describe('Crear llave (pantalla)', () => {
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo crear la llave' })).toHaveTextContent('Servicio no disponible');
   });
 
+  it('el permiso de verificación (SDK móviles) avisa que la llave irá dentro de una aplicación', async () => {
+    const { calls } = mockFetch(apiOk({ ...key({ name: 'App móvil', scopes: ['VERIFICATION'] }), secret: SECRET }, { status: 201 }));
+    renderForm();
+    expect(screen.queryByRole('note')).toBeNull();
+    await userEvent.type(screen.getByLabelText(/Nombre/), 'App móvil');
+    await userEvent.click(screen.getByRole('switch', { name: 'Verificación' }));
+    const note = screen.getByRole('note');
+    expect(note).toHaveTextContent('Esta llave irá dentro de una aplicación móvil');
+    expect(note).toHaveTextContent('Úsala solo con el permiso «Verificación»');
+    // Con otro permiso, pide separarla: una llave solo con «Verificación» y otra para el servidor.
+    await userEvent.click(screen.getByRole('switch', { name: 'Empleados' }));
+    expect(screen.getByRole('note')).toHaveTextContent('no la combines con permisos de lectura');
+    await userEvent.click(screen.getByRole('switch', { name: 'Empleados' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
+    await confirmCreate('App móvil');
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'App móvil', scopes: ['VERIFICATION'], expires_in_days: 365 });
+  });
+
   it('al llegar al tope de llaves lo explica', async () => {
     mockFetch(apiFail(409, 'API_KEY_LIMIT', 'Tu empresa ya tiene 10 llaves sin revocar.'));
     renderForm();

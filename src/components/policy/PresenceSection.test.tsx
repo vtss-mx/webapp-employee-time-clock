@@ -64,15 +64,28 @@ async function choose(control: RegExp, option: string) {
 afterEach(() => resetPolicyCache());
 
 describe('Política: prueba de presencia (antifraude 2b)', () => {
-  it('tres controles con los NOMBRES de los modos del catálogo y su ayuda propia (sin la descripción del catálogo)', async () => {
+  it('cuatro controles con los NOMBRES de los modos del catálogo y su ayuda propia (sin la descripción del catálogo)', async () => {
     serve();
     renderPage();
     expect(await screen.findByRole('heading', { name: 'Prueba de presencia' })).toBeInTheDocument();
     expect(screen.getByText('Cada identificación lleva la firma del dispositivo con que el validador inició sesión.')).toBeInTheDocument();
     expect(screen.getByText('Los validadores que requieren ubicación la envían en cada identificación.')).toBeInTheDocument();
+    expect(screen.getByText('Cada verificación facial (empleado, validador y la API) envía dónde se hizo; la empresa la ve en el mapa.')).toBeInTheDocument();
     expect(screen.getByText('En los sitios que lo activen, la entrada y la salida llevan el código del kiosco.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Firma por petición/ }));
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Apagada', 'Solo medir', 'Obligatoria']);
+  });
+
+  it('exigir la ubicación de la verificación se confirma con su advertencia y se guarda con el modo elegido', async () => {
+    const { calls } = serve();
+    renderPage();
+    await screen.findByRole('heading', { name: 'Prueba de presencia' });
+    await choose(/Ubicación de la verificación/, 'Obligatoria');
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Cambiar «Ubicación de la verificación» a Obligatoria?' });
+    expect(confirm).toHaveTextContent('Sin una ubicación válida, la verificación no se completa.');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Guardar ajuste' }));
+    await screen.findByRole('dialog', { name: 'Ubicación de la verificación: Obligatoria' });
+    expect(calls.filter((c) => c.init.method === 'PUT').map(body)).toEqual([{ verification_location: 'ENFORCE' }]);
   });
 
   it('exigirlo se confirma con "antes → después" y su advertencia; se guarda y lo avisa con el modo elegido', async () => {
@@ -113,6 +126,7 @@ describe('Política: prueba de presencia (antifraude 2b)', () => {
     expect(named('site_codes', 'OBSERVE', 'OFF')).toEqual({ label: 'Código de sitio', before: 'Solo medir', after: 'Apagada' });
     expect(named('validator_signing', 'OFF', 'ENFORCE')).toEqual({ label: 'Firma por petición', before: 'Apagada', after: 'Obligatoria' });
     expect(named('validator_location', 'OBSERVE', 'NUEVO')).toEqual({ label: 'Ubicación en cada identificación', before: 'Solo medir', after: 'NUEVO' });
+    expect(named('verification_location', 'OFF', 'ENFORCE')).toEqual({ label: 'Ubicación de la verificación', before: 'Apagada', after: 'Obligatoria' });
   });
 
   it('en inglés', async () => {
@@ -123,5 +137,6 @@ describe('Política: prueba de presencia (antifraude 2b)', () => {
     expect(screen.getByText('At sites that turn it on, check-in and check-out include the kiosk code.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Per-request signature/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Location on each identification/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Verification location/ })).toBeInTheDocument();
   });
 });

@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>14/14</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/16</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>12/12</span>
+                <span class='fraction'>11/11</span>
             </div>
         
             
@@ -155,11 +155,7 @@
 <a name='L90'></a><a href='#L90'>90</a>
 <a name='L91'></a><a href='#L91'>91</a>
 <a name='L92'></a><a href='#L92'>92</a>
-<a name='L93'></a><a href='#L93'>93</a>
-<a name='L94'></a><a href='#L94'>94</a>
-<a name='L95'></a><a href='#L95'>95</a>
-<a name='L96'></a><a href='#L96'>96</a>
-<a name='L97'></a><a href='#L97'>97</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L93'></a><a href='#L93'>93</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -182,15 +178,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-yes">10x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">114x</span>
+<span class="cline-any cline-yes">114x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">20x</span>
-<span class="cline-any cline-yes">20x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -211,8 +207,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -226,16 +222,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">115x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">22x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">111x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -248,17 +244,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">238x</span>
-<span class="cline-any cline-yes">206x</span>
-<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">504x</span>
+<span class="cline-any cline-yes">396x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useId, type CSSProperties } from 'react';
 import type { FaceGuidance } from '../hooks/useFaceDetection';
 import { actionTarget, type ActionMode } from '../utils/facePose';
-import { AccessoryAlert } from './FaceGuide';
 import type { Phase } from './FaceScan';
 &nbsp;
 /*
@@ -268,7 +259,7 @@ import type { Phase } from './FaceScan';
  *    desliza hacia ese lado;
  *  - acercarse: ondas finas que salen del anillo hacia afuera (el rostro debe crecer) mientras el círculo "respira".
  * La indicación escrita (en vivo para lectores de pantalla) la da el mensaje bajo el círculo; esto es solo apoyo
- * visual. Todo es CSS (transformaciones y opacidad) y "reducir movimiento" lo deja quieto.
+ * visual. Sobre el rostro nunca va una insignia (decisión del dueño, 2026-10-07: fuera el aviso de accesorios).
  */
 &nbsp;
 /** Hacia dónde va el movimiento: el lado del anillo que se resalta. */
@@ -341,14 +332,11 @@ interface ScannerHintsProps {
   /** Movimiento en curso (solo mientras se pide; null al volver al frente o fuera del reto). */
   mode: ActionMode | null;
   mirrored: boolean;
-  /** Accesorios a retirar (bloqueo por accesorios). */
-  accessories: string[];
 }
 &nbsp;
-/** Indicaciones sobre el rostro: la señal del movimiento (reto) o los accesorios a retirar (bloqueo). */
-export function ScannerHints({ phase, guidance, mode, mirrored, accessories }: ScannerHintsProps) {
-  if (phase === 'blocked') return &lt;AccessoryAlert items={accessories} /&gt;;
-  if (mode &amp;&amp; guidance !== 'hold_still' &amp;&amp; guidance !== 'ready') return &lt;ActionCue mode={mode} mirrored={mirrored} /&gt;;
+/** Sobre el rostro solo la señal del movimiento del reto (mientras falta hacerlo); en un bloqueo, nada. */
+export function ScannerHints({ phase, guidance, mode, mirrored }: ScannerHintsProps) {
+  if (phase !== 'blocked' &amp;&amp; mode &amp;&amp; guidance !== 'hold_still' &amp;&amp; guidance !== 'ready') return &lt;ActionCue mode={mode} mirrored={mirrored} /&gt;;
   return null;
 }
 &nbsp;</pre></td></tr></table></pre>
@@ -358,7 +346,7 @@ export function ScannerHints({ phase, guidance, mode, mirrored, accessories }: S
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:23.868Z
+                at 2026-10-08T07:13:13.955Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

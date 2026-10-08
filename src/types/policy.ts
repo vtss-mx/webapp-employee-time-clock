@@ -42,6 +42,22 @@ export interface VerificationPolicy {
   qr_lifetime_seconds: number;
   /** Aprendizaje continuo: cada identificación segura enseña a la galería del empleado. */
   adaptive_learning: boolean;
+  /**
+   * Registro facial (decisión del dueño, 2026-10-06): tras las fotos, tres preguntas en video sobre los datos del
+   * empleado (voz y rostro comparados en el servidor; la empresa revisa el video al validar).
+   */
+  voice_verification: boolean;
+  /**
+   * Guía por voz del registro facial (decisión del dueño, 2026-10-08): lee las indicaciones en voz alta con la síntesis
+   * del propio dispositivo (sin servicios externos; regla 13). Es NEUTRAL: no es un candado de seguridad ni entra en la
+   * regla de dos personas; la empresa y su personal la leen, el ADMIN la configura.
+   */
+  voice_guidance_enabled: boolean;
+  /**
+   * Voz con que se dictan las indicaciones: código del catálogo `voice_profiles`. Cada perfil fija género, tono y ritmo
+   * en la app (`PROFILE_PARAMS` de `utils/speech.ts`); el servidor solo valida el código contra el catálogo.
+   */
+  voice_profile: string;
   // --- Ubicación de los registros de asistencia (las evalúa solo el servidor) ---
   /** Precisión mínima (m) que debe informar el navegador; más imprecisa, se pide repetir. */
   max_location_accuracy_m: number;
@@ -49,6 +65,14 @@ export interface VerificationPolicy {
   detect_impossible_travel: boolean;
   /** Velocidad máxima creíble entre dos registros (km/h). */
   max_travel_kmh: number;
+  /**
+   * Ubicación de cada verificación de identidad (empleado, validador y API pública), modo del catálogo `signal_modes`:
+   * `OFF` no la pide, `OBSERVE` la registra (la empresa ve dónde se hizo cada verificación en el mapa) y `ENFORCE` la
+   * exige —el servidor no completa una verificación sin una ubicación válida—. La define el ADMIN por empresa; la
+   * decisión de bloquear la toma siempre el servidor (la app solo la envía). Distinto de `validator_location`, que es la
+   * prueba de presencia del dispositivo del validador (antifraude 2b).
+   */
+  verification_location: string;
   /** Nombres de cámaras virtuales que no se aceptan (la app avisa antes de capturar). */
   blocked_cameras: string[];
   /** Un validador en modo QR registra asistencia con el QR solo (decisión del dueño: apagado en empresas nuevas). */
@@ -144,6 +168,7 @@ export type AdminPolicyUpdate = VerificationPolicyUpdate &
       | 'fraud_evidence'
       | 'flash_paced'
       | 'capture_burst'
+      | 'voice_verification'
       | 'validator_signing'
       | 'validator_location'
       | 'site_codes'

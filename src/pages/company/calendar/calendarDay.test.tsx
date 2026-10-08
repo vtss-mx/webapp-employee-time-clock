@@ -65,6 +65,14 @@ describe('Calendario: detalle del día', () => {
     expect(within(detail()).getByRole('list', { name: 'Trabajan este día' })).toHaveTextContent('Ana RuizEMP-7Trabaja');
   });
 
+  it('un día laborable sin nota de un empleado sin número (opcional): solo su nombre', async () => {
+    calendarServer((call) =>
+      call.url.startsWith('/api/calendar/workdays') ? apiOk(page([{ ...workday, note: null, employee: { ...workday.employee, employee_number: null } }])) : null,
+    );
+    renderAt(`/company/calendar?date=${last}`);
+    expect(await within(detail()).findByRole('list', { name: 'Trabajan este día' })).toHaveTextContent(/^ARAna RuizTrabaja$/); // iniciales, nombre y la insignia
+  });
+
   it('si no cargan los días laborables del mes, lo dice; el resto del calendario sigue', async () => {
     calendarServer((call) => (call.url.startsWith('/api/calendar/workdays') ? apiFail(500, 'INTERNAL_ERROR', 'Falla inesperada') : null));
     renderAt('/company/calendar');

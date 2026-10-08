@@ -14,14 +14,138 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>%VITE_APP_NAME% · %VITE_APP_TAGLINE%</title>
+    <!-- Aviso «Actualiza tu navegador» (#browser-notice): se dibuja sin la hoja de estilos de la app (ese navegador no la
+         carga), así que lleva aquí lo mínimo, con los mismos valores de los tokens de global.css (surface, navy, text,
+         muted). Oculto por omisión; solo lo muestra el guion compat/browserSupport.ts. -->
+    <style>
+      .browser-notice {
+        --surface: #ffffff;
+        --navy: #172554;
+        --text: #0e1a33;
+        --muted: #6b7a96;
+      }
+      .browser-notice:not([hidden]) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        min-height: 100vh;
+        padding: 24px 16px;
+        background: var(--surface);
+        color: var(--text);
+        font-family: Candara, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        text-align: center;
+      }
+      .browser-notice__notice:not([hidden]) {
+        display: block;
+        max-width: 46ch;
+      }
+      .browser-notice__brand {
+        margin: 0 0 20px;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--navy);
+      }
+      .browser-notice h1 {
+        margin: 0 0 12px;
+        font-size: 24px;
+        line-height: 1.2;
+        color: var(--navy);
+      }
+      .browser-notice p {
+        margin: 0 0 8px;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+      .browser-notice__minimum {
+        color: var(--muted);
+        font-size: 14px;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
-    <!-- Solo si el idioma no se pudo descargar al arrancar (main.tsx): aviso en ambos idiomas. -->
+    <!-- Solo si el idioma no se pudo descargar al arrancar (main.tsx): se muestra SOLO el aviso del idioma del
+         dispositivo (regla 16: nunca se mezclan idiomas). -->
     <div id="boot-error" class="boot-error" role="alert" hidden>
-      <p lang="es-MX">No se pudo cargar la aplicación. Revisa tu conexión e inténtalo de nuevo.</p>
-      <p lang="en-US">The app could not be loaded. Check your connection and try again.</p>
-      <button type="button" class="btn btn--primary">Reintentar · Retry</button>
+      <div class="boot-error__notice" lang="es-MX" hidden>
+        <p>No se pudo cargar la aplicación. Revisa tu conexión e intenta de nuevo.</p>
+        <button type="button" class="btn btn--primary">Reintentar</button>
+      </div>
+      <div class="boot-error__notice" lang="en-US" hidden>
+        <p>The app couldn't load. Check your connection and try again.</p>
+        <button type="button" class="btn btn--primary">Retry</button>
+      </div>
+      <div class="boot-error__notice" lang="pt-BR" hidden>
+        <p>Não foi possível carregar o aplicativo. Verifique sua conexão e tente novamente.</p>
+        <button type="button" class="btn btn--primary">Tentar novamente</button>
+      </div>
+      <div class="boot-error__notice" lang="fr-FR" hidden>
+        <p>Impossible de charger l'application. Vérifiez votre connexion et réessayez.</p>
+        <button type="button" class="btn btn--primary">Réessayer</button>
+      </div>
+      <div class="boot-error__notice" lang="de-DE" hidden>
+        <p>Die App konnte nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</p>
+        <button type="button" class="btn btn--primary">Erneut versuchen</button>
+      </div>
+      <div class="boot-error__notice" lang="it-IT" hidden>
+        <p>Impossibile caricare l'applicazione. Controlla la connessione e riprova.</p>
+        <button type="button" class="btn btn--primary">Riprova</button>
+      </div>
+      <div class="boot-error__notice" lang="es-ES" hidden>
+        <p>No se pudo cargar la aplicación. Revisa tu conexión e inténtalo de nuevo.</p>
+        <button type="button" class="btn btn--primary">Reintentar</button>
+      </div>
+    </div>
+    <!-- Navegador antiguo (decisión D-C1): el paquete de la app no se interpreta en iOS 15 / Safari < 16.4, Chrome o Edge
+         < 111 ni Firefox < 114 y la página quedaba en blanco. El guion compat/browserSupport.ts (insertado al final del
+         body por vite.config.ts, antes de que corra el módulo principal) sondea las capacidades y, si falta alguna,
+         muestra SOLO el bloque del idioma del navegador (regla 16: nunca se mezclan idiomas; la marca no se traduce).
+         En un navegador compatible este aviso jamás se dibuja. -->
+    <div id="browser-notice" class="browser-notice" role="alert" hidden>
+      <div class="browser-notice__notice" lang="es-MX" hidden>
+        <p class="browser-notice__brand">Employee Time Clock</p>
+        <h1>Actualiza tu navegador</h1>
+        <p>Este navegador no puede abrir la aplicación. Actualiza el sistema o el navegador e intenta de nuevo.</p>
+        <p class="browser-notice__minimum">Mínimo: Safari 16.4, Chrome 111, Edge 111 o Firefox 114.</p>
+      </div>
+      <div class="browser-notice__notice" lang="en-US" hidden>
+        <p class="browser-notice__brand">Employee Time Clock</p>
+        <h1>Update your browser</h1>
+        <p>This browser can't open the app. Update your system or browser and try again.</p>
+        <p class="browser-notice__minimum">Minimum: Safari 16.4, Chrome 111, Edge 111, or Firefox 114.</p>
+      </div>
+      <div class="browser-notice__notice" lang="pt-BR" hidden>
+        <p class="browser-notice__brand">Employee Time Clock</p>
+        <h1>Atualize seu navegador</h1>
+        <p>Este navegador não consegue abrir o aplicativo. Atualize o sistema ou o navegador e tente novamente.</p>
+        <p class="browser-notice__minimum">Mínimo: Safari 16.4, Chrome 111, Edge 111 ou Firefox 114.</p>
+      </div>
+      <div class="browser-notice__notice" lang="fr-FR" hidden>
+        <p class="browser-notice__brand">Employee Time Clock</p>
+        <h1>Mettez à jour votre navigateur</h1>
+        <p>Ce navigateur ne peut pas ouvrir l'application. Mettez à jour le système ou le navigateur et réessayez.</p>
+        <p class="browser-notice__minimum">Minimum: Safari 16.4, Chrome 111, Edge 111 ou Firefox 114.</p>
+      </div>
+      <div class="browser-notice__notice" lang="de-DE" hidden>
+        <p class="browser-notice__brand">Employee Time Clock</p>
+        <h1>Aktualisieren Sie Ihren Browser</h1>
+        <p>Dieser Browser kann die App nicht öffnen. Aktualisieren Sie das System oder den Browser und versuchen Sie es erneut.</p>
+        <p class="browser-notice__minimum">Mindestens: Safari 16.4, Chrome 111, Edge 111 oder Firefox 114.</p>
+      </div>
+      <div class="browser-notice__notice" lang="it-IT" hidden>
+        <p class="browser-notice__brand">Employee Time Clock</p>
+        <h1>Aggiorna il browser</h1>
+        <p>Questo browser non può aprire l'applicazione. Aggiorna il sistema o il browser e riprova.</p>
+        <p class="browser-notice__minimum">Minimo: Safari 16.4, Chrome 111, Edge 111 o Firefox 114.</p>
+      </div>
+      <div class="browser-notice__notice" lang="es-ES" hidden>
+        <p class="browser-notice__brand">Employee Time Clock</p>
+        <h1>Actualiza tu navegador</h1>
+        <p>Este navegador no puede abrir la aplicación. Actualiza el sistema o el navegador e inténtalo de nuevo.</p>
+        <p class="browser-notice__minimum">Mínimo: Safari 16.4, Chrome 111, Edge 111 o Firefox 114.</p>
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

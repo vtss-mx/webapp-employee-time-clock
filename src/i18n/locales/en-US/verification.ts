@@ -33,4 +33,23 @@ export default {
     nounOther: 'attempts',
     confidence: 'Confidence {value}',
   },
+  map: {
+    label: 'Verifications map',
+    pin: 'Verification location',
+    loading: 'Loading the map…',
+    failed: 'The map isn’t available.',
+  },
+  company: {
+    title: 'Verifications',
+    subtitle: 'Where and when your people’s identity was verified.',
+    loadError: 'Couldn’t load the verifications',
+    mapHint: 'Pick a verification with a location to see it on the map.',
+    notIdentified: 'Not identified',
+    noun: { one: 'verification', other: 'verifications' },
+    filters: { all: 'All', success: 'Successful', failed: 'Failed', from: 'From', to: 'To' },
+    columns: { when: 'Date and time', result: 'Result', method: 'Method', place: 'Place' },
+    place: { show: 'View on the map', none: 'No location', accuracy: 'Accuracy {distance}' },
+    empty: { title: 'No verifications', description: 'Here you’ll see where each verification happened.' },
+    noMatch: { title: 'No results', description: 'Try another filter or date range.' },
+  },
 } satisfies Translation<typeof es>;

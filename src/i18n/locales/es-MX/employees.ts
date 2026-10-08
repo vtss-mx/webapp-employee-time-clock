@@ -40,7 +40,7 @@ export default {
     nssPlaceholder: '11 dígitos del IMSS',
     nssHint: 'Opcional · 11 dígitos, como aparece en el IMSS',
     employeeNumber: 'No. de empleado',
-    employeeNumberHint: 'Único. Letras, números, guion o guion bajo',
+    employeeNumberHint: 'Opcional · único, con letras, números, guion o guion bajo',
     phoneHint: 'Elige el país y escribe el número',
     password: 'Contraseña',
     newPassword: 'Nueva contraseña',

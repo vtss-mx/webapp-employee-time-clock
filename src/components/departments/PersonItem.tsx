@@ -4,6 +4,8 @@ import { DeletedMark } from '../ui/DeletedMark';
 
 interface PersonItemProps {
   name: string;
+  /** Ruta versionada de su foto de perfil (`avatar` de la respuesta); sin ella, sus iniciales. */
+  avatar?: string | null;
   /** Línea secundaria (número de empleado, departamento actual...). */
   detail?: ReactNode;
   badges?: ReactNode;
@@ -16,10 +18,10 @@ interface PersonItemProps {
  * Una persona en una lista de departamentos (responsables, empleados asignados, candidatos): se
  * acomoda al ancho de su contenedor (una columna en teléfono, acciones a un lado en tableta).
  */
-export function PersonItem({ name, detail, badges, actions, deleted = false }: PersonItemProps) {
+export function PersonItem({ name, avatar, detail, badges, actions, deleted = false }: PersonItemProps) {
   return (
     <li className="people-list__item">
-      <Avatar name={name} decorative />
+      <Avatar name={name} src={avatar} decorative />
       <span className="people-list__info">
         <strong className="truncate">{name}</strong>
         {detail && <small className="muted truncate">{detail}</small>}

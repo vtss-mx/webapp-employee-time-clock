@@ -35,6 +35,13 @@ export const config = {
   apiGetRetries: envNumber(env, 'VITE_API_GET_RETRIES', 2, 0, 5),
   apiMaxRetryAfterMs: seconds('VITE_API_MAX_RETRY_AFTER_SECONDS', 10, 1, 60),
 
+  /**
+   * Espera máxima de la llave del dispositivo (WebCrypto e IndexedDB: firmar o leerla). Un almacenamiento que no
+   * responde (modo privado estricto, un navegador integrado) no deja colgado un registro ni un inicio de sesión: se
+   * sigue sin llave y el servidor lo mide.
+   */
+  deviceKeyTimeoutMs: seconds('VITE_DEVICE_KEY_TIMEOUT_SECONDS', 5, 1, 30),
+
   // --- Tiempo real (WebSocket de validación) ---
   realtimeEnabled: envBoolean(env, 'VITE_REALTIME_ENABLED', true),
   /** Espera máxima por respuesta del canal antes de usar el respaldo HTTP. */
@@ -68,14 +75,29 @@ export const config = {
 
   // --- Reconocimiento facial ---
   /**
-   * Registro facial (decisión del dueño, 2026-10-06: «por lo menos 36» fotos): fotos completas que se toman mientras la
-   * persona mira a la cámara, el lado mayor de cada una (px) y la pausa mínima entre una y otra (cada foto espera además
-   * un cuadro NUEVO del video). El servidor las analiza todas, elige las mejores como referencia y descarta las demás
-   * (acepta hasta `FACE_ENROLL_MAX_PHOTOS`). Con 640 px cada foto pesa ≈ 0.05 MB: las 36, ≈ 1.8 MB.
+   * Registro facial (decisión del dueño, 2026-10-06 y 2026-10-07: 32 fotos VÁLIDAS, no 32 intentos, y nunca se repite
+   * el proceso): fotos completas que se toman mientras la persona mira a la cámara, contando SOLO las que pasan la
+   * revisión en vivo (rostro dentro de la guía, centrado, de frente y quieto, nítida —varianza del Laplaciano sobre el
+   * rostro ≥ `enrollmentMinSharpness`— y con luz; «Capturas válidas: 24/32»; sin tope de cuadros: el escaneo espera a
+   * la persona), el lado mayor de cada una (px) y la pausa mínima entre una y otra (cada foto espera además un cuadro
+   * NUEVO del video). El servidor las vuelve a validar todas, elige las mejores como referencia y descarta las demás
+   * (acepta hasta `FACE_ENROLL_MAX_PHOTOS`). Con 640 px cada foto pesa ≈ 0.05 MB: las 32, ≈ 1.6 MB.
    */
-  enrollmentFrames: envNumber(env, 'VITE_FACE_ENROLLMENT_FRAMES', 36, 1, 36),
+  enrollmentValidPhotos: envNumber(env, 'VITE_FACE_ENROLLMENT_VALID_PHOTOS', 32, 1, 36),
+  enrollmentMinSharpness: envNumber(env, 'VITE_FACE_ENROLLMENT_MIN_SHARPNESS', 12, 0, 500),
   enrollmentPhotoPx: envNumber(env, 'VITE_FACE_ENROLLMENT_PHOTO_PX', 640, 480, 1280),
   enrollmentPhotoGapMs: envNumber(env, 'VITE_FACE_ENROLLMENT_PHOTO_GAP_MS', 100, 40, 1000),
+  /**
+   * Verificación por voz y video del registro (decisión del dueño, 2026-10-06): lo más que dura la grabación de una
+   * respuesta (s; el servidor rechaza más de `SPEECH_MAX_ANSWER_SECONDS`), el silencio tras la voz que la da por
+   * terminada (ms), la voz mínima para empezar a contar ese silencio (ms), la tasa de bits del video grabado (kbps; con
+   * 600 un clip de 5 s pesa ≈ 0.4 MB) y la sensibilidad del medidor del micrófono (RMS 0-1 que llena el medidor).
+   */
+  voiceMaxAnswerSeconds: envNumber(env, 'VITE_VOICE_MAX_ANSWER_SECONDS', 12, 2, 60),
+  voiceSilenceStopMs: envNumber(env, 'VITE_VOICE_SILENCE_STOP_MS', 1200, 300, 5000),
+  voiceMinSpeechMs: envNumber(env, 'VITE_VOICE_MIN_SPEECH_MS', 600, 100, 5000),
+  voiceVideoBitrateKbps: envNumber(env, 'VITE_VOICE_VIDEO_BITRATE_KBPS', 600, 100, 4000),
+  voiceLevelFullScale: envNumber(env, 'VITE_VOICE_LEVEL_FULL_SCALE', 0.25, 0.05, 1),
   verificationFrames: envNumber(env, 'VITE_FACE_VERIFICATION_FRAMES', 3, 1, 3),
   faceFrameGapMs: envNumber(env, 'VITE_FACE_FRAME_GAP_MS', 380, 100, 2000),
   faceResumeAfterBlockMs: seconds('VITE_FACE_RESUME_AFTER_BLOCK_SECONDS', 3, 1, 30),
@@ -90,10 +112,53 @@ export const config = {
    * segundo, con margen bajo el límite de 3 destellos por segundo (WCAG 2.3.1, fotosensibilidad); por
    * eso el mínimo configurable es 340 ms.
    */
-  faceFlashSettleMs: envNumber(env, 'VITE_FACE_FLASH_SETTLE_MS', 400, 340, 1000),
+  /**
+   * Luminancia con que la pantalla pinta cada color del destello (1 = el color puro; decisión del dueño, 2026-10-06:
+   * un aspecto sobrio, sin colores saturados a toda pantalla). El servidor compara la CROMATICIDAD (proporción de rojo,
+   * verde y azul), que no cambia con la luminancia; la magnitud medida baja en la misma proporción (modelo sintético
+   * con `photometry.py`: con 0.75 sigue muy por encima del mínimo concluyente). Bajarla más debilita la medición.
+   */
   faceDetectorTimeoutMs: seconds('VITE_FACE_DETECTOR_TIMEOUT_SECONDS', 20, 5, 120),
   faceDetectionMinScore: envNumber(env, 'VITE_FACE_DETECTION_MIN_SCORE', 0.6, 0.1, 1),
   faceDetectionIntervalMs: envNumber(env, 'VITE_FACE_DETECTION_INTERVAL_MS', 110, 50, 1000),
+  /**
+   * Validez de un cuadro de FRENTE (decisión del dueño, 2026-10-07: una foto se toma solo si es factible; mirar hacia
+   * abajo, salirse de la guía o moverse NO es válido), medida contra la guía que se dibuja (`faceGuideShape.ts`).
+   * Pose: giro (`yaw_ratio`), inclinación (grados) y cabeceo (`pitch_ratio`: la nariz entre los ojos, 0, y la boca, 1)
+   * dentro de un margen MÁS estricto que el del servidor (`FACE_MAX_YAW_RATIO` 0.15, `FACE_MAX_ROLL_DEGREES` 15 y el
+   * cabeceo 0.20-0.85 de `pipeline.py`): MediaPipe y YuNet miden distinto y lo que la app acepta debe pasar allá.
+   * Calibrado con un rostro real y el detector de la app (harness): el cabeceo de frente mide 0.51-0.59 con ±0.03 de
+   * ruido entre cuadros, y la inclinación natural de una foto de frente llega a 9° (los puntos de los ojos son gruesos).
+   * `faceFrontalPitchDrift`: cuánto puede subir o bajar la cabeza respecto al rostro en reposo mientras se toman las
+   * fotos (menos que lo que el servidor da por «mirar abajo», `FACE_LIVENESS_MIN_PITCH_DELTA` 0.08).
+   * Encuadre: cuánto llena el rostro detectado la caja objetivo de la guía (`faceGuideMinFill`, «Acércate»;
+   * `faceGuideMaxFill`, «Aléjate»: el rostro cabe dentro del contorno) y cuánto puede alejarse su centro del de la
+   * guía (`faceCenterTolerance`, parte del tamaño de la caja). Quietud (decisión del dueño, 2026-10-07: el rechazo por
+   * «movimiento no solicitado» saltaba de más en el iPhone): el desplazamiento se mide SUAVIZADO contra el promedio de
+   * una ventana corta (`faceSteadyWindow`) y solo se marca «Mantente quieto» si supera `faceSteadyMaxShift` (parte del
+   * tamaño del rostro) durante `faceSteadyGraceFrames` cuadros SEGUIDOS (un pico de ruido del detector no rechaza). Afloja
+   * solo la quietud: la validez de posición y de pose NO se relaja.
+   */
+  faceFrontalMaxYaw: envNumber(env, 'VITE_FACE_FRONTAL_MAX_YAW', 0.1, 0.02, 0.3),
+  faceFrontalMaxRollDegrees: envNumber(env, 'VITE_FACE_FRONTAL_MAX_ROLL_DEGREES', 12, 2, 30),
+  faceFrontalPitchMin: envNumber(env, 'VITE_FACE_FRONTAL_PITCH_MIN', 0.4, 0, 1),
+  faceFrontalPitchMax: envNumber(env, 'VITE_FACE_FRONTAL_PITCH_MAX', 0.72, 0, 1),
+  faceFrontalPitchDrift: envNumber(env, 'VITE_FACE_FRONTAL_PITCH_DRIFT', 0.06, 0.01, 0.3),
+  faceGuideMinFill: envNumber(env, 'VITE_FACE_GUIDE_MIN_FILL', 0.6, 0.2, 1),
+  faceGuideMaxFill: envNumber(env, 'VITE_FACE_GUIDE_MAX_FILL', 1.15, 1, 2),
+  faceCenterTolerance: envNumber(env, 'VITE_FACE_CENTER_TOLERANCE', 0.15, 0.02, 0.5),
+  faceSteadyMaxShift: envNumber(env, 'VITE_FACE_STEADY_MAX_SHIFT', 0.08, 0.01, 0.5),
+  faceSteadyWindow: envNumber(env, 'VITE_FACE_STEADY_WINDOW', 4, 2, 12),
+  faceSteadyGraceFrames: envNumber(env, 'VITE_FACE_STEADY_GRACE_FRAMES', 2, 1, 8),
+  /**
+   * Vigilancia CONTINUA de accesorios (decisión del dueño, 2026-10-07: la insignia de cubrebocas/lentes debe aparecer en
+   * CUALQUIER momento del flujo): mientras hay un rostro a la vista, cada `faceAccessoryCheckIntervalMs` se valida un
+   * cuadro en el servidor (`/face/check`) y se actualizan las insignias. Throttleada y sin solaparse para no spamear ni
+   * disparar la alerta de peticiones lentas (la ruta facial alerta desde 2.5 s); el cuadro se toma a `faceAccessoryCheckPx`
+   * de lado (chico: basta para los accesorios y pesa poco). Ese cuadro solo va a `/face/check`, nunca a la toma enviada.
+   */
+  faceAccessoryCheckIntervalMs: envNumber(env, 'VITE_FACE_ACCESSORY_CHECK_INTERVAL_MS', 2500, 1000, 15000),
+  faceAccessoryCheckPx: envNumber(env, 'VITE_FACE_ACCESSORY_CHECK_PX', 480, 240, 1280),
   /** Giro extra que exige el navegador sobre el mínimo del servidor: MediaPipe (cliente) y YuNet
    *  (servidor) miden distinto; con margen, la captura enviada siempre supera la prueba de vida. */
   faceTurnMargin: envNumber(env, 'VITE_FACE_TURN_MARGIN', 0.04, 0, 0.3),
@@ -235,10 +300,14 @@ export const config = {
    * una subida que el servidor rechazará): el backend valida con su `COMPANY_DOCUMENT_MAX_MB`, que debe ser el mismo.
    */
   companyDocumentMaxMb: envNumber(env, 'VITE_COMPANY_DOCUMENT_MAX_MB', 20, 1, 25),
+  /**
+   * Documentos de identidad del empleado (onboarding con OCR): tamaño máximo (MB) antes de subirlo. Solo ayuda (el
+   * backend valida con su `EMPLOYEE_DOCUMENT_MAX_MB`, que debe ser el mismo).
+   */
+  employeeDocumentMaxMb: envNumber(env, 'VITE_EMPLOYEE_DOCUMENT_MAX_MB', 15, 1, 25),
   /** Opciones de "por página" de todos los listados (el backend acepta hasta 50). */
   pageSizes,
   /** Elementos por página al abrir cualquier listado (una de las opciones). */
   pageSize: defaultPageSize,
 } as const;
 
-export type AppConfig = typeof config;

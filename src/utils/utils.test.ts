@@ -140,8 +140,11 @@ describe('validation', () => {
     // Regresión: a las 23:30 hora local (UTC ya es el día siguiente) la fecha máxima sigue siendo válida.
     expect(maxBirthDate(new Date(2026, 8, 30, 23, 30))).toBe('2010-09-30');
     expect(validateBirthDate('2999-01-01')).toBeDefined();
-    expect(validateEmployeeNumber('')).toBeDefined();
+    // El número es opcional: vacío no es un error; con valor, su formato.
+    expect(validateEmployeeNumber('')).toBeUndefined();
+    expect(validateEmployeeNumber('   ')).toBeUndefined();
     expect(validateEmployeeNumber('EMP-001')).toBeUndefined();
+    expect(validateEmployeeNumber(' EMP 1 ')).toBe('1-30 caracteres: letras, números, guion o guion bajo');
   });
   it('valida el formulario completo y permite contraseña opcional al editar', () => {
     const values = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'ana@e.com', password: '', password_confirm: '' };
@@ -261,7 +264,7 @@ describe('CURP, NSS y teléfono (mismas reglas que el backend)', () => {
     expect(edited.parse('+526621234567')?.country.code).toBe('US');
 
     const notFeatured = countryDirectory(catalogsFixture.countries.filter((c) => !c.featured));
-    expect(notFeatured.defaultCountry.code).toBe('DE');
+    expect(notFeatured.defaultCountry.code).toBe('AF');
     expect(() => countryDirectory([])).toThrow(/no tiene países activos/);
   });
 });

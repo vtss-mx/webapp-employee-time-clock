@@ -5,7 +5,8 @@
  */
 import { deviceStore } from '../utils/deviceStore';
 import { sleep } from '../utils/waits';
-import { DEFAULT_LOCALE, isLocale, matchLocale, type Locale } from './core';
+import { DEFAULT_LOCALE, isLocale, type Locale } from './core';
+import { firstLocale } from './negotiation';
 
 const DEVICE_KEY = 'locale';
 /** IndexedDB puede tardar o no responder (modo privado estricto): no se espera más que esto. */
@@ -22,13 +23,9 @@ export async function deviceLocale(timeoutMs = DEVICE_READ_TIMEOUT_MS): Promise<
   }
 }
 
-/** El primer idioma del navegador que la app tiene (`es*` → es-MX, `en*` → en-US), o null. */
+/** El primer idioma del navegador que la app tiene (`firstLocale`: `es-ES` → es-ES, otro `es*` → es-MX, `en*`, `pt*`, `fr*`, `de*`, `it*`), o null. */
 export function browserLocale(languages: readonly string[] = [...navigator.languages, navigator.language]): Locale | null {
-  for (const tag of languages) {
-    const match = matchLocale(tag);
-    if (match) return match;
-  }
-  return null;
+  return firstLocale(languages);
 }
 
 /** Idioma al abrir la app: el del dispositivo, el del navegador o es-MX. */

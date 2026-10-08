@@ -18,7 +18,7 @@ describe('idioma del dispositivo', () => {
     const get = vi.spyOn(deviceStore, 'get').mockResolvedValue('en-US');
     expect(await deviceLocale()).toBe('en-US');
     expect(get).toHaveBeenCalledWith('locale');
-    get.mockResolvedValue('fr-FR'); // un valor ajeno no cuenta
+    get.mockResolvedValue('ja-JP'); // un valor ajeno no cuenta
     expect(await deviceLocale()).toBeNull();
   });
 
@@ -38,12 +38,15 @@ describe('idioma del dispositivo', () => {
 });
 
 describe('idioma del navegador', () => {
-  it('toma el primer idioma que la app tiene (es* → es-MX, en* → en-US)', () => {
-    expect(browserLocale(['fr-FR', 'en-GB', 'es'])).toBe('en-US');
+  it('toma el primer idioma que la app tiene (cada variante a su idioma; España → es-ES)', () => {
+    expect(browserLocale(['ja-JP', 'en-GB', 'es'])).toBe('en-US');
     expect(browserLocale(['es-AR'])).toBe('es-MX');
-    expect(browserLocale(['de', 'fr'])).toBeNull();
+    expect(browserLocale(['es-ES', 'es'])).toBe('es-ES');
+    expect(browserLocale(['ja', 'ko'])).toBeNull();
     languages(['pt-BR', 'es-419']);
-    expect(browserLocale()).toBe('es-MX');
+    expect(browserLocale()).toBe('pt-BR');
+    languages(['fr-CA', 'de-AT', 'it']);
+    expect(browserLocale()).toBe('fr-FR');
   });
 });
 

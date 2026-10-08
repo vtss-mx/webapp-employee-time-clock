@@ -3,10 +3,12 @@ import { useEffect, useId } from 'react';
 import { useCountdown } from '../hooks/useCountdown';
 import { t, useLocale, useT } from '../i18n';
 import { resolveLazy, type LazyText } from '../i18n/lazy';
+import { localizeServerText } from '../i18n/serverTexts';
 import type { ValidatorAttendance, VerificationResult } from '../types';
 import { formatConfidence, formatDateTime } from '../utils/format';
 import { haptic } from '../utils/haptics';
 import { ACTION_ICONS } from './attendance/sessionFacts';
+import { Avatar } from './ui/Avatar';
 import { Button } from './ui/Button';
 import { ResultPopup } from './ui/ResultPopup';
 import { StatusMark } from './ui/StatusMark';
@@ -55,7 +57,7 @@ function AttendanceNote({ attendance }: { attendance: ValidatorAttendance }) {
   return (
     <p className={`result-card__attendance ${attendance.action ? 'is-recorded' : ''}`}>
       <Icon size={20} aria-hidden />
-      {attendance.message}
+      {localizeServerText(attendance.message)}
     </p>
   );
 }
@@ -69,12 +71,17 @@ function IdentifiedDetails({ result }: { result: VerificationResult }) {
       <dl className="result-card__details stagger">
         <div>
           <dt>{t('common.fields.employee')}</dt>
-          <dd>{result.name}</dd>
+          <dd className="person">
+            <Avatar name={result.name ?? ''} src={result.avatar} size="sm" decorative />
+            <span className="truncate">{result.name}</span>
+          </dd>
         </div>
-        <div>
-          <dt>{t('verification.result.number')}</dt>
-          <dd>{result.employee_number}</dd>
-        </div>
+        {result.employee_number && (
+          <div>
+            <dt>{t('verification.result.number')}</dt>
+            <dd>{result.employee_number}</dd>
+          </div>
+        )}
         {result.confidence != null && (
           <div>
             <dt>{t('verification.result.confidence')}</dt>
@@ -110,7 +117,7 @@ export function VerificationResultCard({ result, error, failureTitle, onRetry, o
       <StatusMark kind={success ? 'success' : 'error'} once />
       <div className="stack" style={{ gap: 6 }}>
         <h1 id={titleId}>{success ? copy.title : failureTitle}</h1>
-        <p className="muted">{success ? copy.greeting : error ? resolveLazy(error) : result?.message}</p>
+        <p className="muted">{success ? copy.greeting : error ? resolveLazy(error) : result && localizeServerText(result.message)}</p>
       </div>
       {success && result && <IdentifiedDetails result={result} />}
 

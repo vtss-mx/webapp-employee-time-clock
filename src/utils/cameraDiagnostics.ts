@@ -4,7 +4,13 @@
  */
 import { t } from '../i18n/core';
 
-export type CameraProblemKind = 'insecure' | 'unsupported' | 'denied' | 'not-found' | 'busy' | 'unknown';
+/**
+ * - `in-app`: el navegador integrado de otra aplicación (Facebook, Instagram, TikTok, LinkedIn...) no deja usar la
+ *   cámara; se abre la página en Safari o Chrome.
+ * - `canvas-blocked`: el navegador entrega una imagen falsa de la cámara (protección contra huellas digitales;
+ *   `utils/canvasReadback.ts`).
+ */
+export type CameraProblemKind = 'insecure' | 'unsupported' | 'denied' | 'not-found' | 'busy' | 'unknown' | 'in-app' | 'canvas-blocked';
 
 /**
  * La cámara no da imagen al capturar: aún se está abriendo o se cortó (llamada o Siri en iOS, permiso
@@ -16,6 +22,19 @@ export class CameraNotReadyError extends Error {
     super();
     this.name = 'CameraNotReadyError';
     Object.defineProperty(this, 'message', { get: () => t('face.camera.notReady'), configurable: true, enumerable: false });
+  }
+}
+
+/**
+ * La imagen de la cámara cambió de tamaño a media toma (el teléfono giró y la pista pasó de vertical a horizontal): las
+ * capturas ya no serían de una sola resolución y el servidor las rechazaría como un montaje (`CAPTURE_INCONSISTENT`, un
+ * intento sospechoso). Es pasajero: el flujo lo explica y repite la toma, sin enviar nada.
+ */
+export class CameraTurnedError extends Error {
+  constructor() {
+    super();
+    this.name = 'CameraTurnedError';
+    Object.defineProperty(this, 'message', { get: () => t('face.camera.turned'), configurable: true, enumerable: false });
   }
 }
 
@@ -78,6 +97,20 @@ export function detectPlatform(userAgent: string = navigator.userAgent, touchPoi
   return { os, browser };
 }
 
+/**
+ * Navegadores integrados de otras aplicaciones (marcas que ponen en su User-Agent; `; wv)` es cualquier WebView de
+ * Android). En Android la cámara solo funciona si la aplicación lo programó (casi ninguna); en iOS, si declaró el uso de
+ * la cámara. Solo cambia la ayuda cuando la cámara YA falló: abrir la página en el navegador lo resuelve.
+ */
+const IN_APP = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|LinkedInApp|musical_ly|Bytedance|TikTok|Line\/|MicroMessenger|Snapchat|Twitter|WAiOS|WA4A|Barcelona|; wv\)/;
+
+export function isInAppBrowser(userAgent: string = navigator.userAgent): boolean {
+  return IN_APP.test(userAgent);
+}
+
+/** Fallas que en un navegador integrado se explican abriendo la página en el navegador del teléfono. */
+const IN_APP_KINDS: ReadonlySet<CameraProblemKind> = new Set(['denied', 'unsupported', 'unknown']);
+
 export function errorKind(error: unknown): CameraProblemKind {
   const name = error instanceof Error || error instanceof DOMException ? error.name : '';
   if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(name)) return 'denied';
@@ -131,8 +164,10 @@ export function describeCameraProblem(
   kind: CameraProblemKind,
   platform: Platform = detectPlatform(),
   location: Pick<Location, 'protocol' | 'hostname' | 'pathname' | 'search'> = window.location,
+  inApp: boolean = isInAppBrowser(),
 ): CameraProblem {
-  return kind === 'insecure' ? { kind, platform, secureUrl: secureUrlFor(location) } : { kind, platform };
+  if (kind === 'insecure') return { kind, platform, secureUrl: secureUrlFor(location) };
+  return { kind: inApp && IN_APP_KINDS.has(kind) ? 'in-app' : kind, platform };
 }
 
 /** Título, causa y pasos de un problema de la cámara, en el idioma activo (se piden al mostrarse). */
@@ -154,6 +189,18 @@ export function cameraProblemText({ kind, platform, secureUrl }: CameraProblem):
       };
     case 'not-found':
       return { title: t('face.cameraHelp.notFound.title'), message: t('face.cameraHelp.notFound.message'), steps: notFoundSteps(platform) };
+    case 'in-app':
+      return {
+        title: t('face.cameraHelp.inApp.title'),
+        message: t('face.cameraHelp.inApp.message'),
+        steps: [platform.os === 'ios' ? t('face.cameraHelp.inApp.ios') : t('face.cameraHelp.inApp.android'), t('face.cameraHelp.inApp.copyLink')],
+      };
+    case 'canvas-blocked':
+      return {
+        title: t('face.cameraHelp.canvasBlocked.title'),
+        message: t('face.cameraHelp.canvasBlocked.message'),
+        steps: [t('face.cameraHelp.canvasBlocked.allow'), t('face.cameraHelp.canvasBlocked.otherBrowser')],
+      };
     case 'busy':
       return {
         title: t('face.cameraHelp.busy.title'),

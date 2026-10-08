@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocale } from '../i18n';
 import { t } from '../i18n/core';
 import { checkAvailability, type AvailabilityField } from '../services/availabilityService';
 import type { AvailabilityState, AvailabilityStatus, FieldStatus } from '../types';
@@ -29,12 +30,14 @@ const STATUS_BY_CODE: Record<string, AvailabilityStatus> = {
 /**
  * Validación en tiempo real mientras se escribe (con pausa entre teclas), por el canal WebSocket
  * del backend (o su respaldo HTTP). Ignora respuestas de valores anteriores y, si no se puede
- * verificar, no bloquea: el servidor valida al guardar.
+ * verificar, no bloquea: el servidor valida al guardar. Al cambiar el idioma se vuelve a verificar lo
+ * escrito: el mensaje del servidor («ese correo ya está registrado») llega en el idioma nuevo (regla 16).
  */
 export function useAvailability(field: AvailabilityField, value: string, options: Options = {}): AvailabilityState {
   const { excludeId, unchangedValue, enabled = true, related } = options;
   const [state, setState] = useState<AvailabilityState>({ status: 'idle' });
   const sequence = useRef(0);
+  const locale = useLocale();
 
   useEffect(() => {
     const current = ++sequence.current;
@@ -54,7 +57,7 @@ export function useAvailability(field: AvailabilityField, value: string, options
         .catch(() => current === sequence.current && setState({ status: 'unknown' }));
     }, config.availabilityDebounceMs);
     return () => window.clearTimeout(timer);
-  }, [field, value, excludeId, unchangedValue, enabled, related]);
+  }, [field, value, excludeId, unchangedValue, enabled, related, locale]);
 
   return state;
 }

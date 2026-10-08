@@ -1,11 +1,6 @@
-/** Textos del selector de idioma (es-MX). */
+/** Textos del selector de idioma (es-MX). Cada idioma se nombra en sí mismo, con su país y su bandera (`ENDONYMS`). */
 export default {
   label: 'Idioma',
-  /** Cómo se llama cada idioma en el idioma de la interfaz (debajo de su nombre propio). */
-  names: {
-    'es-MX': 'Español de México',
-    'en-US': 'Inglés de Estados Unidos',
-  },
   hintAccount: 'Se aplica en todos tus dispositivos.',
   hintDevice: 'Se recuerda en este dispositivo.',
   saveFailed: 'No se pudo guardar tu idioma',

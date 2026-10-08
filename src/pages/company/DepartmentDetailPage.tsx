@@ -19,13 +19,13 @@ import { departmentService } from '../../services/departmentService';
 import { employeeService } from '../../services/employeeService';
 import type { Department, DepartmentPerson, Employee } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
+import { employeeLabel, employeeNumberLabel } from '../../utils/employeeLabel';
 import { formatCount } from '../../utils/numbers';
 
 /** Busy de cada botón: el responsable o el empleado que se está quitando, o el borrado. */
 type Busy = `manager:${number}` | `member:${number}` | 'delete';
 
 /** "Ana Ruiz · No. EMP-7": la persona en una confirmación. */
-const personText = (name: string, number: string) => t('departments.person', { name, number });
 
 /** Los responsables en una línea ("Sin responsables" si no hay). */
 const managerNames = (managers: DepartmentPerson[]) => managers.map((m) => m.full_name).join(', ') || t('departments.noManagers');
@@ -45,7 +45,7 @@ function removeManagerConfirm(department: Department, manager: DepartmentPerson)
         after: managerNames(department.managers.filter((m) => m.employee_id !== manager.employee_id)),
       },
     ],
-    details: [{ label: t('departments.detail.removeManagerConfirm.manager'), value: personText(manager.full_name, manager.employee_number) }],
+    details: [{ label: t('departments.detail.removeManagerConfirm.manager'), value: employeeLabel(manager, { prefixed: true }) }],
     confirmLabel: t('departments.detail.removeManagerConfirm.confirm'),
     confirmIcon: <X size={18} />,
   };
@@ -60,7 +60,7 @@ function removeMemberConfirm(department: Department, employee: Employee): Confir
     title: t('departments.detail.removeMemberConfirm.title', { name: employee.full_name, department: department.name }),
     message: t('departments.detail.removeMemberConfirm.message'),
     changes: [{ label: t('common.fields.department'), before: department.name, after: t('departments.noDepartment') }],
-    details: [{ label: t('common.fields.employee'), value: personText(employee.full_name, employee.employee_number) }],
+    details: [{ label: t('common.fields.employee'), value: employeeLabel(employee, { prefixed: true }) }],
     confirmLabel: t('departments.detail.removeMemberConfirm.confirm'),
     confirmIcon: <UserMinus size={18} />,
   };
@@ -189,7 +189,8 @@ function DepartmentView({ department, setData }: { department: Department; setDa
                 <PersonItem
                   key={manager.employee_id}
                   name={manager.full_name}
-                  detail={t('employees.number', { number: manager.employee_number })}
+                  avatar={manager.avatar}
+                  detail={employeeNumberLabel(manager.employee_number)}
                   badges={manager.active ? null : <StatusBadge active={false} />}
                   actions={
                     <Button
@@ -230,7 +231,8 @@ function DepartmentView({ department, setData }: { department: Department; setDa
                   <PersonItem
                     key={employee.id}
                     name={employee.full_name}
-                    detail={t('employees.number', { number: employee.employee_number })}
+                    avatar={employee.avatar}
+                    detail={employeeNumberLabel(employee.employee_number)}
                     badges={<StatusBadge active={employee.active} />}
                     actions={
                       <>

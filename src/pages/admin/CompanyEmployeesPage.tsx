@@ -15,6 +15,7 @@ import { paths } from '../../routes/paths';
 import { adminService } from '../../services/adminService';
 import type { CompanyDetail, CompanyEmployee } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
+import { employeeLabel } from '../../utils/employeeLabel';
 import { timeAgo } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
 import { Avatar } from '../../components/ui/Avatar';
@@ -103,10 +104,10 @@ function CompanyEmployees({ company }: { company: CompanyDetail }) {
                 <>
                   <td className="table__primary">
                     <span className="person">
-                      <Avatar name={name} decorative />
+                      <Avatar name={name} src={emp.avatar} decorative />
                       <span className="person__info">
                         <strong className="truncate">{name}</strong>
-                        <small>{emp.employee_number}</small>
+                        {emp.employee_number && <small>{emp.employee_number}</small>}
                       </span>
                     </span>
                   </td>
@@ -149,7 +150,7 @@ function forgetConfirm(employee: CompanyEmployee): ConfirmInput {
     message: t('admin.employees.forget.message'),
     detailsTitle: t('admin.employees.forget.detailsTitle'),
     details: [
-      { label: t('common.fields.employee'), value: `${name} · ${employee.employee_number}` },
+      { label: t('common.fields.employee'), value: employeeLabel({ full_name: name, employee_number: employee.employee_number }) },
       { label: t('admin.employees.forget.learned'), value: `${samples(employee.face_learned_samples)} · ${timeAgo(employee.face_last_learned_at)}` },
     ],
     note: t('admin.employees.forget.note'),

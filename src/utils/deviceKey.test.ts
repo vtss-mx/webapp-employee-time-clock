@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { config } from './config';
 import { DeviceKeyError, deviceKeyPair, deviceProof, devicePublicKey, requestSignature, signMessage } from './deviceKey';
 
 /** IndexedDB mínima en memoria (jsdom no la trae): guarda objetos tal cual, como el navegador. */
@@ -54,6 +55,17 @@ describe('llave del dispositivo', () => {
     const request = await requestSignature('n1', 'n1.qr.abc');
     expect(request).toMatchObject({ signature_key: signed.publicKey, signature_nonce: 'n1' });
     expect(await verify(request.signature, 'n1.qr.abc')).toBe(true);
+  });
+
+  it('un almacenamiento que no responde no deja nada colgado: tarde es "sin llave"', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('indexedDB', { open: () => ({}) }); // nunca responde (modo privado estricto, navegador integrado)
+    const signing = signMessage('reto');
+    const publicKey = devicePublicKey();
+    const expectations = [expect(signing).rejects.toBeInstanceOf(DeviceKeyError), expect(publicKey).rejects.toBeInstanceOf(DeviceKeyError)];
+    await vi.advanceTimersByTimeAsync(config.deviceKeyTimeoutMs);
+    await Promise.all(expectations);
+    vi.useRealTimers();
   });
 
   it('sin IndexedDB o sin WebCrypto no se puede registrar el dispositivo', async () => {

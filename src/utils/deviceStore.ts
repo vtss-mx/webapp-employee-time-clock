@@ -1,6 +1,7 @@
 import { deviceObjectStore, idbRequest } from './indexedDb';
 
-const unavailable = () => new Error('Este navegador no permite guardar datos del dispositivo');
+/** Falla interna (nunca llega a la persona: estas preferencias son accesorias y su error se descarta): un código. */
+const unavailable = () => new Error('DEVICE_STORAGE_UNAVAILABLE');
 
 /**
  * Preferencias de ESTE dispositivo (no de la persona: esas viven en la BD, `users.preferences`), en

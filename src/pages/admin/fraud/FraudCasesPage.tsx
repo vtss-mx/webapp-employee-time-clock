@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RiskBadge } from '../../../components/fraud/RiskBadge';
 import { CatalogStatusBadge } from '../../../components/StatusBadge';
+import { Avatar } from '../../../components/ui/Avatar';
 import { ListResults } from '../../../components/ui/ListResults';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { Select } from '../../../components/ui/Select';
@@ -12,6 +13,7 @@ import { t, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
 import { fraudCaseService } from '../../../services/fraudCaseService';
 import type { FraudCase } from '../../../types';
+import { employeeLabel } from '../../../utils/employeeLabel';
 import { timeAgo } from '../../../utils/format';
 import { formatCount } from '../../../utils/numbers';
 
@@ -22,10 +24,21 @@ const ANY_KIND = 'any';
 
 const loadError = () => t('fraud.list.loadError');
 
-/** Quién: la ficha de trabajo del empleado (nombre y número) o, sin persona identificada, la cuenta que operó. */
+/** Quién: la ficha de trabajo del empleado (nombre y, si tiene, número) o, sin persona identificada, la cuenta que operó. */
 export function subjectOf(item: FraudCase): string {
-  if (item.employee) return `${item.employee.full_name} · ${item.employee.employee_number}`;
+  if (item.employee) return employeeLabel(item.employee);
   return item.actor ?? t('fraud.list.unknown');
+}
+
+/** Quién, con la foto del empleado (el ADMIN ve la de todos) o, sin ella, sus iniciales. */
+export function FraudSubject({ item }: { item: FraudCase }) {
+  const label = subjectOf(item);
+  return (
+    <span className="person">
+      <Avatar name={item.employee?.full_name ?? label} src={item.employee?.avatar} size="sm" decorative />
+      <span className="truncate">{label}</span>
+    </span>
+  );
 }
 
 /**
@@ -94,7 +107,7 @@ export function FraudCasesPage() {
                 </td>
                 <td data-label={t('fraud.list.company')}>{item.company_name}</td>
                 <td data-label={t('fraud.list.subject')} className="table__wide">
-                  <span className="truncate">{subjectOf(item)}</span>
+                  <FraudSubject item={item} />
                 </td>
                 <td data-label={t('fraud.list.kind')}>{nameOf('fraud_kinds', item.kind)}</td>
                 <td data-label={t('fraud.list.risk')}>

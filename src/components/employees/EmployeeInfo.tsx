@@ -34,7 +34,7 @@ export function EmployeeInfo({ employee }: { employee: Employee }) {
         </div>
         <div>
           <dt>{t('common.fields.employeeNumber')}</dt>
-          <dd>{employee.employee_number}</dd>
+          <dd>{orMissing(employee.employee_number)}</dd>
         </div>
         <div>
           <dt>CURP</dt>

@@ -11,8 +11,12 @@ interface FloatingProps {
   /** Para el cierre al tocar fuera: el campo y la superficie cuentan como "dentro". */
   floatingRef?: RefObject<HTMLDivElement | null>;
   className: string;
-  /** Mismo ancho que el campo (p. ej. la lista de países bajo el teléfono). */
+  /** Mismo ancho que el campo (p. ej. la lista de países bajo el teléfono o la lista de idiomas). */
   matchWidth?: boolean;
+  /** Ancho mínimo en píxeles (una lista cuyo contenido debe caber en una línea aunque el campo sea angosto). */
+  minWidth?: number;
+  /** Con qué borde del campo se alinea: el izquierdo (`start`) o el derecho (`end`, un control pegado a la derecha). */
+  align?: 'start' | 'end';
   children: ReactNode;
 }
 
@@ -24,15 +28,16 @@ interface Placement {
 }
 
 /**
- * Base ÚNICA de las superficies flotantes de los campos (selector de país, calendario).
+ * Base ÚNICA de las superficies flotantes de los campos (selector de país, calendario, listas).
  *
  * Se monta fuera del formulario con un portal y se posiciona con `position: fixed` contra el campo.
  * Dentro de la página, el `overflow: hidden` de los paneles la recortaría y las animaciones de
  * entrada de cada sección (crean su propia capa) dejarían la sección siguiente encima. En una
  * ventana emergente se monta en su capa, para quedar sobre ella sin salir de su foco.
- * Se abre hacia arriba si abajo no cabe, y sigue al campo al desplazar o cambiar el tamaño.
+ * Se abre hacia arriba si abajo no cabe, nunca sale de los bordes de la pantalla y sigue al campo al
+ * desplazar o cambiar el tamaño.
  */
-export function Floating({ anchorRef, floatingRef, className, matchWidth = false, children }: FloatingProps) {
+export function Floating({ anchorRef, floatingRef, className, matchWidth = false, minWidth, align = 'start', children }: FloatingProps) {
   const ownRef = useRef<HTMLDivElement>(null);
   const ref = floatingRef ?? ownRef;
   const [placement, setPlacement] = useState<Placement | null>(null);
@@ -44,13 +49,14 @@ export function Floating({ anchorRef, floatingRef, className, matchWidth = false
       const anchor = anchorRef.current?.getBoundingClientRect();
       const surface = ref.current;
       if (!anchor || !surface) return;
-      const width = matchWidth ? anchor.width : surface.offsetWidth;
+      const width = Math.max(matchWidth ? anchor.width : surface.offsetWidth, minWidth ?? 0);
       const height = surface.offsetHeight;
       const below = window.innerHeight - anchor.bottom - GAP - GUTTER;
       const above = height > below && anchor.top - GAP - GUTTER > below;
+      const start = align === 'end' ? anchor.left + anchor.width - width : anchor.left;
       setPlacement({
         top: above ? anchor.top - GAP - height : anchor.bottom + GAP,
-        left: Math.max(GUTTER, Math.min(anchor.left, window.innerWidth - GUTTER - width)),
+        left: Math.max(GUTTER, Math.min(start, window.innerWidth - GUTTER - width)),
         above,
         width: matchWidth ? width : undefined,
       });
@@ -72,14 +78,14 @@ export function Floating({ anchorRef, floatingRef, className, matchWidth = false
       window.removeEventListener('scroll', schedule, true);
       window.removeEventListener('resize', schedule);
     };
-  }, [anchorRef, ref, matchWidth]);
+  }, [anchorRef, ref, matchWidth, minWidth, align]);
 
   return createPortal(
     <div
       ref={ref}
       className={`floating ${placement?.above ? 'floating--above' : ''} ${className}`}
       // Hasta medirse no se ve (evita un parpadeo en la esquina de la pantalla).
-      style={placement ? { top: placement.top, left: placement.left, width: placement.width } : { visibility: 'hidden' }}
+      style={placement ? { top: placement.top, left: placement.left, width: placement.width, minWidth } : { visibility: 'hidden', minWidth }}
     >
       {children}
     </div>,

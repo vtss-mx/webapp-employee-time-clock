@@ -53,7 +53,7 @@ describe('UsagePage (consumo de la plataforma)', () => {
     expect(row).toHaveTextContent('Activos: 10 empleados y 1 validador'); // cada validador activo se cobra como un empleado
     expect(row).toHaveTextContent('62.5 % del total');
     expect(row).toHaveTextContent('5.00 MB / 2,048.00 MB');
-    expect(row).toHaveTextContent('31 minprom. 150 ms');
+    expect(row).toHaveTextContent('31 minpromedio 150 ms');
 
     await settle(() => refreshers.at(-1)?.());
     await waitFor(() => expect(urls(calls, '/overview')).toHaveLength(2));
@@ -129,7 +129,7 @@ describe('CompanyUsagePage (consumo de una empresa)', () => {
     expect(screen.getByRole('link', { name: 'Cobranza' })).toHaveAttribute('href', '/admin/billing/companies/4');
     expect(screen.getByRole('link', { name: /Consumo/ })).toHaveAttribute('href', '/admin/usage?start=2026-09-01&end=2026-09-30');
     expect(urls(calls, '/usage/companies/4?')[0]).toBe('/api/admin/usage/companies/4?start=2026-09-01&end=2026-09-30');
-    expect(screen.getByRole('list', { name: 'Rutas más usadas' })).toHaveTextContent('GET /api/employees/{employee_id}12,400prom. 150 ms');
+    expect(screen.getByRole('list', { name: 'Rutas más usadas' })).toHaveTextContent('GET /api/employees/{employee_id}12,400promedio 150 ms');
     const cost = screen.getByRole('heading', { name: 'Costo frente a consumo' }).closest('section') as HTMLElement;
     expect(cost).toHaveTextContent('Activos hoy10 empleados y 2 validadores');
     expect(cost).toHaveTextContent('PlanPor empleado activo · $120.00 MXN por mes');

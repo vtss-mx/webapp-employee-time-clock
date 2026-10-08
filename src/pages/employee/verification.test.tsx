@@ -12,12 +12,25 @@ import { identifiedResult, samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders, sampleUser } from '../../test/render';
 import type { User, VerificationPolicy } from '../../types';
+import type { LocationProblem } from '../../utils/geolocation';
+import type { LocationTake } from '../../utils/locationPayload';
 import { FaceVerificationPage } from './FaceVerificationPage';
 import { PendingValidationPage } from './PendingValidationPage';
 import { VerificationMenuPage } from './VerificationMenuPage';
 
 const session = vi.hoisted(() => ({ user: null as User | null, refreshUser: vi.fn<() => Promise<void>>(), flowErrors: [] as unknown[] }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => session }));
+
+// Ubicación "caliente" controlada: la cámara y la geolocalización real se prueban en navegador; aquí, qué hace la
+// pantalla con el modo de la empresa (`verification_location`) y la ubicación que entrega la toma.
+const warm = vi.hoisted(() => ({ enabled: false, onProblem: (_problem: LocationProblem) => {}, take: vi.fn<() => Promise<LocationTake | null>>() }));
+vi.mock('../../hooks/useWarmLocation', () => ({
+  useWarmLocation: (enabled: boolean, onProblem: (problem: LocationProblem) => void) => {
+    warm.enabled = enabled;
+    warm.onProblem = onProblem;
+    return { take: warm.take };
+  },
+}));
 
 interface FlowProps {
   title: string;
@@ -32,7 +45,7 @@ vi.mock('../../components/LiveFaceFlow', () => ({
   LiveFaceFlow: ({ title, alternative, onSubmit, onFatal, onCancel }: FlowProps) => (
     <div>
       <h1>{title}</h1>
-      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false }).catch((error: unknown) => session.flowErrors.push(error))}>
+      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] }).catch((error: unknown) => session.flowErrors.push(error))}>
         capturar rostro
       </button>
       <button onClick={() => onFatal(new Error('No se pudo abrir la cámara'))}>falla de cámara</button>
@@ -63,6 +76,10 @@ beforeEach(() => {
   session.user = sampleUser;
   session.flowErrors = [];
   session.refreshUser.mockResolvedValue(undefined);
+  warm.enabled = false;
+  warm.onProblem = () => {};
+  warm.take.mockReset();
+  warm.take.mockResolvedValue(null);
 });
 afterEach(() => resetPolicyCache());
 
@@ -129,6 +146,49 @@ describe('FaceVerificationPage (el empleado se identifica con su rostro)', () =>
   });
 });
 
+describe('FaceVerificationPage: ubicación de la verificación (verification_location)', () => {
+  const HERE: LocationTake = { latitude: 29.1, longitude: -110.9, accuracy: 12, samples: [{ latitude: 29.1, longitude: -110.9, accuracy: 12 }] };
+  const posted = (calls: MockCall[]) => calls.find((c) => c.init.method === 'POST');
+
+  it('OFF: no mantiene la ubicación caliente ni la envía con las capturas', async () => {
+    const { calls } = server({ verification_location: 'OFF' });
+    renderVerification();
+    await waitFor(() => expect(warm.enabled).toBe(false));
+    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
+    await screen.findByText('Identidad confirmada');
+    expect(warm.take).not.toHaveBeenCalled();
+    expect((posted(calls)?.init.body as FormData).get('latitude')).toBeNull();
+  });
+
+  it('OBSERVE: envía la ubicación de la toma y no avisa si el permiso está bloqueado', async () => {
+    warm.take.mockResolvedValue(HERE);
+    const { calls } = server({ verification_location: 'OBSERVE' });
+    renderVerification();
+    await waitFor(() => expect(warm.enabled).toBe(true));
+    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
+    await screen.findByText('Identidad confirmada');
+    const form = posted(calls)?.init.body as FormData;
+    expect([form.get('latitude'), form.get('longitude'), form.get('accuracy')]).toEqual(['29.1', '-110.9', '12']);
+    expect(form.get('location_samples')).toBe(JSON.stringify([{ latitude: 29.1, longitude: -110.9, accuracy: 12 }]));
+    // OBSERVE sigue en silencio: un permiso bloqueado no abre popup.
+    act(() => warm.onProblem('denied'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('ENFORCE: sin ubicación envía la verificación igual (el servidor responde LOCATION_REQUIRED) y avisa del permiso bloqueado', async () => {
+    const { calls } = server({ verification_location: 'ENFORCE' }, () => apiFail(422, 'LOCATION_REQUIRED', 'Se necesita tu ubicación'));
+    renderVerification();
+    await waitFor(() => expect(warm.enabled).toBe(true));
+    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
+    await waitFor(() => expect(session.flowErrors).toHaveLength(1));
+    expect(session.flowErrors[0]).toMatchObject({ code: 'LOCATION_REQUIRED' });
+    expect((posted(calls)?.init.body as FormData).get('latitude')).toBeNull();
+    // ENFORCE sí explica el permiso bloqueado (una vez), con los pasos para permitirlo.
+    act(() => warm.onProblem('denied'));
+    expect(await screen.findByRole('alertdialog', { name: 'Permite el acceso a tu ubicación' })).toHaveTextContent('Esta verificación necesita tu ubicación');
+  });
+});
+
 describe('VerificationMenuPage (cómo identificarse)', () => {
   it('saluda por su nombre y ofrece rostro (con prueba de vida) o su QR con la vigencia de la política', async () => {
     server({ qr_lifetime_seconds: 45 });
@@ -151,15 +211,27 @@ describe('VerificationMenuPage (cómo identificarse)', () => {
 });
 
 describe('PendingValidationPage (registro en validación)', () => {
-  it('explica en qué paso va; "Actualizar estado" relee el usuario sin avisos si sale bien', async () => {
+  // La pantalla lee la política de la empresa (si el registro llevó el paso del video) con la lectura compartida.
+  beforeEach(() => server());
+
+  it('explica en qué paso va, con los tres pasos del registro hechos (en verde); "Actualizar estado" relee el usuario sin avisos si sale bien', async () => {
     renderWithProviders(<PendingValidationPage />);
     expect(screen.getByRole('heading', { name: 'Tu identidad está en validación' })).toBeInTheDocument();
     expect(screen.getByText(/Ana, tu registro facial se envió\./)).toBeInTheDocument();
     expect(screen.getByText('Registro facial enviado').closest('li')).toHaveClass('is-done');
     expect(screen.getByText('Validación por tu empresa').closest('li')).toHaveClass('is-current');
+    // Los pasos del registro: foto, capturas y video hechos según el servidor; «Listo» es el estado actual.
+    const steps = await screen.findByRole('list', { name: 'Paso 4 de 4' });
+    expect([...steps.querySelectorAll('li')].map((item) => item.className)).toEqual(['is-done', 'is-done', 'is-done', 'is-current']);
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
     expect(session.refreshUser).toHaveBeenCalledOnce();
     expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('sin la verificación por voz en la política, los pasos del registro son tres', async () => {
+    server({ voice_verification: false });
+    renderWithProviders(<PendingValidationPage />);
+    expect(await screen.findByRole('list', { name: 'Paso 3 de 3' })).toBeInTheDocument();
   });
 
   it('si actualizar falla, lo avisa en popup', async () => {
@@ -219,6 +291,7 @@ describe('pantallas del empleado en inglés (en-US) y cambio de idioma en calien
   });
 
   it('registro en validación: la pantalla y su popup de error abierto cambian de idioma', async () => {
+    server();
     session.refreshUser.mockRejectedValue(new ApiError({ statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: 'Servidor ocupado' }));
     renderWithProviders(<PendingValidationPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
@@ -231,6 +304,7 @@ describe('pantallas del empleado en inglés (en-US) y cambio de idioma en calien
   });
 
   it('registro en validación sin datos de empleado: el texto no lleva nombre', () => {
+    server();
     session.user = { ...sampleUser, employee: null };
     renderWithProviders(<PendingValidationPage />);
     expect(screen.getByText(/^, tu registro facial se envió\./)).toBeInTheDocument();

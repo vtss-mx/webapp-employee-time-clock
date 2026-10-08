@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocale } from '../i18n';
 import type { LazyText } from '../i18n/lazy';
 import type { Page, PageQuery } from '../types';
 import { config } from '../utils/config';
@@ -23,6 +24,8 @@ interface PagedListOptions {
  * al cambiar los filtros o el tamaño.
  * Base de todos los listados (con búsqueda: `useSearchList`; sin ella: validadores, validaciones,
  * bitácoras) para que se comporten igual y se dibujen con el mismo `Paginator`.
+ * Al cambiar el idioma se vuelve a pedir la MISMA página (con su tamaño y sus filtros): los textos del servidor
+ * llegan en el idioma nuevo y, mientras, se ven los anteriores (regla 16, en caliente).
  */
 export function usePagedList<T, X extends object = object>(fetchPage: (query: PageQuery, signal: AbortSignal) => Promise<Page<T> & X>, options: PagedListOptions) {
   const { errorTitle, filterKey = '' } = options;
@@ -37,6 +40,7 @@ export function usePagedList<T, X extends object = object>(fetchPage: (query: Pa
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
+  const locale = useLocale();
   const retry = useCallback(() => setReload((n) => n + 1), []);
   useErrorPopup(error, { title: errorTitle, retry });
   useRetryOnReconnect(error, retry);
@@ -55,7 +59,7 @@ export function usePagedList<T, X extends object = object>(fetchPage: (query: Pa
       .catch((e: unknown) => !controller.signal.aborted && setError(e))
       .finally(() => !controller.signal.aborted && setLoading(false));
     return () => controller.abort();
-  }, [filterKey, page, size, reload]);
+  }, [filterKey, page, size, reload, locale]);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / size)) : 1;
 

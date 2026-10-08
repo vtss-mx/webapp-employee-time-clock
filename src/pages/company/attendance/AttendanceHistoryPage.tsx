@@ -108,13 +108,15 @@ function SessionCells({ session }: { session: CompanySession }) {
     <>
       <td className="table__primary">
         <span className="person">
-          <Avatar name={employee.full_name} decorative />
+          <Avatar name={employee.full_name} src={employee.avatar} decorative />
           <span className="person__info">
             <strong className="truncate">{employee.full_name}</strong>
-            <small>
-              {employee.employee_number}
-              <DeletedMark deleted={employee.deleted} />
-            </small>
+            {(employee.employee_number || employee.deleted) && (
+              <small>
+                {employee.employee_number}
+                <DeletedMark deleted={employee.deleted} />
+              </small>
+            )}
           </span>
         </span>
       </td>

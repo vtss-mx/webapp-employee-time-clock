@@ -72,7 +72,7 @@ function EmployeeShifts({ employee }: { employee: Employee }) {
       title={employee.full_name}
       subtitle={
         <>
-          <span className="badge badge--info badge--plain">{employee.employee_number}</span>
+          {employee.employee_number && <span className="badge badge--info badge--plain">{employee.employee_number}</span>}
           {!employee.active && <StatusBadge active={false} />}
           <span>{t('shifts.assign.history.subtitle')}</span>
         </>

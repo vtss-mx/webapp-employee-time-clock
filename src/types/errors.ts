@@ -39,9 +39,10 @@ export interface ErrorOccurrence {
   occurred_at: string;
   trace_id: string | null;
   message: string;
-  /** Quién lo provocó: el correo de un ADMIN o de una empresa; de un empleado o validador solo su
-   * rol y número de cuenta (el ADMIN de la plataforma no ve datos de los empleados). */
+  /** Quién lo provocó, tal cual: «correo (Rol)». */
   user_label: string | null;
+  /** Su foto de perfil (ruta versionada) o null: se dibuja junto a `user_label` (el ADMIN ve la de todos). */
+  user_avatar?: string | null;
   company_name: string | null;
   /** Contexto literal (sin secretos ni archivos); null en ocurrencias anteriores a guardarlo. */
   context: ErrorContext | null;

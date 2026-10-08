@@ -60,6 +60,7 @@ export default {
     attempts_other: '{count} intentos',
   },
   flash: {
+    retired: 'Destello retirado por decisión del producto (2026-10-06): estas mediciones son históricas.',
     ready: 'Listo para exigirlo',
     calibrating: 'Calibrando',
     window_one: 'Intentos exitosos del último día.',

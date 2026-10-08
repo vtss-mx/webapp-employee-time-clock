@@ -14,8 +14,17 @@
  *   Opción `allow`: nombres propios que no se traducen (marcas, navegadores, sistemas).
  *   No se marcan códigos (`MXN`, `TURN_LEFT`, `RFC`), identificadores en minúsculas (`primary`,
  *   `current-password`), unidades sueltas (`km`, `ms`) ni símbolos (`—`, `·`, `→`).
+ *     · el texto de un error (`new Error('No se pudo leer')`): si puede llegar a la persona va con
+ *       `localizedError(() => t('…'))`; uno interno lleva un código (`'SESSION_RENEW_FAILED'`).
+ *   Lo que siempre se ve o se lee (`title`, `placeholder`, `alt` y los `aria-*` hablados) se marca aunque sea una
+ *   sola palabra en minúsculas o un ejemplo («nombre@empresa.com» también es texto de un idioma).
  * - `i18n/no-module-level-t`: `t('…')` solo dentro de funciones. Una constante del módulo se calcula
  *   una vez al cargar y se quedaría en ese idioma: un cambio de idioma en caliente no la traduciría.
+ * - `i18n/no-hardcoded-locale`: fechas, horas, números y comparaciones solo en el idioma ACTIVO. Prohíbe un idioma
+ *   escrito (`toLocaleString('es-MX')`, `new Intl.NumberFormat('en-US')`) y omitirlo (`toLocaleDateString()`,
+ *   `new Intl.DateTimeFormat()`, `a.localeCompare(b)`), que usa el idioma del NAVEGADOR: en un teléfono en inglés con la
+ *   app en español saldría «Oct 5» en una pantalla en español. Se usan los ayudantes de `utils/format.ts` y
+ *   `utils/numbers.ts` o `currentLocale()`.
  */
 
 /** Atributos JSX que nunca se ven: su valor no se traduce. */
@@ -31,6 +40,9 @@ const HIDDEN_ATTRIBUTES = new Set([
 
 /** `aria-*` que sí se leen en voz alta (los demás son referencias o estados). */
 const SPOKEN_ARIA = new Set(['aria-label', 'aria-description', 'aria-valuetext', 'aria-roledescription', 'aria-placeholder']);
+
+/** Atributos que SIEMPRE son texto para la persona (se ven o se leen): cualquier palabra cuenta. */
+const ALWAYS_TEXT = new Set([...SPOKEN_ARIA, 'title', 'placeholder', 'alt']);
 
 /** Propiedades de objetos (y parámetros) cuyo valor se muestra a la persona. */
 const TEXT_PROPERTIES = new Set([
@@ -103,6 +115,9 @@ function propertyName(node) {
 
 const MESSAGE = 'Texto visible escrito en el código ("{{text}}"): va en los diccionarios es-MX y en-US y se muestra con t()/useT().';
 
+/** `Error`, `TypeError`... (`new Error('…')` o `Error('…')`). */
+const isErrorConstructor = (callee) => callee.type === 'Identifier' && /^([A-Z][a-zA-Z]*)?Error$/.test(callee.name);
+
 const noHardcodedText = {
   meta: {
     type: 'problem',
@@ -122,8 +137,12 @@ const noHardcodedText = {
         if (node.parent.type === 'JSXElement' || node.parent.type === 'JSXFragment') check(node.expression, visibleInJsx);
       },
       JSXAttribute(node) {
-        if (!node.value || isHiddenAttribute(attributeName(node))) return;
-        check(node.value.type === 'JSXExpressionContainer' ? node.value.expression : node.value, looksLikeText);
+        const name = attributeName(node);
+        if (!node.value || isHiddenAttribute(name)) return;
+        check(node.value.type === 'JSXExpressionContainer' ? node.value.expression : node.value, ALWAYS_TEXT.has(name) ? visibleInJsx : looksLikeText);
+      },
+      NewExpression(node) {
+        if (isErrorConstructor(node.callee)) check(node.arguments[0], looksLikeText);
       },
       Property(node) {
         const name = propertyName(node);
@@ -133,6 +152,7 @@ const noHardcodedText = {
       },
       CallExpression(node) {
         const callee = node.callee;
+        if (isErrorConstructor(callee)) check(node.arguments[0], looksLikeText);
         if (callee.type !== 'MemberExpression' || callee.property.type !== 'Identifier' || !FEEDBACK_SHORTCUTS.has(callee.property.name)) return;
         if (callee.object.type === 'Identifier' && callee.object.name === 'console') return;
         check(node.arguments[0], looksLikeText);
@@ -172,7 +192,54 @@ const noModuleLevelT = {
   },
 };
 
+/** Métodos que formatean o comparan según un idioma: en qué argumento va el idioma. */
+const LOCALE_METHODS = { toLocaleString: 0, toLocaleDateString: 0, toLocaleTimeString: 0, toLocaleUpperCase: 0, toLocaleLowerCase: 0, localeCompare: 1 };
+
+/** Un idioma escrito a mano: `'es-MX'`, `"en"`, `['es-MX']`. */
+function isLiteralLocale(node) {
+  if (node.type === 'Literal') return typeof node.value === 'string';
+  if (node.type === 'TemplateLiteral') return node.expressions.length === 0;
+  return node.type === 'ArrayExpression' && node.elements.some((element) => element && isLiteralLocale(element));
+}
+
+const noHardcodedLocale = {
+  meta: {
+    type: 'problem',
+    docs: { description: 'Fechas, horas, números y comparaciones en el idioma activo: ni un idioma escrito ni el del navegador.' },
+    messages: {
+      literal: 'Idioma escrito a mano ("{{name}}"): usa el idioma activo (utils/format.ts, utils/numbers.ts o currentLocale()).',
+      missing: '"{{name}}" sin idioma usa el del navegador, no el de la app: pásale currentLocale() o usa utils/format.ts / utils/numbers.ts.',
+    },
+    schema: [],
+  },
+  create(context) {
+    const inspect = (node, name, locale) => {
+      if (!locale) context.report({ node, messageId: 'missing', data: { name } });
+      else if (isLiteralLocale(locale)) context.report({ node: locale, messageId: 'literal', data: { name } });
+    };
+    const intl = (node) => {
+      const callee = node.callee;
+      if (callee.type === 'MemberExpression' && callee.object.type === 'Identifier' && callee.object.name === 'Intl' && callee.property.type === 'Identifier') {
+        inspect(node, `Intl.${callee.property.name}`, node.arguments[0]);
+      }
+    };
+    return {
+      NewExpression: intl,
+      CallExpression(node) {
+        intl(node);
+        const callee = node.callee;
+        if (callee.type !== 'MemberExpression' || callee.property.type !== 'Identifier' || !Object.hasOwn(LOCALE_METHODS, callee.property.name)) return;
+        const name = callee.property.name;
+        // `toLocaleUpperCase()`/`toLocaleLowerCase()` sin idioma solo cambian mayúsculas: se marcan solo con un idioma escrito.
+        const optional = name === 'toLocaleUpperCase' || name === 'toLocaleLowerCase';
+        const locale = node.arguments[LOCALE_METHODS[name]];
+        if (locale || !optional) inspect(node, name, locale);
+      },
+    };
+  },
+};
+
 export default {
   meta: { name: 'i18n' },
-  rules: { 'no-hardcoded-text': noHardcodedText, 'no-module-level-t': noModuleLevelT },
+  rules: { 'no-hardcoded-text': noHardcodedText, 'no-module-level-t': noModuleLevelT, 'no-hardcoded-locale': noHardcodedLocale },
 };

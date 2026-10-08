@@ -5,6 +5,7 @@ import { locationProblemMessage } from '../../components/location/locationMessag
 import { QrScanPanel } from '../../components/QrScanPanel';
 import { VerificationAttempt, type VerificationOutcome } from '../../components/VerificationAttempt';
 import { ValidatorModeBadge, availableMethods } from '../../components/ValidatorModes';
+import { Avatar } from '../../components/ui/Avatar';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { PagedItems } from '../../components/ui/PagedItems';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
@@ -163,6 +164,7 @@ function RecentList({ list }: { list: PagedList<CheckpointEvent> }) {
         {events.map((event) => (
           <li key={event.id} className={event.success ? 'is-ok' : 'is-failed'}>
             {event.success ? <CheckCircle2 size={20} aria-label={t('checkpoint.recent.identified')} /> : <XCircle size={20} aria-label={t('checkpoint.recent.notIdentified')} />}
+            {event.employee_name && <Avatar name={event.employee_name} src={event.avatar} size="sm" decorative />}
             <span className="recent-list__info">
               <strong className="truncate">{event.employee_name ?? t('checkpoint.recent.notIdentified')}</strong>
               <small className="muted">

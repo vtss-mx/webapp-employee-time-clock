@@ -24,12 +24,12 @@ vi.mock('../../components/LiveFaceFlow', () => ({
   LiveFaceFlow: ({ title, onSubmit, onFatal }: { title: string; onSubmit: (c: CapturedFace) => Promise<void>; onFatal: (error: unknown) => void }) => (
     <div>
       <h1>{title}</h1>
-      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false }).catch(onFatal)}>capturar rostro</button>
+      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] }).catch(onFatal)}>capturar rostro</button>
     </div>
   ),
 }));
 
-const QR_CARD = /QR.*Credencial impresa o en el teléfono/;
+const QR_CARD = /QR.*Código dinámico en el teléfono/;
 const FACE_CARD = /Rostro.*se busca entre todo el personal/;
 const watchers: Array<{ ok: PositionCallback; fail: PositionErrorCallback }> = [];
 const located: CheckpointProfile = { ...sampleCheckpoint, location_required: true };

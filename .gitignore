@@ -4,3 +4,6 @@ dist
 .env.local
 public/mediapipe
 *.tsbuildinfo
+# Salida de `npm run coverage` / jscpd y metadatos de Finder: nunca al repositorio
+coverage
+.DS_Store

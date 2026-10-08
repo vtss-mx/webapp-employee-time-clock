@@ -33,6 +33,8 @@ const OPTIONS = {
   qr_only_attendance: 'qrOnlyAttendance',
   risk_engine: 'riskEngine',
   fraud_evidence: 'fraudEvidence',
+  voice_verification: 'voiceVerification',
+  voice_guidance_enabled: 'voiceGuidance',
 } as const;
 
 /** Ajustes con su texto en `policy.tuning.<id>.label`. */
@@ -68,14 +70,20 @@ const RISK = {
 export const PRESENCE_FIELDS = {
   validator_signing: 'signing',
   validator_location: 'location',
+  // Ubicación de cada verificación de identidad (empleado, validador y API; decisión del dueño, 2026-10-07): su modo
+  // (OFF/OBSERVE/ENFORCE) decide si la verificación la envía y si el servidor la exige para completarse.
+  verification_location: 'verificationLocation',
   site_codes: 'siteCodes',
 } as const;
 
 /** Campos cuyo valor es un código de un catálogo (se muestra su nombre). */
-const CATALOG_FIELDS: Partial<Record<string, 'antispoof_levels' | 'flash_modes' | 'employee_device_modes' | 'risk_actions' | 'signal_modes'>> = {
+const CATALOG_FIELDS: Partial<Record<string, 'antispoof_levels' | 'flash_modes' | 'employee_device_modes' | 'risk_actions' | 'signal_modes' | 'voice_profiles'>> = {
+  // Voz de la guía por audio (decisión del dueño, 2026-10-08): su valor es un código del catálogo `voice_profiles`.
+  voice_profile: 'voice_profiles',
   // Prueba de presencia (antifraude 2b): firma por petición, ubicación del validador y código de sitio.
   validator_signing: 'signal_modes',
   validator_location: 'signal_modes',
+  verification_location: 'signal_modes',
   site_codes: 'signal_modes',
   anti_spoofing_level: 'antispoof_levels',
   flash_liveness: 'flash_modes',
@@ -101,6 +109,7 @@ export function fieldLabel(field: string, policy: Pick<AdminVerificationPolicy, 
   if (has(TUNINGS, field)) return t(`policy.tuning.${TUNINGS[field]}.label`);
   if (has(RISK, field)) return t(`policy.risk.fields.${RISK[field]}`);
   if (has(PRESENCE_FIELDS, field)) return t(`policy.presence.${PRESENCE_FIELDS[field]}.label`);
+  if (field === 'voice_profile') return t('policy.voice.profile.label');
   const accessory = ruledAccessories(catalogs.accessories).find((a) => a.rule === field);
   if (accessory) return t('policy.accessories.remove', { phrase: accessory.item.phrase });
   const signal = /^risk_signals\.([A-Z0-9_]+)\.(mode|points)$/.exec(field);

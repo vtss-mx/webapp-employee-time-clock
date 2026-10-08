@@ -42,6 +42,13 @@ export interface ChallengeCapture {
 export type LivenessAction = 'TURN_LEFT' | 'TURN_RIGHT' | 'LOOK_UP' | 'LOOK_DOWN' | 'MOVE_CLOSER';
 
 /**
+ * Para qué se pide el reto (`POST /face/challenge?purpose=`): una verificación (los 1 a 3 movimientos de la política de
+ * la empresa) o el registro facial, que pide SIEMPRE los cuatro movimientos de la cabeza (derecha, izquierda, arriba y
+ * abajo, en orden al azar; decisión del dueño, 2026-10-07) con la vuelta al frente entre uno y otro.
+ */
+export type ChallengePurpose = 'VERIFICATION' | 'ENROLLMENT';
+
+/**
  * Reto de prueba de vida (de uso único): la pantalla destella los colores de `flash` (una captura por
  * color) y la persona hace cada movimiento de `actions` (una captura por movimiento), antes de
  * `expires_in` segundos. Los mínimos son los vigentes de la plataforma (se endurecen solos).
@@ -53,7 +60,7 @@ export interface FaceChallenge extends ChallengeCapture {
   /** Primer movimiento (igual a `actions[0]`). */
   action: LivenessAction | null;
   instruction: string | null;
-  /** Movimientos en orden (de uno a tres; nunca el mismo dos veces seguidas). */
+  /** Movimientos en orden: de uno a tres en una verificación (nunca el mismo dos veces seguidas); los cuatro en el registro. */
   actions: LivenessAction[];
   instructions: string[];
   /** Giro mínimo (nariz respecto a los ojos / distancia entre ojos). */

@@ -22,6 +22,8 @@ function page<K extends string>(load: () => Promise<Record<K, ComponentType>>, n
 // Públicas y comunes
 export const LoginPage = page(() => import('../pages/LoginPage'), 'LoginPage');
 export const ProfilePage = page(() => import('../pages/ProfilePage'), 'ProfilePage');
+/** Llave de acceso (WebAuthn): registrar una en este dispositivo o renombrarla (Mi perfil → Llaves de acceso). */
+export const PasskeyFormPage = page(() => import('../pages/PasskeyFormPage'), 'PasskeyFormPage');
 export const ForbiddenPage = page(() => import('../pages/ForbiddenPage'), 'ForbiddenPage');
 export const NotFoundPage = page(() => import('../pages/NotFoundPage'), 'NotFoundPage');
 /** Tableta de un sitio (pública, sin sesión): el código que el personal escanea o escribe al checar. */
@@ -38,6 +40,7 @@ export const RejectPolicyChangePage = page(() => import('../pages/admin/RejectPo
 export const CompanyEmployeesPage = page(() => import('../pages/admin/CompanyEmployeesPage'), 'CompanyEmployeesPage');
 export const CompanyDocumentUploadPage = page(() => import('../pages/admin/CompanyDocumentUploadPage'), 'CompanyDocumentUploadPage');
 export const FaceSecurityPage = page(() => import('../pages/admin/FaceSecurityPage'), 'FaceSecurityPage');
+export const DriftPage = page(() => import('../pages/admin/drift/DriftPage'), 'DriftPage');
 export const BillingPage = page(() => import('../pages/admin/billing/BillingPage'), 'BillingPage');
 export const CompanyBillingPage = page(() => import('../pages/admin/billing/CompanyBillingPage'), 'CompanyBillingPage');
 export const PaymentFormPage = page(() => import('../pages/admin/billing/PaymentFormPage'), 'PaymentFormPage');
@@ -85,6 +88,7 @@ export const EmployeeDetailPage = page(() => import('../pages/company/EmployeeDe
 export const EmployeeEditPage = page(() => import('../pages/company/EmployeeEditPage'), 'EmployeeEditPage');
 export const EmployeeFacePage = page(() => import('../pages/company/EmployeeFacePage'), 'EmployeeFacePage');
 export const ValidationsPage = page(() => import('../pages/company/ValidationsPage'), 'ValidationsPage');
+export const VerificationsPage = page(() => import('../pages/company/VerificationsPage'), 'VerificationsPage');
 export const ValidationReviewPage = page(() => import('../pages/company/ValidationReviewPage'), 'ValidationReviewPage');
 export const ApiKeysPage = page(() => import('../pages/company/ApiKeysPage'), 'ApiKeysPage');
 export const ApiKeyFormPage = page(() => import('../pages/company/ApiKeyFormPage'), 'ApiKeyFormPage');
@@ -99,6 +103,13 @@ export const CheckpointPage = page(() => import('../pages/validator/CheckpointPa
 
 // EMPLOYEE
 export const EnrollmentPage = page(() => import('../pages/employee/EnrollmentPage'), 'EnrollmentPage');
+/** Los tres pasos del registro facial, cada uno en su pantalla (decisión del dueño, 2026-10-07). */
+export const EnrollmentPhotoPage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentPhotoPage');
+export const EnrollmentCapturePage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentCapturePage');
+export const EnrollmentVoicePage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentVoicePage');
+/** Documentos de identidad del onboarding (decisión del dueño, 2026-10-07). */
+export const EmployeeDocumentsPage = page(() => import('../pages/employee/EmployeeDocumentsPages'), 'EmployeeDocumentsPage');
+export const EmployeeDocumentUploadPage = page(() => import('../pages/employee/EmployeeDocumentsPages'), 'EmployeeDocumentUploadPage');
 export const MyAttendancePage = page(() => import('../pages/employee/attendance/MyAttendancePage'), 'MyAttendancePage');
 export const AttendanceRecordPage = page(() => import('../pages/employee/attendance/AttendanceRecordPage'), 'AttendanceRecordPage');
 export const MyAttendanceHistoryPage = page(() => import('../pages/employee/attendance/MyAttendanceHistoryPage'), 'MyAttendanceHistoryPage');

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setLocale } from '../i18n/core';
-import { TAX_ID_TYPES } from '../test/taxIdTypes';
+import { TAX_ID_TYPES } from '../test/catalogs';
 import { DeviceKeyError } from './deviceKey';
 import { validateCompanyForm, validateEmployeeForm } from './formRules';
 import { countryDirectory, validatePhone } from './phone';
@@ -55,10 +55,10 @@ describe('validación en inglés (en-US)', () => {
       first_name: 'First name is required',
       last_name: 'Only letters, spaces, apostrophes, periods, and hyphens',
       birth_date: 'Date of birth is required',
-      employee_number: 'Employee number is required',
       phone: 'Phone number is required',
     });
-    // RFC, CURP and NSS are optional: blank means not provided.
+    // The employee number, RFC, CURP, and NSS are optional: blank means not provided.
+    expect(errors).not.toHaveProperty('employee_number');
     expect(errors).not.toHaveProperty('rfc');
     expect(errors).not.toHaveProperty('curp');
     expect(errors).not.toHaveProperty('nss');

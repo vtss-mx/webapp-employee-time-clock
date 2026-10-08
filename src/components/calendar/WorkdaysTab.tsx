@@ -6,6 +6,7 @@ import { paths } from '../../routes/paths';
 import { calendarService } from '../../services/calendarService';
 import type { Workday } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
+import { employeeLabel } from '../../utils/employeeLabel';
 import { formatDate } from '../../utils/format';
 import { DeletedNote, deleteNote, listEmpty, RestoreButton } from '../trash/TrashParts';
 import { useRestore, type RestoreQuestion } from '../trash/useRestore';
@@ -17,7 +18,7 @@ import { EmployeeCard } from './EmployeeCard';
 
 /** Un día laborable especial en una confirmación: de quién y qué día. */
 const workdayFacts = ({ employee, work_date }: Workday) => [
-  { label: t('common.fields.employee'), value: `${employee.full_name} · ${employee.employee_number}` },
+  { label: t('common.fields.employee'), value: employeeLabel(employee) },
   { label: t('calendar.fields.day'), value: longDate(work_date) },
 ];
 

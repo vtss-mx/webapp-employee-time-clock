@@ -4,6 +4,7 @@
 // Las horas `HH:MM:SS` son de la hora del negocio; las fechas y horas completas viajan en UTC y se
 // muestran con `formatDateTime` / `formatTime` (zona del negocio).
 
+import type { WithAvatar } from './avatar';
 import type { DayOff } from './calendar';
 import type { Address, Page, VerificationResult } from './index';
 import type { DeletedFlag, SoftDeleted } from './trash';
@@ -131,10 +132,11 @@ export interface AssignmentPayload {
 
 export type ShiftRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
-export interface EmployeeRef extends DeletedFlag {
+export interface EmployeeRef extends DeletedFlag, WithAvatar {
   id: number;
   full_name: string;
-  employee_number: string;
+  /** Opcional (decisión del dueño del producto): null = sin número. */
+  employee_number: string | null;
 }
 
 export interface ShiftRequest {

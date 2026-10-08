@@ -20,6 +20,7 @@ import { calendarService } from '../../../services/calendarService';
 import { fieldErrorsFrom } from '../../../services/http/envelope';
 import type { DayOffTypeItem } from '../../../types';
 import { businessToday } from '../../../utils/format';
+import { inSentence } from '../../../utils/text';
 
 interface AbsenceRequestValues {
   type: string;
@@ -61,7 +62,7 @@ function rangeHint(values: AbsenceRequestValues): string {
 /** Lo que se confirma y se avisa al pedir los días (se arma al dibujarse: sigue al idioma activo). */
 function absenceRequestSummary(values: AbsenceRequestValues, typeName: string) {
   return {
-    title: t('myAttendance.absenceForm.confirm.title', { type: typeName.toLowerCase() }),
+    title: t('myAttendance.absenceForm.confirm.title', { type: inSentence(typeName) }),
     details: absenceFacts({ ...values, days: spanDays(values.starts_on, values.ends_on) }, typeName),
     done: t('myAttendance.absenceForm.confirm.done'),
   };

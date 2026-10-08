@@ -13,33 +13,27 @@ export interface FaceChallengeCapture {
 export interface FaceCaptures {
   frontal: Blob[];
   challenge?: FaceChallengeCapture;
-  /** Una captura por cada color del destello del reto, en el orden en que se pintaron. */
-  flash?: Blob[];
   /** Nombre de la cámara usada (el backend rechaza las cámaras virtuales). */
   camera?: string;
   /** Telemetría de la toma (JSON, `utils/captureTelemetry.ts`): señales del motor de riesgo, solo números. */
   telemetry?: string;
   /** Reto que firma la llave de este dispositivo (`device_nonce` del reto; solo del propio empleado, decisión D2). */
   deviceNonce?: string;
-  /** Antifraude 2a: la hoja de la ráfaga de recortes del rostro y el comprobante del destello dictado por el servidor. */
+  /** Antifraude 2a: la hoja de la ráfaga de recortes del rostro. */
   burst?: FaceBurst;
-  flashReceipt?: string;
 }
 
 /**
- * Multipart con las capturas frontales, las del reto (una por movimiento), las del destello (una por
- * color; el orden importa: el servidor compara cada una con el color que se pintó, y con el destello dictado, con la
- * huella que se comprometió), la ráfaga, la cámara y la telemetría.
+ * Multipart con las capturas frontales, las del reto (una por movimiento), la ráfaga, la cámara y la telemetría. (El
+ * destello de colores se retiró de la experiencia por decisión del dueño, 2026-10-06: ya no viajan capturas de colores.)
  */
-export function buildFaceForm({ frontal, challenge, flash = [], camera, telemetry, burst, flashReceipt }: FaceCaptures, extra: Record<string, string> = {}): FormData {
+export function buildFaceForm({ frontal, challenge, camera, telemetry, burst }: FaceCaptures, extra: Record<string, string> = {}): FormData {
   const form = new FormData();
   Object.entries(extra).forEach(([key, value]) => form.append(key, value));
   frontal.forEach((image, i) => form.append('images', image, `frontal-${i + 1}.jpg`));
   if (challenge) {
     form.append('challenge_id', challenge.id);
     challenge.images.forEach((image, i) => form.append('challenge_image', image, `challenge-${i + 1}.jpg`));
-    flash.forEach((image, i) => form.append('flash_image', image, `flash-${i + 1}.jpg`));
-    if (flashReceipt) form.append('flash_receipt', flashReceipt);
     if (burst) {
       form.append('burst', burst.image, 'burst.jpg');
       form.append('burst_meta', burst.meta);

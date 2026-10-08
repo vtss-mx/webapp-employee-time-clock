@@ -1,4 +1,6 @@
 // Antifraude de identidad: motor de riesgo, casos de fraude (los revisa el ADMIN) y gobierno de la política.
+import type { WithAvatar } from './avatar';
+import type { EmployeeRef } from './shifts';
 import type { CatalogItem, Page, PageQuery, StatusItem } from './index';
 
 /** Una señal del motor de riesgo en un intento: lo medido, su umbral, sus puntos y su modo (solo la ve el ADMIN). */
@@ -30,7 +32,7 @@ export interface FraudCase {
   reason: string;
   reason_name: string;
   /** La ficha de trabajo del empleado (nombre y número) o, si no se supo quién era, la cuenta que operó la cámara. */
-  employee: { id: number; full_name: string; employee_number: string } | null;
+  employee: EmployeeRef | null;
   actor: string | null;
   attempts: number;
   max_score: number | null;
@@ -122,10 +124,11 @@ export interface FraudCaseQuery extends PageQuery {
 }
 
 /** Un empleado aprobado cuyo rostro se parece al del registro (marca POSSIBLE_DUPLICATE). */
-export interface SimilarEmployee {
+export interface SimilarEmployee extends WithAvatar {
   employee_id: number;
   full_name: string;
-  employee_number: string;
+  /** Opcional (decisión del dueño del producto): null = sin número. */
+  employee_number: string | null;
   /** Similitud de 0 a 1. */
   similarity: number;
 }

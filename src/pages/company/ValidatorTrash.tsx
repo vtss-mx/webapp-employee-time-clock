@@ -28,7 +28,7 @@ interface DeletedValidatorItemProps {
 export function DeletedValidatorItem({ validator, busy, disabled, onRestore }: DeletedValidatorItemProps) {
   return (
     <li>
-      <Avatar name={validator.name} decorative />
+      <Avatar name={validator.name} src={validator.avatar} decorative />
       <span className="validator-list__info">
         <strong className="truncate">{validator.name}</strong>
         <small className="muted truncate">{validator.email}</small>

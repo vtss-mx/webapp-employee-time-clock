@@ -1,9 +1,7 @@
 import { RotateCcw, ScanFace, Users } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ReasonFormPanel } from '../../components/ReasonFormPanel';
-import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
-import { RetryState } from '../../components/ui/RetryState';
-import { SkeletonCard } from '../../components/ui/Skeleton';
+import { ResourceFallback } from '../../components/ui/ResourceFallback';
 import { useFeedback } from '../../hooks/useFeedback';
 import { useResource } from '../../hooks/useResource';
 import { t, useT } from '../../i18n';
@@ -70,18 +68,7 @@ export function ReverifyIdentityPage() {
 
   const back = () => void navigate(paths.company.employee(employeeId));
   if (!employee) {
-    return error ? (
-      <div className="page">
-        <Panel>
-          <PanelHeader title={t('employees.reverify.title')} backTo={paths.company.employee(employeeId)} backLabel={t('common.fields.employee')} />
-          <PanelSection>
-            <RetryState onRetry={retry} />
-          </PanelSection>
-        </Panel>
-      </div>
-    ) : (
-      <SkeletonCard lines={4} />
-    );
+    return <ResourceFallback error={error} retry={retry} lines={4} header={{ title: t('employees.reverify.title'), backTo: paths.company.employee(employeeId), backLabel: t('common.fields.employee') }} />;
   }
   return (
     <ReasonFormPanel

@@ -10,8 +10,8 @@ import { describeDevice } from '../../utils/userAgent';
 import type { MessageInput } from '../MessageDialog';
 import { Avatar } from '../ui/Avatar';
 
-/** La cuenta que se cierra: quién es, en qué empresa y desde qué dispositivo. */
-function LogoutCard({ user, role }: { user: User; role: string }) {
+/** La cuenta que se cierra: quién es, en qué empresa y desde qué dispositivo. `role` se pide al dibujarse. */
+function LogoutCard({ user, role }: { user: User; role: () => string }) {
   const t = useT();
   const name = user.employee?.full_name ?? user.email;
   const device = describeDevice(navigator.userAgent);
@@ -22,7 +22,7 @@ function LogoutCard({ user, role }: { user: User; role: string }) {
         <span className="logout-card__identity">
           <strong className="truncate">{name}</strong>
           {name !== user.email && <span className="muted small truncate">{user.email}</span>}
-          <span className="logout-card__role">{[role, user.company?.name].filter(Boolean).join(' · ')}</span>
+          <span className="logout-card__role">{[role(), user.company?.name].filter(Boolean).join(' · ')}</span>
         </span>
       </div>
       <dl className="logout-card__session">
@@ -47,9 +47,10 @@ function LogoutCard({ user, role }: { user: User; role: string }) {
 
 /**
  * Popup "¿Cerrar sesión?" con la cuenta y lo que implica salir según el
- * rol, en el idioma activo (quien lo abre lo pide al dibujarse para que siga al idioma).
+ * rol, en el idioma activo (quien lo abre lo pide al dibujarse para que siga al idioma). `role` es una función: el
+ * nombre del rol sale de los catálogos vigentes al dibujarse (al cambiar el idioma, en el nuevo).
  */
-export function logoutMessage(user: User, role: string): MessageInput {
+export function logoutMessage(user: User, role: () => string): MessageInput {
   return {
     variant: 'warning',
     icon: <LogOut size={30} />,
@@ -77,8 +78,7 @@ export function useConfirmLogout() {
   const { nameOf } = useCatalogs();
   return useCallback(async () => {
     if (!user) return;
-    const role = nameOf('roles', user.role);
-    const choice = await feedback.show(() => logoutMessage(user, role));
+    const choice = await feedback.show(() => logoutMessage(user, () => nameOf('roles', user.role)));
     if (choice === 'logout') {
       await logout();
     } else if (choice === 'everywhere') {

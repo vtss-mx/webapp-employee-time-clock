@@ -4,12 +4,10 @@ import { useId, type CSSProperties } from 'react';
 const TURN = 360;
 
 interface ProgressRingProps {
-  /** Avance 0..1 (se acota): el arco crece de forma continua hasta él. */
+  /** Avance 0..1 (se acota): el arco llega a él al instante. */
   value: number;
   /** Grosor del trazo en unidades del dibujo (el anillo mide 100 × 100: crece con el círculo que rodea). */
   thickness?: number;
-  /** Algo se está tomando ahora: una luz suave late en la punta del arco (se apaga con "reducir movimiento"). */
-  active?: boolean;
   /** Texto para lectores de pantalla; sin él, el anillo es decorativo (lo explica el texto que lo acompaña). */
   label?: string;
   className?: string;
@@ -21,24 +19,22 @@ export function ringValue(value: number): number {
 }
 
 /**
- * Anillo de avance continuo (componente propio, regla 12): una pista fina con `--ring-track` y un arco con puntas
- * redondas y el degradado de `--ring-from` a `--ring-to` (tokens del tema; cada pantalla los personaliza). Empieza
- * arriba y avanza en el sentido del reloj.
+ * Anillo de avance (componente propio, regla 12): una pista fina con `--ring-track` y un arco con puntas redondas del
+ * color `--ring-from` → `--ring-to` (hoy un solo color; tokens del tema que cada pantalla personaliza). Empieza arriba y
+ * avanza en el sentido del reloj.
  *
- * Fluido y barato en un teléfono: el avance solo cambia el `stroke-dashoffset` del arco y el giro de su punta; el CSS
- * los lleva a su destino con una transición larga y suave que, si llega otro valor a medio camino (una ráfaga de fotos),
- * parte de donde va: el arco nunca salta. Nada se vuelve a dibujar en React por cuadro y "reducir movimiento" deja los
- * estados al instante.
+ * Decisión del dueño del producto (2026-10-06, «algo más enterprise»): estados fijos. El avance solo cambia el
+ * `stroke-dashoffset` del arco y se ve AL INSTANTE: sin transiciones, sin luces en la punta ni brillos. Nada se vuelve
+ * a dibujar en React por cuadro.
  */
-export function ProgressRing({ value, thickness = 1.2, active = false, label, className }: ProgressRingProps) {
+export function ProgressRing({ value, thickness = 1.2, label, className }: ProgressRingProps) {
   // `useId` puede traer caracteres que no sirven dentro de `url(#…)`: se dejan solo letras, números, - y _.
   const id = `ring-${useId().replace(/[^\w-]/g, '')}`;
   const ratio = ringValue(value);
-  // Una unidad libre por fuera: la luz de la punta y el suavizado del borde caben en el dibujo.
+  // Una unidad libre por fuera: el suavizado del borde cabe en el dibujo.
   const radius = 49 - thickness / 2;
   const arc = { strokeDashoffset: TURN - ratio * TURN } as CSSProperties;
-  const head = { transform: `rotate(${ratio * TURN}deg)` } as CSSProperties;
-  const classes = ['progress-ring', ratio > 0 && 'progress-ring--started', active && 'progress-ring--active', className].filter(Boolean).join(' ');
+  const classes = ['progress-ring', ratio > 0 && 'progress-ring--started', className].filter(Boolean).join(' ');
   return (
     <svg
       className={classes}
@@ -66,10 +62,6 @@ export function ProgressRing({ value, thickness = 1.2, active = false, label, cl
           stroke={`url(#${id}-fill)`}
           style={arc}
         />
-        <g className="progress-ring__head" style={head}>
-          <circle className="progress-ring__glow" cx={50 + radius} cy="50" r={thickness * 1.7} />
-          <circle className="progress-ring__spark" cx={50 + radius} cy="50" r={thickness * 0.42} />
-        </g>
       </g>
     </svg>
   );

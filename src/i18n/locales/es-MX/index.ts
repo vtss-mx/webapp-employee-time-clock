@@ -13,7 +13,9 @@ import departments from './departments';
 import devices from './devices';
 import dialogs from './dialogs';
 import documents from './documents';
+import drift from './drift';
 import employee from './employee';
+import employeeDocuments from './employeeDocuments';
 import employees from './employees';
 import enrollments from './enrollments';
 import errors from './errors';
@@ -28,6 +30,7 @@ import language from './language';
 import layout from './layout';
 import location from './location';
 import myAttendance from './myAttendance';
+import passkeys from './passkeys';
 import performance from './performance';
 import policy from './policy';
 import profile from './profile';
@@ -41,6 +44,7 @@ import ui from './ui';
 import usage from './usage';
 import validators from './validators';
 import verification from './verification';
+import voice from './voice';
 
 /**
  * Textos de la interfaz en español de México: el idioma por omisión y la fuente de las llaves
@@ -63,7 +67,9 @@ const esMX = {
   devices,
   dialogs,
   documents,
+  drift,
   employee,
+  employeeDocuments,
   employees,
   enrollments,
   errors,
@@ -78,6 +84,7 @@ const esMX = {
   layout,
   location,
   myAttendance,
+  passkeys,
   performance,
   policy,
   profile,
@@ -91,6 +98,7 @@ const esMX = {
   usage,
   validators,
   verification,
+  voice,
 } as const;
 
 export default esMX;

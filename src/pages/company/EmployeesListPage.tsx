@@ -90,7 +90,7 @@ export function EmployeesListPage() {
                     <Avatar name={emp.full_name} src={emp.avatar} decorative />
                     <span className="person__info">
                       <strong className="truncate">{emp.full_name}</strong>
-                      <small>{emp.employee_number}</small>
+                      {emp.employee_number && <small>{emp.employee_number}</small>}
                     </span>
                   </span>
                 </td>

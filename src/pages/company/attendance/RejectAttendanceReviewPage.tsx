@@ -11,6 +11,7 @@ import { paths } from '../../../routes/paths';
 import { attendanceService } from '../../../services/attendanceService';
 import type { CompanySessionDetail } from '../../../types';
 import type { ConfirmInput } from '../../../types/confirm';
+import { employeeLabel } from '../../../utils/employeeLabel';
 import { formatDate } from '../../../utils/format';
 
 const MIN_NOTE = 3;
@@ -28,7 +29,7 @@ function rejectConfirm(session: CompanySessionDetail, note: string): ConfirmInpu
     title: t('attendance.review.rejectPage.confirmTitle', { name: session.employee.full_name }),
     message: t('attendance.review.rejectPage.confirmMessage'),
     details: [
-      { label: t('common.fields.employee'), value: `${session.employee.full_name} · ${session.employee.employee_number}` },
+      { label: t('common.fields.employee'), value: employeeLabel(session.employee) },
       { label: t('common.fields.date'), value: formatDate(session.work_date) },
       { label: t('attendance.review.rejectPage.label'), value: note },
     ],

@@ -1,0 +1,98 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/profile';
+
+/** Textos de Mi perfil: cuenta, idioma, contraseña y sesiones en portugués de Brasil (pt-BR): las mismas llaves que es-MX. */
+export default {
+  title: 'Meu perfil',
+  subtitle: 'Sua conta, senha e sessões ativas',
+  refreshFailed: 'Não foi possível atualizar suas informações',
+  account: {
+    title: 'Conta',
+    lastLogin: 'Último acesso',
+    createdAt: 'Conta criada',
+  },
+  language: {
+    title: 'Idioma',
+  },
+  photo: {
+    title: 'Foto de perfil',
+    description: 'Identifica você no menu, no seu perfil e nas listas da sua empresa. Fica guardada criptografada e sem a localização nem os dados da câmera.',
+    saveAsk: {
+      eyebrow: 'Sua foto de perfil',
+      titleNew: 'Salvar esta foto de perfil?',
+      titleReplace: 'Trocar sua foto de perfil?',
+      message: 'Assim ela aparecerá no seu perfil, no menu e nas listas da sua empresa.',
+      file: 'Arquivo',
+      note: 'Antes de salvá-la, a localização e os dados da câmera são removidos.',
+      replaceNote: 'Sua foto anterior é excluída. Antes de salvar a nova, a localização e os dados da câmera são removidos.',
+      confirm: 'Salvar foto',
+    },
+    removeAsk: {
+      eyebrow: 'Sua foto de perfil',
+      title: 'Remover sua foto de perfil?',
+      message: 'No lugar dela aparecerão suas iniciais.',
+      note: 'A foto é excluída e não pode ser recuperada.',
+      confirm: 'Remover foto',
+    },
+    saveFailed: 'Não foi possível salvar sua foto',
+    removeFailed: 'Não foi possível remover sua foto',
+  },
+  password: {
+    title: 'Alterar senha',
+    current: 'Senha atual',
+    new: 'Nova senha',
+    confirm: 'Confirmar nova senha',
+    submit: 'Atualizar senha',
+    submitDisabled: 'Preencha corretamente todos os campos obrigatórios',
+    currentRequired: 'Digite sua senha atual',
+    mustDiffer: 'Deve ser diferente da atual',
+    failed: 'Não foi possível alterar a senha',
+    changed: 'Senha atualizada',
+    revoked_zero: 'Sua sessão atual continua ativa.',
+    revoked_one: 'A sessão foi encerrada em mais {count} dispositivo.',
+    revoked_other: 'A sessão foi encerrada em mais {count} dispositivos.',
+    ask: {
+      eyebrow: 'Segurança da sua conta',
+      title: 'Alterar sua senha?',
+      message: 'A partir de agora você entrará com a nova senha.',
+      otherDevices: 'Sua sessão será encerrada nos seus outros dispositivos.',
+      thisDevice: 'Este dispositivo continuará com a sessão aberta.',
+      confirm: 'Alterar senha',
+    },
+  },
+  sessions: {
+    title: 'Sessões ativas',
+    loadFailed: 'Não foi possível carregar suas sessões',
+    empty: {
+      title: 'Sem sessões abertas',
+      description: 'Aqui você verá os dispositivos com sua sessão aberta.',
+    },
+    noun: {
+      one: 'sessão',
+      other: 'sessões',
+    },
+    thisDevice: 'Este dispositivo',
+    unknownIp: 'IP desconhecido',
+    activity: '{ip} · Ativa {ago} · Iniciada em {started}',
+    hint: 'Não reconhece um dispositivo? Encerre a sessão dele e altere sua senha.',
+    revokeAll: 'Sair de todos os dispositivos',
+    revoke: {
+      eyebrow: 'Sessão ativa',
+      title: 'Encerrar a sessão de {device}?',
+      message: 'Esse dispositivo precisará entrar novamente para usar sua conta.',
+      ip: 'IP',
+      unknown: 'Desconhecido',
+      started: 'Iniciada',
+      failed: 'Não foi possível encerrar a sessão',
+      done: 'Sessão encerrada',
+      doneText: 'Esse dispositivo precisará entrar novamente.',
+    },
+    revokeAllAsk: {
+      eyebrow: 'Todas as suas sessões',
+      title: 'Sair de todos os seus dispositivos?',
+      message: 'Inclui este dispositivo: você precisará entrar novamente.',
+      confirm: 'Sair de todos',
+      failed: 'Não foi possível sair de todos os dispositivos',
+    },
+  },
+} satisfies Translation<typeof es>;

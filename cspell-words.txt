@@ -3,7 +3,9 @@
 # Antes de agregar una palabra se confirma que está bien escrita: estas listas no son para silenciar
 # errores. Lo que solo es correcto en un idioma va en cspell-words.es-MX.txt o cspell-words.en-US.txt.
 
-# Producto, marcas y programas
+# Producto, marcas y programas. La marca «Employee Time Clock» NO va aquí como palabras sueltas: es la única excepción
+# entre idiomas y se reconoce solo como frase completa (ignoreRegExpList de cspell.json y src/test/language.ts); así
+# «Employee» o «Clock» sueltos en un texto en español fallan.
 ETC
 Excel
 Firebase
@@ -11,6 +13,32 @@ Kaspersky
 MediaPipe
 OBS
 Cam
+# Sistemas, equipos, navegadores y programas que las ayudas nombran (cómo dar permiso a la cámara o a la ubicación,
+# qué programa la está usando, de qué tipo es un archivo): nombres propios, iguales en los dos idiomas
+Android
+Apple
+Chrome
+Edge
+Firefox
+Safari
+FaceTime
+Google
+iPad
+iPhone
+Mac
+MacBook
+Maps
+Meet
+PostgreSQL
+Studio
+Teams
+WebDriver
+WebSocket
+Windows
+Word
+Zoom
+# Tecla del teclado (atajo del menú: Ctrl/⌘ + B)
+Ctrl
 # Antifraude (fase 1b): cámara virtual y herramientas de automatización del navegador que nombran las señales
 ManyCam
 Playwright
@@ -21,15 +49,43 @@ WebCrypto
 Hermosillo
 Juárez
 Morelos
+# Siglas técnicas iguales en todos los idiomas: el PIN de un dispositivo (llaves de acceso) y el índice de estabilidad de
+# población (PSI) de la deriva de señales
+PIN
+PSI
 # Siglas de México (identificación fiscal y de población, impuestos, seguridad social, instituciones)
 CURP
 IMSS
+INE
 IVA
 NSS
 RFC
 SAT
-# Siglas técnicas
+# Siglas técnicas (iguales en los dos idiomas) y el nombre del propio equipo en una dirección web
+API
+DOCX
+DTD
 ERP
+HTTP
+HTTPS
+ISO
+JPEG
+JPG
+JSON
+PDF
+PNG
+SQL
+URL
+UTC
+UUID
+VPN
+XLSX
+XML
+localhost
+# Esquema de una dirección web segura (https://)
+https
+# Correctas e iguales en los dos idiomas aunque el diccionario de español no las traiga (RAE: perceptual)
+perceptual
 # Siglas de identificadores fiscales de otros países, iguales en los dos idiomas (catálogo tax_id_types, migración
 # 0074): EIN (Estados Unidos), NIF y CIF (España), NIT (Colombia), CUIT (Argentina), RUT (Chile), RUC (Perú), CNPJ
 # (Brasil), VAT y CRN (Reino Unido), SIREN y SIRET (Francia)
@@ -57,13 +113,52 @@ EUR
 MXN
 USD
 WEBP
-# Nombre del producto (Employee Time Clock), también el del rol en el catálogo de roles
-Clock
-Employee
 # Abreviaturas iguales en los dos idiomas (min: minutos; pong: respuesta del canal en vivo a un ping)
 min
 pong
-# Países y territorios con el mismo nombre en los dos idiomas (catálogo countries)
+# Países y territorios con el mismo nombre en todos los idiomas (catálogo countries); también los nombres propios de
+# origen francés o portugués que el inglés conserva tal cual (Saint Barthélemy, Tristan da Cunha, Réunion, São Tomé)
+# y la sigla SAR (Hong Kong SAR)
+Barthélemy
+Cunha
+Réunion
+SAR
+São
+# Nombres propios de países iguales en varios idiomas que el inglés también conoce (Bosnia and Herzegovina, San Marino,
+# Svalbard, Trinidad and Tobago): por eso no van en la lista de un idioma
+Herzegovina
+San
+Svalbard
+Trinidad
+# Territorios y partes de nombres de países que varios idiomas conservan en su forma original (Curaçao, Guernsey, isla
+# Norfolk, islas Caimán/Cayman, Cocos (Keeling), Falkland, islas Marshall, Turks, Mayotte, Nevis, Saint-Pierre-et-Miquelon,
+# Saint Vincent, Jan Mayen, Tristan da Cunha, Wallis, Åland, Eswatini, Niue)
+Curaçao
+Guernsey
+Norfolk
+Cayman
+Cocos
+Keeling
+Falkland
+Marshall
+Turks
+Mayotte
+Nevis
+Pierre
+Miquelon
+Vincent
+Jan
+Tristan
+Wallis
+Åland
+Eswatini
+Niue
+# (Cabo Verde, Guam, Ascension, Palau)
+Verde
+Guam
+Ascension
+Palau
+Kitts
 Burkina
 Caicos
 Côte

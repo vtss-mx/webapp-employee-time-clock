@@ -52,7 +52,7 @@ function RowContent({ row }: { row: BoardRow }) {
   return (
     <>
       <span className="person att-row__person">
-        <Avatar name={employee.full_name} decorative />
+        <Avatar name={employee.full_name} src={employee.avatar} decorative />
         <span className="person__info">
           <strong className="truncate">{employee.full_name}</strong>
           <small className="truncate">

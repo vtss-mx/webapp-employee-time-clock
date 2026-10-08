@@ -27,7 +27,7 @@ vi.mock('../../../components/LiveFaceFlow', () => ({
   LiveFaceFlow: ({ title, onSubmit, onFatal }: { title: string; onSubmit: (c: CapturedFace) => Promise<void>; onFatal: (e: unknown) => void }) => (
     <div>
       <h1>{title}</h1>
-      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false }).catch(onFatal)}>capturar rostro</button>
+      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] }).catch(onFatal)}>capturar rostro</button>
     </div>
   ),
 }));

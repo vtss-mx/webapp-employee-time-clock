@@ -157,6 +157,19 @@ describe('ManualSessionPage: la empresa registra la asistencia de un empleado', 
     expect(await screen.findByText('Detalle de la jornada')).toBeInTheDocument();
   });
 
+  it('sin número de empleado (opcional): se nombra solo por su nombre y su turno se busca por su nombre', async () => {
+    const unnumbered = { ...carla, employee_number: null };
+    const { calls } = renderAt(NEW_ROUTE, {
+      'GET /api/employees/9': () => apiOk({ ...employee, employee_number: null }),
+      'GET /api/attendance/board': () => apiOk(board([other, row({ employee: unnumbered })])),
+    });
+    expect(await screen.findByRole('heading', { name: 'Registrar asistencia' })).toBeInTheDocument();
+    expect(screen.getByText('Carla Díaz')).toBeInTheDocument();
+    expect(await screen.findByText('Turno Matutino: 08:00 – 16:00.')).toBeInTheDocument();
+    const lookup = calls.find((call) => call.url.startsWith('/api/attendance/board'));
+    expect(new URL(lookup?.url ?? '', 'http://localhost').searchParams.get('search')).toBe('Carla Díaz');
+  });
+
   it('errores del servidor en su campo (se limpian al cambiarlo); "Aún no sale" envía sin salida', async () => {
     const { calls } = renderAt(NEW_ROUTE, {
       'POST /api/attendance/sessions': inOrder(

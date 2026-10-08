@@ -8,8 +8,7 @@ import { DeletedMark } from '../../../components/ui/DeletedMark';
 import { ButtonLink } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
-import { RetryState } from '../../../components/ui/RetryState';
-import { SkeletonCard } from '../../../components/ui/Skeleton';
+import { ResourceFallback } from '../../../components/ui/ResourceFallback';
 import { useResource } from '../../../hooks/useResource';
 import { t, useT } from '../../../i18n';
 import { paths } from '../../../routes/paths';
@@ -45,18 +44,7 @@ export function AttendanceSessionPage() {
   const back = useBackLink(session?.work_date);
 
   if (!session) {
-    return error ? (
-      <div className="page">
-        <Panel>
-          <PanelHeader title={t('attendance.nav.session')} {...back} />
-          <PanelSection>
-            <RetryState onRetry={retry} />
-          </PanelSection>
-        </Panel>
-      </div>
-    ) : (
-      <SkeletonCard lines={8} />
-    );
+    return <ResourceFallback error={error} retry={retry} lines={8} header={{ title: t('attendance.nav.session'), ...back }} />;
   }
 
   const { employee, events } = session;
@@ -65,7 +53,7 @@ export function AttendanceSessionPage() {
       <Panel>
         <PanelHeader
           title={employee.full_name}
-          subtitle={`${employee.employee_number} · ${formatDate(session.work_date)} · ${session.shift_name}`}
+          subtitle={[employee.employee_number, formatDate(session.work_date), session.shift_name].filter(Boolean).join(' · ')}
           {...back}
           actions={
             <>

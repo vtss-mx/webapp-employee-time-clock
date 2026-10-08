@@ -4,7 +4,6 @@ import type { ReactElement } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
-import { AccessoryReviewPrompt } from '../../components/LiveFaceParts';
 import { catalogsFixture, catalogsWith } from '../../test/catalogs';
 import { publishPolicy, resetPolicyCache, useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { sampleAdminPolicy, samplePolicy } from '../../test/fixtures';
@@ -112,11 +111,11 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
     await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
 
     // Ajustes: cada uno se confirma con su "antes → después"; los que protegen menos, en rojo.
-    await choose(/Sensibilidad del anti-spoofing/, /Máximo/);
-    const level = await answer('dialog', '¿Cambiar «Sensibilidad del anti-spoofing» a Máximo?', 'Guardar ajuste');
-    expect(within(level).getByRole('region', { name: 'Cambios' })).toHaveTextContent('Sensibilidad del anti-spoofingAntes: EstándarDespués: Máximo');
-    expect(level).toHaveTextContent('Basta con que una sola captura parezca una foto'); // qué hará el nivel
-    expect(await screen.findByText('Anti-spoofing: nivel Máximo')).toBeInTheDocument();
+    await choose(/Sensibilidad de la detección de suplantación/, /Máximo/);
+    const level = await answer('dialog', '¿Cambiar «Sensibilidad de la detección de suplantación» a Máximo?', 'Guardar ajuste');
+    expect(within(level).getByRole('region', { name: 'Cambios' })).toHaveTextContent('Sensibilidad de la detección de suplantaciónAntes: EstándarDespués: Máximo');
+    expect(level).toHaveTextContent('Rechaza si una sola captura parece una foto'); // qué hará el nivel
+    expect(await screen.findByText('Detección de suplantación: nivel Máximo')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
     await choose(/Movimientos de la prueba de vida/, '1 movimiento');
     const turns = await answer('alertdialog', '¿Cambiar «Movimientos de la prueba de vida» a 1 movimiento?', 'Guardar ajuste');
@@ -164,7 +163,7 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
     await waitFor(() => expect(calls.filter((c) => c.url === '/api/admin/companies/4/face-learning')).toHaveLength(2));
   });
 
-  it('prueba de vida: su tiempo y el destello; exigir el destello advierte calibrar antes y apagarlo protege menos', async () => {
+  it('prueba de vida: su tiempo; el destello (retirado) se muestra apagado y sin control', async () => {
     const { calls } = serve((call) => {
       if (call.init.method !== 'PUT') return apiOk(policy);
       return apiOk({ ...policy, ...(JSON.parse(call.init.body as string) as object) });
@@ -177,22 +176,30 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
     expect(await screen.findByText('Cada reto vencerá a los 45 s.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
-    await choose(/Destello de colores/, /^Obligatorio/);
-    const enforce = await screen.findByRole('alertdialog', { name: '¿Cambiar «Destello de colores» a Obligatorio?' });
-    expect(enforce).toHaveTextContent('Hazlo después de calibrar con capturas reales (Seguridad facial › Destello de colores). Con luz del sol directa puede pedir repetir la prueba.');
-    expect(enforce).toHaveTextContent('Aplica en segundos a todo el personal de Panificadora.');
-    expect(enforce).not.toHaveTextContent('protege menos');
-    await userEvent.click(within(enforce).getByRole('button', { name: 'Cancelar' }));
-    expect(calls.filter((c) => c.init.method === 'PUT')).toHaveLength(1); // cancelar no envía nada
+    // El destello de colores se retiró (decisión del dueño, 2026-10-06): se ve apagado, con su nota y sin control; el
+    // destello dictado, igual.
+    const flash = screen.getByText('Destello de colores').closest('.tuning-row') as HTMLElement;
+    expect(flash).toHaveTextContent('Desactivado por decisión del producto (2026-10-06)');
+    expect(within(flash).queryByRole('button')).toBeNull();
+    const paced = screen.getByText('Destello dictado por el servidor').closest('.tuning-row') as HTMLElement;
+    expect(paced).toHaveClass('tuning-row--retired');
+    expect(paced).toHaveTextContent('Desactivado por decisión del producto (2026-10-06)');
+    expect(within(paced).getByText('Desactivado')).toBeInTheDocument(); // apagado, sin interruptor
+    expect(within(paced).queryByRole('switch')).toBeNull();
+    expect(calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([{ liveness_timeout_seconds: 45 }]);
+  });
 
-    await choose(/Destello de colores/, /^Apagado/);
-    const off = await answer('alertdialog', '¿Cambiar «Destello de colores» a Apagado?', 'Guardar ajuste');
-    expect(off).toHaveTextContent('Este valor protege menos contra la suplantación de identidad.');
-    expect(await screen.findByText('Destello de colores: Apagado')).toBeInTheDocument();
-    expect(calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([
-      { liveness_timeout_seconds: 45 },
-      { flash_liveness: 'OFF' },
-    ]);
+  it('verificación por voz y video del registro: apagarla protege menos y lo advierte (regla de dos personas)', async () => {
+    const { calls } = serve((call) => (call.init.method !== 'PUT' ? apiOk(policy) : apiOk({ ...policy, ...(JSON.parse(call.init.body as string) as object) })));
+    renderPolicy();
+    const voice = await screen.findByRole('switch', { name: 'Verificación por voz y video en el registro' });
+    expect(screen.getByText('Tras las fotos, el empleado responde en video tres preguntas sobre sus datos; la voz y el rostro se comparan en el servidor y la empresa revisa el video.')).toBeInTheDocument();
+    await userEvent.click(voice);
+    const confirm = await screen.findByRole('alertdialog', { name: '¿Desactivar «Verificación por voz y video en el registro»?' });
+    expect(confirm).toHaveTextContent('Un registro con fotos de otra persona ya no tendrá la segunda comprobación de voz y rostro en video.');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Desactivar' }));
+    await waitFor(() => expect(voice).toHaveAttribute('aria-checked', 'false'));
+    expect(calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([{ voice_verification: false }]);
   });
 
   it('ubicación de la asistencia: precisión exigida, viaje imposible (con confirmación) y su velocidad', async () => {
@@ -231,10 +238,9 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
   it('los ajustes de un candado apagado no se pueden cambiar', async () => {
     serve(apiOk({ ...policy, anti_spoofing: false, liveness_challenge: false, lockout_enabled: false, qr_enabled: false }));
     renderPolicy();
-    expect(await screen.findByRole('button', { name: /Sensibilidad del anti-spoofing/ })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: /Sensibilidad de la detección de suplantación/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Movimientos de la prueba de vida/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Tiempo para la prueba de vida/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Destello de colores/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Intentos antes del bloqueo/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Duración del bloqueo/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /Vigencia del código QR/ })).toBeDisabled();
@@ -362,22 +368,22 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
       call.init.method === 'PUT' ? apiOk({ ...policy, anti_spoofing: false }) : apiOk(policy),
     );
     renderPolicy();
-    await userEvent.click(await screen.findByRole('switch', { name: 'Anti-spoofing' }));
-    const dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar «Anti-spoofing»?' });
+    await userEvent.click(await screen.findByRole('switch', { name: 'Detección de suplantación' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar «Detección de suplantación»?' });
     expect(calls.some((c) => c.init.method === 'PUT')).toBe(false); // aún no se guarda
-    expect(screen.getByRole('switch', { name: 'Anti-spoofing' })).toHaveAttribute('aria-checked', 'true'); // ni se ve como guardado
+    expect(screen.getByRole('switch', { name: 'Detección de suplantación' })).toHaveAttribute('aria-checked', 'true'); // ni se ve como guardado
     await userEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }));
-    await waitFor(() => expect(screen.getByRole('switch', { name: 'Anti-spoofing' })).toHaveAttribute('aria-checked', 'false'));
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Detección de suplantación' })).toHaveAttribute('aria-checked', 'false'));
   });
 
   it('revierte el interruptor si el guardado falla', async () => {
     serve((call) => (call.init.method === 'PUT' ? apiFail(503, 'SERVER_BUSY', 'Ocupado') : apiOk(policy)));
     renderPolicy();
-    const glasses = await screen.findByRole('switch', { name: 'Retirar los lentes' });
-    await userEvent.click(glasses);
-    await answer('alertdialog', '¿Desactivar «Retirar los lentes»?', 'Desactivar');
+    const mask = await screen.findByRole('switch', { name: 'Retirar el cubrebocas' });
+    await userEvent.click(mask);
+    await answer('alertdialog', '¿Desactivar «Retirar el cubrebocas»?', 'Desactivar');
     expect(await screen.findByText('No se pudo guardar')).toBeInTheDocument();
-    expect(glasses).toHaveAttribute('aria-checked', 'true');
+    expect(mask).toHaveAttribute('aria-checked', 'true');
   });
 
   it('informa errores al cargar', async () => {
@@ -394,11 +400,12 @@ function accepting(base = samplePolicy) {
 const puts = (calls: Array<{ init: RequestInit }>) => calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as unknown);
 
 describe('Política de verificación: activar y confirmar', () => {
-  it('activar una regla se confirma en verde (cancelar la deja apagada) y avisa qué cambia', async () => {
-    const { calls } = accepting({ ...samplePolicy, block_glasses: false });
+  it('activar una regla se confirma en verde (cancelar la deja apagada) y avisa qué cambia: los lentes nacen apagados', async () => {
+    const { calls } = accepting(); // samplePolicy: block_glasses false por omisión (decisión del dueño, 2026-10-07)
     renderPolicy();
     const glasses = await screen.findByRole('switch', { name: 'Retirar los lentes' });
     expect(glasses).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByText(/Desactivado por decisión del producto \(2026-10-07\)/)).toBeNull(); // interruptor normal, sin nota
     await userEvent.click(glasses);
     const dialog = await answer('dialog', '¿Activar «Retirar los lentes»?', 'Cancelar');
     expect(dialog).toHaveClass('msg--success');
@@ -417,9 +424,9 @@ describe('Política de verificación: activar y confirmar', () => {
   it('cancelar la confirmación deja la protección encendida y no guarda nada', async () => {
     const { calls } = accepting();
     renderPolicy();
-    const antiSpoofing = await screen.findByRole('switch', { name: 'Anti-spoofing' });
+    const antiSpoofing = await screen.findByRole('switch', { name: 'Detección de suplantación' });
     await userEvent.click(antiSpoofing);
-    const dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar «Anti-spoofing»?' });
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar «Detección de suplantación»?' });
     expect(dialog).toHaveTextContent('Esto reduce la protección contra suplantación de identidad');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
@@ -446,7 +453,7 @@ describe('Política de verificación: activar y confirmar', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('switch')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Volver a cargar' }));
-    expect(await screen.findByRole('switch', { name: 'Anti-spoofing' })).toBeInTheDocument();
+    expect(await screen.findByRole('switch', { name: 'Detección de suplantación' })).toBeInTheDocument();
   });
 });
 
@@ -488,12 +495,3 @@ describe('useVerificationPolicy', () => {
   });
 });
 
-describe('AccessoryReviewPrompt', () => {
-  it('ofrece enviar a revisión con los accesorios detectados', async () => {
-    let confirmed = false;
-    renderWithProviders(<AccessoryReviewPrompt accessories={['MASK']} onConfirm={() => (confirmed = true)} />);
-    expect(screen.getByText('¿No estás usando el cubrebocas?')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /No uso el cubrebocas/ }));
-    expect(confirmed).toBe(true);
-  });
-});

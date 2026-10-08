@@ -28,7 +28,6 @@ export default {
       minAge: 'The employee must be at least {age} years old',
     },
     employeeNumber: {
-      required: 'Employee number is required',
       format: '1-30 characters: letters, numbers, hyphens, or underscores',
     },
     rfc: {

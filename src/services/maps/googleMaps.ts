@@ -1,6 +1,7 @@
 import { currentLocale, type Locale } from '../../i18n/core';
 import { addressFromParts, addressFromResults, distanceMeters, missingAreaFields, type AddressPart, type AddressValues, type GeoPoint } from '../../utils/address';
 import { config } from '../../utils/config';
+import { withinTime } from '../../utils/waits';
 
 /**
  * ÚNICO punto de contacto con el SDK de Google Maps (carga del script, geocodificación y búsqueda
@@ -28,8 +29,8 @@ export const DEFAULT_CENTER: GeoPoint = { lat: 19.4326, lng: -99.1332 };
 export const DEFAULT_ZOOM = 5;
 export const POINT_ZOOM = 17;
 
-/** Idioma que se pide a Google para cada idioma de la app (sus códigos: "es", "en"). */
-const MAPS_LANGUAGES: Record<Locale, string> = { 'es-MX': 'es', 'en-US': 'en' };
+/** Idioma que se pide a Google para cada idioma de la app (sus códigos: "es", "en", "pt-BR", "fr", "de", "it"). */
+const MAPS_LANGUAGES: Record<Locale, string> = { 'es-MX': 'es', 'en-US': 'en', 'pt-BR': 'pt-BR', 'fr-FR': 'fr', 'de-DE': 'de', 'it-IT': 'it', 'es-ES': 'es' };
 
 /**
  * El idioma activo en el código de Google. Se pide en CADA búsqueda, geocodificación y lugar: con un
@@ -120,11 +121,7 @@ function asMapsError(api: MapsApi, error: unknown): MapsApiError {
 
 /** La respuesta de Google o, si no llega a tiempo, una falla pasajera ("timeout"): nada se queda esperando. */
 function inTime<T>(api: MapsApi, task: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
-  let timer = 0;
-  const late = new Promise<never>((_resolve, reject) => {
-    timer = window.setTimeout(() => reject(new MapsApiError(api, 'failed', 'timeout')), ms);
-  });
-  return Promise.race([task, late]).finally(() => window.clearTimeout(timer));
+  return withinTime(task, ms, () => new MapsApiError(api, 'failed', 'timeout'));
 }
 
 /** La API está activada en la configuración (y hay clave). */

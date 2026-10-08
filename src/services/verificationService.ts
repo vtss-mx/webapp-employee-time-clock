@@ -1,5 +1,6 @@
-import type { FaceChallenge, FaceCheckResult, VerificationResult } from '../types';
+import type { ChallengePurpose, FaceChallenge, FaceCheckResult, VerificationResult } from '../types';
 import { hasKeys } from '../utils/guards';
+import { locationFormFields, type LocationTake } from '../utils/locationPayload';
 import { apiRequest } from './apiClient';
 import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 
@@ -10,20 +11,30 @@ const isChallenge = hasKeys<FaceChallenge>('liveness_required', 'actions', 'flas
 const isCheck = hasKeys<FaceCheckResult>('detection_score');
 
 export const verificationService = {
-  verifyFace(captures: FaceCaptures): Promise<VerificationResult> {
-    return postFaceCaptures('/verification/face', captures, isResult);
+  /**
+   * Verificación facial del propio empleado. Si la empresa pide ubicación (`verification_location` OBSERVE/ENFORCE) y la
+   * hay, viaja la lectura que decide y todas las de la toma (los mismos campos del registro de asistencia, para que el
+   * servidor mida y registre dónde se hizo). Sin ubicación se envía igual: en OBSERVE queda "sin ubicación" y en ENFORCE
+   * el servidor responde `LOCATION_REQUIRED` (lo decide el servidor, nunca la app).
+   */
+  verifyFace(captures: FaceCaptures, location?: LocationTake | null): Promise<VerificationResult> {
+    return postFaceCaptures('/verification/face', captures, isResult, location ? locationFormFields(location) : {});
   },
 };
 
 export const faceService = {
-  /** Reto aleatorio de prueba de vida (destello de colores y movimientos de cabeza), de uso único. */
-  getChallenge(): Promise<FaceChallenge> {
-    return apiRequest<FaceChallenge>('/face/challenge', { method: 'POST', validate: isChallenge });
+  /**
+   * Reto aleatorio de prueba de vida (movimientos de cabeza), de uso único. El del registro facial (`ENROLLMENT`) pide
+   * siempre los cuatro movimientos (decisión del dueño, 2026-10-07); una verificación, los de la política.
+   */
+  getChallenge(purpose: ChallengePurpose = 'VERIFICATION'): Promise<FaceChallenge> {
+    const query = purpose === 'ENROLLMENT' ? { purpose } : undefined;
+    return apiRequest<FaceChallenge>('/face/challenge', { method: 'POST', query, validate: isChallenge });
   },
 
   /**
-   * Validación previa de una captura (calidad, pose, lentes, gorra, cubrebocas).
-   * Lanza ApiError 422 con `code` y `errors[0].details.accessories` si no son aptas.
+   * Validación previa de una captura (calidad, pose, cubrebocas o gorra si la empresa lo exige; los lentes se permiten).
+   * Lanza ApiError 422 con `code` (y `errors[0].details.accessories` si fue un accesorio) si no es apta.
    */
   check(images: Blob[], allowHeadwear = false): Promise<FaceCheckResult> {
     // Varias capturas consecutivas: los accesorios se deciden por mayoría en el backend.

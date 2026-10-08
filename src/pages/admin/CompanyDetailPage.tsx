@@ -1,9 +1,10 @@
-import { Blocks, KeyRound, Pencil, Power, PowerOff, ShieldCheck, Trash2, Unplug, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react';
+import { Blocks, IdCard, KeyRound, Pencil, Power, PowerOff, ShieldCheck, Trash2, Unplug, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CompanyBillingSection } from '../../components/billing/CompanyBillingSection';
 import { LoadFailed } from '../../components/shifts/PageStates';
 import { deleteNote } from '../../components/trash/TrashParts';
 import { StatusBadge } from '../../components/StatusBadge';
+import { Avatar } from '../../components/ui/Avatar';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { Panel, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { PagedItems } from '../../components/ui/PagedItems';
@@ -25,8 +26,8 @@ import { CompanyDocumentsSection } from './CompanyDocumentsSection';
 import { CompanyPlanUsage } from './CompanyPlanUsage';
 import { CompanyDataSection, companyFacts, DeletedCompany, taxIdLine } from './CompanyRecord';
 
-/** Qué se está procesando: el estado o el acceso a la API de la empresa, eliminarla o un administrador (su id). */
-type Busy = 'status' | 'api' | 'delete' | number;
+/** Qué se está procesando: el estado, el acceso a la API o los documentos del onboarding, eliminarla o un administrador (su id). */
+type Busy = 'status' | 'api' | 'documents' | 'delete' | number;
 /** Estado de la empresa (femenino: "Activa" / "Inactiva"). */
 const companyState = (active: boolean) => t(active ? 'admin.shared.active' : 'admin.shared.inactive');
 const adminState = (active: boolean) => t(active ? 'common.states.active' : 'common.states.inactive');
@@ -153,6 +154,22 @@ const statusNotice = (wasActive: boolean) => (): SuccessNotice =>
     : [t('admin.detail.done.activated'), t('admin.detail.done.activatedText')];
 const apiNotice = (enabled: boolean) => (): SuccessNotice =>
   enabled ? [t('admin.detail.done.apiOn'), t('admin.detail.done.apiOnText')] : [t('admin.detail.done.apiOff'), t('admin.detail.done.apiOffText')];
+const documentsNotice = (required: boolean) => (): SuccessNotice =>
+  required
+    ? [t('employeeDocuments.admin.onNotice'), t('employeeDocuments.admin.onText')]
+    : [t('employeeDocuments.admin.offNotice'), t('employeeDocuments.admin.offText')];
+
+/** Pedir o dejar de pedir documentos de identidad en el onboarding (módulo que concede el ADMIN; decisión 2026-10-07). */
+function documentsConfirm(company: CompanyDetail, required: boolean): ConfirmInput {
+  return {
+    kind: 'edit',
+    tone: required ? 'success' : 'danger',
+    icon: <IdCard size={30} />,
+    eyebrow: t('admin.shared.modules'),
+    title: t(required ? 'employeeDocuments.admin.giveTitle' : 'employeeDocuments.admin.removeTitle', { name: company.name }),
+    message: t(required ? 'employeeDocuments.admin.giveMessage' : 'employeeDocuments.admin.removeMessage'),
+  };
+}
 const adminNotice = (wasActive: boolean) => (): SuccessNotice => [t(wasActive ? 'admin.detail.done.adminDeactivated' : 'admin.detail.done.adminActivated')];
 const deletedNotice = (name: string) => (): SuccessNotice => [t('admin.detail.done.deleted'), t('admin.detail.done.deletedText', { name })];
 
@@ -216,7 +233,7 @@ function CompanyAdmins({ list, companyId, busy, onToggle }: CompanyAdminsProps) 
         <ul className={`company-admins ${list.loading ? 'is-loading' : ''}`}>
           {admins.map((admin) => (
             <li key={admin.id}>
-              <span className="avatar">{admin.email.slice(0, 2).toUpperCase()}</span>
+              <Avatar name={admin.email} src={admin.avatar} decorative />
               <span className="company-admins__info">
                 <strong className="truncate">{admin.email}</strong>
                 <small className="muted">
@@ -259,6 +276,22 @@ function ApiAccess({ enabled, busy, saving, onChange }: ApiAccessProps) {
       icon={<KeyRound size={20} />}
       label={t('admin.shared.api')}
       description={t(enabled ? 'admin.detail.apiOn' : 'admin.detail.apiOff')}
+      disabled={busy}
+      busy={saving}
+    />
+  );
+}
+
+/** Documentos de identidad en el onboarding (módulo que decide el ADMIN; decisión del dueño, 2026-10-07). */
+function DocumentsAccess({ required, busy, saving, onChange }: { required: boolean; busy: boolean; saving: boolean; onChange: (required: boolean) => void }) {
+  const t = useT();
+  return (
+    <Switch
+      checked={required}
+      onChange={onChange}
+      icon={<IdCard size={20} />}
+      label={t('employeeDocuments.admin.label')}
+      description={t(required ? 'employeeDocuments.admin.on' : 'employeeDocuments.admin.off')}
       disabled={busy}
       busy={saving}
     />
@@ -315,6 +348,13 @@ function CompanyView({ company, setCompany }: { company: CompanyDetail; setCompa
       () => apiConfirm(company, enabled),
       apiNotice(enabled),
     );
+  const setDocumentsRequired = (required: boolean) =>
+    change(
+      () => adminService.setDocumentsRequired(company.id, required),
+      'documents',
+      () => documentsConfirm(company, required),
+      documentsNotice(required),
+    );
   // Al terminar (bien o mal) se vuelve a pedir la página de administradores: el backend decide su estado.
   const toggleAdmin = (admin: CompanyAdmin) =>
     change(
@@ -369,6 +409,7 @@ function CompanyView({ company, setCompany }: { company: CompanyDetail; setCompa
           }
         >
           <ApiAccess enabled={company.api_enabled} busy={busy} saving={action.busy === 'api'} onChange={setApiAccess} />
+          <DocumentsAccess required={company.require_employee_documents} busy={busy} saving={action.busy === 'documents'} onChange={setDocumentsRequired} />
         </PanelSection>
 
         <PanelSection

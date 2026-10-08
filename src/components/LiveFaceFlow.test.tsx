@@ -4,7 +4,7 @@ import { resetPolicyCache } from '../hooks/useVerificationPolicy';
 import { samplePolicy } from '../test/fixtures';
 import { apiFail, mockFetch, type MockCall } from '../test/http';
 import { renderWithProviders } from '../test/render';
-import { CameraNotReadyError } from '../utils/cameraDiagnostics';
+import { CameraNotReadyError, CameraTurnedError } from '../utils/cameraDiagnostics';
 import { LiveFaceFlow } from './LiveFaceFlow';
 
 // La cámara real (getUserMedia) y MediaPipe se prueban en navegador; aquí, cómo reacciona el flujo a
@@ -108,6 +108,17 @@ describe('LiveFaceFlow ante fallas pasajeras', () => {
       await advance(3_000);
       expect(blocked()).toBeNull();
     }
+    expect(onFatal).not.toHaveBeenCalled();
+  });
+
+  it('el teléfono giró a media toma: lo explica y repite la toma sin enviar nada (nunca un intento sospechoso)', async () => {
+    camera.capture.mockRejectedValue(new CameraTurnedError());
+    renderFlow(() => apiFail(404, 'NOT_FOUND'));
+    await capture();
+    expect(blocked()).toBeInTheDocument();
+    expect(screen.getByText('La cámara cambió de orientación. Mantén el teléfono en la misma posición.')).toBeInTheDocument();
+    await advance(3_000);
+    expect(blocked()).toBeNull();
     expect(onFatal).not.toHaveBeenCalled();
   });
 

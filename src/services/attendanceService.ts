@@ -38,7 +38,6 @@ export const ATTENDANCE_SLUGS = {
   CHECK_OUT: 'check-out',
 } as const satisfies Record<AttendanceAction, string>;
 
-export type AttendanceSlug = (typeof ATTENDANCE_SLUGS)[AttendanceAction];
 
 export interface SessionHistoryQuery extends PageQuery {
   employee_id?: number;

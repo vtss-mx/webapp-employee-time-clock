@@ -47,7 +47,7 @@ describe('DateField en inglés: mm/dd/yyyy y calendario del idioma', () => {
     await english();
     expect(dateOrder()).toBe('mdy');
     expect(isoToDisplay('2001-01-09')).toBe('01/09/2001');
-    expect(isoToDisplay('2001-01-09', 'dmy')).toBe('09/01/2001');
+    expect(isoToDisplay('2001-01-09', { order: 'dmy', separator: '/' })).toBe('09/01/2001');
     expect(displayToValue('01/09/2001')).toBe('2001-01-09');
     expect(displayToValue('02/31/2001')).toBe('02/31/2001'); // completa pero inexistente → inválida
   });

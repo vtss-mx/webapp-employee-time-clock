@@ -49,11 +49,9 @@
   --blue-600: #2563eb;
   --blue-700: #1d4ed8;
   --blue-800: #1e40af;
-  --blue-900: #1e3a8a;
   --navy: #172554;
 
   --primary: var(--blue-600);
-  --primary-hover: var(--blue-700);
   --primary-soft: var(--blue-50);
   --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 55%, #1d4ed8 100%);
 
@@ -1112,11 +1110,22 @@ img {
   place-items: center;
   background: #fff;
 }
+/* Carga dentro del área de trabajo (no pantalla completa): llena el alto disponible del contenido y
+   centra el ícono vertical y horizontalmente. Antes `min-height: 50vh` dejaba el ícono en la mitad
+   superior con mucho espacio abajo (lo señaló el dueño). El alto disponible es la ventana menos el
+   relleno de `.content` (32 px arriba y 32 px abajo en escritorio = 64 px); en teléfono, además, menos
+   la barra superior (`--mobilebar-h`) y el relleno reducido (16 px + 16 px = 32 px). El relleno simétrico
+   conserva el centrado (box-sizing: border-box). No afecta a `.app-splash` (pantalla completa). */
 .page-loader {
   display: grid;
   place-items: center;
-  min-height: 50vh;
-  padding: 56px 16px;
+  min-height: calc(100dvh - 64px);
+  padding: 16px;
+}
+@media (max-width: 599px) {
+  .page-loader {
+    min-height: calc(100dvh - var(--mobilebar-h) - 32px);
+  }
 }
 .brand-loader {
   display: grid;
@@ -1831,6 +1840,26 @@ img {
   margin: -6px 0 0;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+/* «o» entre la contraseña y «Entrar con llave de acceso»: una línea fina a cada lado. */
+.auth-card__divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.auth-card__divider::before,
+.auth-card__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
 }
 .auth-card__options {
   display: flex;
@@ -2800,20 +2829,28 @@ a.kpi:hover {
   }
 }
 
-/* Escáner facial (FaceGuide.tsx), claro como el área de trabajo: la cámara en un círculo con la silueta fina de cabeza y
-   hombros (blanca y suave en reposo, verde suave con el rostro bien colocado, atenuada mientras se toman las fotos para
-   no tapar la cara), el anillo fino y continuo que se llena de verde (ui/ProgressRing) y la marca ✓ al pie del círculo
-   al terminar. El tamaño y el lugar los da el visor (.camera: --face-d, --face-cy y --ring-r, unidades de contenedor);
-   los colores, los tokens --scan-* y --ring-* (cada pantalla los personaliza). Solo se animan transformaciones,
-   opacidad y el trazo del anillo, con CSS: nada se vuelve a dibujar en React por cuadro. */
+/* Escáner facial (FaceGuide.tsx), claro como el área de trabajo: la cámara en un círculo con la GUÍA del rostro
+   (decisión del dueño, 2026-10-07: un contorno blanco, grueso y nítido con forma de rostro —óvalo con mentón, línea del
+   cabello y hombros— que la persona alinea con su cara; verde con el rostro bien colocado, color de aviso cuando no lo
+   está; nunca se oculta durante las fotos y se retira solo al confirmar), el anillo fino y continuo que se llena de
+   verde (ui/ProgressRing) y la indicación grande bajo el círculo. El tamaño y el lugar los da el visor (.camera:
+   --face-d, --face-cy y --ring-r, unidades de contenedor); los colores, los tokens --scan-* y --ring-* (cada pantalla
+   los personaliza). Estados fijos: ningún cambio lleva transición ni animación (una nueva aquí choca con esa decisión);
+   nada se vuelve a dibujar en React por cuadro. */
 .face-scan {
-  --scan-idle: rgba(255, 255, 255, 0.78);
+  --scan-idle: #ffffff;
   --scan-ok: #6ee7a8;
   --scan-warn: #fcd34d;
+  /* Rojo del borde al TOMAR FOTOS cuando el cuadro no es válido (no enfocado o fuera de posición; decisión del dueño,
+     2026-10-07). Vivo para verse sobre el video y, con el halo oscuro, con contraste AA sobre la tarjeta clara. */
+  --scan-bad: #ef4444;
   --scan-color: var(--scan-idle);
+  /* Halo oscuro bajo el trazo: la guía se ve sobre un rostro claro, una pared blanca o piel oscura. */
+  --scan-halo: rgba(14, 26, 51, 0.38);
+  --scan-stroke: 3.5px;
   --scan-backdrop: var(--fi-panel, var(--surface));
   --ring-track: #e3e8f0;
-  --ring-from: #4ade80;
+  --ring-from: #0e9f6e;
   --ring-to: #0e9f6e;
   position: absolute;
   left: 50%;
@@ -2830,11 +2867,9 @@ a.kpi:hover {
 .face-scan--warn {
   --scan-color: var(--scan-warn);
 }
-/* Destello: alrededor del círculo (lo único que deja ver su ventana además de la cámara) un gris oscuro NEUTRO, sin
-   tinte, para que a la cara solo llegue la luz del color que se mide; entra al instante y al terminar regresa suave. */
-.face-scan--flash {
-  --scan-backdrop: #16181d;
-  --ring-track: rgba(255, 255, 255, 0.16);
+/* Al tomar fotos, el borde ROJO cuando el cuadro no es válido (no enfocado o fuera de posición). */
+.face-scan--bad {
+  --scan-color: var(--scan-bad);
 }
 /* Fuera del círculo, el fondo de la tarjeta (opaco): la atención queda en el rostro (el video se ve solo en el círculo). */
 .face-scan__window {
@@ -2844,39 +2879,38 @@ a.kpi:hover {
   box-shadow:
     0 0 0 200vmax var(--scan-backdrop),
     inset 0 0 0 1px rgba(14, 26, 51, 0.06);
-  transition: box-shadow 0.45s var(--ease);
 }
-.face-scan--flash .face-scan__window,
-.face-scan--flash .progress-ring__track {
-  transition: none;
-}
-.face-scan__silhouette {
+.face-scan__guide {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
   clip-path: circle(50%);
-  transition: opacity 0.5s var(--ease);
 }
-.face-scan__silhouette path {
+.face-scan__guide path {
   fill: none;
-  stroke: var(--scan-color);
-  stroke-width: 1.6px;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 0 1px rgba(8, 15, 35, 0.3));
-  transition: stroke 0.45s var(--ease);
 }
-/* Mientras se toman las fotos y en los movimientos la silueta se atenúa (no tapa la cara); al confirmar se retira. */
-.face-scan--scan .face-scan__silhouette {
-  opacity: 0.3;
+.face-scan__halo {
+  stroke: var(--scan-halo);
+  stroke-width: calc(var(--scan-stroke) + 2px);
 }
-.face-scan--liveness .face-scan__silhouette {
-  opacity: 0.42;
+.face-scan__line {
+  stroke: var(--scan-color);
+  stroke-width: var(--scan-stroke);
 }
-.face-scan--confirm .face-scan__silhouette {
+/* Mientras se toman las fotos y en los movimientos la guía sigue a la vista, apenas más tenue (no tapa la cara); al
+   confirmar se retira. */
+.face-scan--scan .face-scan__guide {
+  opacity: 0.85;
+}
+.face-scan--liveness .face-scan__guide {
+  opacity: 0.7;
+}
+.face-scan--confirm .face-scan__guide {
   opacity: 0;
 }
 /* El anillo rodea al círculo con un aire fino (110 % de su diámetro; su línea media a --ring-r del centro). */
@@ -2886,46 +2920,10 @@ a.kpi:hover {
   width: 110%;
   height: 110%;
 }
-/* Marca ✓: un círculo verde con la palomita blanca, montado sobre el pie del anillo; aparece con un rebote suave cuando
-   el anillo termina de llenarse (su transición dura 0.8 s). */
-.face-scan__badge {
-  --badge-size: clamp(34px, calc(var(--face-d, 300px) * 0.13), 52px);
-  position: absolute;
-  left: 50%;
-  top: calc(50% + var(--ring-r, 0.532) * 100%);
-  display: grid;
-  place-items: center;
-  width: var(--badge-size);
-  height: var(--badge-size);
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--ring-from), var(--ring-to));
-  color: #fff;
-  box-shadow:
-    0 0 0 3px var(--scan-backdrop),
-    0 8px 18px -6px color-mix(in srgb, var(--ring-to) 60%, transparent);
-  transform: translate(-50%, -50%);
-  animation: badge-pop 0.5s var(--ease-spring) 0.55s both;
-}
-.face-scan__badge svg {
-  width: 54%;
-  height: 54%;
-}
-@keyframes badge-pop {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.5);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-
-/* Anillo de avance continuo (ui/ProgressRing.tsx): pista con --ring-track y arco con puntas redondas y el degradado
-   --ring-from → --ring-to. El arco y su punta van a su destino con una transición larga y suave: si llega otro valor a
-   medio camino (una ráfaga de fotos) parte de donde va, sin saltos. */
+/* Anillo de avance (ui/ProgressRing.tsx): pista con --ring-track y arco con puntas redondas de un solo color
+   (--ring-from = --ring-to: sin degradado). Decisión del dueño, 2026-10-06 («algo más enterprise»): el arco cambia al
+   instante, sin transiciones, luces ni punta que late. */
 .progress-ring {
-  --ring-ease: cubic-bezier(0.22, 1, 0.36, 1);
   display: block;
   overflow: visible;
 }
@@ -2935,7 +2933,6 @@ a.kpi:hover {
 }
 .progress-ring__track {
   stroke: var(--ring-track, #e3e8f0);
-  transition: stroke 0.45s var(--ease);
 }
 .progress-ring__from {
   stop-color: var(--ring-from, #4ade80);
@@ -2943,57 +2940,14 @@ a.kpi:hover {
 .progress-ring__to {
   stop-color: var(--ring-to, var(--success));
 }
+/* El arco va a su valor AL INSTANTE (decisión del dueño, 2026-10-06: sin transiciones ni luces durante las capturas). */
 .progress-ring__arc {
   stroke-linecap: round;
   stroke-dasharray: 360 360;
   opacity: 0; /* en 0 no asoma la punta redonda */
-  transition:
-    stroke-dashoffset 0.8s var(--ring-ease),
-    opacity 0.3s var(--ease);
 }
 .progress-ring--started .progress-ring__arc {
   opacity: 1;
-}
-/* Punta del arco: gira con el mismo ritmo; mientras se toman fotos, una luz blanca late en ella. */
-.progress-ring__head {
-  transform-box: view-box;
-  transform-origin: 50% 50%;
-  transition: transform 0.8s var(--ring-ease);
-}
-/* La luz: un halo verde suave alrededor de la punta y un punto blanco en ella, que laten juntos. */
-.progress-ring__glow,
-.progress-ring__spark {
-  opacity: 0;
-}
-.progress-ring__glow {
-  fill: var(--ring-from, #4ade80);
-}
-.progress-ring__spark {
-  fill: #fff;
-}
-.progress-ring--active.progress-ring--started .progress-ring__glow {
-  animation: ring-glow 1.2s ease-in-out infinite;
-}
-.progress-ring--active.progress-ring--started .progress-ring__spark {
-  animation: ring-spark 1.2s ease-in-out infinite;
-}
-@keyframes ring-glow {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 0.38;
-  }
-}
-@keyframes ring-spark {
-  0%,
-  100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 1;
-  }
 }
 
 /* Texto con fundido cruzado (ui/CrossfadeText.tsx): las dos capas se apilan en la misma celda (nada se desplaza). */
@@ -3004,55 +2958,11 @@ a.kpi:hover {
 .crossfade__layer {
   grid-area: 1 / 1;
 }
-/* El que sale se va rápido y el que entra llega un instante después: casi no se enciman (se lee siempre uno). */
-.crossfade__layer--current {
-  animation: crossfade-in 0.36s var(--ease) 0.08s both;
-}
+/* Sin fundido (decisión del dueño, 2026-10-06: estados fijos en las capturas): el texto cambia al instante y la capa que
+   sale no se ve. */
 .crossfade__layer--leaving {
   pointer-events: none;
-  animation: crossfade-out 0.2s var(--ease) both;
-}
-@keyframes crossfade-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-}
-@keyframes crossfade-out {
-  to {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-.accessory-alert {
-  position: absolute;
-  left: 50%;
-  top: var(--face-cy, 50%);
-  transform: translate(-50%, -50%);
-  display: flex;
-  gap: 14px;
-  padding: 18px 22px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: var(--shadow-lg);
-  animation: scale-in 0.35s var(--ease-spring);
-}
-.accessory-alert span {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  color: var(--danger);
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-.accessory-alert span > :first-child {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--danger-soft);
+  opacity: 0;
 }
 
 .qr-guide {
@@ -3351,6 +3261,11 @@ a.kpi:hover {
   margin: 0;
   font-weight: 700;
   text-align: right;
+}
+/* La persona identificada: su foto (o sus iniciales) junto al nombre, alineada a la derecha. */
+.result-card__details dd.person {
+  justify-content: flex-end;
+  gap: 8px;
 }
 .result-card__actions {
   width: 100%;
@@ -3703,42 +3618,35 @@ a.kpi:hover {
   }
 }
 
-/* ---------- Revisión humana de accesorios ---------- */
-.review-prompt {
-  display: grid;
-  gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--warning, #d97706) 40%, var(--border));
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--warning, #d97706) 8%, var(--surface));
-  animation: fade-in-up 0.35s var(--ease);
-}
-.review-prompt--sent {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
-  background: color-mix(in srgb, var(--success) 8%, var(--surface));
-}
-
 /* ---------- Visor de escaneo: diseño enterprise (móvil primero) ---------- */
 .camera {
   container-type: size; /* el círculo se dimensiona con el visor (cqw/cqh) */
   scroll-margin-top: calc(env(safe-area-inset-top) + 8px);
   scroll-margin-bottom: 8px;
-  /* Tamaño y lugar del círculo según el dispositivo, medidos con su propio visor (sin medidas fijas ni matchMedia):
-     - diámetro (--face-d): el 80 % del ancho (en un teléfono la silueta mide lo que un rostro en una selfie a la
-       distancia del brazo) o lo que permita el alto (dejando abajo el lugar de la marca ✓ y del mensaje,
-       --msg-space); nunca más de 64cqh (en escritorio el rostro se ve grande sin tocar los controles de arriba);
-     - centro (--face-cy): a la mitad de lo que queda sobre el mensaje.
+  /* Tamaño y lugar del círculo según el dispositivo, medidos con su propio visor (sin medidas fijas ni matchMedia;
+     decisión del dueño, 2026-10-07: «100 % adaptativo»):
+     - diámetro (--face-d): el menor de lo que permite el ancho (80 %: en un teléfono la silueta mide lo que un rostro
+       en una selfie a la distancia del brazo) y lo que permite el alto —la franja de arriba (--top-space: el rótulo de
+       la cámara y sus controles), el lugar del mensaje (--msg-space) y un aire abajo—, nunca más de 64cqh ni del tope
+       --face-d-max (en un monitor grande un círculo mayor no da más detalle: la cámara manda la misma imagen);
+     - centro (--face-cy): a la mitad de la franja libre entre lo de arriba y el mensaje (si el ancho limita el
+       círculo, queda centrado en ella y el mensaje lo sigue).
      Las indicaciones «acércate / aléjate» van del 18 % al 80 % del cuadro: un rostro del tamaño de la silueta queda
      dentro de ese rango. --ring-r: la línea media del anillo (y de sus señales), en diámetros del círculo, desde el
      centro (ProgressRing: radio 48.4 de 100, dibujado al 110 %). */
   --ring-r: 0.532;
+  --top-space: 44px;
   --msg-space: clamp(84px, 17cqh, 140px);
-  --face-d: min(80cqw, calc(100cqh - var(--msg-space) - 64px), 64cqh);
-  --face-cy: calc((100cqh - var(--msg-space)) / 2 + 12px);
+  --face-d-max: 640px;
+  --face-d: min(80cqw, calc(100cqh - var(--msg-space) - var(--top-space) - 20px), 64cqh, var(--face-d-max));
+  --face-cy: calc(var(--top-space) + (100cqh - var(--msg-space) - var(--top-space) - 20px) / 2);
+  /* Campo visual del círculo (decisión del dueño, 2026-10-07): el video se escala respecto al CÍRCULO, no al visor. Su
+     lado CORTO mide --face-fov diámetros y su centro es el centro del círculo, en cualquier dispositivo y con cualquier
+     relación de aspecto del flujo (--video-ar = ancho / alto real del flujo; la escribe CameraCapture al conocerlo y
+     4:3 mientras tanto): un rostro a la distancia del brazo o sentado frente a la computadora cabe en la guía con aire.
+     Antes el video se escalaba al visor: en una tarjeta ancha y baja se acercaba al doble y solo se veía la frente. */
+  --face-fov: 1.3;
+  --video-ar: 1.3333;
 }
 /* Mensaje de estado abajo, sobre un degradado; controles arriba a la derecha: nada tapa el rostro. */
 .camera__message {
@@ -3777,12 +3685,13 @@ a.kpi:hover {
   background: transparent;
   color: var(--warning);
 }
+/* Al tomar fotos: el motivo en rojo cuando el borde está rojo (no enfocado o fuera de posición). */
+.camera__message--face.camera__message--bad {
+  background: transparent;
+  color: var(--danger);
+}
 .camera__message--face.camera__message--busy {
   background: transparent;
-}
-/* Durante el destello el fondo alrededor del círculo es oscuro: el texto (si se alcanza a ver) en claro. */
-.face-scan--flash ~ .camera__message--face {
-  color: #fff;
 }
 .camera__detail {
   color: var(--fi-muted, var(--muted));
@@ -3847,13 +3756,61 @@ a.kpi:hover {
     border-radius: 50%;
   }
 }
+/* Donde la lista de cámaras se ve (arriba a la derecha, bajo el botón de cambiar), la franja de arriba crece: el círculo
+   empieza debajo de ella y ningún control queda sobre el anillo aunque el panel sea justo del tamaño del círculo. */
+@media (min-width: 700px) and (orientation: landscape), (min-width: 901px) {
+  .camera {
+    --top-space: 112px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .switch,
-  .switch__thumb,
-  .review-prompt {
+  .switch__thumb {
     animation: none;
     transition: none;
   }
+}
+
+/* ---------- Insignias de accesorios (FaceGuide.tsx › AccessoryBadges) ----------
+   El ÚNICO aviso de un accesorio (decisión del dueño, 2026-10-07): un chip por accesorio detectado —ícono y nombre del
+   catálogo— en fila bajo el rostro, dentro del círculo (nunca sobre los ojos); varios se apilan en la fila. Estados
+   fijos: sin animación ni transición. */
+.accessory-badges {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--face-cy, 50%) + var(--face-d, 300px) * 0.3);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: calc(var(--face-d, 300px) * 0.84);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.accessory-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid rgba(14, 26, 51, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-sm);
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.accessory-badge__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--danger-soft);
 }
 
 /* ---------- Prueba de vida: señales de cada movimiento (LivenessCues.tsx) ----------
@@ -3968,71 +3925,6 @@ a.kpi:hover {
     opacity: 0;
     transform: scale(min(var(--closer-scale, 1.3), 1.16));
   }
-}
-.camera__overlay:has(.ring-cue--closer) .face-scan {
-  animation: scan-breathe 2.4s ease-in-out infinite;
-}
-@keyframes scan-breathe {
-  50% {
-    transform: translate(-50%, -50%) scale(1.03);
-  }
-}
-
-/* ---------- Destello de colores de la prueba de vida (FlashOverlay.tsx) ----------
-   A pantalla completa y sobre todo (también sobre los popups): la luz de la pantalla debe llegar al
-   rostro. Una ventana circular sobre el anillo deja ver la cámara y el avance de las fotos en su lugar (alrededor del
-   círculo el visor queda en gris oscuro neutro: .face-scan--flash). El color cambia al instante (sin transición), también
-   con "reducir movimiento": es la prueba de seguridad. La indicación va en una cápsula oscura y NEUTRA (sin tinte azul):
-   no agrega luz de otro color a la que se mide. */
-.flash {
-  position: fixed;
-  inset: 0;
-  z-index: 1300;
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  gap: 12px;
-  padding: calc(env(safe-area-inset-top) + 20px) 16px 16px;
-  background: var(--flash-color);
-}
-.flash--window {
-  background: radial-gradient(var(--flash-rx) var(--flash-ry) at var(--flash-x) var(--flash-y), transparent 99%, var(--flash-color) 100%);
-}
-.flash__hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  padding: 9px 16px;
-  border-radius: 999px;
-  background: rgba(17, 19, 24, 0.78);
-  color: #fff;
-  font-weight: 600;
-  text-align: center;
-  box-shadow: 0 8px 24px rgba(17, 19, 24, 0.22);
-  animation: fade-in 0.3s var(--ease);
-}
-.flash__steps {
-  display: flex;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.flash__steps li {
-  width: 8px;
-  height: 8px;
-  border: 1.5px solid rgba(255, 255, 255, 0.95);
-  border-radius: 50%;
-  background: rgba(17, 19, 24, 0.35);
-  transition: transform 0.2s var(--ease);
-}
-.flash__steps li.is-done,
-.flash__steps li.is-current {
-  background: #fff;
-}
-.flash__steps li.is-current {
-  transform: scale(1.3);
 }
 
 /* ---------- Panel: contenedor único por pantalla ---------- */
@@ -4215,7 +4107,7 @@ a.kpi:hover {
   --fi-accent: var(--primary);
   --fi-ok: var(--success);
   display: grid;
-  grid-template-areas: 'head' 'progress' 'intro' 'viewport' 'actions' 'extras';
+  grid-template-areas: 'head' 'progress' 'intro' 'viewport' 'actions';
   gap: 16px;
   width: min(100%, 560px);
   margin-inline: auto;
@@ -4232,6 +4124,12 @@ a.kpi:hover {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+}
+/* Controles del encabezado (silenciar la guía por voz y «Cancelar») en fila, alineados arriba a la derecha. */
+.faceid__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .faceid__titles {
   flex: 1;
@@ -4287,7 +4185,6 @@ a.kpi:hover {
   background: var(--fi-accent);
   transform: scaleX(var(--fill, 0));
   transform-origin: left;
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .faceid__intro {
   grid-area: intro;
@@ -4330,10 +4227,26 @@ a.kpi:hover {
   background: var(--fi-panel);
   box-shadow: none;
 }
-/* El centro del video queda en el centro del círculo: sentado frente a la cámara, el rostro aparece centrado en él (y
-   el detector, que mide contra el centro del cuadro, coincide con lo que se ve). Fuera del círculo nada se ve. */
+/* El video se dibuja respecto al CÍRCULO, no al visor (decisión del dueño, 2026-10-07): su lado corto mide --face-fov
+   diámetros y su centro es el centro del círculo, así el campo visual dentro de la guía es el mismo en una computadora
+   portátil (flujo 16:9 horizontal), un teléfono (3:4 o 9:16 vertical) o una cámara web 4:3; sentado frente a la cámara,
+   el rostro aparece centrado y del tamaño de la guía. El lado largo sale de la relación de aspecto real del flujo
+   (--video-ar): con max() el lado corto es siempre el que mide --face-fov diámetros, sea el flujo horizontal o vertical.
+   El video sobresale del visor y lo recortan el visor (overflow) y el fondo opaco fuera del círculo: fuera de él nada se
+   ve. El detector mide con la geometría REAL del <video> (getBoundingClientRect, con la transformación incluida), así que
+   lo que se ve sigue siendo lo que se exige (faceGuideShape.guideTarget). El espejo de la cámara frontal se suma a la
+   misma transformación (el centrado no cambia: el círculo queda centrado sobre el video). */
 .faceid .camera__video {
-  top: calc(var(--face-cy) - 50%);
+  inset: auto;
+  top: var(--face-cy);
+  left: 50%;
+  width: calc(var(--face-d) * var(--face-fov) * max(var(--video-ar), 1));
+  height: calc(var(--face-d) * var(--face-fov) * max(1 / var(--video-ar), 1));
+  max-width: none;
+  transform: translate(-50%, -50%);
+}
+.faceid .camera__video--mirrored {
+  transform: translate(-50%, -50%) scaleX(-1);
 }
 .faceid .camera__overlay::after {
   display: none; /* el degradado oscuro de abajo es de los visores oscuros */
@@ -4406,23 +4319,12 @@ a.kpi:hover {
 .faceid__actions:empty {
   display: none;
 }
-.faceid__extras {
-  grid-area: extras;
-  display: grid;
-  gap: 12px;
-}
-.faceid .review-prompt {
-  color: var(--text);
-}
 /* "Reducir movimiento": estados al instante (sin esperas: la ✓ aparece de inmediato, nada respira ni late). */
 @media (prefers-reduced-motion: reduce) {
-  .face-scan__badge,
   .crossfade__layer--current,
   .ring-cue,
   .ring-cue__arc,
   .ring-cue__pointer,
-  .progress-ring__glow,
-  .progress-ring__spark,
   .camera__overlay:has(.ring-cue--closer) .face-scan {
     animation: none;
   }
@@ -4488,28 +4390,44 @@ a.kpi:hover {
     padding-top: 0;
     border-top: 0;
   }
-  .faceid__actions:last-child,
-  .faceid__extras:last-child {
+  .faceid__actions:last-child {
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
   }
 }
+/* El panel de la cámara envuelve al círculo con un margen moderado, nunca al ancho del área (decisión del dueño,
+   2026-10-07: una tarjeta de 1220 px para un círculo de 330 dejaba media pantalla vacía). Su ancho lo decide la tarjeta
+   ANTES de dibujar el círculo —las unidades de contenedor del visor no pueden mirar hacia su padre— con la MISMA cuenta
+   que hace el visor (alto del visor menos la franja de arriba, el mensaje y el aire, con sus topes), en unidades de la
+   pantalla: --fi-view-h es el alto que tendrá el visor en ese diseño y --fi-d el diámetro que saldrá de él; el panel
+   mide --fi-view-ratio diámetros (sitio para el anillo y las señales de los movimientos por fuera). Si la cuenta y el
+   visor difirieran en algo, solo cambiaría el margen alrededor del círculo: el círculo SIEMPRE lo mide el visor con su
+   tamaño real. Las dos columnas (cámara y textos) existen solo donde el ancho lo permite; si no, todo apilado. */
+.faceid {
+  --fi-view-ratio: 1.3;
+  --fi-msg: clamp(84px, var(--fi-view-h, 0px) * 0.17, 140px);
+  --fi-d: min(calc(var(--fi-view-h, 0px) - var(--fi-msg) - var(--fi-top, 112px) - 20px), var(--fi-view-h, 0px) * 0.64, 640px);
+  --fi-view-w: calc(var(--fi-d) * var(--fi-view-ratio));
+}
 @media (orientation: landscape) and (min-width: 900px) {
   .faceid {
-    width: min(100%, 1120px);
-    grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
-    grid-template-rows: auto auto auto auto 1fr;
+    --fi-view-h: max(420px, calc(100dvh - 140px));
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    grid-template-columns: minmax(0, var(--fi-view-w)) minmax(300px, 440px);
+    grid-template-rows: auto auto auto 1fr;
     grid-template-areas:
       'viewport head'
       'viewport progress'
       'viewport intro'
-      'viewport actions'
-      'viewport extras';
+      'viewport actions';
     column-gap: 28px;
     align-items: start;
   }
   .faceid__viewport {
-    height: calc(100dvh - 140px);
-    min-height: 420px;
+    height: var(--fi-view-h);
+    min-height: 0;
+    margin-inline: 0;
   }
   /* Con la columna lateral, el título de la etapa y su indicación completos (no mueven el círculo). */
   .faceid__intro h2,
@@ -4523,26 +4441,29 @@ a.kpi:hover {
     justify-content: flex-start;
   }
 }
-/* Escritorio (con el menú lateral): el escáner ocupa TODO el espacio de trabajo, con un margen
-   corto y uniforme. La cámara llena la columna izquierda de arriba abajo y las etapas, la
-   indicación y las acciones van en una columna lateral de ancho cómodo de leer. */
+/* Escritorio (con el menú lateral): el escáner usa TODO el alto del espacio de trabajo, con un margen corto y uniforme,
+   y la tarjeta mide lo que necesitan sus dos columnas, centrada: la cámara llena la columna izquierda de arriba abajo
+   (el panel, justo del tamaño del círculo: --fi-view-w) y las etapas, la indicación y las acciones van en una columna
+   lateral de ancho cómodo de leer. Sin una fila de más al final (la que dejaba el visor a media altura). */
 @media (min-width: 1024px) {
   .content:has(.faceid) {
     padding: 20px;
   }
   .faceid {
-    width: 100%;
+    /* Alto del visor: la pantalla menos el margen del área (20 + 20), el relleno de la tarjeta (24 + 24) y sus bordes. */
+    --fi-view-h: calc(100dvh - 40px - 48px - 2px);
+    width: fit-content;
+    max-width: 100%;
     min-height: calc(100dvh - 40px);
-    margin: 0;
+    margin: 0 auto;
     padding: 24px;
-    grid-template-columns: minmax(0, 1fr) clamp(320px, 28vw, 440px);
-    grid-template-rows: auto auto auto auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, var(--fi-view-w)) minmax(300px, clamp(320px, 28vw, 440px));
+    grid-template-rows: auto auto auto minmax(0, 1fr);
     grid-template-areas:
       'viewport head'
       'viewport progress'
       'viewport intro'
-      'viewport actions'
-      'viewport extras';
+      'viewport actions';
     column-gap: 32px;
     align-items: start;
   }
@@ -4561,6 +4482,30 @@ a.kpi:hover {
   .faceid__head,
   .faceid__intro {
     padding-top: 4px;
+  }
+}
+/* Tableta grande en vertical (≥ 1024 px de ancho pero más alta que ancha): el ancho NO permite dos columnas con un
+   círculo digno, así que todo va apilado y el visor toma el alto que queda bajo el encabezado, las etapas y la
+   indicación; el panel mide lo que el círculo necesita (o todo el ancho si es menos). */
+@media (min-width: 1024px) and (orientation: portrait) {
+  .faceid {
+    --fi-view-h: calc(100dvh - 40px - 48px - 2px - 180px);
+    width: min(100%, 720px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head'
+      'progress'
+      'intro'
+      'viewport'
+      'actions';
+  }
+  .faceid__viewport {
+    align-self: stretch;
+    justify-self: center;
+    width: min(100%, var(--fi-view-w));
+    height: auto;
+    min-height: 420px;
   }
 }
 
@@ -4718,6 +4663,11 @@ a.kpi:hover {
   --select-option-radius: var(--radius-xs);
   --select-option-active: var(--blue-50);
   --select-option-selected: var(--primary);
+  --select-option-selected-bg: var(--blue-50);
+  --select-option-selected-active-bg: var(--blue-100);
+  --select-menu-border: var(--border);
+  --select-check: var(--primary);
+  --select-option-muted: var(--muted);
 }
 .select {
   position: relative;
@@ -4751,6 +4701,8 @@ a.kpi:hover {
 }
 .select__icon {
   display: grid;
+  /* Sobre el control: el control oscuro (backdrop-filter) pintaba encima del ícono y lo dejaba opaco. */
+  z-index: 1;
 }
 .select__chevron {
   right: 14px;
@@ -4775,6 +4727,12 @@ a.kpi:hover {
 .select--sm .select__chevron {
   right: 10px;
 }
+.select--sm.select--with-icon .select__control {
+  padding-left: 40px;
+}
+.select--sm .select__icon {
+  left: 12px;
+}
 /* Sobre superficies oscuras (la cámara). */
 .select--dark .select__control {
   border-color: rgba(255, 255, 255, 0.18);
@@ -4783,12 +4741,22 @@ a.kpi:hover {
   backdrop-filter: blur(8px);
 }
 .select--dark .select__chevron,
-.select--dark:focus-within .select__chevron {
+.select--dark:focus-within .select__chevron,
+.select--dark .select__icon {
   color: #fff;
 }
+.select--dark .select__control:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.42);
+}
+.select--dark .select__control:focus {
+  border-color: var(--blue-300);
+  box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.35);
+}
 /* Lista (vive en una capa flotante: ningún panel la recorta). */
-.select__menu {
+.select__menu,
+.floating.select__menu {
   padding: 6px;
+  border-color: var(--select-menu-border);
   border-radius: var(--select-menu-radius);
   background: var(--select-menu-bg);
 }
@@ -4814,8 +4782,12 @@ a.kpi:hover {
   background: var(--select-option-active);
 }
 .select__option.is-selected {
+  background: var(--select-option-selected-bg);
   color: var(--select-option-selected);
   font-weight: 600;
+}
+.select__option.is-selected.is-active {
+  background: var(--select-option-selected-active-bg);
 }
 .select__option[aria-disabled='true'] {
   opacity: 0.5;
@@ -4831,19 +4803,29 @@ a.kpi:hover {
   min-width: 0;
 }
 .select__option-text small {
-  color: var(--muted);
+  color: var(--select-option-muted);
   font-weight: 400;
 }
 .select__check {
   flex: none;
   margin-left: auto;
+  color: var(--select-check);
 }
+/* Lista sobre superficies oscuras (la barra del inicio de sesión): la misma paleta de la barra —el azul marino del
+   fondo de la app, translúcido y desenfocado como el cristal del encabezado— y el acento de la marca (azul 300) en la
+   fila elegida, la palomita y el anillo de foco del control; contraste AA en texto, país y palomita. */
 .select__menu--dark {
-  --select-menu-bg: #0e1a33;
+  --select-menu-bg: rgba(11, 34, 80, 0.92);
+  --select-menu-border: rgba(255, 255, 255, 0.16);
   --select-option-active: rgba(255, 255, 255, 0.08);
-  --select-option-selected: #7dd3fc;
-  border-color: rgba(255, 255, 255, 0.12);
+  --select-option-selected: #fff;
+  --select-option-selected-bg: rgba(147, 197, 253, 0.2);
+  --select-option-selected-active-bg: rgba(147, 197, 253, 0.3);
+  --select-check: var(--blue-300);
+  --select-option-muted: rgba(219, 232, 255, 0.8);
   color: #fff;
+  backdrop-filter: saturate(1.4) blur(12px);
+  -webkit-backdrop-filter: saturate(1.4) blur(12px);
 }
 
 /* ---------- Superficie flotante de un campo (calendario, selector de país) ----------
@@ -6669,6 +6651,25 @@ button.method-card {
 .map-canvas__state--failed {
   background: repeating-linear-gradient(135deg, var(--surface-2) 0 12px, #f1f4fa 12px 24px);
 }
+/* ---------- Verificaciones de la empresa (pantalla «Verificaciones» con mapa) ---------- */
+/* El mapa de solo lectura (VerificationMap) reutiliza .map-canvas; aquí recibe su alto y su redondeo, porque esas
+   variables viven en .location-picker y esta pantalla no la usa. Debajo van los filtros y la lista. */
+.verifications__map {
+  --map-h: clamp(320px, 48vh, 560px);
+  --map-radius: var(--radius-lg);
+  margin-bottom: 10px;
+}
+.verifications__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+/* Fila elegida (su punto se ve en el mapa): un acento sutil, sin depender solo del color (también aria-pressed). */
+.table tr.is-selected {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
 .place-search {
   position: relative;
 }
@@ -7441,8 +7442,71 @@ button.method-card {
   .faceid {
     display: grid;
   }
+}
+/* Teléfono en horizontal (alto corto): el círculo se limita por el alto y los textos van a su lado; el visor llena el
+   alto bajo la barra superior sin desplazamiento. La franja de arriba y el mensaje se reducen (solo el botón redondo de
+   cambiar cámara; la lista de cámaras no cabe) y la indicación grande baja un punto para caber en dos líneas. */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 640px) and (max-width: 1023px) {
+  .content:has(.faceid) {
+    padding: 0;
+  }
+  .faceid {
+    --fi-top: 40px;
+    --fi-msg: 72px;
+    --fi-view-h: calc(100dvh - var(--mobilebar-h) - env(safe-area-inset-top) - 16px);
+    display: grid;
+    width: 100%;
+    max-width: none;
+    height: calc(100dvh - var(--mobilebar-h) - env(safe-area-inset-top));
+    min-height: 0;
+    margin: 0;
+    padding: 16px 16px 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    grid-template-columns: minmax(0, var(--fi-view-w)) minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'viewport head'
+      'viewport progress'
+      'viewport intro'
+      'viewport actions';
+    column-gap: 20px;
+    align-items: start;
+  }
   .faceid__viewport {
-    min-height: min(420px, calc(100dvh - 140px));
+    position: relative;
+    align-self: stretch;
+    height: auto;
+    min-height: 0;
+    margin-inline: 0;
+    overflow: hidden;
+  }
+  .faceid__viewport .camera {
+    --top-space: 40px;
+    --msg-space: 72px;
+    position: absolute;
+    inset: 0;
+    height: auto;
+    min-height: 0;
+  }
+  .faceid__viewport .camera__select {
+    display: none;
+  }
+  .faceid__viewport .camera__message--face {
+    font-size: clamp(0.95rem, 0.88rem + 0.9cqw, 1.12rem);
+  }
+  .faceid__intro h2,
+  .faceid__intro p {
+    display: block;
+  }
+  .faceid__intro .faceid__eyebrow {
+    display: none;
+  }
+  .faceid__actions {
+    justify-content: flex-start;
+    padding-top: 0;
+    border-top: 0;
   }
 }
 
@@ -7451,6 +7515,12 @@ button.method-card {
   display: grid;
   gap: 2px;
   align-items: start;
+}
+/* Quién provocó el error: su foto (o sus iniciales) junto a «correo (Rol)». */
+.log-list__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .log-list--stacked li > * {
   min-width: 0;
@@ -9010,11 +9080,19 @@ label.radio-card--sm {
 }
 .bulk-result__list li {
   display: grid;
-  gap: 2px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
+}
+/* Nombre, número, marca y motivo junto a la foto (o las iniciales) de la persona. */
+.bulk-result__who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 .bulk-result__reason {
   color: var(--text-2);
@@ -10738,20 +10816,62 @@ label.radio-card--sm {
   font-size: 0.72rem;
 }
 
-/* ---------- Idioma (regla 16: es-MX y en-US, cambio en caliente) ---------- */
-/* Selector de idioma (LanguageSwitcher): compacto en la barra del inicio de sesión; campo completo en Mi perfil. */
+/* ---------- Idioma (regla 16: siete idiomas, cambio en caliente) ---------- */
+/* Selector de idioma (LanguageSwitcher): compacto en la barra del inicio de sesión y el kiosco; campo completo en
+   Mi perfil. Cada opción: bandera dibujada por la app (LocaleFlag), el idioma en sí mismo y su país. */
 .language-switcher--compact {
   flex: none;
   max-width: 100%;
+}
+/* Tan ancho como el nombre más largo («English (United States)»): nada se recorta y la lista, que mide lo que el
+   control, deja cada idioma y su país en una línea. */
+.language-switcher--compact .select__control {
+  min-width: 252px;
 }
 .language-switcher--field {
   display: flex;
   width: 100%;
 }
-/* En teléfonos la barra del inicio de sesión solo muestra el ícono y el idioma corto. */
+.locale-flag {
+  display: block;
+  flex: none;
+  border-radius: 3px;
+  /* Borde fino para que las franjas blancas se vean sobre blanco (y sobre azul, más claro). */
+  box-shadow: inset 0 0 0 1px rgba(14, 26, 51, 0.14);
+}
+.select--dark .locale-flag,
+.select__menu--dark .locale-flag {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+.language-switcher__menu ul {
+  --select-menu-max-h: 420px; /* los siete idiomas (dos líneas cada uno) a la vista, sin desplazar */
+}
+.language-switcher__menu .select__option {
+  min-height: 44px; /* área táctil */
+  padding: 8px 12px;
+}
+.language-option__text {
+  gap: 1px;
+  line-height: 1.25;
+}
+.language-option__text small {
+  font-size: 0.82rem;
+}
+/* En teléfonos la barra del inicio de sesión solo deja ver la bandera y la flecha (el nombre sigue en el nombre
+   accesible del control y en la lista). */
 @media (max-width: 520px) {
   .auth__header .language-switcher--compact .select__value {
-    max-width: 9ch;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .auth__header .language-switcher--compact .select__control {
+    width: 72px;
+    min-width: 0;
+    padding-right: 30px;
   }
 }
 /* Aviso bilingüe si el diccionario del idioma no se pudo descargar al arrancar (index.html, main.tsx). */
@@ -10764,6 +10884,10 @@ label.radio-card--sm {
   padding: 24px 16px;
   color: var(--text);
   text-align: center;
+}
+.boot-error__notice:not([hidden]) {
+  display: grid;
+  gap: 12px;
 }
 .boot-error p {
   max-width: 46ch;
@@ -11174,4 +11298,294 @@ label.radio-card--sm {
   .document-note {
     max-width: none;
   }
+}
+
+/* ---------- Registro facial: indicador de los cuatro pasos (EnrollmentStepper.tsx) ----------
+   Decisión del dueño del producto (2026-10-06): foto inicial → capturas → video → listo, sobrio y fijo (sin animaciones):
+   un número en un círculo y su nombre; el actual con el color de la marca, los hechos marcados, los que faltan atenuados. */
+.enroll-steps {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  width: min(100%, 560px);
+  margin: 0 auto 14px;
+  padding: 0;
+  list-style: none;
+}
+/* Dentro de la tarjeta del escáner (bajo el título): a la izquierda, compacto y sin margen propio. */
+.faceid__titles .enroll-steps {
+  justify-content: flex-start;
+  gap: 14px;
+  width: 100%;
+  margin: 10px 0 0;
+}
+.enroll-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.enroll-steps__dot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.enroll-steps li.is-current {
+  color: var(--text);
+}
+.enroll-steps li.is-current .enroll-steps__dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+/* Un paso hecho, COMPLETO en verde (adenda del dueño, 2026-10-07: «se debe marcar todo en verde siempre y cuando se
+   haya procesado de manera correcta»): la palomita en su círculo y su nombre; el actual en el azul de la marca, los que
+   faltan en gris. En «En validación» los tres pasos van así, hechos según el servidor. */
+.enroll-steps li.is-done {
+  color: var(--success-strong);
+}
+.enroll-steps li.is-done .enroll-steps__dot {
+  border-color: var(--success);
+  background: var(--success);
+  color: #fff;
+}
+@media (max-width: 480px) {
+  .enroll-steps {
+    gap: 12px;
+  }
+  .enroll-steps li:not(.is-current) .enroll-steps__name {
+    display: none;
+  }
+}
+
+/* ---------- Registro facial: índice de los pasos independientes (EnrollmentSteps.tsx) ----------
+   Decisión del dueño del producto (2026-10-07): una opción por paso (foto inicial, capturas y prueba de vida, video con
+   preguntas), en orden, cada una con su número, su estado desde el servidor y su botón. Estados fijos, sin animaciones;
+   se acomoda al ancho de su contenedor (botón a lo ancho en un teléfono, a un lado en tableta y escritorio). */
+.enroll-index {
+  container-type: inline-size;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.enroll-index__step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.enroll-index__step--locked {
+  background: var(--surface-2);
+}
+.enroll-index__step--locked .enroll-index__body {
+  opacity: 0.72;
+}
+.enroll-index__number {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted);
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.enroll-index__step--pending .enroll-index__number {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+/* Un paso HECHO según el servidor se ve COMPLETO en verde (adenda del dueño, 2026-10-07: «se debe marcar todo en verde
+   siempre y cuando se haya procesado de manera correcta»): número con palomita, ícono, título, etiqueta «Completado ·
+   fecha», borde y un fondo verde muy suave (tokens --success*; contraste AA: --success-strong sobre --success-soft
+   4.8:1, la descripción en --text-2). Su acción secundaria («Repetir foto») es neutra con el verde, nunca el azul de la
+   acción principal (que conserva solo un paso pendiente). Nunca verde por un estado local u optimista: solo por lo que
+   responde GET /enrollment/progress (el índice lo vuelve a pedir al regresar de un paso). */
+.enroll-index__step--done {
+  border-color: color-mix(in srgb, var(--success) 30%, var(--surface));
+  background: var(--success-soft);
+}
+.enroll-index__step--done .enroll-index__number {
+  border-color: var(--success);
+  background: var(--success);
+  color: #fff;
+}
+.enroll-index__step--done .enroll-index__head {
+  color: var(--success-strong);
+}
+.enroll-index__step--done .enroll-index__body .muted {
+  color: var(--text-2);
+}
+.enroll-index__step--done .enroll-index__action {
+  --btn-bg: var(--surface);
+  --btn-fg: var(--success-strong);
+  --btn-border: color-mix(in srgb, var(--success) 35%, var(--surface));
+  --btn-shadow: none;
+}
+.enroll-index__step--done .enroll-index__action:hover:not(:disabled) {
+  --btn-bg: var(--surface-2);
+}
+.enroll-index__step--warn .enroll-index__number {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.enroll-index__body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.enroll-index__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.enroll-index__head .badge {
+  gap: 4px;
+}
+.enroll-index__body p {
+  margin: 0;
+}
+.enroll-index__hint {
+  color: var(--text-2);
+}
+.enroll-index__action {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+}
+@container (min-width: 560px) {
+  .enroll-index__step {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .enroll-index__action {
+    grid-column: auto;
+    justify-self: end;
+  }
+}
+
+/* ---------- Verificación por voz y video (VoiceVerificationFlow.tsx) ----------
+   La misma tarjeta clara del escáner con la MISMA guía del rostro (decisión del dueño, 2026-10-07: una sola guía en toda
+   la app; la persona habla dentro del contorno), la pregunta grande bajo el círculo, el indicador de grabación fijo (un
+   punto rojo, sin latido) y el medidor del micrófono. */
+.faceid--voice .faceid__actions {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+.voice-rec {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(17, 19, 24, 0.78);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.voice-rec__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5484d;
+}
+.mic-level {
+  width: min(100%, 320px);
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8edf5;
+}
+.mic-level__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* ---------- Reproductor de video propio (ui/VideoPlayer.tsx) ---------- */
+.video-player {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+/* Conserva la relación de aspecto del clip (vertical de un teléfono u horizontal de una computadora) y nunca pasa del
+   ancho del panel ni de una parte del alto de la pantalla, centrado: sin medidas fijas ni desbordes (decisión del dueño,
+   2026-10-07: los contenedores de video se adaptan a donde se ejecutan). */
+.video-player__video {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 60dvh;
+  margin-inline: auto;
+  border-radius: var(--radius-lg);
+  background: #0f1115;
+}
+.video-player__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.video-player__seek {
+  flex: 1;
+  min-width: 0;
+}
+.video-player__time {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- Revisión del video de un registro (components/enrollments/VoiceReviewSection.tsx) ---------- */
+.voice-review {
+  display: grid;
+  gap: 10px;
+}
+.voice-review__failed {
+  color: var(--warning, #b45309);
+  font-weight: 600;
+}
+.voice-review__list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.voice-review__item {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.voice-review__head {
+  display: grid;
+  gap: 2px;
+}
+.voice-review__heard {
+  margin: 0;
+  font-style: italic;
 }

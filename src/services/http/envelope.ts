@@ -4,6 +4,7 @@
  * cuerpo vacío o JSON inválido.
  */
 import { t } from '../../i18n/core';
+import { localizeServerText, parseEnvelopeI18n, rememberServerTexts, textsOf, type EnvelopeI18n, type ServerTexts } from '../../i18n/serverTexts';
 import type { Messages } from '../../types/i18n';
 import { isRecord } from '../../utils/guards';
 
@@ -24,6 +25,12 @@ export interface ApiEnvelope<T = unknown> {
   errors: ApiErrorItem[];
   traceId: string | null;
   timestamp: string | null;
+  /**
+   * `message` y `errors[].message` en cada idioma que habla la API (null si la respuesta no los trae: otro
+   * servidor, un proxy o un texto que armó la app). Con ellos un popup abierto o el error de un campo cambian de
+   * idioma al instante (`i18n/serverTexts.ts`).
+   */
+  i18n?: EnvelopeI18n | null;
 }
 
 type EnvelopeInit = Pick<ApiEnvelope, 'statusCode' | 'code' | 'message'> & Partial<ApiEnvelope>;
@@ -41,14 +48,17 @@ export class ApiError extends Error {
 
   constructor(envelope: EnvelopeInit, retryAfterMs: number | null = null) {
     super(envelope.message);
-    // Texto que armó la app (sin respuesta o sin mensaje del servidor): se traduce al leerse, así un
-    // popup abierto con este error cambia de idioma junto con la app. El del servidor ya llega traducido.
+    // Se lee en el idioma VIGENTE, así un popup abierto con este error cambia de idioma junto con la app: un
+    // texto que armó la app (sin respuesta o sin mensaje del servidor) se vuelve a traducir; uno del servidor
+    // toma su versión del idioma activo de las que trajo la respuesta (`i18n`).
     const local = LOCAL_TEXTS.get(envelope);
-    if (local) Object.defineProperty(this, 'message', { get: local, configurable: true, enumerable: false });
+    const texts = textsOf(envelope.i18n ?? null);
+    const original = envelope.message;
+    Object.defineProperty(this, 'message', { get: local ?? (() => localizeServerText(original, texts)), configurable: true, enumerable: false });
     this.name = 'ApiError';
     this.status = envelope.statusCode;
     this.code = envelope.code;
-    this.errors = envelope.errors ?? [];
+    this.errors = (envelope.errors ?? []).map((item) => localizedItem(item, texts));
     this.traceId = envelope.traceId ?? null;
     this.timestamp = envelope.timestamp ?? null;
     this.data = envelope.data ?? null;
@@ -73,6 +83,12 @@ export class ApiError extends Error {
   get isTransient(): boolean {
     return this.status === 0 || this.status === 408 || this.status === 429 || this.status >= 502;
   }
+}
+
+/** Un error de la lista con su texto en el idioma vigente (la versión del idioma activo, si la respuesta la trajo). */
+function localizedItem(item: ApiErrorItem, texts: ServerTexts): ApiErrorItem {
+  const original = item.message;
+  return Object.defineProperty({ ...item }, 'message', { get: () => localizeServerText(original, texts), enumerable: true, configurable: true });
 }
 
 /**
@@ -210,6 +226,10 @@ function fromEnvelope(status: number, body: Record<string, unknown>, traceId: st
   const message = serverMessage ?? defaultMessage(status);
   const success = isSuccessStatus(status) && body.success !== false;
   const errors = normalizeErrors(body.errors, code);
+  // Las versiones de sus textos en cada idioma se recuerdan: una copia (un aviso de éxito abierto, el error de un
+  // campo) también cambia de idioma al instante.
+  const i18n = serverMessage ? parseEnvelopeI18n(body.i18n) : null;
+  if (i18n) rememberServerTexts(textsOf(i18n));
   const envelope: ApiEnvelope = {
     success,
     statusCode: status,
@@ -219,6 +239,7 @@ function fromEnvelope(status: number, body: Record<string, unknown>, traceId: st
     errors: success ? [] : errors.length ? errors : [singleError(code, message)],
     traceId: asString(body.traceId) ?? traceId,
     timestamp: asString(body.timestamp),
+    i18n,
   };
   return serverMessage ? envelope : localText(envelope, () => defaultMessage(status));
 }

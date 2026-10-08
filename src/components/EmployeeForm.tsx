@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { liveFeedback } from '../hooks/useAvailability';
 import { useT } from '../i18n';
 import type { EmployeeFormValues, LiveChecks } from '../types';
-import { OPTIONAL_DOCUMENTS } from '../utils/formRules';
+import { OPTIONAL_FIELDS } from '../utils/formRules';
 import {
   CURP_LENGTH,
   MIN_EMPLOYEE_AGE,
@@ -74,8 +74,8 @@ export function EmployeeFormFields({
       error: errors[name] ?? feedback.error,
       status: feedback.status,
       disabled,
-      // Opcionales: RFC, CURP y NSS siempre; la contraseña al editar (vacía = no cambiarla).
-      required: !(OPTIONAL_DOCUMENTS as readonly Field[]).includes(name) && (!isEdit || (name !== 'password' && name !== 'password_confirm')),
+      // Opcionales: número, RFC, CURP y NSS siempre; la contraseña al editar (vacía = no cambiarla).
+      required: !(OPTIONAL_FIELDS as readonly Field[]).includes(name) && (!isEdit || (name !== 'password' && name !== 'password_confirm')),
       onBlur: () => onTouch?.(name),
       onChange: (e: ChangeEvent<HTMLInputElement>) =>
         onChange({ ...values, [name]: normalize ? normalize(e.target.value) : e.target.value }),

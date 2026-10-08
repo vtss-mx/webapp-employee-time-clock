@@ -80,6 +80,16 @@ describe('ProfilePage (Mi perfil)', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
+  it('empleado sin número, RFC, CURP ni NSS (opcionales): no los muestra', async () => {
+    session.user = { ...sampleUser, employee: sampleUser.employee && { ...sampleUser.employee, employee_number: null, rfc: null, curp: null, nss: null } };
+    server();
+    renderWithProviders(<ProfilePage />);
+    expect(screen.getByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
+    for (const label of ['Número de empleado', 'CURP', 'RFC', 'NSS']) expect(screen.queryByText(label)).toBeNull();
+    expect(screen.getByText('Correo electrónico').nextElementSibling).toHaveTextContent('ana@empresa.com');
+    expect(await screen.findByText('Este dispositivo')).toBeInTheDocument();
+  });
+
   it('cuenta sin datos de empleado: su correo como nombre y sin datos del expediente', async () => {
     session.user = companyUser;
     server();

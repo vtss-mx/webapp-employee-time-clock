@@ -4,8 +4,8 @@ import {
   Clapperboard,
   FileImage,
   Film,
-  FlaskConical,
   Fingerprint,
+  FlaskConical,
   Gauge,
   History,
   ImageOff,
@@ -14,6 +14,7 @@ import {
   Lock,
   LockKeyhole,
   MapPin,
+  Mic,
   MonitorSmartphone,
   Power,
   PowerOff,
@@ -29,23 +30,25 @@ import {
   Smartphone,
   Sparkles,
   Timer,
+  type LucideIcon,
   Users,
   VideoOff,
+  Volume2,
   Zap,
-  type LucideIcon,
 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { ruledAccessories, type AccessoryRule } from '../../components/accessories';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
 import { FaceLearningPanel } from '../../components/FaceLearningPanel';
 import { PolicyChanges } from '../../components/policy/PolicyChanges';
+import { ruledAccessories, type AccessoryRule } from '../../components/accessories';
 import { withChanges } from '../../components/policy/policyFields';
 import { PolicyPresets, presetConfirm } from '../../components/policy/PolicyPresets';
 import { PresenceSection } from '../../components/policy/PresenceSection';
 import { RiskEngineSection } from '../../components/policy/RiskEngineSection';
 import { RiskSimulationPanel } from '../../components/policy/RiskSimulation';
-import { PolicyTuning, type TuningKey, type TuningSave } from '../../components/settings/PolicyTuning';
+import { VoiceGuidanceSection } from '../../components/policy/VoiceGuidanceSection';
+import { PolicyTuning, RetiredRow, type TuningKey, type TuningSave } from '../../components/settings/PolicyTuning';
 import { formatConfidence } from '../../utils/format';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
@@ -84,7 +87,9 @@ type PolicyKey =
   | 'risk_engine'
   | 'fraud_evidence'
   | 'flash_paced'
-  | 'capture_burst';
+  | 'capture_burst'
+  | 'voice_verification'
+  | 'voice_guidance_enabled';
 
 /** Las reglas con texto propio en `policy.options` (las de accesorios usan `policy.accessories`). */
 type OptionId = keyof Messages['policy']['options'];
@@ -116,6 +121,8 @@ interface Section {
   id: SectionId;
   icon: ReactNode;
   options: Option[];
+  /** Reglas retiradas por decisión del dueño del producto: se muestran apagadas y sin control, con su nota. */
+  retired?: { key: PolicyKey; Icon: LucideIcon; label: () => string; note: () => string }[];
 }
 
 /** Una regla con sus textos en `policy.options.<id>`. */
@@ -130,7 +137,11 @@ const ACCESSORY_TEXT: Record<AccessoryRule, AccessoryId> = {
   block_mask: 'blockMask',
 };
 
-/** Requisitos del rostro: un interruptor por accesorio activo del catálogo ("Retirar los lentes"). */
+/**
+ * Requisitos del rostro: un interruptor por accesorio activo del catálogo («Retirar los lentes», «Retirar el
+ * cubrebocas»). Los lentes nacen apagados en toda empresa (decisión del dueño, 2026-10-07; migración 0082) y ningún
+ * nivel predefinido los enciende; encendidos, el servidor los respeta como a los demás.
+ */
 function faceSection(accessories: AccessoryItem[]): Section {
   return {
     id: 'face',
@@ -182,15 +193,19 @@ const POLICY_SECTIONS: Section[] = [
   {
     id: 'antifraud',
     icon: <ShieldAlert size={20} />,
-    options: [option('risk_engine', 'riskEngine', Radar, { security: true, warning: 'riskEngine' }), option('fraud_evidence', 'fraudEvidence', FileImage)],
+    options: [
+      option('risk_engine', 'riskEngine', Radar, { security: true, warning: 'riskEngine' }),
+      option('fraud_evidence', 'fraudEvidence', FileImage),
+      // Verificación por voz y video del registro (decisión del dueño, 2026-10-06): apagarla relaja (dos personas).
+      option('voice_verification', 'voiceVerification', Mic, { security: true, warning: 'voiceVerification' }),
+    ],
   },
   {
     id: 'capture',
     icon: <Aperture size={20} />,
-    options: [
-      option('flash_paced', 'flashPaced', Zap, { security: true, warning: 'captureProtocol' }),
-      option('capture_burst', 'captureBurst', Clapperboard, { security: true, warning: 'captureProtocol' }),
-    ],
+    options: [option('capture_burst', 'captureBurst', Clapperboard, { security: true, warning: 'captureProtocol' })],
+    // El destello dictado se retiró con el destello (decisión del dueño, 2026-10-06): se muestra apagado, sin control.
+    retired: [{ key: 'flash_paced', Icon: Zap, label: () => t('policy.options.flashPaced.label'), note: () => t('policy.retired') }],
   },
   {
     id: 'devices',
@@ -201,6 +216,12 @@ const POLICY_SECTIONS: Section[] = [
     ],
   },
 ];
+
+/**
+ * Guía por voz del registro (decisión del dueño, 2026-10-08): interruptor NEUTRAL (sin `security`: no es un candado ni
+ * lleva la insignia de recomendado). Su confirmación y su aviso reutilizan el mecanismo de cualquier interruptor.
+ */
+const VOICE_GUIDANCE = option('voice_guidance_enabled', 'voiceGuidance', Volume2);
 
 /**
  * Lo que se puede estar guardando (su control queda ocupado): una regla (`PolicyKey`), un ajuste (también del motor
@@ -246,7 +267,7 @@ function switchNotice(option: Option, value: boolean): SuccessNotice {
 
 /**
  * Cambiar un ajuste de los candados: "antes → después"; si protege menos, la advertencia en rojo; si
- * tiene una advertencia propia (exigir el destello sin calibrar), en ámbar y al pie.
+ * tiene una advertencia propia (exigir una prueba de presencia sin preparar los dispositivos), en ámbar y al pie.
  */
 function tuningConfirm({ change, detail, relaxes, warning }: TuningSave, company: string, twoPerson: boolean): ConfirmInput {
   const caution = relaxes ? t('policy.tuning.relaxes') : warning?.();
@@ -262,6 +283,26 @@ function tuningConfirm({ change, detail, relaxes, warning }: TuningSave, company
     changes: [changed],
     note: caution ? `${caution} ${scope}` : scope,
     confirmLabel: t('policy.tuning.confirmLabel'),
+    confirmIcon: <Save size={18} />,
+  };
+}
+
+/**
+ * Cambiar la voz de la guía por audio: siempre NEUTRAL (nunca relaja la seguridad ni pasa por la regla de dos
+ * personas). Su confirmación es la del contexto de la guía por voz, no la de los candados de la prueba de vida.
+ */
+function voiceProfileConfirm({ change, detail }: TuningSave, company: string): ConfirmInput {
+  const changed = change();
+  return {
+    kind: 'edit',
+    tone: 'primary',
+    icon: <Mic size={30} />,
+    eyebrow: t('policy.voice.title'),
+    title: t('policy.voice.profile.confirmTitle', { value: changed.after }),
+    message: detail(),
+    changes: [changed],
+    note: appliesTo(company),
+    confirmLabel: t('policy.voice.profile.confirmLabel'),
     confirmIcon: <Save size={18} />,
   };
 }
@@ -366,6 +407,11 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
     apply('identify_confidence', { identify_confidence: value }, () => identifyNotice(Math.max(value, policy.min_confidence)));
   const saveTuning = (tuning: TuningSave) =>
     apply(tuning.key, tuning.changes, () => [tuning.title(), tuning.detail()], () => tuningConfirm(tuning, companyName, twoPerson));
+  // Guía por voz (decisión del dueño, 2026-10-08): encenderla es un interruptor neutral; la voz se confirma sin la
+  // regla de dos personas (cambiarla nunca relaja la seguridad).
+  const onToggleVoiceGuidance = (value: boolean) => onToggle(VOICE_GUIDANCE, value);
+  const saveVoiceProfile = (save: TuningSave) =>
+    apply('voice_profile', save.changes, () => [save.title(), save.detail()], () => voiceProfileConfirm(save, companyName));
   const applyPreset = (preset: CatalogItem) =>
     void run(() => adminService.applyPolicyPreset(companyId, preset.code), {
       busy: 'preset',
@@ -412,12 +458,16 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
               />
             );
           })}
+          {section.retired?.map(({ key, Icon, label, note }) => (
+            <RetiredRow key={key} icon={<Icon size={20} />} label={label()} note={note()} value={t('policy.toggle.off')} />
+          ))}
         </PanelSection>
       ))}
       <PanelSection title={t('policy.tuning.title')} icon={<SlidersHorizontal size={20} />}>
         <p className="muted small">{t('policy.tuning.hint')}</p>
         <PolicyTuning policy={policy} saving={saving} onSave={saveTuning} />
       </PanelSection>
+      <VoiceGuidanceSection policy={policy} saving={saving} onToggle={onToggleVoiceGuidance} onSaveProfile={saveVoiceProfile} />
       <PanelSection title={t('policy.risk.title')} icon={<Radar size={20} />}>
         <p className="muted small">{t('policy.risk.hint')}</p>
         <RiskEngineSection policy={policy} saving={saving} onSave={saveTuning} />

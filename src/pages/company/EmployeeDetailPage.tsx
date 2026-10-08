@@ -62,11 +62,12 @@ function deleteConfirm(employee: Employee): ConfirmInput {
     title: t('employees.detail.deleteConfirm.title', { name: employee.full_name }),
     message: <Trans k="employees.detail.deleteConfirm.message" values={{ deactivate: <em>{t('common.actions.deactivate')}</em> }} />,
     details: [
-      { label: t('common.fields.employeeNumber'), value: employee.employee_number },
+      ...(employee.employee_number ? [{ label: t('common.fields.employeeNumber'), value: employee.employee_number }] : []),
       { label: t('employees.email'), value: employee.email },
     ],
     note: deleteNote({ person: true }),
-    confirmText: employee.employee_number,
+    // Se escribe su número para confirmar; sin número (es opcional), su nombre.
+    confirmText: employee.employee_number ?? employee.full_name,
     confirmLabel: t('employees.detail.delete'),
   };
 }
@@ -189,7 +190,7 @@ export function EmployeeDetailPage() {
           backLabel={t('employees.back')}
           subtitle={
             <>
-              <span className="badge badge--info badge--plain">{employee.employee_number}</span>
+              {employee.employee_number && <span className="badge badge--info badge--plain">{employee.employee_number}</span>}
               <StatusBadge active={employee.active} />
               <FaceStatusBadge status={employee.face_status} />
               {employee.shared_account && (

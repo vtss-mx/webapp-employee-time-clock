@@ -222,6 +222,6 @@ describe('AuthProvider', () => {
 
   it('useAuth fuera del provider lanza un error claro', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(() => renderHook(() => useAuth())).toThrow(/AuthProvider/);
+    expect(() => renderHook(() => useAuth())).toThrow('AUTH_PROVIDER_MISSING');
   });
 });

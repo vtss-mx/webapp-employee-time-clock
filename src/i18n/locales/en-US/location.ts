@@ -47,6 +47,10 @@ export default {
       text: 'This validator sends its location with each identification, and permission is blocked in this browser.',
       next: 'Open the checkpoint again.',
     },
+    verification: {
+      text: 'This verification needs your location, and permission is blocked in this browser.',
+      next: 'Come back here and tap “Retry.”',
+    },
   },
   server: {
     outOfRange: "You're outside the allowed area",

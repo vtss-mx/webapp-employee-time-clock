@@ -90,7 +90,7 @@ describe('ValidationSocket', () => {
       if (attempts === 1) throw new DOMException('URL bloqueada por el proxy', 'SyntaxError');
       return new FakeSocket(url, server) as unknown as WebSocket;
     });
-    await expect(channel.request({ type: 'validate', field: 'employee_number', value: 'EMP-1' })).rejects.toThrow('No se pudo abrir el canal');
+    await expect(channel.request({ type: 'validate', field: 'employee_number', value: 'EMP-1' })).rejects.toThrow('REALTIME_OPEN_FAILED');
     expect(channel.available).toBe(true); // una sola falla no lo degrada
     const answer = await channel.request({ type: 'validate', field: 'employee_number', value: 'EMP-2' });
     expect(answer.code).toBe('AVAILABLE');
@@ -106,12 +106,12 @@ describe('ValidationSocket', () => {
     const channel = new ValidationSocket((url) => new FakeSocket(url, silent) as unknown as WebSocket);
     for (let i = 0; i < 2; i++) {
       const pending = channel.request({ type: 'validate', field: 'email', value: 'a@b.com' });
-      const assertion = expect(pending).rejects.toThrow('Tiempo de espera agotado');
+      const assertion = expect(pending).rejects.toThrow('REALTIME_TIMEOUT');
       await vi.advanceTimersByTimeAsync(5000);
       await assertion;
     }
     expect(channel.available).toBe(false);
-    await expect(channel.request({ type: 'ping' })).rejects.toThrow('no disponible');
+    await expect(channel.request({ type: 'ping' })).rejects.toThrow('REALTIME_UNAVAILABLE');
   });
 
   it('una consulta sin respuesta cierra la conexión (medio abierta) y la siguiente abre otra', async () => {
@@ -128,7 +128,7 @@ describe('ValidationSocket', () => {
       return socket as unknown as WebSocket;
     });
     const first = channel.request({ type: 'validate', field: 'employee_number', value: 'EMP-2' });
-    const assertion = expect(first).rejects.toThrow('Tiempo de espera agotado');
+    const assertion = expect(first).rejects.toThrow('REALTIME_TIMEOUT');
     const closed = vi.spyOn(sockets[0], 'close');
     await vi.advanceTimersByTimeAsync(5000);
     await assertion;
@@ -161,7 +161,7 @@ describe('ValidationSocket', () => {
   it('sin sesión no abre el canal', async () => {
     configureApiClient({ getToken: () => null, onUnauthorized: vi.fn(), refreshSession: () => Promise.resolve(false) });
     const channel = new ValidationSocket((url) => new FakeSocket(url, server) as unknown as WebSocket);
-    await expect(channel.request({ type: 'ping' })).rejects.toThrow('Sin sesión');
+    await expect(channel.request({ type: 'ping' })).rejects.toThrow('REALTIME_NO_SESSION');
   });
 });
 
@@ -194,7 +194,7 @@ describe('ValidationSocket: fallas del canal', () => {
     const sockets: FakeSocket[] = [];
     const channel = channelWith(() => undefined, sockets);
     const pending = channel.request({ type: 'validate', field: 'email', value: 'a@b.com' });
-    const assertion = expect(pending).rejects.toThrow('No se pudo abrir el canal');
+    const assertion = expect(pending).rejects.toThrow('REALTIME_OPEN_FAILED');
     await vi.advanceTimersByTimeAsync(0);
     const closed = vi.spyOn(sockets[0], 'close');
     await vi.advanceTimersByTimeAsync(4_000);
@@ -220,16 +220,16 @@ describe('ValidationSocket: fallas del canal', () => {
 
   it('el servidor corta la conexión: la consulta en curso se rechaza y, tras dos cortes, el canal se pausa', async () => {
     const channel = channelWith(closesWith(1006));
-    await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('Canal cerrado (1006)');
+    await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('REALTIME_CLOSED:1006');
     expect(channel.available).toBe(true); // una falla aislada no pausa el canal
-    await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('Canal cerrado (1006)');
+    await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('REALTIME_CLOSED:1006');
     expect(channel.available).toBe(false);
   });
 
   it('un cierre normal (1000) del servidor no cuenta como falla', async () => {
     const channel = channelWith(closesWith(1000));
     for (let i = 0; i < 3; i++) {
-      await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('Canal cerrado (1000)');
+      await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('REALTIME_CLOSED:1000');
     }
     expect(channel.available).toBe(true);
   });
@@ -239,7 +239,7 @@ describe('ValidationSocket: fallas del canal', () => {
     configureApiClient({ getToken: () => 'vencido', onUnauthorized: vi.fn(), refreshSession: refresh });
     const channel = channelWith((_message, socket) => socket.close(4401));
     for (let i = 0; i < 3; i++) {
-      await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('Canal cerrado (4401)');
+      await expect(channel.request({ type: 'validate', field: 'email', value: 'x' })).rejects.toThrow('REALTIME_CLOSED:4401');
     }
     expect(refresh).toHaveBeenCalledOnce();
     expect(channel.available).toBe(false);

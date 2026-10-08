@@ -289,6 +289,22 @@ describe('Asistencia: historial', () => {
     expect(screen.getByRole('link', { name: /Historial de asistencia/ })).toHaveAttribute('href', '/company/attendance/history');
   });
 
+  it('un empleado sin número (opcional) se nombra solo por su nombre, también en el detalle de su jornada', async () => {
+    const unnumbered = { ...beto, employee_number: null };
+    const gone = { ...ana, employee_number: null, deleted: true };
+    mockFetch((call: MockCall) =>
+      call.url.includes('/attendance/sessions/') ? apiOk({ ...detail, employee: unnumbered }) : history([{ ...betoSession, employee: unnumbered }, { ...anaSession, employee: gone }]),
+    );
+    renderHistory();
+    const row = (await screen.findByText('Beto López')).closest('tr') as HTMLElement;
+    expect(row.querySelector('.person__info small')).toBeNull();
+    // Uno eliminado sin número conserva su marca «Eliminado».
+    expect((screen.getByText('Ana Ruiz').closest('tr') as HTMLElement).querySelector('.person__info small')).toHaveTextContent('Eliminado');
+    await userEvent.click(screen.getByText('Beto López'));
+    expect(await screen.findByRole('heading', { name: 'Beto López' })).toBeInTheDocument();
+    expect(screen.getByText('2 oct 2026 · Matutino')).toBeInTheDocument();
+  });
+
   it('filtra por rangos rápidos, fechas a mano y estado', async () => {
     const { calls } = mockFetch(history([betoSession]));
     renderHistory();

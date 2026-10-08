@@ -5,8 +5,11 @@
  */
 import type esMX from '../i18n/locales/es-MX';
 
-/** Idiomas de la aplicación: español de México (por omisión) e inglés de Estados Unidos. */
-export type Locale = 'es-MX' | 'en-US';
+/**
+ * Los siete idiomas de la aplicación (decisión del dueño del producto, 2026-10-06; `docs/i18n/glosario.md`): español de
+ * México (por omisión), inglés de Estados Unidos, portugués de Brasil, francés, alemán, italiano y español de España.
+ */
+export type Locale = 'es-MX' | 'en-US' | 'pt-BR' | 'fr-FR' | 'de-DE' | 'it-IT' | 'es-ES';
 
 /** Forma de los textos: la del diccionario es-MX (fuente de las llaves y de sus variables). */
 export type Messages = typeof esMX;
@@ -14,7 +17,7 @@ export type Messages = typeof esMX;
 /** El diccionario de otro idioma: las mismas llaves, con sus propios textos. */
 export type Translation<T> = { readonly [K in keyof T]: T[K] extends string ? string : Translation<T[K]> };
 
-/** Formas del plural de `Intl.PluralRules` (es y en usan `one` y `other`; `zero` es opcional). */
+/** Formas del plural de `Intl.PluralRules` (los siete idiomas usan `one` y `other`; `zero` es opcional; `many` cae en `other`). */
 export type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
 
 type Join<P extends string, K extends string> = P extends '' ? K : `${P}.${K}`;

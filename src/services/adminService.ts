@@ -89,6 +89,14 @@ export const adminService = {
     return apiRequest<CompanyDetail>(`/admin/companies/${id}`, { method: 'PUT', body: { api_enabled: enabled }, validate: isDetail });
   },
 
+  /**
+   * Si la empresa exige documentos de identidad en el onboarding (comprobante de domicilio e identificación oficial;
+   * decisión del dueño, 2026-10-07). Encendido, el empleado los sube y la empresa los revisa en el expediente.
+   */
+  setDocumentsRequired(id: number, required: boolean): Promise<CompanyDetail> {
+    return apiRequest<CompanyDetail>(`/admin/companies/${id}`, { method: 'PUT', body: { require_employee_documents: required }, validate: isDetail });
+  },
+
   setStatus(id: number, active: boolean): Promise<CompanyDetail> {
     return apiRequest<CompanyDetail>(`/admin/companies/${id}/status`, { method: 'PATCH', body: { active }, validate: isDetail });
   },

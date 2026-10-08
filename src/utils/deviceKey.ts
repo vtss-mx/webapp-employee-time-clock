@@ -10,7 +10,9 @@
  */
 
 import { t } from '../i18n/core';
+import { config } from './config';
 import { deviceObjectStore, idbRequest } from './indexedDb';
+import { withinTime } from './waits';
 
 /** Su nombre en IndexedDB (se conserva: cambiarlo dejaría sin su llave a los validadores ya autorizados). */
 const KEY_ID = 'validator-device';
@@ -56,8 +58,14 @@ export interface SignedMessage {
   signature: string;
 }
 
-/** Firma un mensaje (texto UTF-8) con la llave del dispositivo; única implementación de la firma. */
-export async function signMessage(message: string): Promise<SignedMessage> {
+/**
+ * La operación con la llave, con su tiempo límite (`config.deviceKeyTimeoutMs`): IndexedDB puede no responder nunca (modo
+ * privado estricto, un navegador integrado de otra aplicación, versiones de Safari con ese defecto) y la firma va antes
+ * de un registro o de un inicio de sesión. Tarde = sin llave (`DeviceKeyError`), como cualquier otra falla de la llave.
+ */
+const inTime = <T>(task: Promise<T>) => withinTime(task, config.deviceKeyTimeoutMs, unavailable);
+
+async function sign(message: string): Promise<SignedMessage> {
   const pair = await deviceKeyPair();
   const subtle = globalThis.crypto.subtle;
   const [spki, signature] = await Promise.all([
@@ -67,10 +75,14 @@ export async function signMessage(message: string): Promise<SignedMessage> {
   return { publicKey: toBase64(spki), signature: toBase64(signature) };
 }
 
+/** Firma un mensaje (texto UTF-8) con la llave del dispositivo; única implementación de la firma. */
+export function signMessage(message: string): Promise<SignedMessage> {
+  return inTime(sign(message));
+}
+
 /** La llave pública de este dispositivo (SPKI DER en base64): con ella se vincula un kiosco. */
-export async function devicePublicKey(): Promise<string> {
-  const pair = await deviceKeyPair();
-  return toBase64(await globalThis.crypto.subtle.exportKey('spki', pair.publicKey));
+export function devicePublicKey(): Promise<string> {
+  return inTime(deviceKeyPair().then((pair) => globalThis.crypto.subtle.exportKey('spki', pair.publicKey)).then(toBase64));
 }
 
 /** Firma el reto del servidor con la llave del dispositivo (ECDSA P-256/SHA-256, r||s). */

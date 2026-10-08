@@ -3,6 +3,7 @@ import { ATTENDANCE_SLUGS } from '../../../services/attendanceService';
 import type { AttendanceAction, AttendanceToday, BoardState, WorkBreak, WorkSession } from '../../../types';
 import { formatMinutes, formatTime } from '../../../utils/format';
 import { addMinutes } from './serverTime';
+import { inSentence } from '../../../utils/text';
 
 /**
  * Presentación de "Mi asistencia" a partir de lo que respondió el servidor (puras). Nada de esto
@@ -18,7 +19,7 @@ export function actionFromSlug(slug: string | undefined): AttendanceAction | nul
 
 /** "Registrar entrada", "Registrar inicio de descanso"... a partir del nombre del catálogo. */
 export function recordLabel(actionName: string): string {
-  return t('myAttendance.record.label', { action: actionName.toLowerCase() });
+  return t('myAttendance.record.label', { action: inSentence(actionName) });
 }
 
 /** El descanso en curso de la jornada (a lo más uno). */

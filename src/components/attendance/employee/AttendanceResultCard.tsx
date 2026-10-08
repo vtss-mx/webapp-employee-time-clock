@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react';
 import { useEffect, useId, type ReactNode } from 'react';
 import { t, Trans, useT } from '../../../i18n';
+import { localizeServerText } from '../../../i18n/serverTexts';
 import type { AttendanceAction, AttendanceActionResult, WorkSession } from '../../../types';
 import { formatMinutes, formatTime } from '../../../utils/format';
 import { haptic } from '../../../utils/haptics';
@@ -79,7 +80,8 @@ export function AttendanceResultCard({ result, onDone }: { result: AttendanceAct
       <div className="result-card result-card--popup attendance-result">
       <StatusMark kind="success" once />
       <header className="attendance-result__head">
-        <h1 id={titleId}>{result.message}</h1>
+        {/* Texto del servidor: en el idioma activo aunque se cambie con el resultado en pantalla (`i18n` del sobre). */}
+        <h1 id={titleId}>{localizeServerText(result.message)}</h1>
         <p className="attendance-result__when">
           <Trans k="myAttendance.result.at" values={{ time: <strong>{formatTime(info.at)}</strong> }} />
           {info.where && ` · ${info.where}`} {info.badge}

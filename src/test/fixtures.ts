@@ -105,6 +105,7 @@ export const sampleAdminPolicy: AdminVerificationPolicy = {
   fraud_evidence: true,
   flash_paced: true,
   capture_burst: true,
+  voice_verification: true,
   validator_signing: 'OBSERVE',
   validator_location: 'OBSERVE',
   site_codes: 'OBSERVE',

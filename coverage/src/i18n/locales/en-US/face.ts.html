@@ -278,7 +278,51 @@
 <a name='L213'></a><a href='#L213'>213</a>
 <a name='L214'></a><a href='#L214'>214</a>
 <a name='L215'></a><a href='#L215'>215</a>
-<a name='L216'></a><a href='#L216'>216</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -505,6 +549,14 @@ export default {
       back: 'Back camera',
       unknown: 'Camera',
     },
+    lenses: {
+      wide: 'wide',
+      ultraWide: 'ultra wide',
+      telephoto: 'telephoto',
+      dual: 'dual',
+      triple: 'triple',
+    },
+    withLens: '{camera} ({lens})',
     numbered: '{name} {number}',
     preview: 'Camera preview',
     requesting: 'Turning on the camera…',
@@ -521,6 +573,7 @@ export default {
     notReady: 'The camera is not ready yet',
     processFailed: "Couldn't process the image",
     captureFailed: "Couldn't capture the image",
+    turned: 'The camera changed orientation. Keep your phone in the same position.',
   },
   cameraHelp: {
     yourBrowser: 'your browser',
@@ -580,16 +633,30 @@ export default {
       reload: 'Reload the page and press "Retry".',
       otherBrowser: 'If it continues, try a different browser.',
     },
+    inApp: {
+      title: 'Open this page in your browser',
+      message: "This app's built-in browser doesn't allow camera access.",
+      ios: 'Tap the menu (⋯ or the share icon) and choose "Open in Safari" or "Open in browser".',
+      android: 'Tap the menu (⋮) and choose "Open in Chrome" or "Open in browser".',
+      copyLink: "If you don't see that option, copy the link and paste it into your browser.",
+    },
+    canvasBlocked: {
+      title: 'Your browser hides the camera image',
+      message: "Its anti-tracking protection alters the image, so your face can't be verified.",
+      allow: "Allow this site to read canvas data in your browser's privacy settings.",
+      otherBrowser: 'Or open the app in Chrome, Edge, Safari, or Firefox with their standard settings.',
+    },
   },
   guidance: {
     loading: 'Preparing face detection…',
-    noFace: 'Place your face inside the silhouette',
+    noFace: 'Place your face in the guide',
     multiple: 'Only one person in front of the camera',
-    tooFar: 'Move a little closer',
-    tooClose: 'Move back a little',
-    offCenter: 'Center your face in the silhouette',
-    lookStraight: 'Look straight at the camera',
-    tooDark: 'Find a brighter spot',
+    cutOff: 'Show your whole face',
+    tooFar: 'Move closer',
+    tooClose: 'Move back',
+    offCenter: 'Center your face',
+    lookStraight: 'Look straight ahead',
+    tooDark: 'More light',
     tooBright: 'Avoid direct light',
     move: 'Make the movement shown',
     holdStill: 'Hold still',
@@ -607,7 +674,7 @@ export default {
     align: {
       name: 'Alignment',
       title: 'Center your face',
-      text: 'Place it inside the silhouette and look at the camera.',
+      text: 'Place it inside the guide and look at the camera.',
     },
     scan: {
       name: 'Scan',
@@ -617,7 +684,7 @@ export default {
     liveness: {
       name: 'Liveness check',
       title: 'Follow the prompt',
-      text: 'Move your head as shown; the screen may briefly change color.',
+      text: 'Move your head as shown until each step is complete.',
     },
     confirm: {
       name: 'Confirmation',
@@ -636,38 +703,29 @@ export default {
     analyzing: 'Analyzing…',
     retry: 'Try again',
     nextStepReady: 'Ready for the next step',
-    lookFront: 'Look straight ahead again',
+    lookFront: 'Center your face',
+    centered: 'Face centered',
     manualOnly: 'Automatic detection unavailable. Use “Capture.”',
     virtualCamera: 'Virtual cameras are not allowed: choose the device camera',
     blockedText: 'Fix what the camera shows; the scan resumes on its own.',
-    flashTitle: '{name} · flash',
-    flashText: 'Keep your face in front of the screen while it changes color.',
     stepTitle: '{name} · step {current} of {total}',
     recenterText: 'Look straight ahead again for the next step.',
+    recenterEndText: 'Center your face to finish.',
     timeout: "The movement wasn't completed in time. Do it slowly until the ring fills.",
-    flashFailed: "Couldn't complete the color flash. Keep the screen on and your face in front of it.",
     challengeRestart: "The liveness check wasn't completed. The scan will start over.",
     capture: 'Capture',
     ring: 'Capture {percent} complete',
     captureDone: 'Capture complete',
-  },
-  flash: {
-    hint: 'Keep your face in front of the screen',
-    progress: 'Color {current} of {total}',
-    interrupted: 'The color flash was interrupted',
-  },
-  review: {
-    nor: 'or',
-    question: 'Not wearing {names}?',
-    explanation: "It may be the lighting or framing. If you're sure, send your enrollment for review: your company will check your photo.",
-    confirm: "I don't wear {names} · send for review",
-    sent: 'Your enrollment will be sent to your company for review.',
+    /** La cuenta del registro facial: solo las fotos VÁLIDAS (decisión del dueño, 2026-10-06). */
+    validPhotos: 'Valid captures: {percent}',
   },
   requirements: {
     label: 'Capture requirements',
-    without: 'No {name}',
     lighting: 'Good lighting',
     realFace: 'Your real face, no photos',
+  },
+  accessories: {
+    detected: 'Detected accessories',
   },
   confidence: {
     label: 'Required confidence level',
@@ -707,6 +765,14 @@ export default {
     pausedTitle: 'Continuous learning is paused',
     pausedText: 'Its employees are compared only with their approved enrollment. Turn on “Continuous learning” in this policy so recognition improves with use.',
   },
+  speak: {
+    position: 'Place your face in the outline and look straight ahead.',
+    recenter: 'Look straight ahead again.',
+    done: 'Done. Processing.',
+    mute: 'Mute voice guidance',
+    unmute: 'Unmute voice guidance',
+    sample: 'This is how voice guidance sounds.',
+  },
 } satisfies Translation&lt;typeof es&gt;;
 &nbsp;</pre></td></tr></table></pre>
 
@@ -715,7 +781,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-06T18:00:23.868Z
+                at 2026-10-08T07:13:13.955Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

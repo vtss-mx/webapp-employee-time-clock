@@ -37,7 +37,9 @@ export function PhoneField({ label, value, onChange, onBlur, error, hint, status
   const id = useId();
   const { countries } = useCatalogs();
   const directory = useMemo(() => countryDirectory(countries), [countries]);
-  const [country, setCountry] = useState<CountryOption>(() => directory.split(value).country);
+  const [chosen, setCountry] = useState<CountryOption>(() => directory.split(value).country);
+  // Se guarda el país elegido; su nombre sale de los catálogos vigentes (al cambiar el idioma, en el nuevo).
+  const country = directory.current(chosen);
   const [open, setOpen] = useState(false);
   const controlRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);

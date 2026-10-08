@@ -1,0 +1,77 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/passkeys';
+
+/** Passkeys (WebAuthn) in English (en-US): the same keys as es-MX. Glossary §2: "passkey". */
+export default {
+  title: 'Passkeys',
+  intro: "Sign in with your device's face, fingerprint or PIN, without typing your password. The private key never leaves your device or your Apple or Google account.",
+  unsupported: "This browser doesn't support passkeys. Use an up-to-date Safari, Chrome or Edge.",
+  loadError: "Couldn't load your passkeys",
+  add: 'Add passkey',
+  empty: {
+    title: 'No passkeys',
+    description: 'Add one to sign in with your face, fingerprint or PIN.',
+  },
+  noun: {
+    one: 'passkey',
+    other: 'passkeys',
+  },
+  created: 'Created on {date}',
+  lastUsed: 'Last used: {date}',
+  neverUsed: 'Not used yet',
+  synced: 'Synced in the cloud',
+  deviceOnly: 'On one device only',
+  rename: 'Rename',
+  revoke: 'Revoke',
+  actionLabel: '{action}: {name}',
+  revokeAsk: {
+    eyebrow: 'Passkey',
+    title: 'Revoke "{name}"?',
+    message: 'That passkey will no longer sign you in, on any of your devices.',
+    note: "This can't be undone. You can register another one anytime.",
+    confirm: 'Revoke passkey',
+  },
+  revoked: 'Passkey revoked',
+  revokeFailed: "Couldn't revoke the passkey",
+  form: {
+    newTitle: 'Add passkey',
+    newSubtitle: 'Register this device to sign in without a password.',
+    renameTitle: 'Rename passkey',
+    renameSubtitle: 'Change the name you recognize it by.',
+    section: 'Passkey name',
+    intro: 'When you register it, your device will ask for your face, fingerprint or PIN. Your password keeps working.',
+    name: 'Name',
+    nameHint: 'So you recognize it: "My phone", "Work laptop"',
+    nameRequired: 'Enter a name',
+    nameTooLong: 'Up to {max} characters',
+    submit: 'Register passkey',
+    renameSubmit: 'Save name',
+    back: 'Back to My profile',
+    createAsk: {
+      eyebrow: 'Passkey',
+      title: 'Register a passkey on this device?',
+      message: 'Your device will ask for your face, fingerprint or PIN to create it.',
+      note: 'You can revoke it anytime from My profile.',
+      confirm: 'Register',
+    },
+    renameAsk: {
+      title: 'Rename the passkey?',
+    },
+    registered: 'Passkey registered',
+    registeredText: 'You can now sign in with it from the sign-in screen.',
+    registerFailed: "Couldn't register the passkey",
+    renamed: 'Name saved',
+    renameFailed: "Couldn't rename the passkey",
+    noChanges: 'No changes',
+  },
+  errors: {
+    unsupported: "This browser doesn't support passkeys. Use an up-to-date Safari, Chrome or Edge.",
+    failed: "Your device couldn't complete the operation. Try again.",
+  },
+  login: {
+    divider: 'or',
+    button: 'Sign in with a passkey',
+    waiting: 'Waiting for your device…',
+    failed: "Couldn't sign in with the passkey",
+  },
+} as const satisfies Translation<typeof es>;

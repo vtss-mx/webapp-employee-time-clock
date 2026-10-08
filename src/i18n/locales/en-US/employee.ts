@@ -40,10 +40,22 @@ export default {
       step: 'Enroll your face with a liveness check; it takes about a minute.',
     },
     confirm: {
-      title: 'Enroll your face?',
-      message: 'The camera will open to capture your face with a liveness check. When you finish, your company will validate your identity.',
       replaces: 'Your previous enrollment will be replaced by this one.',
+      replacesPhoto: 'Your previous first photo will be replaced by this one.',
       open: 'Open camera',
+      photo: {
+        title: 'Take your first photo?',
+        message: "The camera will open to take a photo of your face, looking straight ahead. It's stored encrypted for your enrollment.",
+      },
+      captures: {
+        title: 'Start the captures?',
+        message: 'The camera will open to take {count} captures of your face and do the liveness check.',
+      },
+      video: {
+        title: 'Record the video?',
+        message_one: 'The camera and microphone will open so you can answer {count} question on video.',
+        message_other: 'The camera and microphone will open so you can answer {count} questions on video.',
+      },
     },
     submitting: 'Sending your enrollment…',
     sent: {
@@ -52,8 +64,6 @@ export default {
       offline: "Your company will validate your identity shortly. The screen will update when you're back online.",
     },
     fatal: "Couldn't complete the enrollment",
-    duration_one: '{count} step · 1 minute',
-    duration_other: '{count} steps · 1 minute',
     again: 'Enroll your face again',
     welcome: 'Welcome, {name}',
     intro: 'To protect your identity, enroll your face. You only do it once, and your company will validate it.',
@@ -62,8 +72,88 @@ export default {
       text: "Your company reviews and approves your identity; you'll see the result in the app.",
     },
     before: 'Before you start:',
-    privacy: "Only encrypted data is stored; it's never shared.",
-    start: 'Start enrollment',
+    privacy: 'Your photos, video, and voice are stored encrypted and reviewed only by your company; they are never shared.',
+    /** Los cuatro pasos del registro (decisión del dueño, 2026-10-06), en el indicador sobre el visor. */
+    steps: {
+      label: 'Step {current} of {total}',
+      photo: 'First photo',
+      captures: 'Captures',
+      video: 'Video',
+      done: 'Done',
+    },
+    /** Mientras se guarda la foto inicial (paso 1). */
+    photoSaving: 'Saving your photo…',
+    /** El índice de los pasos independientes (decisión del dueño, 2026-10-07): estado, aviso y botón de cada uno. */
+    index: {
+      steps_one: '{count} step',
+      steps_other: '{count} steps',
+      resume: 'Do them in order. You can leave after any step and continue another day: your progress is saved.',
+      errorTitle: "Couldn't load your enrollment",
+      label: 'Face enrollment steps',
+      photo: {
+        title: 'First photo',
+        text: 'A photo of your face, looking straight ahead, in good light.',
+      },
+      captures: {
+        title: 'Captures and liveness check',
+        text: '{count} captures of your face and four head movements.',
+      },
+      video: {
+        title: 'Video questions',
+        text: 'Answer questions about your details out loud, looking at the camera.',
+      },
+      state: {
+        pending: 'Pending',
+        done: 'Completed · {date}',
+        complete: 'Completed',
+        locked: 'Locked',
+        expired: 'Expired',
+        exhausted: 'Out of tries',
+        answered: '{answered} of {total} answered',
+      },
+      hint: {
+        validUntil: 'Valid until {date}',
+        expired: 'Your photo expired. Take it again.',
+        needsPhoto: 'Take your first photo first.',
+        needsCaptures: 'Complete the captures first.',
+        exhausted: 'You ran out of tries. Repeat the first photo and the captures.',
+      },
+      action: {
+        photo: 'Take photo',
+        retakePhoto: 'Retake photo',
+        captures: 'Start captures',
+        video: 'Record video',
+        resumeVideo: 'Continue video',
+      },
+    },
+    /** Una pantalla de un paso que se abrió fuera de orden: qué falta (su vacío). */
+    blocked: {
+      back: 'Back to enrollment',
+      photoUsed: {
+        title: 'First photo ready',
+        text: 'It was already used in your captures. Continue with the next step.',
+      },
+      needsPhoto: {
+        title: 'First photo missing',
+        text: 'Take your first photo before the captures.',
+      },
+      capturesDone: {
+        title: 'Captures ready',
+        text: 'They were already sent. Continue with the next step.',
+      },
+      needsCaptures: {
+        title: 'Captures missing',
+        text: 'Complete the captures before the video.',
+      },
+      exhausted: {
+        title: 'Out of tries',
+        text: 'Repeat the first photo and the captures to try again.',
+      },
+      noVideo: {
+        title: 'No video needed',
+        text: "Your company doesn't require the video questions.",
+      },
+    },
   },
   myQr: {
     errorTitle: "Couldn't generate your QR code",

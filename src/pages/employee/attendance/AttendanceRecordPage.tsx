@@ -17,6 +17,7 @@ import { errorMessage } from '../../../services/apiClient';
 import { attendanceService } from '../../../services/attendanceService';
 import type { AttendanceAction, AttendanceActionResult, VerificationResult } from '../../../types';
 import { config } from '../../../utils/config';
+import { inSentence } from '../../../utils/text';
 
 /**
  * Pasos de un registro: ubicación → código del sitio (si lo pide) → rostro → resultado (o un problema que se puede
@@ -55,7 +56,7 @@ function AttendanceRecorder({ action }: { action: AttendanceAction }) {
   // Cada intento monta de nuevo la lectura de la ubicación o la cámara (libera la anterior).
   const [attempt, setAttempt] = useState(0);
   const fix = useRef<LocationFix | null>(null);
-  const actionName = nameOf('attendance_actions', action).toLowerCase();
+  const actionName = inSentence(nameOf('attendance_actions', action));
   const title = recordLabel(actionName);
   // Al salir se reemplaza esta pantalla: "atrás" en Mi asistencia no vuelve a abrir la cámara.
   const back = useCallback(() => void navigate(paths.employee.attendance, { replace: true }), [navigate]);

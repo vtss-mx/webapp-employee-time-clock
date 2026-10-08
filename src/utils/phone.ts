@@ -2,6 +2,7 @@ import { AsYouType, isSupportedCountry, parsePhoneNumberFromString, type Country
 import { t } from '../i18n/core';
 import { localizedError } from '../i18n/lazy';
 import type { CountryItem } from '../types';
+import { foldText } from './text';
 
 /**
  * Teléfonos internacionales. Los países (nombre, lada, frecuentes y orden) vienen del catálogo
@@ -36,9 +37,14 @@ export interface CountryDirectory {
   parse: (text: string, preferred?: CountryOption) => PhoneParts | null;
   /** Valor E.164 → país y número nacional para el control. */
   split: (value: string, preferred?: CountryOption) => PhoneParts;
+  /**
+   * El mismo país con los datos de este catálogo (su nombre en el idioma de los catálogos vigentes): el control guarda
+   * el país elegido y lo muestra con el nombre del idioma activo. Uno que ya no está en el catálogo, tal cual.
+   */
+  current: (country: CountryOption) => CountryOption;
 }
 
-export const foldText = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+export { foldText };
 
 /** Bandera como emoji (indicadores regionales). */
 export function flagOf(code: string): string {
@@ -75,7 +81,7 @@ export function countryDirectory(countries: CountryItem[]): CountryDirectory {
     return parse(value, preferred) ?? { country: preferred, national: value.replace(/\D/g, '') };
   };
 
-  return { options, defaultCountry, parse, split };
+  return { options, defaultCountry, parse, split, current: (country) => byCode.get(country.code) ?? country };
 }
 
 /** País + número nacional → E.164 ("" si no hay número). */

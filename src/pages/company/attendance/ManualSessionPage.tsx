@@ -25,6 +25,7 @@ import { employeeService } from '../../../services/employeeService';
 import type { BoardRow, CompanySessionDetail, EmployeeRef } from '../../../types';
 import type { ConfirmInput } from '../../../types/confirm';
 import { describeChanges, describeValues } from '../../../utils/changes';
+import { employeeLabel } from '../../../utils/employeeLabel';
 import { businessToday, formatDate } from '../../../utils/format';
 
 /** Empleados que puede traer la búsqueda por número en el tablero (la página más grande de la API). */
@@ -50,7 +51,7 @@ interface DayLookup {
 }
 
 /**
- * Su turno el día elegido, desde el tablero de ese día (búsqueda por su número). Solo orienta: si no
+ * Su turno el día elegido, desde el tablero de ese día (búsqueda por su número o, sin él, por su nombre). Solo orienta: si no
  * se puede saber, el formulario funciona igual y el backend valida el día (sin turno, día libre o ya
  * registrado).
  */
@@ -60,7 +61,7 @@ function useDayLookup(employee: EmployeeRef, workDate: string): DayLookup {
     (signal) =>
       day
         ? attendanceService
-            .board({ date: day, search: employee.employee_number, page: 1, size: SCHEDULE_LOOKUP }, signal)
+            .board({ date: day, search: employee.employee_number ?? employee.full_name, page: 1, size: SCHEDULE_LOOKUP }, signal)
             .then((board) => ({ day, row: board.items.find((row) => row.employee.id === employee.id) ?? null, failed: false }))
             // Accesorio (horario y horas sugeridas): sin él se registra igual, por eso no abre un popup.
             .catch(() => ({ day, row: null, failed: true }))
@@ -215,7 +216,7 @@ function ManualForm({ target, schedule, form, day }: ManualFormProps) {
       <Panel onSubmit={onSubmit} className="manual-session">
         <PanelHeader
           title={t(creating ? 'attendance.record' : 'attendance.manual.correctTitle')}
-          subtitle={creating ? `${employee.full_name} · ${employee.employee_number}` : `${employee.full_name} · ${formatDate(target.session.work_date)} · ${target.session.shift_name}`}
+          subtitle={creating ? employeeLabel(employee) : `${employee.full_name} · ${formatDate(target.session.work_date)} · ${target.session.shift_name}`}
           {...back}
         />
         {day && (

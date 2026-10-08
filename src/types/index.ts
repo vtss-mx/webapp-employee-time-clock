@@ -1,3 +1,5 @@
+import type { EnrollmentVoice, VoiceChallenge, VoiceQuestionKind } from './voice';
+import type { WithAvatar } from './avatar';
 import type { ApiKey, ApiKeyStatus, ApiScope } from './apiKeys';
 import type { Department, DepartmentRef } from './departments';
 import type { ErrorOccurrence, ErrorReport, ErrorSeverity, ErrorStatus } from './errors';
@@ -20,7 +22,8 @@ export type EnrollmentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface UserEmployeeInfo {
   id: number;
-  employee_number: string;
+  /** Opcional (decisión del dueño del producto): null = sin número. */
+  employee_number: string | null;
   rfc?: string | null;
   curp?: string | null;
   nss?: string | null;
@@ -145,9 +148,10 @@ export type CompanyAdminList = Page<CompanyAdmin>;
  * Empleado de una empresa visto por el ADMIN de la plataforma: solo su ficha de trabajo, de solo
  * lectura (sin RFC, CURP, NSS, fecha de nacimiento ni nada biométrico: el backend no los envía).
  */
-export interface CompanyEmployee {
+export interface CompanyEmployee extends WithAvatar {
   id: number;
-  employee_number: string;
+  /** Opcional (decisión del dueño del producto): null = sin número. */
+  employee_number: string | null;
   first_name: string;
   last_name: string;
   department_name: string | null;
@@ -170,7 +174,8 @@ export type CompanyList = Page<Company>;
 export interface Employee extends SoftDeleted {
   id: number;
   user_id: number;
-  employee_number: string;
+  /** El número, el RFC, la CURP y el NSS son opcionales (`OPTIONAL_FIELDS`): null = sin capturar. */
+  employee_number: string | null;
   first_name: string;
   last_name: string;
   full_name: string;
@@ -196,7 +201,7 @@ export interface Employee extends SoftDeleted {
   department_name?: string | null;
   /** Departamentos de los que es responsable (solo en el detalle). */
   managed_departments?: DepartmentRef[];
-  /** Ruta versionada de la foto de perfil de la persona (null: sin foto o empleado inactivo). */
+  /** Ruta versionada de la foto de perfil de la persona (null: sin foto o en «Eliminados»). */
   avatar?: string | null;
   created_at: string;
   updated_at: string;
@@ -242,26 +247,29 @@ export interface EmployeeFormValues {
   password_confirm: string;
 }
 
-/** Documentos opcionales del empleado: vacíos viajan como null (sin capturar; al editar, null borra el dato). */
-export type OptionalDocument = 'rfc' | 'curp' | 'nss';
-export type OptionalDocuments = Record<OptionalDocument, string | null>;
+/** Datos opcionales del empleado (número, RFC, CURP y NSS): vacíos viajan como null (sin capturar; al editar, null lo borra). */
+export type OptionalField = 'employee_number' | 'rfc' | 'curp' | 'nss';
+export type OptionalFields = Record<OptionalField, string | null>;
 /** Solo lo que cambia; omitido = no cambiarlo. */
-export type EmployeeUpdatePayload = Partial<Omit<EmployeeFormValues, OptionalDocument> & OptionalDocuments> & { headwear_exempt?: boolean };
+export type EmployeeUpdatePayload = Partial<Omit<EmployeeFormValues, OptionalField> & OptionalFields> & { headwear_exempt?: boolean };
 /** Sin `password` cuando se vincula a una persona que ya tiene cuenta (conserva la suya). */
-export type EmployeeCreatePayload = Omit<EmployeeFormValues, 'password' | 'password_confirm' | OptionalDocument> &
-  OptionalDocuments & { password?: string; headwear_exempt: boolean };
+export type EmployeeCreatePayload = Omit<EmployeeFormValues, 'password' | 'password_confirm' | OptionalField> &
+  OptionalFields & { password?: string; headwear_exempt: boolean };
 
 export interface EnrollmentSubmitResponse {
   enrollment_id: number;
   face_status: FaceStatus;
   message: string;
+  /** Con la verificación por voz de la política: las preguntas en video que siguen (el registro aún no termina). */
+  voice?: VoiceChallenge | null;
 }
 
-export interface FaceEnrollment {
+export interface FaceEnrollment extends WithAvatar {
   id: number;
   status: EnrollmentStatus;
   employee_id: number;
-  employee_number: string;
+  /** Opcional (decisión del dueño del producto): null = sin número. */
+  employee_number: string | null;
   full_name: string;
   email: string;
   birth_date: string;
@@ -281,6 +289,8 @@ export interface FaceEnrollmentDetail extends FaceEnrollment {
   photo: string | null;
   /** Los empleados más parecidos (nivel de sospecha de la empresa): revisarlos antes de aprobar. */
   similar?: SimilarEmployee[];
+  /** La verificación por voz y video (decisión del dueño, 2026-10-06); null si el registro no la llevó. */
+  voice?: EnrollmentVoice | null;
 }
 
 export type FaceEnrollmentList = Page<FaceEnrollment>;
@@ -291,7 +301,8 @@ export type FaceEnrollmentList = Page<FaceEnrollment>;
  */
 export interface DynamicQr {
   id: number;
-  employee_number: string;
+  /** Opcional (decisión del dueño del producto): null = sin número. */
+  employee_number: string | null;
   created_at: string;
   expires_at: string;
   lifetime_seconds: number;
@@ -318,7 +329,8 @@ export interface EmployeeQrSummary {
 }
 
 /** QR_FACE: doble factor del validador (el QR dice quién es y el rostro lo confirma). */
-export type VerificationMethod = 'FACE' | 'QR' | 'QR_FACE';
+/** API_FACE: el rostro desde la aplicación móvil de la empresa (API pública de verificación, SDK; migración 0084). */
+export type VerificationMethod = 'FACE' | 'QR' | 'QR_FACE' | 'API_FACE';
 
 export interface FaceCheckResult {
   ok: boolean;
@@ -326,9 +338,11 @@ export interface FaceCheckResult {
   detection_score: number;
   quality_score: number;
   yaw_ratio: number | null;
+  /** Accesorios detectados (códigos del catálogo `accessories`), bloqueados o no: las insignias sobre el rostro. */
+  accessories?: string[];
 }
 
-export interface VerificationResult {
+export interface VerificationResult extends WithAvatar {
   verified: boolean;
   method: VerificationMethod;
   message: string;
@@ -368,7 +382,7 @@ export type VerificationLogList = Page<VerificationLog>;
 /** QR, rostro, cualquiera de los dos (el operador elige) o ambos (el rostro confirma al dueño del QR). */
 export type ValidatorMode = 'QR' | 'FACE' | 'QR_OR_FACE' | 'QR_AND_FACE';
 
-export interface Validator extends SoftDeleted {
+export interface Validator extends SoftDeleted, WithAvatar {
   id: number;
   name: string;
   email: string;
@@ -455,28 +469,6 @@ export interface CheckpointProfile {
   /** La app manda la ubicación en cada identificación (validador con "requiere ubicación"). */
   location_required: boolean;
 }
-
-/** Dueño de un QR (paso 1 del modo QR y rostro). */
-export interface CheckpointEmployee {
-  employee_id: number;
-  name: string;
-  employee_number: string;
-  /** El siguiente reto para firmar (antifraude 2b). */
-  device_nonce?: string | null;
-}
-
-export interface CheckpointEvent {
-  id: number;
-  created_at: string;
-  method: VerificationMethod;
-  success: boolean;
-  reason: string | null;
-  confidence: number | null;
-  employee_name: string | null;
-  employee_number: string | null;
-}
-
-export type CheckpointEventList = Page<CheckpointEvent>;
 
 // ---------- Catálogos de la BD (GET /api/catalogs) ----------
 
@@ -604,6 +596,10 @@ export interface Catalogs extends AntifraudCatalogs {
   face_errors: FaceErrorItem[];
   /** Marcas del registro facial para el revisor (códigos de `flagged_accessories`). */
   enrollment_flags: CatalogItem[];
+  /** Preguntas de la verificación por voz del registro facial (su texto es la pregunta que oye el empleado). */
+  voice_questions: CatalogItem<VoiceQuestionKind>[];
+  /** Voces de la guía por voz del registro facial (decisión del dueño, 2026-10-08): la que elige el ADMIN por empresa. */
+  voice_profiles: CatalogItem[];
   /** Asistencia por turno: cómo se checó, cada registro, el estado de la jornada y de una solicitud. */
   work_modes: CatalogItem<WorkMode>[];
   attendance_actions: CatalogItem<AttendanceAction>[];
@@ -632,14 +628,18 @@ export interface Catalogs extends AntifraudCatalogs {
   slow_alert_statuses: StatusItem<SlowAlertStatus>[];
   /** Tipos de documento de una empresa (constancia fiscal, acta constitutiva...; `types/documents.ts`). */
   company_document_types: CatalogItem[];
+  /** Tipos de documento de identidad del empleado (pasaporte, INE, licencia, comprobante; migración 0087). */
+  employee_document_types: CatalogItem[];
 }
 
 export type CatalogKey = keyof Catalogs;
 export type CatalogEntry<K extends CatalogKey> = Catalogs[K][number];
 
 export type { ApiKey, ApiKeyCreated, ApiKeyCreatePayload, ApiKeyStatus, ApiScope } from './apiKeys';
+export type { EnrollmentVoice, VoiceAnswer, VoiceAnswerResult, VoiceChallenge, VoiceClip, VoiceQuestion, VoiceQuestionKind } from './voice';
+export type { CaptureStepStatus, EnrollmentPhotoResult, EnrollmentProgress, PhotoStepStatus, VoiceStepStatus } from './enrollmentSteps';
 export type { EmployeeDevice, EmployeeDeviceList } from './devices';
-export type { BurstSpec, FaceChallenge, FlashPace, LivenessAction } from './capture';
+export type { BurstSpec, ChallengePurpose, FaceChallenge, FlashPace, LivenessAction } from './capture';
 // Política de verificación (lo que lee la empresa y lo que configura el ADMIN) y casos de fraude (solo el ADMIN).
 export type * from './policy';
 export type * from './fraud';
@@ -649,6 +649,9 @@ export type { Company, CompanyAdmin, CompanyFormValues, CompanyListParams, Platf
 export type { AvailabilityResult, AvailabilityState, AvailabilityStatus, EmployeeUniqueField, FieldStatus, LiveChecks } from './forms';
 // Papelera («Eliminados»): cuándo y quién eliminó un registro, la marca de una referencia y lo que devuelve restaurar.
 export type { DeletedFlag, Restored, SoftDeleted } from './trash';
+export type { CheckpointEmployee, CheckpointEvent, CheckpointEventList } from './checkpoint';
+// Verificaciones de la empresa con dónde se hicieron (pantalla «Verificaciones», mapa).
+export type { CompanyVerification, CompanyVerificationList, CompanyVerificationQuery } from './verifications';
 // Sesión: respuesta del login, sesión en memoria y sesiones abiertas en otros dispositivos.
 export type { AuthTokenResponse, DeviceSession, DeviceSessionList, Session } from './session';
 

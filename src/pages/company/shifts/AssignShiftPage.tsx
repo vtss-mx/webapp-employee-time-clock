@@ -15,6 +15,7 @@ import { paths } from '../../../routes/paths';
 import { employeeService } from '../../../services/employeeService';
 import { shiftService } from '../../../services/shiftService';
 import type { Employee, Shift, ShiftAssignmentList } from '../../../types';
+import { employeeLabel } from '../../../utils/employeeLabel';
 import { businessToday, formatDate } from '../../../utils/format';
 
 /**
@@ -95,7 +96,7 @@ function AssignForm({ employee, shifts, history }: { employee: Employee; shifts:
   return (
     <div className="page">
       <Panel onSubmit={onSubmit}>
-        <PanelHeader title={t('shifts.assign.title')} subtitle={`${employee.full_name} · ${employee.employee_number}`} backTo={paths.company.employeeShifts(employee.id)} backLabel={t('shifts.assign.history.title')} />
+        <PanelHeader title={t('shifts.assign.title')} subtitle={employeeLabel(employee)} backTo={paths.company.employeeShifts(employee.id)} backLabel={t('shifts.assign.history.title')} />
         <AssignmentSections shifts={shifts} shiftId={shiftId} onShift={setShiftId} assignment={assignment} minDate={minDate} dateHint={dateHint.trim()} />
         <FormFooter submitLabel={t('shifts.assign.title')} submitIcon={<CalendarPlus size={20} />} saving={assignment.saving} disabled={shifts.length === 0} disabledTitle={t('shifts.choice.empty.title')} onCancel={back} />
       </Panel>

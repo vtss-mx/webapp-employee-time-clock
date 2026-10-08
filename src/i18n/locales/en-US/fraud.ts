@@ -65,6 +65,7 @@ export default {
     network: 'Network: {network}',
     asn: 'AS{asn}',
     hosting: 'cloud or data center',
+    dbIpCredit: 'IP Geolocation by DB-IP',
   },
   evidence: {
     title: 'Evidence',

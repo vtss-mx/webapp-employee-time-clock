@@ -5,6 +5,7 @@ import type { FraudCaseAttempt, FraudCaseEvent, FraudNetwork, RiskReason } from 
 import { DbIpCredit } from './DbIpCredit';
 import { formatDateTime } from '../../utils/format';
 import { formatNumber } from '../../utils/numbers';
+import { cameraName } from '../../utils/cameraDevices';
 
 /**
  * Una señal del intento: "Cámara sin nombre: 0.07 (umbral 0.25) · +20 pts · Obligatoria" y, debajo, qué mide y por
@@ -81,7 +82,10 @@ export function FraudAttempts({ attempts }: { attempts: FraudCaseAttempt[] }) {
             <dl className="fraud-attempts__metrics small">
               {Object.entries(attempt.metrics).map(([name, value]) => (
                 <div key={name}>
-                  <dt>{name}</dt>
+                  {/* El nombre de la métrica es un identificador técnico del motor (frontal_real_min), no un texto de un idioma. */}
+                  <dt>
+                    <code>{name}</code>
+                  </dt>
                   <dd>{typeof value === 'number' ? formatNumber(value) : value}</dd>
                 </div>
               ))}
@@ -92,7 +96,7 @@ export function FraudAttempts({ attempts }: { attempts: FraudCaseAttempt[] }) {
             <Fingerprint size={14} />{' '}
             {[
               t('fraud.attempts.signatures', { count: attempt.signatures }),
-              attempt.camera ? t('fraud.attempts.camera', { camera: attempt.camera }) : t('fraud.attempts.noCamera'),
+              attempt.camera ? t('fraud.attempts.camera', { camera: cameraName(attempt.camera) }) : t('fraud.attempts.noCamera'),
               attempt.ip_address,
               attempt.user_agent,
             ]

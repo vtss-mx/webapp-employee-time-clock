@@ -199,6 +199,20 @@ describe('lienzos fuera de la pantalla', () => {
     expect([canvas.width, canvas.height]).toEqual([30, 40]);
   });
 
+  it('con un canvas sin montar (sin OffscreenCanvas) también recorta y arma la hoja con toBlob', async () => {
+    const drawn = vi.fn();
+    const sheet = new Blob(['hoja']);
+    const canvas = () =>
+      ({ getContext: () => ({ drawImage: drawn }), toBlob: (done: (value: Blob | null) => void) => done(sheet) }) as unknown as HTMLCanvasElement;
+    const recorder = new FaceBurstRecorder(() => video(), canvas);
+    recorder.start({ x: 500, y: 200, width: 200, height: 240 });
+    await tick();
+    await tick();
+    const taken = await recorder.take(SPEC);
+    expect(taken?.image).toBe(sheet);
+    expect(drawn).toHaveBeenCalled();
+  });
+
   it('codifica con convertToBlob o con toBlob; una falla al codificar no se propaga', async () => {
     const offscreen = { convertToBlob: () => Promise.reject(new Error('sin memoria')) } as unknown as OffscreenCanvas;
     expect(await encodeSurface(offscreen, 0.8)).toBeNull();

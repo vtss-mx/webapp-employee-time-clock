@@ -1,85 +1,58 @@
 {
   "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
   "version": "0.2",
-  "description": "Ortografía de los textos de la interfaz (regla 16): es-MX solo contra el diccionario de español y en-US solo contra el de inglés de Estados Unidos, más las listas de palabras propias revisadas (cspell-words*.txt: comunes a los dos idiomas, solo español y solo inglés). Distingue mayúsculas y acentos ('informacion' sin acento es un error). Revisa las cadenas (comillas simples, dobles e invertidas), no los comentarios.",
+  "description": "Ortografía de los textos de la interfaz (regla 16) en los siete idiomas: cada diccionario de src/i18n/locales/<idioma> se revisa SOLO contra el diccionario de su idioma (es-MX y es-ES con el de español, en-US con el de inglés de Estados Unidos, pt-BR con el de portugués de Brasil, fr-FR con el de francés, de-DE con el de alemán, it-IT con el de italiano), más la lista común de nombres propios y siglas (cspell-words.txt) y su lista propia revisada (cspell-words.<idioma>.txt). ESTRICTA: sin la configuración por omisión de cspell (loadDefaultConfiguration: false), que traía diccionarios de programación (softwareTerms, companies, aws...) con los que palabras en inglés como «Save» o «Retry» pasaban en un texto en español. La marca «Employee Time Clock» es la única excepción entre idiomas y solo como frase completa. Distingue mayúsculas y acentos ('informacion' sin acento es un error). Revisa las cadenas (comillas simples, dobles e invertidas), no los comentarios. La prueba src/i18n/dictionaryLanguage.test.ts usa los mismos diccionarios y además dice si la palabra que falló es de otro de los idiomas de la app.",
   "import": [
-    "@cspell/dict-es-es/cspell-ext.json"
+    "@cspell/dict-es-es/cspell-ext.json",
+    "@cspell/dict-en_us/cspell-ext.json",
+    "@cspell/dict-pt-br/cspell-ext.json",
+    "@cspell/dict-fr-fr/cspell-ext.json",
+    "@cspell/dict-de-de/cspell-ext.json",
+    "@cspell/dict-it-it/cspell-ext.json"
   ],
   "caseSensitive": true,
   "minWordLength": 3,
   "dictionaryDefinitions": [
-    {
-      "name": "project-words",
-      "path": "./cspell-words.txt",
-      "addWords": true
-    },
-    {
-      "name": "project-words-es",
-      "path": "./cspell-words.es-MX.txt",
-      "addWords": true
-    },
-    {
-      "name": "project-words-en",
-      "path": "./cspell-words.en-US.txt",
-      "addWords": true
-    }
+    { "name": "project-words", "path": "./cspell-words.txt", "addWords": true },
+    { "name": "project-words-es-MX", "path": "./cspell-words.es-MX.txt", "addWords": true },
+    { "name": "project-words-en-US", "path": "./cspell-words.en-US.txt", "addWords": true },
+    { "name": "project-words-pt-BR", "path": "./cspell-words.pt-BR.txt", "addWords": true },
+    { "name": "project-words-fr-FR", "path": "./cspell-words.fr-FR.txt", "addWords": true },
+    { "name": "project-words-de-DE", "path": "./cspell-words.de-DE.txt", "addWords": true },
+    { "name": "project-words-it-IT", "path": "./cspell-words.it-IT.txt", "addWords": true },
+    { "name": "project-words-es-ES", "path": "./cspell-words.es-ES.txt", "addWords": true }
   ],
-  "dictionaries": [
-    "project-words"
-  ],
-  "ignorePaths": [
-    "node_modules",
-    "dist",
-    "coverage"
-  ],
-  "files": [
-    "src/i18n/locales/**/*.ts",
-    "src/i18n/endonyms.ts",
-    "index.html",
-    "public/site.webmanifest"
-  ],
+  "dictionaries": ["project-words"],
+  "ignorePaths": ["node_modules", "dist", "coverage", "src/i18n/locales/*/index.ts"],
+  "files": ["src/i18n/locales/**/*.ts", "src/i18n/endonyms.ts", "index.html", "public/*.webmanifest"],
   "overrides": [
     {
-      "filename": [
-        "src/i18n/**/*.ts"
-      ],
-      "includeRegExpList": [
-        "/\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`/g"
-      ],
-      "ignoreRegExpList": [
-        "/\\/\\*[\\s\\S]*?\\*\\//g",
-        "/^\\s*\\/\\/.*$/gm",
-        "/\\{\\w+\\}/g",
-        "/\\$\\{[^}]*\\}/g",
-        "/from\\s+'[^']*'/g",
-        "/'[a-z]{2}-[A-Z]{2}'/g"
-      ]
+      "filename": ["src/i18n/**/*.ts"],
+      "includeRegExpList": ["/\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`/g"],
+      "ignoreRegExpList": ["/\\/\\*[\\s\\S]*?\\*\\//g", "/^\\s*\\/\\/.*$/gm", "/\\{\\w+\\}/g", "/\\$\\{[^}]*\\}/g", "/from\\s+'[^']*'/g", "/'[a-z]{2}-[A-Z]{2}'/g"]
     },
+    { "filename": "src/i18n/locales/es-MX/**", "language": "es", "dictionaries": ["project-words-es-MX"] },
+    { "filename": "src/i18n/locales/en-US/**", "language": "en-US", "dictionaries": ["project-words-en-US"] },
+    { "filename": "src/i18n/locales/pt-BR/**", "language": "pt", "dictionaries": ["project-words-pt-BR"] },
+    { "filename": "src/i18n/locales/fr-FR/**", "language": "fr", "dictionaries": ["project-words-fr-FR"] },
+    { "filename": "src/i18n/locales/de-DE/**", "language": "de", "dictionaries": ["project-words-de-DE"] },
+    { "filename": "src/i18n/locales/it-IT/**", "language": "it", "dictionaries": ["project-words-it-IT"] },
+    { "filename": "src/i18n/locales/es-ES/**", "language": "es", "dictionaries": ["project-words-es-ES"] },
     {
-      "filename": "src/i18n/locales/es-MX/**",
-      "language": "es",
-      "dictionaries": [
-        "project-words-es"
-      ]
+      "filename": ["src/i18n/endonyms.ts", "index.html"],
+      "language": "es,en-US,pt,fr,de,it",
+      "dictionaries": ["project-words-es-MX", "project-words-en-US", "project-words-pt-BR", "project-words-fr-FR", "project-words-de-DE", "project-words-it-IT", "project-words-es-ES"]
     },
-    {
-      "filename": "src/i18n/locales/en-US/**",
-      "language": "en-US",
-      "dictionaries": [
-        "project-words-en"
-      ]
-    },
-    {
-      "filename": [
-        "src/i18n/endonyms.ts",
-        "index.html",
-        "public/site.webmanifest"
-      ],
-      "language": "es,en-US",
-      "dictionaries": [
-        "project-words-es",
-        "project-words-en"
-      ]
-    }
-  ]
+    { "filename": "index.html", "ignoreRegExpList": ["/<!--[\\s\\S]*?-->/g", "/<style[\\s\\S]*?<\\/style>/g", "/<[^>]*>/g", "/%\\w+%/g"] },
+    { "filename": "public/*.webmanifest", "includeRegExpList": ["/(?<=\"(?:name|short_name|description)\":\\s*\")(?:[^\"\\\\]|\\\\.)*/g"] },
+    { "filename": "public/site.webmanifest", "language": "es", "dictionaries": ["project-words-es-MX"] },
+    { "filename": "public/site.en-US.webmanifest", "language": "en-US", "dictionaries": ["project-words-en-US"] },
+    { "filename": "public/site.pt-BR.webmanifest", "language": "pt", "dictionaries": ["project-words-pt-BR"] },
+    { "filename": "public/site.fr-FR.webmanifest", "language": "fr", "dictionaries": ["project-words-fr-FR"] },
+    { "filename": "public/site.de-DE.webmanifest", "language": "de", "dictionaries": ["project-words-de-DE"] },
+    { "filename": "public/site.it-IT.webmanifest", "language": "it", "dictionaries": ["project-words-it-IT"] },
+    { "filename": "public/site.es-ES.webmanifest", "language": "es", "dictionaries": ["project-words-es-ES"] }
+  ],
+  "loadDefaultConfiguration": false,
+  "ignoreRegExpList": ["/Employee Time Clock/g", "/\\bX-[A-Za-z]+(?:-[A-Za-z]+)*\\b/g", "/[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+/g"]
 }

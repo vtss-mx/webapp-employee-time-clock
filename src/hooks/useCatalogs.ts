@@ -5,7 +5,7 @@ import type { CatalogApi } from '../utils/catalogs';
 /** Estado de la carga de los catálogos (cargando, error o listos). */
 export function useCatalogState(): CatalogState {
   const context = useContext(CatalogContext);
-  if (!context) throw new Error('useCatalogs debe usarse dentro de <CatalogProvider>');
+  if (!context) throw new Error('CATALOG_PROVIDER_MISSING');
   return context;
 }
 
@@ -15,6 +15,6 @@ export function useCatalogState(): CatalogState {
  */
 export function useCatalogs(): CatalogApi {
   const state = useCatalogState();
-  if (state.status !== 'ready') throw new Error('Los catálogos aún no se cargan: usa useCatalogs() dentro de <CatalogGate>');
+  if (state.status !== 'ready') throw new Error('CATALOGS_NOT_READY');
   return state.catalogs;
 }

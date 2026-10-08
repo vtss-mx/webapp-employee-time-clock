@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setLocale } from '../../i18n/core';
+import { localizeServerText } from '../../i18n/serverTexts';
 import { apiOk, jsonResponse, mockFetch } from '../../test/http';
 import { describeError } from '../../utils/errorPresentation';
 import { apiRequest, ApiError, errorMessage } from '../apiClient';
@@ -61,5 +62,39 @@ describe('textos que arma la app', () => {
     expect(errorMessage(undefined)).toBe('An unexpected error occurred');
     expect(describeError(new ApiError({ statusCode: 418, code: 'TEAPOT', message: '' }))).toMatchObject({ title: "Couldn't complete the action", text: 'An unexpected error occurred. Try again.' });
     expect(describeError(new ApiError({ statusCode: 500, code: 'X', message: 'm' })).title).toBe('Server error');
+  });
+});
+
+describe('textos del servidor en cada idioma (`i18n` del sobre)', () => {
+  const i18n = {
+    'es-MX': { message: 'Revisa los datos', errors: ['Ese correo ya está registrado'], texts: [] },
+    'en-US': { message: 'Check the data', errors: ['That email is already registered'], texts: [] },
+  };
+
+  it('un error abierto cambia de idioma al instante: su mensaje, el de cada campo y su copia (sin repetir la petición)', async () => {
+    mockFetch(
+      jsonResponse(
+        { success: false, statusCode: 422, code: 'VALIDATION_ERROR', message: 'Revisa los datos', data: null, errors: [{ code: 'TAKEN', message: 'Ese correo ya está registrado', field: 'email', details: null }], i18n },
+        422,
+      ),
+    );
+    const error = (await apiRequest('/employees', { method: 'POST', body: {} }).catch((e: unknown) => e)) as ApiError;
+    const copy = error.fieldErrors.email; // lo que guarda un formulario
+    expect(error.message).toBe('Revisa los datos');
+    await setLocale('en-US');
+    expect(error.message).toBe('Check the data');
+    expect(error.errors[0].message).toBe('That email is already registered');
+    expect(error.fieldErrors).toEqual({ email: 'That email is already registered' });
+    expect(describeError(error).text).toBe('Check the data');
+    expect(localizeServerText(copy)).toBe('That email is already registered');
+  });
+
+  it('sin `i18n` (una lectura exitosa o un servidor anterior) el texto queda como llegó; uno con otra forma se ignora', () => {
+    const plain = normalizeResponse(200, { success: true, statusCode: 200, code: 'OK', message: 'Listo', data: 1, errors: [], i18n: null });
+    expect(plain.i18n).toBeNull();
+    const odd = normalizeResponse(409, { success: false, statusCode: 409, code: 'C', message: 'Choque', data: null, errors: [], i18n: { 'es-MX': 'Choque' } });
+    expect(new ApiError(odd).message).toBe('Choque');
+    const appText = normalizeResponse(404, { statusCode: 404, code: 'NOT_FOUND', message: '', data: null, i18n });
+    expect(appText.i18n).toBeNull(); // sin mensaje del servidor el texto es de la app
   });
 });

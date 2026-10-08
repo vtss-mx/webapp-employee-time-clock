@@ -31,7 +31,7 @@ vi.mock('../../components/LiveFaceFlow', () => ({
   LiveFaceFlow: ({ title, onSubmit, onFatal, alternative }: FlowProps) => (
     <div>
       <h1>{title}</h1>
-      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])], accessoryReview: false })}>capturar rostro</button>
+      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] })}>capturar rostro</button>
       <button onClick={() => onFatal(new Error('La cámara se desconectó'))}>falla de cámara</button>
       {alternative && <button onClick={alternative.onSelect}>{alternative.label}</button>}
     </div>
@@ -59,7 +59,7 @@ afterEach(() => resetPolicyCache());
 
 // Tarjetas de método: título y descripción del catálogo verification_methods.
 const FACE_CARD = /Rostro.*se busca entre todo el personal/;
-const QR_CARD = /QR.*Credencial impresa o en el teléfono/;
+const QR_CARD = /QR.*Código dinámico en el teléfono/;
 const QR_FACE_CARD = /QR \+ rostro.*confirma que el rostro es de su dueño/;
 
 describe('CheckpointPage (VALIDATOR)', () => {

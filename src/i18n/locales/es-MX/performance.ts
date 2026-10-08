@@ -128,7 +128,7 @@ export default {
   },
   vitals: {
     title: 'Pantallas de la aplicación web',
-    intro: 'Medido en los navegadores de quienes usan la app. Cada valor es el que no superan 3 de cada 4 visitas (p75), con la calificación de Google; Safari y Firefox no miden todas las métricas.',
+    intro: 'Medido en los navegadores de quienes usan la aplicación. Cada valor es el que no superan 3 de cada 4 visitas (p75), con la calificación de Google; Safari y Firefox no miden todas las métricas.',
     loadError: 'No se pudieron cargar las mediciones de las pantallas',
     noun: { one: 'pantalla', other: 'pantallas' },
     columns: {
@@ -199,7 +199,7 @@ export default {
     lastStatus: 'Respondió {status}',
     reopened_one: 'reabierta {count} vez',
     reopened_other: 'reabierta {count} veces',
-    averageMax: 'prom. {average} · máx. {max}',
+    averageMax: 'promedio {average} · máx. {max}',
     emptyTitle: 'Sin peticiones lentas',
     emptyDescription: 'Todas las peticiones responden a tiempo.',
     noMatchTitle: 'Sin resultados',

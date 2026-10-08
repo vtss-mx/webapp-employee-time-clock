@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { catalogsFixture, testCatalogs } from '../test/catalogs';
 import { apiOk, mockFetch } from '../test/http';
-import { CameraNotReadyError } from '../utils/cameraDiagnostics';
+import { CameraNotReadyError, CameraTurnedError } from '../utils/cameraDiagnostics';
 import { config } from '../utils/config';
-import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, isRetryableFaceError, isTransientFaceError, MAX_TRANSIENT_FACE_FAILURES, stepUpChallenge } from '../utils/faceErrors';
+import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, isRetryableFaceError, isTransientFaceError, MAX_TRANSIENT_FACE_FAILURES, reportedAccessories, stepUpChallenge } from '../utils/faceErrors';
 import { ApiError } from './apiClient';
 import { authService } from './authService';
 import { catalogService } from './catalogService';
@@ -28,7 +28,7 @@ const detail = { id: 3, status: 'PENDING', employee_id: 1 };
 const department = { id: 3, name: 'Producción', employee_count: 0, managers: [] };
 const errorReport = { id: 9, code: 'INTERNAL_ERROR', status: 'PENDING', severity: 'CRITICAL', occurrences: 2 };
 const result = { verified: true, method: 'FACE', message: 'ok' };
-const policy = { block_glasses: true, block_headwear: true, block_mask: false, liveness_challenge: true, anti_spoofing: true, qr_enabled: true };
+const policy = { block_glasses: true, block_headwear: true, block_mask: false, liveness_challenge: true, anti_spoofing: true, qr_enabled: true, voice_guidance_enabled: false };
 /** La del ADMIN: la de la empresa más el motor de riesgo (lo mínimo que la app revisa). */
 const adminPolicy = { ...policy, risk_engine: true, risk_signals: [], pending_changes: 0 };
 const site = { id: 2, name: 'Planta Norte', address: {}, radius_m: 100, active: true };
@@ -89,11 +89,15 @@ describe('servicios', () => {
     ['errors.resolveMatching', () => errorReportService.resolveMatching({ severity: 'WARNING' }, '2026-10-03T10:00:00Z'), { resolved: 4 }, 'POST', '/api/admin/errors/resolve'],
     ['enrollments.submit', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
     ['enrollments.list', () => enrollmentService.list('PENDING', { page: 1, size: 10 }), { items: [detail], total: 1 }, 'GET', '/api/enrollments?status=PENDING&page=1&size=10'],
+    ['enrollments.progress', () => enrollmentService.progress(), { photo: { status: 'pending' }, capture: { status: 'locked' }, voice: { status: 'locked' } }, 'GET', '/api/enrollment/progress'],
+    ['enrollments.photo', () => enrollmentService.photo({ frontal: [new Blob(['a'])], camera: 'Cámara' }), { ok: true, checked_at: 'x', expires_at: 'y' }, 'POST', '/api/enrollment/photo'],
+    ['enrollments.startVoice', () => enrollmentService.startVoice(), { token: 't', questions: [], total: 3, answered: 3 }, 'POST', '/api/enrollment/voice/start'],
     ['enrollments.get', () => enrollmentService.get(3), detail, 'GET', '/api/enrollments/3'],
     ['enrollments.approve', () => enrollmentService.approve(3), detail, 'POST', '/api/enrollments/3/approve'],
     ['enrollments.reject', () => enrollmentService.reject(3, 'foto borrosa'), detail, 'POST', '/api/enrollments/3/reject'],
     ['verification.face', () => verificationService.verifyFace({ frontal: [new Blob(['a'])], challenge: { id: 'c', images: [new Blob(['t'])] } }), result, 'POST', '/api/verification/face'],
     ['face.challenge', () => faceService.getChallenge(), { liveness_required: true, actions: ['LOOK_UP'], flash: ['#FF0000'] }, 'POST', '/api/face/challenge'],
+    ['face.enrollmentChallenge', () => faceService.getChallenge('ENROLLMENT'), { liveness_required: true, actions: ['LOOK_UP', 'TURN_RIGHT', 'LOOK_DOWN', 'TURN_LEFT'], flash: [] }, 'POST', '/api/face/challenge?purpose=ENROLLMENT'],
     ['face.check', () => faceService.check([new Blob(['a']), new Blob(['b'])], true), { detection_score: 0.9 }, 'POST', '/api/face/check'],
     ['me.issueQr', () => meService.issueQr(), qr, 'POST', '/api/users/me/qr'],
     ['apiKeys.list', () => apiKeyService.list({ page: 1, size: 10 }), { items: [apiKey], total: 1, page: 1, size: 10 }, 'GET', '/api/api-keys?page=1&size=10'],
@@ -106,7 +110,7 @@ describe('servicios', () => {
     ['admin.updatePolicy', () => adminService.updatePolicy(4, { block_mask: false }), { policy: adminPolicy, change: null }, 'PUT', '/api/admin/companies/4/verification-policy'],
     ['admin.faceLearning', () => adminService.faceLearning(4), { enabled: true, employees_learning: 1, learned_samples: 2 }, 'GET', '/api/admin/companies/4/face-learning'],
     ['admin.forgetLearnedFace', () => adminService.forgetLearnedFace(4, 1), { ...employee, active: true, face_status: 'APPROVED' }, 'DELETE', '/api/admin/companies/4/employees/1/face/learned'],
-    ['enrollments.submitReview', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }, true), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
+    ['enrollments.submit', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
     ['auth.sessions', () => authService.sessions({ page: 1, size: 10 }), { items: [{ id: 's', created_at: 'x', current: true }], total: 1, page: 1, size: 10 }, 'GET', '/api/auth/sessions?page=1&size=10'],
     ['auth.revokeSession', () => authService.revokeSession('s/1'), null, 'DELETE', '/api/auth/sessions/s%2F1'],
     ['auth.logoutAll', () => authService.logoutAll(), { revoked: 1 }, 'POST', '/api/auth/logout-all'],
@@ -196,19 +200,24 @@ describe('servicios', () => {
 describe('errores faciales', () => {
   const apiError = (statusCode: number, code: string) => new ApiError({ statusCode, code, message: 'x' });
 
-  it('identifica errores corregibles (catálogo face_errors) y accesorios', () => {
+  it('identifica errores corregibles (catálogo face_errors, la cámara sin imagen o girada) y los accesorios que el servidor reporta', () => {
     const accessories = new ApiError({
       statusCode: 422,
       code: 'ACCESSORIES_DETECTED',
-      message: 'Quita lentes',
-      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'm', field: null, details: { accessories: ['GLASSES', 7] } }],
+      message: 'Quítate el cubrebocas para continuar',
+      errors: [{ code: 'ACCESSORIES_DETECTED', message: 'm', field: null, details: { accessories: ['MASK', 'GLASSES', 7] } }],
     });
     expect(isRetryableFaceError(accessories, testCatalogs)).toBe(true);
-    expect(detectedAccessories(accessories)).toEqual(['GLASSES']);
-    expect(isRetryableFaceError(apiError(422, 'POSE_TILTED'), testCatalogs)).toBe(true);
-    expect(isRetryableFaceError(new Error('x'), testCatalogs)).toBe(false);
+    expect(detectedAccessories(accessories)).toEqual(['MASK', 'GLASSES']); // solo códigos: lo demás se descarta
     expect(detectedAccessories(new Error('x'))).toEqual([]);
     expect(detectedAccessories(new ApiError({ statusCode: 422, code: 'ACCESSORIES_DETECTED', message: 'x' }))).toEqual([]);
+    expect(detectedAccessories(apiError(422, 'TOO_DARK'))).toEqual([]);
+    expect(reportedAccessories({ accessories: ['GLASSES', 9 as unknown as string] })).toEqual(['GLASSES']);
+    expect(reportedAccessories({})).toEqual([]);
+    expect(isRetryableFaceError(apiError(422, 'POSE_TILTED'), testCatalogs)).toBe(true);
+    expect(isRetryableFaceError(new CameraNotReadyError(), testCatalogs)).toBe(true);
+    expect(isRetryableFaceError(new CameraTurnedError(), testCatalogs)).toBe(true);
+    expect(isRetryableFaceError(new Error('x'), testCatalogs)).toBe(false);
   });
 
   it('no se reintenta lo que el catálogo marca como no corregible ni lo que no conoce', () => {
@@ -300,5 +309,43 @@ describe('servicios del antifraude', () => {
       ['/api/attendance/reviews/count', undefined],
       ['/api/attendance/sessions/5/review', { decision: 'CONFIRMED', note: null }],
     ]);
+  });
+});
+
+describe('enrollmentService: los pasos independientes del registro (decisión del dueño, 2026-10-07)', () => {
+  it('la foto inicial viaja sola (sin cámara, telemetría ni reto: la ruta solo recibe la imagen) y su respuesta se valida', async () => {
+    const { calls } = mockFetch(apiOk({ ok: true, checked_at: 'x', expires_at: 'y' }));
+    await enrollmentService.photo({ frontal: [new Blob(['a'])], camera: 'Cámara', telemetry: '{}', challenge: { id: 'c', images: [] } });
+    const form = calls[0].init.body as FormData;
+    expect(form.getAll('images')).toHaveLength(1);
+    expect([form.get('camera_label'), form.get('telemetry'), form.get('challenge_id')]).toEqual([null, null, null]);
+    mockFetch(apiOk({ ok: true }));
+    await expect(enrollmentService.photo({ frontal: [new Blob(['a'])] })).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('enrollmentService: verificación por voz y video (decisión del dueño, 2026-10-06)', () => {
+  it('cada respuesta va como formulario (token, pregunta y el clip con su nombre según el formato) y valida la forma de la respuesta', async () => {
+    const { calls } = mockFetch(apiOk({ token: 't2', position: 1, done: false, next_position: 2 }));
+    await expect(enrollmentService.answerVoice('t1', 1, new Blob(['v'], { type: 'video/webm;codecs=vp8,opus' }))).resolves.toEqual({ token: 't2', position: 1, done: false, next_position: 2 });
+    expect(calls[0].url).toBe('/api/enrollment/voice/answer');
+    expect(calls[0].init.method).toBe('POST');
+    const form = calls[0].init.body as FormData;
+    expect(form.get('token')).toBe('t1');
+    expect(form.get('position')).toBe('1');
+    expect((form.get('clip') as File).name).toBe('answer.webm');
+    const mp4 = mockFetch(apiOk({ token: 't3', position: 2, done: true, next_position: null }));
+    await enrollmentService.answerVoice('t2', 2, new Blob(['v'], { type: 'video/mp4' }));
+    expect(((mp4.calls[0].init.body as FormData).get('clip') as File).name).toBe('answer.mp4');
+    mockFetch(apiOk({ nope: true }));
+    await expect(enrollmentService.answerVoice('t3', 0, new Blob(['v']))).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('el clip de una respuesta llega en base64 por la API (nunca una URL del bucket) y se valida su forma', async () => {
+    const { calls } = mockFetch(apiOk({ content_type: 'video/webm', data: 'AAAA', byte_size: 3, duration_ms: 900 }));
+    await expect(enrollmentService.voiceClip(3, 8)).resolves.toMatchObject({ data: 'AAAA', content_type: 'video/webm' });
+    expect(calls[0].url).toBe('/api/enrollments/3/voice/8/clip');
+    mockFetch(apiOk({ url: 'https://bucket/clip' }));
+    await expect(enrollmentService.voiceClip(3, 8)).rejects.toBeInstanceOf(ApiError);
   });
 });

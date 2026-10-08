@@ -1,5 +1,6 @@
 // Consumo de la plataforma por empresa y por usuario (solo el ADMIN). Enteros como number: bytes,
 // milisegundos y conteos.
+import type { WithAvatar } from './avatar';
 import type { BillingStatus, CurrencyCode, Money, PricePeriod, PricingMode } from './billing';
 
 export interface UsageCounters {
@@ -67,7 +68,7 @@ export interface RouteUsage extends UsageCounters {
   max_ms: number;
 }
 
-export interface UserUsage extends UsageCounters {
+export interface UserUsage extends UsageCounters, WithAvatar {
   user_id: number;
   email: string | null;
   role: string | null;
