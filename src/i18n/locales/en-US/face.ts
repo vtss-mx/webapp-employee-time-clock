@@ -162,6 +162,7 @@ export default {
     almost: 'A little more',
     photo: 'Photo {current} of {total}',
     analyzing: 'Analyzing…',
+    flash: 'The screen will flash colors. Hold still.',
     retry: 'Try again',
     nextStepReady: 'Ready for the next step',
     lookFront: 'Center your face',

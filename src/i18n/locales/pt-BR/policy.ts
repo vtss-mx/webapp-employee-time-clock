@@ -5,8 +5,6 @@ import tuning from './policy/tuning';
 
 /** Textos de política de verificación y ajustes de la prueba de vida de una empresa en portugués de Brasil (pt-BR): las mismas llaves que es-MX. */
 export default {
-  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
-  retired: 'Desativado por decisão do produto (2026-10-06).',
   loadError: 'Não foi possível carregar a política de verificação',
   title: 'Política de verificação de identidade',
   saveError: 'Não foi possível salvar',
@@ -82,6 +80,26 @@ export default {
       label: 'Prova de vida',
       on: 'A pessoa faz movimentos aleatórios com a cabeça.',
       off: 'Sem desafio de movimentos.',
+    },
+    enableTurnRight: {
+      label: 'Virar à direita',
+      on: 'A prova de vida pode pedir para virar a cabeça à direita.',
+      off: 'A prova de vida não pede para virar à direita.',
+    },
+    enableTurnLeft: {
+      label: 'Virar à esquerda',
+      on: 'A prova de vida pode pedir para virar a cabeça à esquerda.',
+      off: 'A prova de vida não pede para virar à esquerda.',
+    },
+    enableLookUp: {
+      label: 'Olhar para cima',
+      on: 'A prova de vida pode pedir para olhar para cima.',
+      off: 'A prova de vida não pede para olhar para cima.',
+    },
+    enableLookDown: {
+      label: 'Olhar para baixo',
+      on: 'A prova de vida pode pedir para olhar para baixo.',
+      off: 'A prova de vida não pede para olhar para baixo.',
     },
     antiSpoofing: {
       label: 'Detecção de fraude de identidade',

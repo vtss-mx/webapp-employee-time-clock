@@ -5,10 +5,11 @@ import { apiOk } from '../test/http';
 import { config } from '../utils/config';
 
 /*
- * Prueba de vida: el vencimiento del reto que dice el servidor (`expires_in`) frente al tiempo de cada movimiento; la
- * pantalla nunca se pinta de colores aunque un reto todavía traiga colores (el destello se retiró de la experiencia por
- * decisión del dueño del producto, 2026-10-06); y la prueba de vida COMPLETA del registro (decisión del dueño,
- * 2026-10-07): los cuatro movimientos de la cabeza, la vuelta al frente después de cada uno y el final centrado.
+ * Prueba de vida: el vencimiento del reto que dice el servidor (`expires_in`) frente al tiempo de cada movimiento; que un
+ * reto SIN destello (lo normal: el destello es un interruptor del ADMIN apagado por omisión) no pinta la pantalla (el
+ * destello dictado tiene su propio banco, `LiveFaceFlow.flash.test.tsx`); y la prueba de vida COMPLETA del registro
+ * (decisión del dueño, 2026-10-07): los cuatro movimientos de la cabeza, la vuelta al frente después de cada uno y el
+ * final centrado.
  */
 vi.mock('../hooks/useCamera', async () => (await import('../test/faceFlowMocks')).cameraModule());
 vi.mock('../hooks/useFaceDetection', async (original) => (await import('../test/faceFlowMocks')).detectionModule(await original()));
@@ -42,21 +43,20 @@ describe('LiveFaceFlow: vencimiento del reto (expires_in)', () => {
   });
 });
 
-describe('LiveFaceFlow: el destello se retiró (decisión del dueño, 2026-10-06)', () => {
-  it('un reto que aún trae colores o el destello dictado se responde sin pintar nada: directo a los movimientos', async () => {
-    serve({ challenge: () => apiOk({ ...TWO_TURNS, flash: ['#FF0000', '#00FF00'], flash_required: true, flash_pace: { token: 't0', total: 2, window_ms: 2000 } }) });
+describe('LiveFaceFlow: sin destello dictado por el reto, la pantalla no se pinta (por omisión)', () => {
+  it('un reto sin `flash` ni `flash_pace` hace los movimientos sin pintar ningún color ni enviar capturas de color', async () => {
+    serve({ challenge: () => apiOk(TWO_TURNS) });
     renderFlow();
     await stable();
     expect(document.querySelector('.flash')).toBeNull();
-    expect(document.querySelector('[class*="flash"]')).toBeNull();
     expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 2');
     await stable();
     await stable();
     await stable();
-    const { onSubmit } = await import('../test/faceFlow').then((m) => m.flow);
-    expect(onSubmit).toHaveBeenCalledTimes(1);
-    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('flash');
-    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('flashReceipt');
+    expect(document.querySelector('.flash')).toBeNull(); // nunca una capa de color (el destello es de la política del ADMIN)
+    expect(flow.onSubmit).toHaveBeenCalledTimes(1);
+    expect(flow.onSubmit.mock.calls[0][0]).not.toHaveProperty('flashImage');
+    expect(flow.onSubmit.mock.calls[0][0]).not.toHaveProperty('flashReceipt');
   });
 });
 

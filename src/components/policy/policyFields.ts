@@ -16,6 +16,11 @@ import { ruledAccessories } from '../accessories';
 /** Interruptores con su texto en `policy.options.<id>.label`. */
 const OPTIONS = {
   liveness_challenge: 'livenessChallenge',
+  // Movimientos de la prueba de vida: cada uno es un interruptor del ADMIN (deben quedar al menos dos encendidos).
+  enable_turn_right: 'enableTurnRight',
+  enable_turn_left: 'enableTurnLeft',
+  enable_look_up: 'enableLookUp',
+  enable_look_down: 'enableLookDown',
   anti_spoofing: 'antiSpoofing',
   qr_enabled: 'qrEnabled',
   validator_mobile_only: 'validatorMobileOnly',
@@ -33,6 +38,8 @@ const OPTIONS = {
   qr_only_attendance: 'qrOnlyAttendance',
   risk_engine: 'riskEngine',
   fraud_evidence: 'fraudEvidence',
+  // Destello dictado por el servidor (antifraude 2a): ahora es un interruptor del ADMIN (ya no está retirado).
+  flash_paced: 'flashPaced',
   voice_verification: 'voiceVerification',
   voice_guidance_enabled: 'voiceGuidance',
 } as const;

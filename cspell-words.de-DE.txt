@@ -43,3 +43,8 @@ Maschinenlesbare
 
 # Guía por voz del registro (decisión del dueño, 2026-10-08): silenciar la síntesis de voz
 stummschalten
+
+# PAD de frontera (migración 0090, 2026-10-08): compuestos alemanes que el diccionario no descompone
+Schärfeanomalie
+Sättigungsanomalie
+Texturanomalie

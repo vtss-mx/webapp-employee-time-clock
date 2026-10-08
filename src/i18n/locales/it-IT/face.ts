@@ -162,6 +162,7 @@ export default {
     almost: "Ancora un po'",
     photo: 'Foto {current} di {total}',
     analyzing: 'Analisi in corso…',
+    flash: 'Lo schermo lampeggerà a colori. Non muoverti.',
     retry: 'Riprova',
     nextStepReady: 'Pronto per il passaggio successivo',
     lookFront: 'Centra il volto',

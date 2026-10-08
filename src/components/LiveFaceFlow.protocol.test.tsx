@@ -7,8 +7,8 @@ import { FaceBurstRecorder } from '../utils/faceBurstRecorder';
 
 /*
  * Protocolo de captura (antifraude 2a) dentro del flujo: la ráfaga de recortes (tramo quieto antes del reto, de
- * movimiento en el primer paso) que viaja con las capturas si el reto la pide. (El destello dictado se retiró con el
- * destello, decisión del dueño del producto, 2026-10-06: ya no hay colores ni comprobante.)
+ * movimiento en el primer paso) que viaja con las capturas si el reto la pide. Este reto NO dicta destello, así que no
+ * viajan capturas de color (el destello dictado tiene su propio banco, `LiveFaceFlow.flash.test.tsx`).
  */
 vi.mock('../hooks/useCamera', async () => (await import('../test/faceFlowMocks')).cameraModule());
 vi.mock('../hooks/useFaceDetection', async (original) => (await import('../test/faceFlowMocks')).detectionModule(await original()));
@@ -42,7 +42,7 @@ describe('LiveFaceFlow: protocolo de captura', () => {
     expect(take).toHaveBeenCalledWith(SPEC);
     const captured = flow.onSubmit.mock.calls[0][0];
     expect(captured).toMatchObject({ burst: sheet });
-    expect(captured).not.toHaveProperty('flash');
+    expect(captured).not.toHaveProperty('flashImage'); // este reto no dicta destello
   });
 
   it('sin hoja (no la pidió el reto o no alcanzó) se envía lo demás', async () => {

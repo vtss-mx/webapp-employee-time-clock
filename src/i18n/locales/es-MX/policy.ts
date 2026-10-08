@@ -8,8 +8,6 @@ import antifraud from './policy/antifraud';
 import tuning from './policy/tuning';
 
 export default {
-  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
-  retired: 'Desactivado por decisión del producto (2026-10-06).',
   loadError: 'No se pudo cargar la política de verificación',
   title: 'Política de verificación de identidad',
   saveError: 'No se pudo guardar',
@@ -91,6 +89,26 @@ export default {
       label: 'Prueba de vida',
       on: 'La persona hace movimientos de cabeza al azar.',
       off: 'Sin reto de movimientos.',
+    },
+    enableTurnRight: {
+      label: 'Girar a la derecha',
+      on: 'La prueba de vida puede pedir girar la cabeza a la derecha.',
+      off: 'La prueba de vida no pide girar a la derecha.',
+    },
+    enableTurnLeft: {
+      label: 'Girar a la izquierda',
+      on: 'La prueba de vida puede pedir girar la cabeza a la izquierda.',
+      off: 'La prueba de vida no pide girar a la izquierda.',
+    },
+    enableLookUp: {
+      label: 'Mirar hacia arriba',
+      on: 'La prueba de vida puede pedir mirar hacia arriba.',
+      off: 'La prueba de vida no pide mirar hacia arriba.',
+    },
+    enableLookDown: {
+      label: 'Mirar hacia abajo',
+      on: 'La prueba de vida puede pedir mirar hacia abajo.',
+      off: 'La prueba de vida no pide mirar hacia abajo.',
     },
     antiSpoofing: {
       label: 'Detección de suplantación',

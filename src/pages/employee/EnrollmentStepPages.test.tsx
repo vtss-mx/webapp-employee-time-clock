@@ -12,6 +12,7 @@ import { CAPTURES_DONE, NOTHING_DONE, PHOTO_DONE } from '../../test/enrollment';
 import { samplePolicy } from '../../test/fixtures';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
 import { renderWithProviders, sampleUser } from '../../test/render';
+import { spokenTexts } from '../../test/speechSynthesis';
 import type { EnrollmentProgress, User, VoiceChallenge } from '../../types';
 import { EnrollmentCapturePage, EnrollmentPhotoPage, EnrollmentVoicePage, refreshWithRetry } from './EnrollmentStepPages';
 
@@ -153,6 +154,13 @@ describe('Paso 1: la foto inicial', () => {
     expect(await screen.findByTestId('flow')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'salir' }));
     expect(await screen.findByText('Índice del registro')).toBeInTheDocument();
+  });
+
+  it('al abrir la cámara a mano desbloquea la síntesis de voz dentro del gesto (para que suene en móviles)', async () => {
+    renderStep(paths.employee.enrollPhoto, EnrollmentPhotoPage, { progress: PHOTO_DONE }, false);
+    expect(spokenTexts()).toEqual([]); // nada hasta el toque
+    await userEvent.click(await screen.findByRole('button', { name: 'Abrir cámara' }));
+    expect(spokenTexts()).toContain(' '); // el enunciado inaudible de `primeSpeech` corrió en el gesto, antes de la confirmación
   });
 
   it('«Volver al registro» desde la confirmación pendiente', async () => {

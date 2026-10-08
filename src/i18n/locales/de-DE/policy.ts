@@ -8,8 +8,6 @@ import tuning from './policy/tuning';
  * llaves que es-MX. Los «candados» son los «Schutzmechanismen».
  */
 export default {
-  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
-  retired: 'Durch Produktentscheidung deaktiviert (2026-10-06).',
   loadError: 'Die Prüfrichtlinie konnte nicht geladen werden',
   title: 'Prüfrichtlinie',
   saveError: 'Das Speichern ist fehlgeschlagen',
@@ -86,6 +84,26 @@ export default {
       label: 'Lebenderkennung',
       on: 'Die Person macht zufällige Kopfbewegungen.',
       off: 'Keine Aufgabe mit Bewegungen.',
+    },
+    enableTurnRight: {
+      label: 'Nach rechts drehen',
+      on: 'Die Lebenderkennung kann verlangen, den Kopf nach rechts zu drehen.',
+      off: 'Die Lebenderkennung verlangt kein Drehen nach rechts.',
+    },
+    enableTurnLeft: {
+      label: 'Nach links drehen',
+      on: 'Die Lebenderkennung kann verlangen, den Kopf nach links zu drehen.',
+      off: 'Die Lebenderkennung verlangt kein Drehen nach links.',
+    },
+    enableLookUp: {
+      label: 'Nach oben schauen',
+      on: 'Die Lebenderkennung kann verlangen, nach oben zu schauen.',
+      off: 'Die Lebenderkennung verlangt kein Schauen nach oben.',
+    },
+    enableLookDown: {
+      label: 'Nach unten schauen',
+      on: 'Die Lebenderkennung kann verlangen, nach unten zu schauen.',
+      off: 'Die Lebenderkennung verlangt kein Schauen nach unten.',
     },
     antiSpoofing: {
       label: 'Täuschungserkennung',

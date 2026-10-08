@@ -1,12 +1,14 @@
 import { vi } from 'vitest';
+import { resetSpeechState } from '../utils/speech';
 
 /**
  * Síntesis de voz simulada para las pruebas (jsdom no la trae). Reproduce lo justo que usa `utils/speech.ts`
- * (`speechSynthesis.speak/cancel/getVoices` y el constructor `SpeechSynthesisUtterance`) y deja a la prueba leer lo que
- * se «dijo», contar las cancelaciones, fijar las voces del sistema y simular un navegador sin soporte.
+ * (`speechSynthesis.speak/cancel/getVoices`, el evento `voiceschanged` y el constructor `SpeechSynthesisUtterance`) y
+ * deja a la prueba leer lo que se «dijo», contar las cancelaciones, fijar las voces del sistema (con su calidad), simular
+ * que el navegador carga las voces tarde (`fireVoicesChanged`) y simular un navegador sin soporte.
  */
 
-/** Un enunciado como lo arma `utils/speech.ts` (lo que la prueba verifica que se leyó). */
+/** Un enunciado como lo arma `utils/speech.ts` (lo que la prueba verifica que se leyó; `volume` para el desbloqueo). */
 export class FakeUtterance {
   lang = '';
   pitch = 1;
@@ -20,6 +22,8 @@ const state = {
   spoken: [] as FakeUtterance[],
   cancelled: 0,
   voices: [] as SpeechSynthesisVoice[],
+  /** Los escuchas de `voiceschanged` que enganchó `utils/speech.ts` (para dispararlos con `fireVoicesChanged`). */
+  voicesListeners: [] as EventListenerOrEventListenerObject[],
 };
 
 const fakeSynthesis = {
@@ -35,15 +39,34 @@ const fakeSynthesis = {
   getVoices: vi.fn((): SpeechSynthesisVoice[] => state.voices),
   pause: vi.fn(),
   resume: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
+  addEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+    if (type === 'voiceschanged') state.voicesListeners.push(listener);
+  }),
+  removeEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+    if (type === 'voiceschanged') state.voicesListeners = state.voicesListeners.filter((registered) => registered !== listener);
+  }),
   dispatchEvent: vi.fn(() => true),
   onvoiceschanged: null,
 };
 
-/** Una voz del sistema de prueba: solo lo que mira `pickVoice` (nombre e idioma). */
-export function fakeVoice(name: string, lang: string): SpeechSynthesisVoice {
-  return { name, lang, default: false, localService: true, voiceURI: name };
+/** Opciones de una voz de prueba: su calidad declarada (local sin red, o la marcada por omisión del sistema). */
+interface FakeVoiceOptions {
+  localService?: boolean;
+  default?: boolean;
+}
+
+/** Una voz del sistema de prueba: nombre e idioma (que mira `pickVoice`) y, opcional, su calidad (`voiceQuality`). */
+export function fakeVoice(name: string, lang: string, options: FakeVoiceOptions = {}): SpeechSynthesisVoice {
+  return { name, lang, default: options.default ?? false, localService: options.localService ?? true, voiceURI: name };
+}
+
+/** Simula que el navegador cargó las voces tarde (Blink): dispara el `voiceschanged` que enganchó `utils/speech.ts`. */
+export function fireVoicesChanged(): void {
+  const event = new Event('voiceschanged');
+  for (const listener of [...state.voicesListeners]) {
+    if (typeof listener === 'function') listener(event);
+    else listener.handleEvent(event);
+  }
 }
 
 /** Instala la síntesis simulada (motor y constructor) como lo haría un navegador que la soporta. */
@@ -83,8 +106,12 @@ export function resetSpeech(): void {
   state.spoken = [];
   state.cancelled = 0;
   state.voices = [];
+  state.voicesListeners = [];
   fakeSynthesis.speak.mockClear();
   fakeSynthesis.cancel.mockClear();
   fakeSynthesis.getVoices.mockClear();
+  fakeSynthesis.addEventListener.mockClear();
+  fakeSynthesis.removeEventListener.mockClear();
+  resetSpeechState(); // el caché de voces, el `voiceschanged` enganchado y el desbloqueo vuelven a empezar
   installSpeechSynthesis();
 }

@@ -5,8 +5,6 @@ import tuning from './policy/tuning';
 
 /** Textos de política de verificación y ajustes de la prueba de vida de una empresa en francés (fr-FR): las mismas llaves que es-MX. */
 export default {
-  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
-  retired: 'Désactivé par décision produit (2026-10-06).',
   loadError: 'Impossible de charger la politique de vérification',
   title: "Politique de vérification d'identité",
   saveError: "Impossible d'enregistrer",
@@ -82,6 +80,26 @@ export default {
       label: 'Détection du vivant',
       on: 'La personne fait des mouvements de tête aléatoires.',
       off: 'Sans défi de mouvements.',
+    },
+    enableTurnRight: {
+      label: 'Tourner à droite',
+      on: 'La détection du vivant peut demander de tourner la tête à droite.',
+      off: 'La détection du vivant ne demande pas de tourner à droite.',
+    },
+    enableTurnLeft: {
+      label: 'Tourner à gauche',
+      on: 'La détection du vivant peut demander de tourner la tête à gauche.',
+      off: 'La détection du vivant ne demande pas de tourner à gauche.',
+    },
+    enableLookUp: {
+      label: 'Regarder vers le haut',
+      on: 'La détection du vivant peut demander de regarder vers le haut.',
+      off: 'La détection du vivant ne demande pas de regarder vers le haut.',
+    },
+    enableLookDown: {
+      label: 'Regarder vers le bas',
+      on: 'La détection du vivant peut demander de regarder vers le bas.',
+      off: 'La détection du vivant ne demande pas de regarder vers le bas.',
     },
     antiSpoofing: {
       label: "Détection d'usurpation",

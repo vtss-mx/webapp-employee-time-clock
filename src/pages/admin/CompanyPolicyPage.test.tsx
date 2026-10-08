@@ -1,87 +1,13 @@
 import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactElement } from 'react';
-import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
 import { catalogsFixture, catalogsWith } from '../../test/catalogs';
 import { publishPolicy, resetPolicyCache, useVerificationPolicy } from '../../hooks/useVerificationPolicy';
-import { sampleAdminPolicy, samplePolicy } from '../../test/fixtures';
-import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
+import { samplePolicy } from '../../test/fixtures';
+import { apiFail, apiOk, mockFetch } from '../../test/http';
 import { renderWithProviders } from '../../test/render';
-import { CompanyPolicyPage } from './CompanyPolicyPage';
-
-const policy = { ...samplePolicy, updated_at: '2026-10-01T10:00:00Z', updated_by: 'superadmin@plataforma.com' };
-const company = {
-  id: 4,
-  name: 'Panificadora',
-  legal_name: null,
-  rfc: null,
-  phone: null,
-  active: true,
-  max_employees: null,
-  api_enabled: false,
-  employee_count: 3,
-  admin_count: 1,
-  billing_status: 'ACTIVE',
-  suspension_reason: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-};
-
-const learning = { enabled: true, approved_employees: 3, employees_learning: 1, learned_samples: 2, identifications: 9, learned_identifications: 1, last_learned_at: null };
-
-/**
- * Lo que el ADMIN recibe además de lo que lee la empresa (motor de riesgo y antifraude). Estas pruebas son de los
- * controles de siempre: la regla de dos personas apagada (sus avisos se prueban en `policyGovernance.test.tsx`).
- */
-const { block_glasses: _g, ...adminExtras } = { ...sampleAdminPolicy, two_person_rule: false };
-
-/**
- * Responde como el ADMIN: la política con sus campos del antifraude y cada PUT como `{ policy, change }` (aplicado).
- * Un error del servidor pasa tal cual.
- */
-async function asAdmin(response: Response, call: MockCall): Promise<Response> {
-  if (!response.ok) return response;
-  const { data } = (await response.clone().json()) as { data: Record<string, unknown> };
-  const policy = { ...adminExtras, ...data };
-  if (call.init.method !== 'PUT') return apiOk(policy);
-  const change = { id: 1, status: 'APPLIED', relaxes: false, preset: null, changes: [], reason: null, simulation: null, requested_by: 'superadmin@plataforma.com', requested_by_me: true, created_at: '2026-10-01T10:00:00Z', expires_at: null, decided_by: null, decided_at: null, decision_note: null };
-  return apiOk({ policy, change });
-}
-
-/** El servidor de la consola: la empresa, su aprendizaje y su política (`policyResponse` responde GET y PUT de la política). */
-function serve(policyResponse: Response | ((call: MockCall) => Response)) {
-  return mockFetch((call) => {
-    if (call.url.endsWith('/face-learning')) return apiOk(learning);
-    if (call.url.includes('/verification-policy/changes')) return apiOk({ items: [], total: 0, page: 1, size: 5 });
-    if (!call.url.includes('/verification-policy')) return apiOk(company);
-    return asAdmin(typeof policyResponse === 'function' ? policyResponse(call) : policyResponse.clone(), call);
-  });
-}
-
-/** La pantalla del ADMIN para la empresa 4 (/admin/companies/:id/policy). */
-function renderPolicy(page: ReactElement = <CompanyPolicyPage />) {
-  return renderWithProviders(
-    <Routes>
-      <Route path="/admin/companies/:id/policy" element={page} />
-    </Routes>,
-    { route: '/admin/companies/4/policy' },
-  );
-}
-
-/** Elige una opción de un ajuste de los candados (todavía no guarda: primero se confirma). */
-async function choose(control: RegExp, option: string | RegExp) {
-  await userEvent.click(screen.getByRole('button', { name: control }));
-  await userEvent.click(screen.getByRole('option', { name: option }));
-}
-
-/** Responde la confirmación con ese título: `dialog` (azul o verde) o `alertdialog` (protege menos, en rojo). */
-async function answer(role: 'dialog' | 'alertdialog', title: string, button: string) {
-  const dialog = await screen.findByRole(role, { name: title });
-  await userEvent.click(within(dialog).getByRole('button', { name: button }));
-  return dialog;
-}
+import { accepting, answer, choose, policy, puts, renderPolicy, serve } from '../../test/companyPolicyKit';
 
 afterEach(() => resetPolicyCache());
 
@@ -163,7 +89,7 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
     await waitFor(() => expect(calls.filter((c) => c.url === '/api/admin/companies/4/face-learning')).toHaveLength(2));
   });
 
-  it('prueba de vida: su tiempo; el destello (retirado) se muestra apagado y sin control', async () => {
+  it('prueba de vida: su tiempo; el destello de colores (retirado) se muestra apagado y sin control', async () => {
     const { calls } = serve((call) => {
       if (call.init.method !== 'PUT') return apiOk(policy);
       return apiOk({ ...policy, ...(JSON.parse(call.init.body as string) as object) });
@@ -176,16 +102,11 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
     expect(await screen.findByText('Cada reto vencerá a los 45 s.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Entendido' }));
 
-    // El destello de colores se retiró (decisión del dueño, 2026-10-06): se ve apagado, con su nota y sin control; el
-    // destello dictado, igual.
+    // El destello de colores (flash_liveness) sigue retirado (decisión del dueño, 2026-10-06): apagado, con su nota y sin
+    // control. El destello dictado por el servidor (flash_paced) ya es un interruptor normal (prueba aparte, más abajo).
     const flash = screen.getByText('Destello de colores').closest('.tuning-row') as HTMLElement;
     expect(flash).toHaveTextContent('Desactivado por decisión del producto (2026-10-06)');
     expect(within(flash).queryByRole('button')).toBeNull();
-    const paced = screen.getByText('Destello dictado por el servidor').closest('.tuning-row') as HTMLElement;
-    expect(paced).toHaveClass('tuning-row--retired');
-    expect(paced).toHaveTextContent('Desactivado por decisión del producto (2026-10-06)');
-    expect(within(paced).getByText('Desactivado')).toBeInTheDocument(); // apagado, sin interruptor
-    expect(within(paced).queryByRole('switch')).toBeNull();
     expect(calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as object)).toEqual([{ liveness_timeout_seconds: 45 }]);
   });
 
@@ -392,12 +313,6 @@ describe('CompanyPolicyPage (ADMIN: política de verificación de una empresa)',
     expect(await screen.findByText('Sin permisos')).toBeInTheDocument();
   });
 });
-
-/** Política con el servidor que acepta cada cambio (responde la política ya actualizada). */
-function accepting(base = samplePolicy) {
-  return serve((call) => apiOk(call.init.method === 'PUT' ? { ...base, ...(JSON.parse(call.init.body as string) as object) } : base));
-}
-const puts = (calls: Array<{ init: RequestInit }>) => calls.filter((c) => c.init.method === 'PUT').map((c) => JSON.parse(c.init.body as string) as unknown);
 
 describe('Política de verificación: activar y confirmar', () => {
   it('activar una regla se confirma en verde (cancelar la deja apagada) y avisa qué cambia: los lentes nacen apagados', async () => {

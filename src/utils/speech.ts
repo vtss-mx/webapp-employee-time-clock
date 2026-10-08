@@ -69,25 +69,80 @@ function genderOf(voice: SpeechSynthesisVoice): VoiceGender | null {
 }
 
 /**
+ * Voces del sistema, con caché. Blink (Chrome/Edge/Android) entrega `getVoices()` VACÍO en la primera llamada y publica
+ * la lista después por el evento `voiceschanged`: por eso `pickVoice` no puede fallar para siempre si la primera vez no
+ * hay voces (si lo hiciera, el navegador usaría su voz por omisión de baja calidad). Estrategia: siempre se vuelve a
+ * leer `getVoices()` (así una voz recién instalada o cargada entra sola) y, mientras llega vacío, se recuerda la última
+ * lista conocida y se engancha UNA vez el `voiceschanged` para refrescar ese respaldo en cuanto el navegador las cargue.
+ */
+let voiceCache: SpeechSynthesisVoice[] = [];
+/** El `voiceschanged` se engancha una sola vez (Blink lo dispara al cargar las voces); evita listeners duplicados. */
+let voicesListenerAttached = false;
+
+/** Engancha `voiceschanged` (una vez) para refrescar el respaldo del caché cuando el navegador cargue las voces. */
+function attachVoicesListener(s: SpeechSynthesis): void {
+  if (voicesListenerAttached) return;
+  voicesListenerAttached = true;
+  s.addEventListener('voiceschanged', () => {
+    const voices = s.getVoices();
+    if (voices.length > 0) voiceCache = voices;
+  });
+}
+
+/**
+ * La lista de voces vigente: `getVoices()` si ya trae algo (se actualiza el respaldo), o la última lista conocida si el
+ * navegador aún la devuelve vacía (y, en ese caso, se engancha `voiceschanged`). Nunca «falla para siempre»: la próxima
+ * indicación vuelve a leer y, ya cargadas, elige una buena voz.
+ */
+function cachedVoices(): SpeechSynthesisVoice[] {
+  const s = synth();
+  if (!s) return [];
+  const voices = s.getVoices();
+  if (voices.length > 0) {
+    voiceCache = voices;
+    return voices;
+  }
+  if (voiceCache.length === 0) attachVoicesListener(s);
+  return voiceCache;
+}
+
+/** Nombres que delatan una voz de ALTA calidad (neuronal/premium del sistema); sin distinguir mayúsculas. */
+const PREMIUM_HINTS = /natural|neural|enhanced|premium|siri|google|microsoft/;
+/** Nombres de las voces BÁSICAS de baja calidad (robóticas): se posponen frente a cualquier otra. */
+const LOW_HINTS = /compact|espeak/;
+
+/**
+ * Qué tan buena suena una voz (mejor esfuerzo, con lo poco que expone la API): una voz «natural/neural/premium…» manda;
+ * luego la local (`localService`, sin red y sin latencia); se posponen las «compact»/«espeak» y la marcada `default`
+ * (suele ser la básica del sistema). Determinista: a igualdad de puntaje se conserva el orden del sistema (ver `reduce`).
+ */
+function voiceQuality(voice: SpeechSynthesisVoice): number {
+  const name = voice.name.toLowerCase();
+  return (PREMIUM_HINTS.test(name) ? 1000 : 0) + (voice.localService ? 100 : 0) - (LOW_HINTS.test(name) ? 500 : 0) - (voice.default ? 50 : 0);
+}
+
+/** La voz de mejor calidad del grupo; a igualdad de puntaje, la primera (orden del sistema): elección determinista. */
+function bestByQuality(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice {
+  return voices.reduce((best, voice) => (voiceQuality(voice) > voiceQuality(best) ? voice : best));
+}
+
+/**
  * La mejor voz del sistema para un idioma y género: primero las del idioma exacto, luego las del mismo idioma base
- * (`es` de `es-mx`) y, sin ninguna, todas; dentro del grupo, la que coincide con el género pedido. `null` si el
- * dispositivo aún no tiene voces (se usa el idioma del enunciado y la voz por omisión).
+ * (`es` de `es-mx`) y, sin ninguna, todas; de ese grupo, las del género pedido (si hay) y, entre ellas, la de MEJOR
+ * calidad (`voiceQuality`): así no cae en la voz por omisión de baja calidad cuando hay una neuronal disponible. `null`
+ * si el dispositivo aún no tiene voces (se usa el idioma del enunciado y la voz por omisión; la próxima indicación, ya
+ * cargadas por `voiceschanged`, sí elige una buena).
  */
 export function pickVoice(locale: string, gender: VoiceGender): SpeechSynthesisVoice | null {
-  const s = synth();
-  if (!s) return null;
-  const voices = s.getVoices();
+  const voices = cachedVoices();
   if (voices.length === 0) return null;
   const wanted = locale.replace(/_/g, '-').toLowerCase();
   const base = wanted.split('-')[0];
   const exact = voices.filter((voice) => voiceLang(voice) === wanted);
   const sameBase = voices.filter((voice) => voiceLang(voice).split('-')[0] === base);
   const pool = exact.length > 0 ? exact : sameBase.length > 0 ? sameBase : voices;
-  if (gender !== 'any') {
-    const match = pool.find((voice) => genderOf(voice) === gender);
-    if (match) return match;
-  }
-  return pool[0];
+  const gendered = gender !== 'any' ? pool.filter((voice) => genderOf(voice) === gender) : [];
+  return bestByQuality(gendered.length > 0 ? gendered : pool);
 }
 
 /** Opciones de `speak`: con qué perfil (código del catálogo), en qué idioma y si corta lo que se estuviera diciendo. */
@@ -122,4 +177,36 @@ export function speak(text: string, { profile, locale, interrupt = true }: Speak
 /** Calla la guía por voz (al desmontar el flujo o al silenciarla): sin motor, no hace nada. */
 export function cancelSpeech(): void {
   synth()?.cancel();
+}
+
+/** La síntesis ya se desbloqueó en este dispositivo (un `speak` corrió dentro de un gesto): no se vuelve a hacer. */
+let primed = false;
+
+/**
+ * Desbloquea la síntesis en móviles (decisión del dueño, 2026-10-08: la guía por voz no sonaba en teléfonos). WebKit —y
+ * por tanto TODOS los navegadores de iOS/iPadOS— mantiene la síntesis bloqueada hasta que un `speak()` corre
+ * SÍNCRONAMENTE dentro de un gesto del usuario; un `speak()` disparado desde un efecto de React (como el de
+ * `useFaceSpeech`) nunca la desbloquea y el teléfono se queda mudo. Por eso esto se llama desde el PRIMER toque (abrir la
+ * cámara): dice un enunciado casi en silencio (un espacio, volumen 0) y de paso calienta `getVoices()`. Es idempotente
+ * (no hace nada si ya se desbloqueó) y seguro (no hace nada si el navegador no soporta síntesis o está apagada la guía:
+ * puede llamarse sin condiciones desde el gesto).
+ */
+export function primeSpeech(): void {
+  const s = synth();
+  if (primed || !s || typeof SpeechSynthesisUtterance === 'undefined') return;
+  primed = true;
+  cachedVoices(); // calienta getVoices() y engancha `voiceschanged` si aún llega vacío (Blink)
+  const utterance = new SpeechSynthesisUtterance(' ');
+  utterance.volume = 0; // inaudible: solo desbloquea el motor, no molesta a quien no quiere la guía
+  s.speak(utterance);
+}
+
+/**
+ * Restablece el estado de módulo (caché de voces, el `voiceschanged` enganchado y el desbloqueo) SOLO para las pruebas:
+ * cada prueba empieza como un dispositivo recién abierto. Lo llama `resetSpeech` del simulador de síntesis.
+ */
+export function resetSpeechState(): void {
+  voiceCache = [];
+  voicesListenerAttached = false;
+  primed = false;
 }

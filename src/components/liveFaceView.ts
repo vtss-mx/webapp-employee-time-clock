@@ -111,7 +111,9 @@ export interface RingInput {
   moveProgress: number;
 }
 
-const AFTER_STILL: ReadonlySet<Phase> = new Set(['challenge', 'recenter', 'submitting']);
+// Fases en que las fotos de frente y la ráfaga ya se tomaron (el anillo las cuenta completas): la prueba de vida, el
+// destello dictado (entre la prueba de vida y el envío, el anillo se queda lleno) y el envío.
+const AFTER_STILL: ReadonlySet<Phase> = new Set(['challenge', 'recenter', 'flash', 'submitting']);
 
 /**
  * Avance del anillo (0..1): las fotos tomadas contra las del plan, en orden (frente, movimientos), así el anillo avanza
@@ -192,6 +194,8 @@ export function flowStatus(input: FlowStatusInput): { message: string; tone: Ton
     if (!input.capture) return { message: t('face.flow.analyzing'), tone: 'busy' };
     return input.validPhotos ? photosStatus(guidance) : { message: guidanceMessage('hold_still'), tone: 'busy' };
   }
+  // Destello dictado por el servidor: el aviso en vivo (lectores de pantalla) mientras la capa de color cubre el visor.
+  if (phase === 'flash') return { message: t('face.flow.flash'), tone: 'busy' };
   if (phase === 'submitting') return { message: input.submittingMessage, tone: 'busy' };
   if (phase === 'blocked') {
     if (input.blockedByAccessory) return { message: guidanceMessage('cut_off'), tone: 'warn' };

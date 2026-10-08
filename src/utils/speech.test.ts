@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cancelCount, fakeVoice, lastUtterance, removeSpeechSupport, setVoices, spokenTexts } from '../test/speechSynthesis';
-import { PROFILE_PARAMS, cancelSpeech, pickVoice, speak, speechSupported } from './speech';
+import { cancelCount, fakeVoice, fireVoicesChanged, lastUtterance, removeSpeechSupport, setVoices, spokenTexts } from '../test/speechSynthesis';
+import { PROFILE_PARAMS, cancelSpeech, pickVoice, primeSpeech, speak, speechSupported } from './speech';
 
 /**
  * Guía por voz (decisión del dueño, 2026-10-08): el único módulo que toca `speechSynthesis`, con su síntesis simulada
@@ -51,6 +51,67 @@ describe('speech: síntesis de voz de la guía', () => {
     it('sin soporte devuelve null', () => {
       removeSpeechSupport();
       expect(pickVoice('es-MX', 'female')).toBeNull();
+    });
+
+    it('elige la MEJOR calidad del grupo: una voz neuronal/premium gana a las demás', () => {
+      setVoices([
+        fakeVoice('Spanish', 'es-MX', { default: true }), // marcada por omisión (básica)
+        fakeVoice('Spanish Compact', 'es-MX'), // compacta (robótica)
+        fakeVoice('Microsoft Sabina', 'es-MX'), // nombre premium del sistema
+      ]);
+      expect(pickVoice('es-MX', 'any')?.name).toBe('Microsoft Sabina');
+    });
+
+    it('pospone «compact» y la marcada por omisión frente a una voz normal', () => {
+      setVoices([fakeVoice('Spanish Compact', 'es-MX'), fakeVoice('Spanish', 'es-MX', { default: true }), fakeVoice('Spanish Clear', 'es-MX')]);
+      expect(pickVoice('es-MX', 'any')?.name).toBe('Spanish Clear');
+    });
+
+    it('prefiere una voz local (localService) sobre una remota', () => {
+      setVoices([fakeVoice('Remote', 'es-MX', { localService: false }), fakeVoice('Local', 'es-MX', { localService: true })]);
+      expect(pickVoice('es-MX', 'any')?.name).toBe('Local');
+    });
+
+    it('respeta el género pedido y, dentro de él, la mejor calidad', () => {
+      setVoices([fakeVoice('Paulina', 'es-MX'), fakeVoice('Microsoft Female', 'es-MX'), fakeVoice('Jorge', 'es-MX')]);
+      expect(pickVoice('es-MX', 'female')?.name).toBe('Microsoft Female'); // premium entre las femeninas
+      expect(pickVoice('es-MX', 'male')?.name).toBe('Jorge');
+    });
+  });
+
+  describe('voiceschanged: Blink entrega las voces tarde', () => {
+    it('sin voces engancha voiceschanged y, al cargarlas, la indicación siguiente ya elige una', () => {
+      expect(pickVoice('es-MX', 'any')).toBeNull(); // getVoices() aún vacío: engancha voiceschanged y no falla
+      setVoices([fakeVoice('Paulina', 'es-MX')]);
+      fireVoicesChanged(); // el navegador cargó las voces: el respaldo del caché se refresca
+      setVoices([]); // aunque getVoices() volviera a quedar vacío…
+      expect(pickVoice('es-MX', 'any')?.name).toBe('Paulina'); // …responde con lo cacheado
+    });
+
+    it('un voiceschanged con getVoices() aún vacío no guarda nada (engancha una sola vez)', () => {
+      expect(pickVoice('es-MX', 'any')).toBeNull(); // engancha
+      fireVoicesChanged(); // sigue vacío: el respaldo queda vacío
+      expect(pickVoice('es-MX', 'any')).toBeNull(); // segunda vez sin voces: no vuelve a enganchar
+    });
+  });
+
+  describe('primeSpeech: desbloqueo de la síntesis en móviles', () => {
+    it('desbloquea con un enunciado inaudible (un espacio, volumen 0) y calienta las voces', () => {
+      primeSpeech();
+      expect(spokenTexts()).toEqual([' ']);
+      expect(lastUtterance()?.volume).toBe(0);
+    });
+
+    it('es idempotente: una segunda llamada no vuelve a hablar', () => {
+      primeSpeech();
+      primeSpeech();
+      expect(spokenTexts()).toEqual([' ']);
+    });
+
+    it('sin soporte no hace nada ni lanza', () => {
+      removeSpeechSupport();
+      expect(() => primeSpeech()).not.toThrow();
+      expect(spokenTexts()).toEqual([]);
     });
   });
 

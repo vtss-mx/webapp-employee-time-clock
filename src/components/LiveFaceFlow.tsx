@@ -8,6 +8,7 @@ import { useFaceAutoCapture, useFaceDetector, type FaceGuidance } from '../hooks
 import { useFaceBurst } from '../hooks/useFaceBurst';
 import { isSteadyGuidance, useEnrollmentPhotoPlan, useFrontalCapture, type FrontalPhoto } from '../hooks/useFrontalCapture';
 import { useMountedRef } from '../hooks/useMountedRef';
+import { useScreenFlash } from '../hooks/useScreenFlash';
 import { t, useLocale } from '../i18n';
 import { resolveLazy, type LazyText } from '../i18n/lazy';
 import { ApiError, errorMessage } from '../services/apiClient';
@@ -22,6 +23,7 @@ import { faceFrameSharpness } from '../utils/frameQuality';
 import { sleep, whenOnline } from '../utils/waits';
 import { CameraCapture } from './CameraCapture';
 import { AccessoryBadges, FaceGuide } from './FaceGuide';
+import { FlashOverlay } from './FlashOverlay';
 import { ScanCard, scanStages, stageFill, type Phase } from './FaceScan';
 import { accessoryWatchEnabled, autoCaptureFlags, challengeActions, detectionMode, detectorActive, manualCaptureDisabled, SCANNING_PHASES, scannerView, scanProgress, shutterEnabled, type ScannerViewInput } from './liveFaceView';
 import { FlowActions, VoiceMuteButton, type FlowAlternative } from './LiveFaceParts';
@@ -74,35 +76,30 @@ interface LiveFaceFlowProps {
  *  1. Preparación    → rostro frente a la cámara, a buena distancia y con luz.
  *  2. Alineación     → dentro de la guía, centrado, de frente y quieto hasta quedar estable (se guarda el rostro "en
  *                      reposo").
- *  3. Escaneo        → en el registro facial (decisión del dueño, 2026-10-06, orden que no se altera): UNA foto
- *                      inicial que el servidor valida (`/face/check`: nítida, con luz, rostro completo) y, solo si
- *                      pasa, las 32 fotos VÁLIDAS (decisión del dueño, 2026-10-07: cada cuadro cuenta solo si el
- *                      detector sigue viendo el rostro dentro de la guía, centrado, de frente —sin mirar arriba ni
- *                      abajo— y quieto, y la medición de nitidez y luz lo acepta; «Capturas válidas: 24/32»; un cuadro
- *                      inválido no cuenta, no toma foto y no reinicia nada: la indicación dice qué corregir y el escaneo
- *                      espera lo que haga falta). En una verificación, las 3 capturas de siempre con su validación
- *                      previa. El reto se pide al empezar el escaneo, junto con las fotos: así se sabe desde el principio
- *                      cuántas fotos serán en total; si vence antes de terminarlas, se pide otro conservando las fotos.
+ *  3. Escaneo        → registro facial (decisión del dueño, 2026-10-06/07, orden fijo): UNA foto inicial que valida el
+ *                      servidor (`/face/check`) y, solo si pasa, las 32 fotos VÁLIDAS (un cuadro cuenta solo si sigue
+ *                      dentro de la guía, centrado, de frente, nítido y quieto; uno inválido no cuenta ni reinicia). En
+ *                      una verificación, las 3 capturas de siempre con su validación previa. El reto se pide al empezar
+ *                      (en paralelo a las fotos); si vence antes de terminarlas, se pide otro conservándolas.
  *  4. Prueba de vida → (si la empresa la exige) reto del servidor. Registro: SIEMPRE los cuatro movimientos de la cabeza
- *                      (derecha, izquierda, arriba, abajo; orden al azar) y, después de CADA uno, la vuelta al frente
- *                      (con detección real de que volvió); termina centrado. Verificación: de uno a tres movimientos de
- *                      la política. Si no se logra a tiempo (cada movimiento y el reto completo, `expires_in`) se pide
- *                      otro reto SIN repetir el escaneo. La pantalla nunca se pinta de colores (decisión del dueño,
- *                      2026-10-06): un reto que aún traiga colores se responde sin ellos.
+ *                      (orden al azar) con la vuelta al frente tras CADA uno; termina centrado. Verificación: de uno a
+ *                      tres movimientos. Si no se logra a tiempo (cada movimiento y el reto, `expires_in`) se pide otro
+ *                      SIN repetir el escaneo.
+ *  4b. Destello      → (restaurado el 2026-10-08 como interruptor del ADMIN, apagado por omisión) si el reto dictó un
+ *                      destello (`flash_pace`: por el canal; o `flash`: en claro), entre la prueba de vida y el envío la
+ *                      pantalla pinta cada color y captura su cuadro (`useScreenFlash` + `FlashOverlay`); sin él, directo
+ *                      al envío (por omisión no se pinta nada).
  *  5. Confirmación   → el backend valida todo de nuevo (fuente de verdad).
  *
- * Antifraude 2a: desde que el rostro queda estable de frente se toma la ráfaga de recortes (`useFaceBurst`: tramo
- * quieto hasta el reto y tramo de movimiento en el primer paso); viaja con las capturas si el reto la pide. Son las
- * 36 fotos LIGERAS de una verificación: el servidor mide con ellas la continuidad y el consenso de la identidad.
+ * Antifraude 2a: desde que el rostro queda estable de frente se toma la ráfaga de recortes (`useFaceBurst`: tramo quieto
+ * hasta el reto y de movimiento en el primer paso); viaja con las capturas si el reto la pide (continuidad y consenso).
  *
  * UN solo anillo (decisión del dueño, 2026-10-06): las fotos tomadas contra las del plan (`scanProgress`), por todo
  * el proceso —fotos de frente y movimientos— hasta completarse al enviar. Estados fijos: sin transiciones ni animaciones.
  *
- * Accesorios (decisión del dueño, 2026-10-07): cada vez que el servidor los reporta (la validación previa, aceptada o
- * rechazada, y el 422 de un envío) se muestran como INSIGNIAS sobre el rostro (`AccessoryBadges`: una por accesorio, de
- * cualquier tipo) y permanecen hasta la siguiente validación del servidor que ya no los reporte. La insignia es el único
- * aviso: la indicación grande nunca pide retirar nada; si la política de la empresa bloquea el accesorio, el servidor
- * rechaza la captura y el escaneo se reanuda con la insignia a la vista.
+ * Accesorios (decisión del dueño, 2026-10-07): cada vez que el servidor los reporta (la validación previa y el 422 de un
+ * envío) se muestran como INSIGNIAS sobre el rostro (`AccessoryBadges`) hasta la siguiente validación que ya no los
+ * reporte. Es el único aviso: la indicación grande nunca pide retirar nada; un accesorio bloqueado reanuda el escaneo.
  */
 
 /** Reto vigente (con prueba de vida): siempre trae su id. */
@@ -238,6 +235,9 @@ export function LiveFaceFlow({
   const stepUpRef = useRef<FaceChallenge | null>(null);
   /** Reto que firma la llave de este dispositivo (lo trae el reto del servidor solo para el propio empleado). */
   const deviceNonceRef = useRef<string | null>(null);
+  // Destello dictado por el servidor (antifraude 2a; restaurado el 2026-10-08, apagado por omisión): lo dispara SOLO el
+  // reto (`flash_pace` o `flash`), nunca una bandera de la app.
+  const flash = useScreenFlash();
   const mounted = useMountedRef();
 
   const clearChallenge = useCallback(() => {
@@ -342,8 +342,8 @@ export function LiveFaceFlow({
     return frames;
   }, [enrollment, enrollmentStep, precheck, shot, takePhotos]);
 
-  // Reto recibido: el tramo quieto de la ráfaga se completa (con tope) y empieza el primer movimiento. Los colores que
-  // un reto aún pudiera traer se ignoran: la pantalla nunca se pinta (decisión del dueño, 2026-10-06).
+  // Reto recibido: el tramo quieto de la ráfaga se completa (con tope) y empieza el primer movimiento. El destello (si
+  // el reto lo dictó) corre DESPUÉS de los movimientos, entre el fin de la prueba de vida y el envío (`finish`).
   const beginChallenge = useCallback(
     async (next: ActiveChallenge) => {
       clearChallenge();
@@ -437,17 +437,16 @@ export function LiveFaceFlow({
     [block, shot, submit],
   );
 
-  // Envío con una captura por movimiento (en orden) y la ráfaga, si el reto la pide.
+  // Envío con una captura por movimiento (en orden), el destello dictado por el servidor (si el reto lo pide: entre el
+  // fin de la prueba de vida y el envío; `flash.run` degrada al respaldo y jamás tumba la captura) y la ráfaga.
   const finish = useCallback(
     async (active: ActiveChallenge) => {
+      if (active.flash_pace || active.flash.length) setPhase('flash');
+      const flashFields = await flash.run(active, shot);
       const sheet = await burst.take(active.burst);
-      await submit({
-        frontal: frontalRef.current,
-        challenge: { id: active.challenge_id, images: stepsRef.current },
-        ...(sheet ? { burst: sheet } : {}),
-      });
+      await submit({ frontal: frontalRef.current, challenge: { id: active.challenge_id, images: stepsRef.current }, ...(sheet ? { burst: sheet } : {}), ...flashFields });
     },
-    [burst, submit],
+    [burst, flash, shot, submit],
   );
 
   // Fase 2: movimiento hecho → captura; después, de vuelta al frente (siempre en el registro, que termina centrado; en
@@ -610,6 +609,8 @@ export function LiveFaceFlow({
           <FaceGuide ref={guideRef} tone={tone} message={message} detail={detail} progress={ring} stage={stage} complete={phase === 'submitting'} />
           <ScannerHints phase={phase} guidance={guidance} mode={mode.kind === 'action' ? mode : null} mirrored={camera.isMirrored} />
           <AccessoryBadges items={accessories} />
+          {/* Destello dictado por el servidor (fijo, a toda pantalla): solo pinta cuando el reto lo dictó; por omisión, nada. */}
+          <FlashOverlay color={flash.color} />
         </CameraCapture>
       }
       actions={

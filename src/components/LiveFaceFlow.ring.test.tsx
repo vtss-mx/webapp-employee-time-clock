@@ -68,7 +68,7 @@ describe('LiveFaceFlow: anillo de las fotos', () => {
     act(() => burst.hold(26));
     expect(ring()).toBe('Captura al 69 %');
     await act(() => Promise.resolve().then(burst.release)); // tramo quieto completo: empieza el primer movimiento
-    expect(document.querySelector('.flash')).toBeNull(); // nunca una capa de color (el destello se retiró)
+    expect(document.querySelector('.flash')).toBeNull(); // este reto no dicta destello: ninguna capa de color
     expect(ring()).toBe('Captura al 69 %');
     see({ guidance: 'move', moveProgress: 0.5 });
     expect(ring()).toBe('Captura al 77 %'); // sigue a la cabeza

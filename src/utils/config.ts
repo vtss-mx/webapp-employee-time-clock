@@ -106,18 +106,21 @@ export const config = {
   /** Margen antes de que venza el reto (`expires_in`): lo que tarda en subir el envío. */
   faceChallengeMarginMs: seconds('VITE_FACE_CHALLENGE_MARGIN_SECONDS', 5, 0, 30),
   /**
-   * Destello de colores: espera tras pintar cada color antes de capturar. Cubre la latencia de la
-   * cámara (el cuadro debe mostrar ya el color) y es menor a lo que tarda el balance de blancos
-   * automático en compensarlo (≈ 0.5–1 s en iPhone). Cada color queda unos 0.4 s: ≈ 2.3 cambios por
-   * segundo, con margen bajo el límite de 3 destellos por segundo (WCAG 2.3.1, fotosensibilidad); por
-   * eso el mínimo configurable es 340 ms.
+   * Destello dictado por el servidor (restaurado el 2026-10-08 como interruptor del ADMIN, apagado por omisión; lo
+   * dispara el RETO —`flash_pace` o `flash`—, nunca una bandera de la app): espera tras pintar cada color antes de
+   * capturar su cuadro. Cubre la latencia de la cámara (el cuadro debe mostrar ya el color) y es menor a lo que tarda el
+   * balance de blancos automático en compensarlo (≈ 0.5–1 s en iPhone). Cada color queda unos 0.4 s: ≈ 2.3 cambios por
+   * segundo, con margen bajo el límite de 3 destellos por segundo (WCAG 2.3.1, fotosensibilidad); por eso el mínimo
+   * configurable es 340 ms.
    */
+  faceFlashHoldMs: envNumber(env, 'VITE_FACE_FLASH_HOLD_MS', 400, 340, 2000),
   /**
    * Luminancia con que la pantalla pinta cada color del destello (1 = el color puro; decisión del dueño, 2026-10-06:
    * un aspecto sobrio, sin colores saturados a toda pantalla). El servidor compara la CROMATICIDAD (proporción de rojo,
-   * verde y azul), que no cambia con la luminancia; la magnitud medida baja en la misma proporción (modelo sintético
-   * con `photometry.py`: con 0.75 sigue muy por encima del mínimo concluyente). Bajarla más debilita la medición.
+   * verde y azul), que no cambia con la luminancia; la magnitud medida baja en la misma proporción. Bajarla más debilita
+   * la medición.
    */
+  faceFlashLuminance: envNumber(env, 'VITE_FACE_FLASH_LUMINANCE', 0.75, 0.3, 1),
   faceDetectorTimeoutMs: seconds('VITE_FACE_DETECTOR_TIMEOUT_SECONDS', 20, 5, 120),
   faceDetectionMinScore: envNumber(env, 'VITE_FACE_DETECTION_MIN_SCORE', 0.6, 0.1, 1),
   faceDetectionIntervalMs: envNumber(env, 'VITE_FACE_DETECTION_INTERVAL_MS', 110, 50, 1000),

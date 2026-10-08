@@ -7,10 +7,11 @@ import { Button } from './ui/Button';
 
 /**
  * Fases internas del flujo facial (lo que hace el sistema). challenge: un movimiento de la prueba de vida; recenter:
- * entre dos movimientos, la persona vuelve a mirar al frente. (El destello de colores se retiró de la experiencia por
- * decisión del dueño del producto, 2026-10-06: ya no hay fase que pinte la pantalla.)
+ * entre dos movimientos, la persona vuelve a mirar al frente; flash: el destello dictado por el servidor (restaurado el
+ * 2026-10-08 como interruptor del ADMIN, apagado por omisión), entre el fin de la prueba de vida y el envío, pinta un
+ * color a toda pantalla por cada captura. Sin destello dictado por el reto, nunca se entra a `flash`.
  */
-export type Phase = 'frontal' | 'checking' | 'blocked' | 'challenge' | 'recenter' | 'submitting';
+export type Phase = 'frontal' | 'checking' | 'blocked' | 'challenge' | 'recenter' | 'flash' | 'submitting';
 
 /** Etapas que ve la persona (lo que debe hacer): una barra de progreso por etapa. */
 export type ScanStage = 'prepare' | 'align' | 'scan' | 'liveness' | 'confirm';
@@ -52,6 +53,7 @@ export function currentStage(phase: Phase, guidance: FaceGuidance): ScanStage {
     case 'challenge':
     case 'recenter':
       return 'liveness';
+    case 'flash':
     case 'submitting':
       return 'confirm';
     case 'blocked':

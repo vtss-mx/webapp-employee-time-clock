@@ -162,6 +162,7 @@ export default {
     almost: 'Só mais um pouco',
     photo: 'Foto {current} de {total}',
     analyzing: 'Analisando…',
+    flash: 'A tela vai dar um flash de cores. Fique parado.',
     retry: 'Tente novamente',
     nextStepReady: 'Pronto para a próxima etapa',
     lookFront: 'Centralize o rosto',

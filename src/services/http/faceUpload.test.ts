@@ -38,7 +38,7 @@ describe('envío de capturas (antifraude 1b)', () => {
 });
 
 describe('envío de capturas (antifraude 2a)', () => {
-  it('con el reto viajan la hoja de la ráfaga y su descripción (ninguna captura de colores: el destello se retiró)', async () => {
+  it('con el reto viajan la hoja de la ráfaga y su descripción (sin destello dictado no viaja ninguna captura de color)', async () => {
     const { calls } = mockFetch(apiOk({ ok: true }));
     const sheet = new Blob(['hoja'], { type: 'image/jpeg' });
     await postFaceCaptures('/verification/face', { frontal: [new Blob(['a'])], challenge: { id: 'ch-1', images: [new Blob(['t'])] }, burst: { image: sheet, meta: '{"v":1}' } }, anything);
@@ -50,5 +50,19 @@ describe('envío de capturas (antifraude 2a)', () => {
     await postFaceCaptures('/verification/face', { frontal: [new Blob(['a'])], challenge: { id: 'ch-1', images: [] } }, anything);
     const plain = calls[1].init.body as FormData;
     expect([plain.get('burst'), plain.get('burst_meta')]).toEqual([null, null]);
+  });
+
+  it('con el destello dictado por el servidor viajan un cuadro por color y el comprobante (`flash_image`/`flash_receipt`)', async () => {
+    const { calls } = mockFetch(apiOk({ ok: true }));
+    const colors = [new Blob(['c1']), new Blob(['c2'])];
+    await postFaceCaptures('/verification/face', { frontal: [new Blob(['a'])], challenge: { id: 'ch-1', images: [] }, flashImage: colors, flashReceipt: 'rcpt-1' }, anything);
+    const form = calls[0].init.body as FormData;
+    expect(form.getAll('flash_image')).toHaveLength(2);
+    expect(form.get('flash_image')).toBeInstanceOf(Blob);
+    expect(form.get('flash_receipt')).toBe('rcpt-1');
+    // Respaldo en claro (sin canal): los colores viajan sin comprobante.
+    await postFaceCaptures('/verification/face', { frontal: [new Blob(['a'])], flashImage: [new Blob(['c1'])] }, anything);
+    const open = calls[1].init.body as FormData;
+    expect([open.getAll('flash_image').length, open.get('flash_receipt')]).toEqual([1, null]);
   });
 });

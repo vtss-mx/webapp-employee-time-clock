@@ -5,8 +5,6 @@ import tuning from './policy/tuning';
 
 /** Textos de política de verificación y ajustes de la prueba de vida de una empresa en italiano (it-IT): las mismas llaves que es-MX. */
 export default {
-  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
-  retired: 'Disattivato per decisione di prodotto (2026-10-06).',
   loadError: 'Impossibile caricare i criteri di verifica',
   title: "Criteri di verifica dell'identità",
   saveError: 'Impossibile salvare',
@@ -82,6 +80,26 @@ export default {
       label: 'Verifica di vivacità',
       on: 'La persona fa movimenti casuali della testa.',
       off: 'Nessuna sfida di movimenti.',
+    },
+    enableTurnRight: {
+      label: 'Girare a destra',
+      on: 'La verifica di vivacità può chiedere di girare la testa a destra.',
+      off: 'La verifica di vivacità non chiede di girare a destra.',
+    },
+    enableTurnLeft: {
+      label: 'Girare a sinistra',
+      on: 'La verifica di vivacità può chiedere di girare la testa a sinistra.',
+      off: 'La verifica di vivacità non chiede di girare a sinistra.',
+    },
+    enableLookUp: {
+      label: 'Guardare in alto',
+      on: 'La verifica di vivacità può chiedere di guardare in alto.',
+      off: 'La verifica di vivacità non chiede di guardare in alto.',
+    },
+    enableLookDown: {
+      label: 'Guardare in basso',
+      on: 'La verifica di vivacità può chiedere di guardare in basso.',
+      off: 'La verifica di vivacità non chiede di guardare in basso.',
     },
     antiSpoofing: {
       label: 'Rilevamento della contraffazione',

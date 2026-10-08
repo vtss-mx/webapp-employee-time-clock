@@ -164,6 +164,7 @@ export default {
     almost: 'Encore un peu',
     photo: 'Photo {current} sur {total}',
     analyzing: 'Analyse en cours…',
+    flash: "L'écran va clignoter en couleurs. Ne bougez pas.",
     retry: 'Réessayez',
     nextStepReady: "Prêt pour l'étape suivante",
     lookFront: 'Centrez votre visage',

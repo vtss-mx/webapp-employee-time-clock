@@ -167,6 +167,7 @@ export default {
     almost: 'Noch etwas',
     photo: 'Foto {current} von {total}',
     analyzing: 'Wird analysiert…',
+    flash: 'Der Bildschirm blitzt in Farben auf. Halten Sie still.',
     retry: 'Versuchen Sie es erneut',
     nextStepReady: 'Bereit für den nächsten Schritt',
     lookFront: 'Zentrieren Sie Ihr Gesicht',

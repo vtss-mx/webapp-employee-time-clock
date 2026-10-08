@@ -182,6 +182,18 @@ const SECTIONS = [
         `Margen antes de que venza el reto (lo que tarda en subir el envío). ${range(0, 30, ' s')}`,
       ],
       [
+        'VITE_FACE_FLASH_HOLD_MS',
+        '400',
+        'Destello dictado por el servidor (apagado por omisión; lo dispara el reto): espera tras pintar cada color antes ' +
+          `de capturar su cuadro (latencia de la cámara, bajo el límite de 3 destellos/s de WCAG 2.3.1). ${range(340, 2000, ' ms')}`,
+      ],
+      [
+        'VITE_FACE_FLASH_LUMINANCE',
+        '0.75',
+        'Luminancia con que se pinta cada color del destello (1 = color puro; sobrio, sin saturar). El servidor compara ' +
+          `la cromaticidad, no la luminancia. ${range(0.3, 1)}`,
+      ],
+      [
         'VITE_FACE_DETECTOR_TIMEOUT_SECONDS',
         '20',
         `Tiempo límite para cargar el detector de rostros (MediaPipe). ${range(5, 120, ' s')}`,

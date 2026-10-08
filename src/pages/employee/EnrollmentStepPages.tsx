@@ -25,6 +25,7 @@ import { ApiError } from '../../services/apiClient';
 import { enrollmentService } from '../../services/enrollmentService';
 import type { EnrollmentProgress, VoiceChallenge } from '../../types';
 import { config } from '../../utils/config';
+import { primeSpeech } from '../../utils/speech';
 import { sleep } from '../../utils/waits';
 
 /*
@@ -119,6 +120,10 @@ function StepGate({ step, children }: StepGateProps) {
   }
   if (!open) {
     const start = async () => {
+      // Desbloquea la síntesis de voz DENTRO del gesto (iOS la mantiene bloqueada hasta el primer `speak` en un toque):
+      // se hace antes del `await` para que corra síncronamente con el clic. Es seguro aunque la guía esté apagada o el
+      // navegador no la soporte (no hace nada), así que no se condiciona a la política.
+      primeSpeech();
       if (await confirm(() => enrollmentStepConfirm(step, progress, user?.employee))) setOpen(true);
     };
     return (

@@ -55,6 +55,12 @@ export const identifiedResult: VerificationResult = {
 /** Política de la empresa como la devuelve GET /api/settings/verification (lo más estricto). */
 export const samplePolicy: VerificationPolicy = {
   ...STRICT_RULES,
+  // Movimientos de la prueba de vida (decisión del dueño, 2026-10-08): por omisión girar a la derecha e izquierda; mirar
+  // arriba y abajo nacen apagados (deben quedar al menos dos encendidos).
+  enable_turn_right: true,
+  enable_turn_left: true,
+  enable_look_up: false,
+  enable_look_down: false,
   blocked_cameras: ['virtual', 'manycam', 'obs virtual'],
   min_confidence: 0.99999,
   identify_confidence: 0.99999,
@@ -103,7 +109,8 @@ export const sampleAdminPolicy: AdminVerificationPolicy = {
   risk_critical_action: 'DENY',
   risk_fallback_action: 'ALERT',
   fraud_evidence: true,
-  flash_paced: true,
+  // Destello dictado por el servidor (antifraude 2a): interruptor del ADMIN, apagado por omisión como en el backend.
+  flash_paced: false,
   capture_burst: true,
   voice_verification: true,
   validator_signing: 'OBSERVE',

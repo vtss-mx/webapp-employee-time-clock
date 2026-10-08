@@ -21,13 +21,21 @@ export interface FaceCaptures {
   deviceNonce?: string;
   /** Antifraude 2a: la hoja de la ráfaga de recortes del rostro. */
   burst?: FaceBurst;
+  /**
+   * Destello dictado por el servidor (antifraude 2a; restaurado el 2026-10-08 como interruptor del ADMIN, apagado por
+   * omisión): un cuadro por color del destello, EN ORDEN. Solo viaja cuando el reto dictó un destello.
+   */
+  flashImage?: Blob[];
+  /** Comprobante del destello DICTADO (el token final del canal en vivo); ausente en el respaldo en claro (FLASH_UNPACED). */
+  flashReceipt?: string;
 }
 
 /**
- * Multipart con las capturas frontales, las del reto (una por movimiento), la ráfaga, la cámara y la telemetría. (El
- * destello de colores se retiró de la experiencia por decisión del dueño, 2026-10-06: ya no viajan capturas de colores.)
+ * Multipart con las capturas frontales, las del reto (una por movimiento), la ráfaga, el destello dictado por el
+ * servidor (un cuadro por color más su comprobante), la cámara y la telemetría. El destello (restaurado el 2026-10-08)
+ * solo viaja cuando el reto lo dictó: sin él no se agrega ningún campo de color.
  */
-export function buildFaceForm({ frontal, challenge, camera, telemetry, burst }: FaceCaptures, extra: Record<string, string> = {}): FormData {
+export function buildFaceForm({ frontal, challenge, camera, telemetry, burst, flashImage, flashReceipt }: FaceCaptures, extra: Record<string, string> = {}): FormData {
   const form = new FormData();
   Object.entries(extra).forEach(([key, value]) => form.append(key, value));
   frontal.forEach((image, i) => form.append('images', image, `frontal-${i + 1}.jpg`));
@@ -39,6 +47,8 @@ export function buildFaceForm({ frontal, challenge, camera, telemetry, burst }: 
       form.append('burst_meta', burst.meta);
     }
   }
+  if (flashImage) flashImage.forEach((image, i) => form.append('flash_image', image, `flash-${i + 1}.jpg`));
+  if (flashReceipt) form.append('flash_receipt', flashReceipt);
   if (camera) form.append('camera_label', camera.slice(0, 200));
   if (telemetry) form.append('telemetry', telemetry);
   return form;

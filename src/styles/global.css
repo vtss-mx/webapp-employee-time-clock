@@ -2950,6 +2950,19 @@ a.kpi:hover {
   opacity: 1;
 }
 
+/* Destello dictado por el servidor (antifraude 2a; restaurado el 2026-10-08 como interruptor del ADMIN, apagado por
+   omisión): capa de color sólido a toda pantalla mientras se captura su cuadro (components/FlashOverlay.tsx). Cubre TODO
+   (sobre el visor, el menú y los popups) para que la luz del color tiña el rostro que mide el servidor. El color cambia
+   AL INSTANTE: sin `transition` ni `animation` (decisión del dueño sobre el visor «enterprise»), lo que respeta
+   `prefers-reduced-motion` por construcción (no hay movimiento que reducir). */
+.flash {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: var(--flash-color, #000000);
+  pointer-events: none;
+}
+
 /* Texto con fundido cruzado (ui/CrossfadeText.tsx): las dos capas se apilan en la misma celda (nada se desplaza). */
 .crossfade {
   display: inline-grid;

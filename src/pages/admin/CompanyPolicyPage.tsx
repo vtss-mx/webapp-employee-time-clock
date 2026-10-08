@@ -1,5 +1,9 @@
 import {
   Aperture,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   BrainCircuit,
   Clapperboard,
   FileImage,
@@ -48,7 +52,7 @@ import { PresenceSection } from '../../components/policy/PresenceSection';
 import { RiskEngineSection } from '../../components/policy/RiskEngineSection';
 import { RiskSimulationPanel } from '../../components/policy/RiskSimulation';
 import { VoiceGuidanceSection } from '../../components/policy/VoiceGuidanceSection';
-import { PolicyTuning, RetiredRow, type TuningKey, type TuningSave } from '../../components/settings/PolicyTuning';
+import { PolicyTuning, type TuningKey, type TuningSave } from '../../components/settings/PolicyTuning';
 import { formatConfidence } from '../../utils/format';
 import { Panel, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
@@ -69,6 +73,10 @@ type PolicyKey =
   | 'block_headwear'
   | 'block_mask'
   | 'liveness_challenge'
+  | 'enable_turn_right'
+  | 'enable_turn_left'
+  | 'enable_look_up'
+  | 'enable_look_down'
   | 'anti_spoofing'
   | 'qr_enabled'
   | 'validator_mobile_only'
@@ -121,8 +129,6 @@ interface Section {
   id: SectionId;
   icon: ReactNode;
   options: Option[];
-  /** Reglas retiradas por decisión del dueño del producto: se muestran apagadas y sin control, con su nota. */
-  retired?: { key: PolicyKey; Icon: LucideIcon; label: () => string; note: () => string }[];
 }
 
 /** Una regla con sus textos en `policy.options.<id>`. */
@@ -163,7 +169,16 @@ const POLICY_SECTIONS: Section[] = [
   {
     id: 'security',
     icon: <ShieldCheck size={20} />,
-    options: [option('liveness_challenge', 'livenessChallenge', Fingerprint, security), option('anti_spoofing', 'antiSpoofing', ScanFace, security)],
+    options: [
+      option('liveness_challenge', 'livenessChallenge', Fingerprint, security),
+      // Movimientos de la prueba de vida (el servidor arma el reto con los encendidos). Apagar uno relaja la seguridad
+      // (regla de dos personas) y el servidor exige que queden al menos dos (422 `LIVENESS_MOVES_MIN`).
+      option('enable_turn_right', 'enableTurnRight', ArrowRight, security),
+      option('enable_turn_left', 'enableTurnLeft', ArrowLeft, security),
+      option('enable_look_up', 'enableLookUp', ArrowUp, security),
+      option('enable_look_down', 'enableLookDown', ArrowDown, security),
+      option('anti_spoofing', 'antiSpoofing', ScanFace, security),
+    ],
   },
   {
     id: 'locks',
@@ -203,9 +218,9 @@ const POLICY_SECTIONS: Section[] = [
   {
     id: 'capture',
     icon: <Aperture size={20} />,
-    options: [option('capture_burst', 'captureBurst', Clapperboard, { security: true, warning: 'captureProtocol' })],
-    // El destello dictado se retiró con el destello (decisión del dueño, 2026-10-06): se muestra apagado, sin control.
-    retired: [{ key: 'flash_paced', Icon: Zap, label: () => t('policy.options.flashPaced.label'), note: () => t('policy.retired') }],
+    // Destello dictado por el servidor (antifraude 2a): interruptor del ADMIN, apagado en empresas nuevas; encendido, el
+    // flujo de captura activa el destello que el servidor dicta en cada reto.
+    options: [option('flash_paced', 'flashPaced', Zap), option('capture_burst', 'captureBurst', Clapperboard, { security: true, warning: 'captureProtocol' })],
   },
   {
     id: 'devices',
@@ -458,9 +473,6 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
               />
             );
           })}
-          {section.retired?.map(({ key, Icon, label, note }) => (
-            <RetiredRow key={key} icon={<Icon size={20} />} label={label()} note={note()} value={t('policy.toggle.off')} />
-          ))}
         </PanelSection>
       ))}
       <PanelSection title={t('policy.tuning.title')} icon={<SlidersHorizontal size={20} />}>

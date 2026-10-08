@@ -22,6 +22,15 @@ export interface VerificationPolicy {
   anti_spoofing_level: string;
   /** Movimientos aleatorios de la prueba de vida (1 a 3: girar, mirar arriba o abajo, acercarse). */
   liveness_steps: number;
+  /**
+   * Movimientos de cabeza que la prueba de vida puede pedir (el servidor arma el reto con ellos). El ADMIN enciende o
+   * apaga cada uno por empresa; deben quedar al menos DOS activos (el servidor responde 422 `LIVENESS_MOVES_MIN` si se
+   * intenta dejar menos). Apagar uno relaja la seguridad (`SAFER_WHEN_ON`): pasa por la regla de dos personas.
+   */
+  enable_turn_right: boolean;
+  enable_turn_left: boolean;
+  enable_look_up: boolean;
+  enable_look_down: boolean;
   /** Segundos para responder el reto completo (destello y movimientos; 20 a 180). */
   liveness_timeout_seconds: number;
   /** Destello de colores en la pantalla: código del catálogo flash_modes (OFF, OBSERVE, ENFORCE). */
@@ -255,6 +264,11 @@ export type VerificationRules = Omit<
   | 'max_travel_kmh'
   | 'liveness_timeout_seconds'
   | 'flash_liveness'
+  // Los movimientos de la prueba de vida los decide el servidor en cada reto (`FaceChallenge`), no la app en pantalla.
+  | 'enable_turn_right'
+  | 'enable_turn_left'
+  | 'enable_look_up'
+  | 'enable_look_down'
   | 'qr_only_attendance'
   | 'updated_at'
   | 'updated_by'

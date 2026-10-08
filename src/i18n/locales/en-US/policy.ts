@@ -5,8 +5,6 @@ import tuning from './policy/tuning';
 
 /** Textos de política de verificación y ajustes de la prueba de vida de una empresa en inglés (en-US): las mismas llaves que es-MX. */
 export default {
-  /** Control retirado por decisión del dueño del producto (2026-10-06): se muestra apagado y sin cambios. */
-  retired: 'Turned off by product decision (2026-10-06).',
   loadError: "Couldn't load the verification policy",
   title: 'Identity verification policy',
   saveError: "Couldn't save",
@@ -81,6 +79,26 @@ export default {
       label: 'Liveness check',
       on: 'The person makes random head moves.',
       off: 'No head-move challenge.',
+    },
+    enableTurnRight: {
+      label: 'Turn right',
+      on: 'The liveness check may ask the person to turn their head right.',
+      off: 'The liveness check won’t ask to turn right.',
+    },
+    enableTurnLeft: {
+      label: 'Turn left',
+      on: 'The liveness check may ask the person to turn their head left.',
+      off: 'The liveness check won’t ask to turn left.',
+    },
+    enableLookUp: {
+      label: 'Look up',
+      on: 'The liveness check may ask the person to look up.',
+      off: 'The liveness check won’t ask to look up.',
+    },
+    enableLookDown: {
+      label: 'Look down',
+      on: 'The liveness check may ask the person to look down.',
+      off: 'The liveness check won’t ask to look down.',
     },
     antiSpoofing: {
       label: 'Anti-spoofing',

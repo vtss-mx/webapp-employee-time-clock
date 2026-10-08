@@ -22,7 +22,7 @@ describe('capturePlan: cuántas fotos pide el escaneo', () => {
     expect(capturePlan(LIVE, 32, true)).toEqual({ still: 32, light: 0, moves: 12, steps: 2 });
   });
 
-  it('los colores que un reto aún traiga no cuentan (el destello se retiró); sin ráfaga, solo una foto por movimiento', () => {
+  it('los colores del destello no cuentan en el anillo (corren tras llenarlo); sin ráfaga, solo una foto por movimiento', () => {
     expect(capturePlan({ ...LIVE, flash: ['#FF0000', '#00FF00'], flash_pace: { token: 't', total: 4, window_ms: 1500 } }, 3, false)).toEqual({ still: 3, light: 26, moves: 12, steps: 2 });
     expect(capturePlan({ ...LIVE, burst: null }, 3, false)).toEqual({ still: 3, light: 0, moves: 2, steps: 2 });
   });

@@ -176,6 +176,8 @@ export default {
     /** La cuenta bajo la indicación mientras se toman las fotos de frente. */
     photo: 'Foto {current} de {total}',
     analyzing: 'Analizando…',
+    /** Aviso en vivo (lectores de pantalla) mientras la pantalla destella el color dictado por el servidor. */
+    flash: 'La pantalla destellará unos colores. No te muevas.',
     retry: 'Intenta de nuevo',
     nextStepReady: 'Listo para el siguiente paso',
     /** De vuelta al frente entre movimientos (y al final del registro, que termina centrado). */
