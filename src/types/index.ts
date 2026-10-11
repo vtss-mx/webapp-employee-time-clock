@@ -1,12 +1,13 @@
 import type { EnrollmentVoice, VoiceChallenge, VoiceQuestionKind } from './voice';
+import type { EnrollmentStepCode } from './enrollmentSteps';
 import type { WithAvatar } from './avatar';
 import type { ApiKey, ApiKeyStatus, ApiScope } from './apiKeys';
-import type { Department, DepartmentRef } from './departments';
+import type { PlatformKey, SigningKey, SigningKeyLimits } from './signingKeys';
 import type { ErrorOccurrence, ErrorReport, ErrorSeverity, ErrorStatus } from './errors';
 import type { Company, CompanyAdmin } from './platform';
-import type { AssignmentState, AttendanceAction, BoardState, ShiftRequestStatus, WorkMode, WorkSessionStatus } from './shifts';
 import type { Locale } from './i18n';
 import type { SlowAlertStatus } from './performance';
+import type { AuditCatalogs } from './audit';
 import type { AntifraudCatalogs, SimilarEmployee } from './fraud';
 import type { BillingStatus, ChargeStatus, DiscountRecurrence, DiscountType, PaymentStatus, PricePeriod, PricingMode, SuspensionReason } from './billing';
 import type { SoftDeleted } from './trash';
@@ -55,6 +56,13 @@ export interface User {
   preferences?: UserPreferences;
   /** Módulos del menú que usan sus pantallas, en orden (los envía el backend con `screens`). */
   modules?: MenuModule[];
+  /**
+   * Segundo factor pendiente (migración 0096): su rol exige una llave de acceso y aún no tiene ninguna. Durante la
+   * gracia trabaja normal y la app le insiste; al vencer, cada pantalla responde 403 `MFA_ENROLLMENT_REQUIRED` y
+   * solo queda registrar su llave. `mfa_grace_until`: hasta cuándo (null = sin plazo, se trata como vencido).
+   */
+  mfa_pending?: boolean;
+  mfa_grace_until?: string | null;
   /**
    * Pantallas del usuario, en orden: las decide el backend (permiso del rol en la BD y estado del
    * usuario). El menú y las rutas se arman solo con ellas.
@@ -154,7 +162,6 @@ export interface CompanyEmployee extends WithAvatar {
   employee_number: string | null;
   first_name: string;
   last_name: string;
-  department_name: string | null;
   email: string;
   phone: string | null;
   active: boolean;
@@ -196,11 +203,6 @@ export interface Employee extends SoftDeleted {
   has_face: boolean;
   /** Muestras activas del rostro (lo que el reconocimiento aprende del uso lo administra el ADMIN). */
   face_samples: number;
-  /** Departamento al que está asignado (a lo más uno). */
-  department_id?: number | null;
-  department_name?: string | null;
-  /** Departamentos de los que es responsable (solo en el detalle). */
-  managed_departments?: DepartmentRef[];
   /** Ruta versionada de la foto de perfil de la persona (null: sin foto o en «Eliminados»). */
   avatar?: string | null;
   created_at: string;
@@ -220,13 +222,10 @@ export interface EmployeeListParams {
   active?: boolean;
   /** Solo los de «Eliminados» (sin `active`). */
   deleted?: boolean;
-  /** Solo los asignados a ese departamento. */
-  department_id?: number;
   page?: number;
   size?: number;
 }
 
-export type DepartmentList = Page<Department>;
 /** `as_of`: hora del servidor al armar la lista ("marcar como solucionados" no toca lo posterior). */
 export type ErrorReportList = Page<ErrorReport> & { as_of: string };
 export type ErrorOccurrenceList = Page<ErrorOccurrence>;
@@ -344,6 +343,8 @@ export interface FaceCheckResult {
 
 export interface VerificationResult extends WithAvatar {
   verified: boolean;
+  /** Estado explícito del servidor; desconocido jamás significa aprobación. */
+  verification_status?: string | null;
   method: VerificationMethod;
   message: string;
   employee_id?: number | null;
@@ -351,18 +352,10 @@ export interface VerificationResult extends WithAvatar {
   name?: string | null;
   confidence?: number | null;
   verified_at?: string | null;
-  /** Validadores: lo que la identificación registró en la asistencia (entrada o salida del turno). */
-  attendance?: ValidatorAttendance | null;
   /** El motor de riesgo lo dejó "en revisión": quedó guardado y la empresa lo confirma o lo rechaza. */
   review?: boolean;
   /** Validadores (antifraude 2b): el siguiente reto para firmar la próxima identificación. */
   device_nonce?: string | null;
-}
-
-/** `action`: CHECK_IN o CHECK_OUT; null si no registró nada (sin turno ahora o doble lectura). */
-export interface ValidatorAttendance {
-  action: 'CHECK_IN' | 'CHECK_OUT' | null;
-  message: string;
 }
 
 export interface VerificationLog {
@@ -562,14 +555,8 @@ export interface CurrencyItem extends CatalogItem {
   decimals: number;
 }
 
-/** Tipo de ausencia: `phrase` es lo que se le dice al empleado; `requestable`, si él lo puede pedir. */
-export interface DayOffTypeItem extends StatusItem {
-  phrase: string;
-  requestable: boolean;
-}
-
-/** Catálogos que envía `GET /api/catalogs` (los del antifraude, en `AntifraudCatalogs`). */
-export interface Catalogs extends AntifraudCatalogs {
+/** Catálogos que envía `GET /api/catalogs` (los del antifraude y los de la bitácora, en sus propios archivos). */
+export interface Catalogs extends AntifraudCatalogs, AuditCatalogs {
   roles: CatalogItem<Role>[];
   verification_methods: CatalogItem<VerificationMethod>[];
   validator_modes: ValidatorModeItem[];
@@ -593,6 +580,8 @@ export interface Catalogs extends AntifraudCatalogs {
   antispoof_levels: AntispoofLevelItem[];
   /** Destello de colores de la prueba de vida: apagado, solo medir u obligatorio (con su descripción). */
   flash_modes: CatalogItem[];
+  /** Nombres de los movimientos emitidos por el servidor, también para el historial. */
+  liveness_actions: CatalogItem[];
   face_errors: FaceErrorItem[];
   /** Marcas del registro facial para el revisor (códigos de `flagged_accessories`). */
   enrollment_flags: CatalogItem[];
@@ -600,17 +589,6 @@ export interface Catalogs extends AntifraudCatalogs {
   voice_questions: CatalogItem<VoiceQuestionKind>[];
   /** Voces de la guía por voz del registro facial (decisión del dueño, 2026-10-08): la que elige el ADMIN por empresa. */
   voice_profiles: CatalogItem[];
-  /** Asistencia por turno: cómo se checó, cada registro, el estado de la jornada y de una solicitud. */
-  work_modes: CatalogItem<WorkMode>[];
-  attendance_actions: CatalogItem<AttendanceAction>[];
-  work_session_statuses: StatusItem<WorkSessionStatus>[];
-  shift_request_statuses: StatusItem<ShiftRequestStatus>[];
-  /** En qué va cada empleado en el tablero del día y la vigencia de una asignación de turno. */
-  board_states: StatusItem<BoardState>[];
-  assignment_states: StatusItem<AssignmentState>[];
-  /** Calendario: tipos de ausencia y motivos sugeridos al registrar o corregir una jornada. */
-  day_off_types: DayOffTypeItem[];
-  attendance_edit_reasons: CatalogItem[];
   /** Cobranza y consumo (ADMIN): cómo se cobra, descuentos, estados, medios de pago y almacenamiento. */
   pricing_modes: CatalogItem<PricingMode>[];
   price_periods: CatalogItem<PricePeriod>[];
@@ -630,6 +608,11 @@ export interface Catalogs extends AntifraudCatalogs {
   company_document_types: CatalogItem[];
   /** Tipos de documento de identidad del empleado (pasaporte, INE, licencia, comprobante; migración 0087). */
   employee_document_types: CatalogItem[];
+  /**
+   * Pasos del registro de identidad (migración 0093): su NOMBRE y su descripción para la persona y para el ADMIN que
+   * configura el flujo. Es la ÚNICA fuente de los nombres de los pasos (nunca los diccionarios de la app).
+   */
+  enrollment_steps: CatalogItem<EnrollmentStepCode>[];
 }
 
 export type CatalogKey = keyof Catalogs;
@@ -637,13 +620,12 @@ export type CatalogEntry<K extends CatalogKey> = Catalogs[K][number];
 
 export type { ApiKey, ApiKeyCreated, ApiKeyCreatePayload, ApiKeyStatus, ApiScope } from './apiKeys';
 export type { EnrollmentVoice, VoiceAnswer, VoiceAnswerResult, VoiceChallenge, VoiceClip, VoiceQuestion, VoiceQuestionKind } from './voice';
-export type { CaptureStepStatus, EnrollmentPhotoResult, EnrollmentProgress, PhotoStepStatus, VoiceStepStatus } from './enrollmentSteps';
+export type { EnrollmentPhotoResult, EnrollmentProgress, EnrollmentStepCode, EnrollmentStepState, EnrollmentStepStatus } from './enrollmentSteps';
 export type { EmployeeDevice, EmployeeDeviceList } from './devices';
 export type { BurstSpec, ChallengePurpose, FaceChallenge, FlashPace, LivenessAction } from './capture';
 // Política de verificación (lo que lee la empresa y lo que configura el ADMIN) y casos de fraude (solo el ADMIN).
 export type * from './policy';
 export type * from './fraud';
-export type { Department, DepartmentPayload, DepartmentPerson, DepartmentRef } from './departments';
 export type { ApiDemand, ErrorContext, ErrorOccurrence, ErrorReport, ErrorReportDetail, ErrorSeverity, ErrorStatus, ErrorSummary, ObjectStorageStatus, ServerStatus, StorageTask, StoredImageCount } from './errors';
 export type { Company, CompanyAdmin, CompanyFormValues, CompanyListParams, PlatformStats } from './platform';
 export type { AvailabilityResult, AvailabilityState, AvailabilityStatus, EmployeeUniqueField, FieldStatus, LiveChecks } from './forms';
@@ -651,15 +633,39 @@ export type { AvailabilityResult, AvailabilityState, AvailabilityStatus, Employe
 export type { DeletedFlag, Restored, SoftDeleted } from './trash';
 export type { CheckpointEmployee, CheckpointEvent, CheckpointEventList } from './checkpoint';
 // Verificaciones de la empresa con dónde se hicieron (pantalla «Verificaciones», mapa).
-export type { CompanyVerification, CompanyVerificationList, CompanyVerificationQuery } from './verifications';
+export type {
+  CompanyVerification,
+  CompanyVerificationList,
+  CompanyVerificationPage,
+  CompanyVerificationQuery,
+  PeriodPage,
+  VerificationActor,
+  VerificationCase,
+  VerificationDetail,
+  VerificationFilters,
+  VerificationHistoryList,
+  VerificationHistoryRow,
+  VerificationMeasurement,
+  VerificationMethodCount,
+  VerificationPlace,
+  VerificationReasonCount,
+  VerificationRisk,
+  VerificationSite,
+  VerificationSummary,
+  VerificationTierCount,
+} from './verifications';
 // Sesión: respuesta del login, sesión en memoria y sesiones abiertas en otros dispositivos.
 export type { AuthTokenResponse, DeviceSession, DeviceSessionList, Session } from './session';
 
 export type ApiKeyList = Page<ApiKey>;
-// Turnos, sitios, asignaciones, solicitudes de cambio y asistencia por turno.
-export type * from './shifts';
-// Calendario de días libres, operaciones masivas y jornadas que registra la empresa.
-export type * from './calendar';
+// Claves de FIRMA de la empresa (migración 0105): su clave pública, la de la plataforma y las reglas del servidor.
+export type { PlatformKey, SigningKey, SigningKeyGenerated, SigningKeyGeneratePayload, SigningKeyLimits, SigningKeyRegisterPayload } from './signingKeys';
+/** Página de claves de firma: además de los elementos, la clave de la plataforma y las reglas del servidor. */
+export type SigningKeyList = Page<SigningKey> & { platform: PlatformKey; limits: SigningKeyLimits };
+// Puntos de verificación de la empresa (sitios con su geocerca).
+export type * from './sites';
+// Referencia a una persona dentro de otra respuesta.
+export type * from './people';
 // Kioscos de los sitios (la tableta que muestra el código del sitio) y su pantalla pública.
 export type * from './kiosk';
 // Cobranza de las empresas y consumo de la plataforma (solo el ADMIN).

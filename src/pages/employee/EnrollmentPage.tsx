@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { enrollmentStepConfirm, replacesEnrollment } from '../../components/enrollments/enrollmentConfirm';
 import { EnrollmentSteps } from '../../components/enrollments/EnrollmentSteps';
-import { ENROLLMENT_STEP_PATHS, type EnrollmentStepKey } from '../../components/enrollments/enrollmentStepRules';
 import { FaceRequirements } from '../../components/FaceRequirements';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { RetryState } from '../../components/ui/RetryState';
@@ -16,6 +15,7 @@ import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { t, useLocale } from '../../i18n';
 import { enrollmentService } from '../../services/enrollmentService';
 import type { EnrollmentProgress } from '../../types';
+import { openableStep, usesCamera } from '../../utils/enrollmentStepRules';
 
 /** Consejos para una buena captura (en el idioma activo). */
 const captureTips = () => [t('employee.enrollment.tips.light'), t('employee.enrollment.tips.front')];
@@ -72,13 +72,16 @@ function useEnrollmentNotices() {
 }
 
 /**
- * Registro facial del propio empleado: el ÍNDICE de sus pasos independientes (decisión del dueño del producto, 2026-10-07:
- * «debe haber una opción para tomar la foto, otra para el enrolamiento y otra para tomar el video y contestar las
- * preguntas»). Cada paso muestra su estado DESDE EL SERVIDOR (`GET /enrollment/progress`: pendiente, hecho con su fecha,
- * bloqueado porque falta el anterior, vencido, intentos agotados, «2 de 3 respondidas») y su botón; el botón confirma
- * ANTES de abrir la cámara y lleva a la pantalla del paso (`EnrollmentStepPages`), que al terminar regresa aquí con el
- * estado al día. La persona puede salir después de cualquier paso y volver otro día: lo hecho se conserva en el servidor
- * (el orden también lo exige el servidor). Al terminar el último, el registro queda en validación de la empresa.
+ * Registro de identidad del propio empleado: el ÍNDICE del flujo que pide SU empresa (decisión del dueño del producto,
+ * 2026-10-08: «el proceso de registro facial debe ser DINÁMICO y un SOLO módulo; el ADMIN decide, por empresa, cuáles
+ * pasos se piden y en qué orden»). La app no sabe cuáles ni cuántos son: dibuja `steps` de `GET /enrollment/progress`
+ * EN SU ORDEN, con el nombre y la descripción de cada paso del catálogo `enrollment_steps` y su estado desde el
+ * servidor (pendiente, hecho con su fecha, bloqueado por otro paso, vencido, intentos agotados, «2 de 3 respondidas»).
+ *
+ * Un paso que abre la cámara o el micrófono confirma ANTES de abrirse y lleva a su pantalla (`EnrollmentStepPages`),
+ * que al terminar regresa aquí con el estado al día; un paso de documentos lleva a su formulario, que pregunta antes de
+ * subir el archivo. La persona puede salir después de cualquier paso y volver otro día: lo hecho se conserva en el
+ * servidor (el orden también lo exige el servidor). Al terminar el último, el registro queda en validación.
  */
 export function EnrollmentPage() {
   useLocale(); // textos con `t` al dibujarse; popups y confirmaciones reciben funciones y siguen al idioma abiertos
@@ -89,21 +92,28 @@ export function EnrollmentPage() {
   const again = useEnrollmentNotices();
   const { data: progress, error, retry } = useResource((signal) => enrollmentService.progress(signal), 'enrollment-progress', () => t('employee.enrollment.index.errorTitle'));
 
-  /** Cada paso confirma antes de abrir la cámara; su pantalla ya no vuelve a preguntar (`state.confirmed`). */
-  const open = async (current: EnrollmentProgress, step: EnrollmentStepKey) => {
-    const ok = await confirm(() => enrollmentStepConfirm(step, current, user?.employee));
-    if (ok) void navigate(ENROLLMENT_STEP_PATHS[step], { state: { confirmed: true } });
+  /**
+   * Abre la pantalla de un paso. Los de cámara confirman antes (su pantalla ya no vuelve a preguntar: `state.confirmed`);
+   * los de documentos llevan a su formulario, que confirma antes de subir. Un código sin pantalla (un backend más nuevo)
+   * no tiene botón en el índice: aquí siempre llega un paso del flujo con su pantalla (`openableStep`).
+   */
+  const open = async (current: EnrollmentProgress, code: string) => {
+    const { step, path } = openableStep(current, code);
+    if (!usesCamera(code)) {
+      void navigate(path);
+      return;
+    }
+    if (await confirm(() => enrollmentStepConfirm(code, step, user?.employee))) void navigate(path, { state: { confirmed: true } });
   };
 
   if (!progress) {
     return <div className="page page-transition">{error ? <RetryState onRetry={retry} /> : <SkeletonCard lines={6} />}</div>;
   }
-  const steps = progress.voice.status === 'not_required' ? 2 : 3;
   return (
     <div className="page page-transition">
       <Panel>
         <PanelHero
-          eyebrow={t('employee.enrollment.index.steps', { count: steps })}
+          eyebrow={t('employee.enrollment.index.steps', { count: progress.steps.length })}
           title={again ? t('employee.enrollment.again') : t('employee.enrollment.welcome', { name: user?.employee?.first_name ?? '' })}
         >
           <p className="muted">{t('employee.enrollment.intro')}</p>
@@ -111,7 +121,7 @@ export function EnrollmentPage() {
         </PanelHero>
 
         <PanelSection>
-          <EnrollmentSteps progress={progress} onOpen={(step) => void open(progress, step)} />
+          <EnrollmentSteps progress={progress} onOpen={(code) => void open(progress, code)} />
           <p className="inline-note small muted">
             <UserCheck size={16} />
             <span>

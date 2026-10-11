@@ -46,8 +46,8 @@ export default {
       hint: 'Cada identificación segura enseña cómo luce hoy cada empleado. Las muestras que validó la empresa nunca se reemplazan.',
     },
     location: {
-      title: 'Ubicación de la asistencia',
-      hint: 'Cada registro de asistencia lleva la ubicación del teléfono y la hora del servidor; ajusta abajo la precisión y la velocidad.',
+      title: 'Ubicación de la verificación',
+      hint: 'Cada verificación lleva la ubicación del teléfono y la hora del servidor; ajusta abajo la precisión y la velocidad.',
     },
     methods: {
       title: 'Métodos de identificación',
@@ -162,8 +162,8 @@ export default {
     },
     detectImpossibleTravel: {
       label: 'Detectar viajes imposibles',
-      on: 'Se rechaza un registro demasiado lejos del anterior para el tiempo transcurrido (ubicación falsa o cuenta compartida).',
-      off: 'No se compara la ubicación de un registro con la del anterior.',
+      on: 'Se rechaza una verificación demasiado lejos de la anterior para el tiempo transcurrido (ubicación falsa o cuenta compartida).',
+      off: 'No se compara la ubicación de una verificación con la de la anterior.',
     },
     qrEnabled: {
       label: 'Verificación con código QR',
@@ -174,11 +174,6 @@ export default {
       label: 'Autorizar dispositivos de validadores',
       on: 'Cada tableta o teléfono de un validador queda por autorizar en Validadores › Dispositivos.',
       off: 'Los validadores pueden iniciar sesión en cualquier dispositivo con su correo y contraseña.',
-    },
-    qrOnlyAttendance: {
-      label: 'Asistencia con el QR solo',
-      on: 'Un validador en modo QR registra la entrada y la salida con el código, sin rostro.',
-      off: 'Con el QR solo se identifica; para registrar la asistencia hace falta el rostro.',
     },
     riskEngine: {
       label: 'Motor de riesgo',
@@ -219,10 +214,9 @@ export default {
   /** Advertencia al apagar una protección (por omisión, la de suplantación de identidad). */
   warnings: {
     spoofing: 'Esto reduce la protección contra suplantación de identidad (fotos, pantallas o videos).',
-    impossibleTravel: 'Un registro con una ubicación falsa o desde otro lugar no se detectará por la distancia.',
+    impossibleTravel: 'Una verificación con una ubicación falsa o desde otro lugar no se detectará por la distancia.',
     deviceApproval: 'Cualquier persona con el correo y la contraseña de un validador podrá operar desde cualquier dispositivo.',
     mobileOnly: 'Los validadores podrán operar desde computadoras, cuya cámara suele ser más fácil de engañar con fotos o pantallas.',
-    qrOnly: 'Quien tenga el teléfono de otro empleado podrá registrar su asistencia sin mostrar el rostro.',
     riskEngine: 'Las señales dejarán de sumarse: un intento con varios indicios de engaño pasará si ningún candado lo detiene solo.',
     captureProtocol: 'Un video preparado de antemano será más difícil de detectar.',
     voiceVerification: 'Un registro con fotos de otra persona ya no tendrá la segunda comprobación de voz y rostro en video.',
@@ -253,6 +247,39 @@ export default {
       confirmLabel: 'Guardar voz',
     },
     preview: 'Probar voz',
+  },
+  /**
+   * Pasos del registro de identidad y su orden (decisión del dueño, 2026-10-08): el ADMIN decide, por empresa, cuáles
+   * se piden y en qué orden. Los NOMBRES y las descripciones de los pasos salen del catálogo `enrollment_steps`.
+   */
+  enrollment: {
+    title: 'Pasos del registro de identidad',
+    hint: 'Elige qué se le pide a cada empleado y en qué orden. El empleado hace los pasos en ese orden.',
+    label: 'Pasos del registro, en orden',
+    /** Insignia del paso que no se puede quitar. */
+    required: 'Obligatorio',
+    locked: 'Siempre se pide: es el registro que valida la empresa.',
+    position: 'Paso {position} de {total}',
+    notAsked: 'No se pide',
+    moveUp: 'Subir «{name}»',
+    moveDown: 'Bajar «{name}»',
+    note: 'El paso «{step}» siempre se pide y queda al final del flujo.',
+    warning: 'Pedir menos pasos reduce las pruebas de que la persona es quien dice ser.',
+    confirm: {
+      enableTitle: '¿Pedir «{name}»?',
+      enableText: 'Cada empleado tendrá que completar «{name}» en su registro.',
+      disableTitle: '¿Dejar de pedir «{name}»?',
+      moveTitle: '¿Mover «{name}» al paso {position}?',
+      moveText: 'Se piden los mismos pasos, en otro orden.',
+      order: 'Orden del registro',
+      save: 'Guardar orden',
+    },
+    notice: {
+      enabled: '{name}: ahora se pide',
+      disabled: '{name}: ya no se pide',
+      moved: '{name}: cambió de lugar',
+      text: 'Aplica al registro de quien aún no lo termina.',
+    },
   },
   tuning,
   ...antifraud,

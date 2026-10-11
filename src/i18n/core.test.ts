@@ -80,7 +80,7 @@ describe('estado y documento', () => {
     expect(i18nSnapshot()).not.toBe(before);
     expect(currentLocale()).toBe('en-US');
     expect(document.documentElement.lang).toBe('en-US');
-    expect(document.title).toBe('Employee Time Clock · Attendance');
+    expect(document.title).toBe('Identity Verification Platform · Attendance');
     expect(meta.content).toBe('Attendance');
 
     const same = i18nSnapshot();

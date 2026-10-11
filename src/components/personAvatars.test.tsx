@@ -7,11 +7,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FraudSubject } from '../pages/admin/fraud/FraudCasesPage';
 import { apiFail, apiOk, mockFetch } from '../test/http';
-import type { BulkResult, FraudCase, VerificationResult } from '../types';
+import type { FraudCase, VerificationResult } from '../types';
 import { clearAvatarCache } from '../utils/avatarCache';
-import { BulkResultSummary } from './BulkResultSummary';
-import { EmployeeCard } from './calendar/EmployeeCard';
-import { PersonItem } from './departments/PersonItem';
+import { Avatar } from './ui/Avatar';
 import { VerificationResultCard } from './VerificationResultCard';
 
 const ANA = '/users/7/avatar?v=a1';
@@ -34,10 +32,10 @@ describe('personas con su foto o sus iniciales', () => {
     const { calls } = mockFetch((call) => (call.url.startsWith('/api/users/7/avatar') ? photo() : apiFail(404, 'AVATAR_NOT_FOUND', 'No existe')));
     const { container } = render(
       <ul>
-        <PersonItem name="Ana Ruiz" avatar={ANA} />
-        <PersonItem name="Luis Paz" />
-        <PersonItem name="Ana Ruiz" avatar={ANA} deleted />
-        <PersonItem name="Eva Sol" avatar="/users/9/avatar?v=e1" />
+        <Avatar name="Ana Ruiz" src={ANA} />
+        <Avatar name="Luis Paz" />
+        <Avatar name="Ana Ruiz" src={ANA} />
+        <Avatar name="Eva Sol" src="/users/9/avatar?v=e1" />
       </ul>,
     );
     await waitFor(() => expect(photos(container)).toEqual(['blob:ana', 'blob:ana']));
@@ -46,36 +44,11 @@ describe('personas con su foto o sus iniciales', () => {
     expect(calls.map((call) => call.url)).toEqual(['/api/users/7/avatar?v=a1&size=96', '/api/users/9/avatar?v=e1&size=96']);
   });
 
-  it('las tarjetas del calendario y el resultado de una operación masiva', async () => {
-    mockFetch(photo);
-    const ana = { id: 7, full_name: 'Ana Ruiz', employee_number: 'EMP-7', avatar: ANA };
-    const result: BulkResult = {
-      done: 1,
-      unchanged: 0,
-      skipped: 1,
-      results: [
-        { employee: ana, result: 'DONE', code: null, message: null },
-        { employee: { id: 8, full_name: 'Luis Paz', employee_number: null, avatar: null }, result: 'SKIPPED', code: 'EMPLOYEE_INACTIVE', message: 'Inactivo' },
-      ],
-    };
-    const { container } = render(
-      <>
-        <ul>
-          <EmployeeCard employee={ana} badges={null}>
-            <span>Vacaciones</span>
-          </EmployeeCard>
-        </ul>
-        <BulkResultSummary result={result} copy={{ title: 'Listo', done: 'Hechos', unchanged: 'Igual', skipped: 'Omitidos' }} />
-      </>,
-    );
-    await waitFor(() => expect(photos(container)).toEqual(['blob:ana', 'blob:ana']));
-    expect(initialsOnly(container)).toEqual(['LP']);
-  });
-
   it('la persona identificada en un validador (con o sin nombre) y el sujeto de un caso de fraude', async () => {
     mockFetch(photo);
     const verified: VerificationResult = {
       verified: true,
+  verification_status: 'APPROVED',
       method: 'QR',
       message: 'Identificación exitosa',
       employee_id: 7,

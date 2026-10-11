@@ -2,7 +2,7 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useT } from '../../i18n';
 import type { CurrencyCode } from '../../types';
 import { currencyText } from '../../utils/billing';
-import { SelectField } from '../shifts/formFields';
+import { SelectField } from '../ui/formFields';
 
 interface CurrencyFieldProps {
   value: CurrencyCode;

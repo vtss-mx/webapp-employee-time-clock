@@ -28,6 +28,8 @@ export default {
     browser: 'Navegador',
     sql: 'SQL',
     alerts: 'Alertas',
+    continuity: 'Continuidade',
+    overdue: 'vencidos',
     open: 'abertos',
   },
   kpis: {

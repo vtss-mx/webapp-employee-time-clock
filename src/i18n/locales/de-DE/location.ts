@@ -39,10 +39,6 @@ export default {
       text: 'Dieses Prüfgerät kann sich nur an seinem Einsatzort anmelden, und die Standortberechtigung ist blockiert.',
       next: 'Kehren Sie zur App zurück und melden Sie sich erneut an.',
     },
-    attendance: {
-      text: 'Für die Erfassung Ihrer Anwesenheit wird Ihre Position benötigt, und die Standortberechtigung ist in diesem Browser blockiert.',
-      next: 'Kehren Sie hierher zurück und tippen Sie auf „Erneut versuchen“.',
-    },
     map: {
       text: 'Um Sie auf der Karte zu finden, ist die Standortberechtigung nötig, und sie ist in diesem Browser blockiert.',
       next: 'Tippen Sie erneut auf „Meine Position“ (oder markieren Sie den Punkt auf der Karte).',

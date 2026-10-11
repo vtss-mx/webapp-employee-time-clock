@@ -14,7 +14,7 @@ vi.mock('../hooks/useCamera', async () => (await import('../test/faceFlowMocks')
 vi.mock('../hooks/useFaceDetection', async (original) => (await import('../test/faceFlowMocks')).detectionModule(await original()));
 
 const SPEC: BurstSpec = { tile: 112, hold: 30, move: 10, fps: 10, quality: 0.85, margin: 1.6, max_bytes: 400_000, min_frames: 6 };
-const WITH_BURST: FaceChallenge = { ...TWO_TURNS, challenge_id: 'ch-p', burst: SPEC };
+const WITH_BURST: FaceChallenge = { ...TWO_TURNS, challenge_id: 'ch-p'.padEnd(64, '0'), burst: SPEC };
 const baseline = { pitch: 0.5, width: 200, box: { x: 10, y: 20, width: 200, height: 220 } };
 
 beforeEach(resetFaceFlow);

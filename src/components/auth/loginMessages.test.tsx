@@ -16,6 +16,23 @@ describe('avisos de las reglas del inicio de sesión', () => {
     expect(loginRuleMessage(new DeviceKeyError())?.title).toBe('No se pudo registrar el dispositivo');
   });
 
+  it('segundo factor: la contraseña sola ya no abre sesión y la acción es entrar con la llave', () => {
+    const notice = loginRuleMessage(apiError('MFA_REQUIRED', 'Tu cuenta ya tiene una llave de acceso.'));
+    expect(notice).toMatchObject({ variant: 'info', eyebrow: 'Segundo factor', title: 'Entra con tu llave de acceso', text: 'Tu cuenta ya tiene una llave de acceso.' });
+    expect(notice?.details).toEqual(['Usa el botón «Entrar con llave de acceso».']);
+    // Solo con su estado: el mismo código con otro estado no es esta regla.
+    expect(loginRuleMessage(new ApiError({ statusCode: 401, code: 'MFA_REQUIRED', message: 'x' }))).toBeNull();
+  });
+
+  it('cuenta bloqueada: dice cuánto falta con el Retry-After y nunca ofrece reintentar', () => {
+    const locked = new ApiError({ statusCode: 429, code: 'ACCOUNT_LOCKED', message: 'Demasiados intentos.' }, 900_000);
+    expect(loginRuleMessage(locked)).toMatchObject({ variant: 'warning', eyebrow: 'Cuenta bloqueada', title: 'Demasiados intentos' });
+    expect(loginRuleMessage(locked)?.details).toEqual(['Espera 15 min antes de volver a intentar.', 'Con una llave de acceso puedes entrar ahora.']);
+    // Sin Retry-After no se inventa un plazo: solo queda la salida que sí funciona.
+    const noWait = new ApiError({ statusCode: 429, code: 'ACCOUNT_LOCKED', message: 'Demasiados intentos.' });
+    expect(loginRuleMessage(noWait)?.details).toEqual(['Con una llave de acceso puedes entrar ahora.']);
+  });
+
   it('la ubicación sigue con su aviso y otros errores no tienen uno propio', () => {
     expect(loginRuleMessage(apiError('LOCATION_OUT_OF_RANGE'))?.title).toBe('Estás fuera del lugar permitido');
     expect(loginRuleMessage(apiError('INVALID_CREDENTIALS'))).toBeNull();
@@ -30,5 +47,7 @@ describe('avisos de las reglas del inicio de sesión en inglés (en-US)', () => 
     expect(loginRuleMessage(apiError('DEVICE_REJECTED'))?.title).toBe('Device not authorized');
     expect(loginRuleMessage(apiError('DEVICE_REVOKED'))?.details).toBeUndefined();
     expect(loginRuleMessage(new DeviceKeyError())?.title).toBe("Couldn't register the device");
+    expect(loginRuleMessage(apiError('MFA_REQUIRED'))?.title).toBe('Sign in with your passkey');
+    expect(loginRuleMessage(new ApiError({ statusCode: 429, code: 'ACCOUNT_LOCKED', message: 'x' }, 60_000))?.details?.[0]).toBe('Wait 1 min before trying again.');
   });
 });

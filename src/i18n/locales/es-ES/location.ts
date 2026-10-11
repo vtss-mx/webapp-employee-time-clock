@@ -17,9 +17,6 @@ export default derive(es, {
     },
   },
   deniedFor: {
-    attendance: {
-      next: 'Vuelve aquí y toca «Reintentar».',
-    },
     map: {
       text: 'Para localizarte en el mapa hace falta el permiso de ubicación y está bloqueado en este navegador.',
     },

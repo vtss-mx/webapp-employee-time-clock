@@ -73,35 +73,20 @@ export default {
     },
     before: 'Before you start:',
     privacy: 'Your photos, video, and voice are stored encrypted and reviewed only by your company; they are never shared.',
-    /** Los cuatro pasos del registro (decisión del dueño, 2026-10-06), en el indicador sobre el visor. */
+    /** El indicador sobre el visor: los pasos los manda el servidor y su nombre sale del catálogo; «Listo» es el final. */
     steps: {
       label: 'Step {current} of {total}',
-      photo: 'First photo',
-      captures: 'Captures',
-      video: 'Video',
       done: 'Done',
     },
-    /** Mientras se guarda la foto inicial (paso 1). */
+    /** Mientras se guarda la foto inicial. */
     photoSaving: 'Saving your photo…',
-    /** El índice de los pasos independientes (decisión del dueño, 2026-10-07): estado, aviso y botón de cada uno. */
+    /** El índice del registro: estado, aviso y botón de cada paso (su nombre y descripción, del catálogo). */
     index: {
       steps_one: '{count} step',
       steps_other: '{count} steps',
       resume: 'Do them in order. You can leave after any step and continue another day: your progress is saved.',
       errorTitle: "Couldn't load your enrollment",
-      label: 'Face enrollment steps',
-      photo: {
-        title: 'First photo',
-        text: 'A photo of your face, looking straight ahead, in good light.',
-      },
-      captures: {
-        title: 'Captures and liveness check',
-        text: '{count} captures of your face and four head movements.',
-      },
-      video: {
-        title: 'Video questions',
-        text: 'Answer questions about your details out loud, looking at the camera.',
-      },
+      label: 'Your enrollment steps',
       state: {
         pending: 'Pending',
         done: 'Completed · {date}',
@@ -112,11 +97,12 @@ export default {
         answered: '{answered} of {total} answered',
       },
       hint: {
+        /** `step`: el nombre del paso que falta, del catálogo. */
+        blocked: 'Complete “{step}” first.',
         validUntil: 'Valid until {date}',
         expired: 'Your photo expired. Take it again.',
-        needsPhoto: 'Take your first photo first.',
-        needsCaptures: 'Complete the captures first.',
         exhausted: 'You ran out of tries. Repeat the first photo and the captures.',
+        unknown: 'Update the application to continue with this step.',
       },
       action: {
         photo: 'Take photo',
@@ -124,35 +110,41 @@ export default {
         captures: 'Start captures',
         video: 'Record video',
         resumeVideo: 'Continue video',
+        document: 'Upload document',
+        replaceDocument: 'Replace document',
       },
     },
-    /** Una pantalla de un paso que se abrió fuera de orden: qué falta (su vacío). */
+    /** La pantalla de un paso que ahora no se puede abrir: qué pasa (su vacío) y de vuelta al índice. */
     blocked: {
       back: 'Back to enrollment',
-      photoUsed: {
-        title: 'First photo ready',
-        text: 'It was already used in your captures. Continue with the next step.',
+      blocked: {
+        title: 'A step comes first',
+        text: 'Complete “{step}” to continue with this step.',
       },
-      needsPhoto: {
-        title: 'First photo missing',
-        text: 'Take your first photo before the captures.',
+      done: {
+        title: 'Step completed',
+        text: 'It is already done. Continue with the next step.',
       },
-      capturesDone: {
-        title: 'Captures ready',
-        text: 'They were already sent. Continue with the next step.',
-      },
-      needsCaptures: {
-        title: 'Captures missing',
-        text: 'Complete the captures before the video.',
+      disabled: {
+        title: 'Step not requested',
+        text: 'Your company does not require this enrollment step.',
       },
       exhausted: {
         title: 'Out of tries',
         text: 'Repeat the first photo and the captures to try again.',
       },
-      noVideo: {
-        title: 'No video needed',
-        text: "Your company doesn't require the video questions.",
+      unknown: {
+        title: 'Step unavailable',
+        text: 'Update the application to continue with this step.',
       },
+    },
+    /** Un 409 del servidor: el paso ya no toca (lo bloquea otro o la empresa dejó de pedirlo). */
+    stepGone: 'This step is no longer available',
+    /** Un paso que se cumple con un documento de identidad: cómo va. */
+    document: {
+      pending: 'Your document is still missing.',
+      done: 'Document received · {date}',
+      doneNoDate: 'Document received.',
     },
   },
   myQr: {
@@ -168,6 +160,10 @@ export default {
     brightness: 'Turn up your screen brightness so it scans faster.',
     singleUse: "Each code works only once and expires in seconds: a photo or screenshot won't work. It contains none of your personal or biometric data.",
     brightnessLarge: 'Turn up the brightness so it scans instantly.',
+    unavailable: {
+      qrTitle: 'QR unavailable',
+      faceTitle: 'Face enrollment pending',
+    },
   },
   pending: {
     errorTitle: "Couldn't update the status",

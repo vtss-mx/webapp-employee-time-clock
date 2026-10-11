@@ -20,7 +20,7 @@ export default {
     inactive: 'Inactivos',
     /** La papelera del listado (se restaura durante 1 año). */
     deleted: 'Eliminados',
-    /** Listados sin estados (departamentos, festivos): lo vigente, frente a «Eliminados». */
+    /** Listados sin estados: lo vigente, frente a «Eliminados». */
     allRecords: 'Todos',
   },
   paginator: {
@@ -107,7 +107,7 @@ export default {
   },
   /** Papelera («Eliminados»): todo borrado se puede restaurar durante 1 año (decisión del dueño del producto). */
   trash: {
-    /** Marca junto al nombre de un registro eliminado (asistencia, calendario, turnos y sitios). */
+    /** Marca junto al nombre de un registro eliminado (una persona, un sitio, un documento). */
     mark: 'Eliminado',
     /** Cuándo y quién lo eliminó (filas de «Eliminados» y aviso del detalle). */
     deletedBy: 'Se eliminó el {date} por {email}',

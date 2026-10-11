@@ -27,7 +27,18 @@ export default {
   },
   password: {
     new: 'Nova senha',
-    hint: 'Mínimo de 8 caracteres, com letra maiúscula, letra minúscula e número',
+    hint: 'Mínimo de 12 caracteres, com letra maiúscula, letra minúscula e número',
+  },
+  mfa: {
+    eyebrow: 'Segundo fator',
+    title: 'Entre com sua chave de acesso',
+    step: 'Use o botão «Entrar com chave de acesso».',
+  },
+  locked: {
+    eyebrow: 'Conta bloqueada',
+    title: 'Tentativas demais',
+    wait: 'Espere {value} antes de tentar novamente.',
+    passkey: 'Com uma chave de acesso você pode entrar agora.',
   },
   device: {
     eyebrow: 'Dispositivo',

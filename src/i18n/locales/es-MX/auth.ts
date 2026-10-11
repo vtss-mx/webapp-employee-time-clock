@@ -27,9 +27,20 @@ export default {
   /** Contraseña que se asigna (alta, restablecer, cambiar). */
   password: {
     new: 'Contraseña nueva',
-    hint: 'Mínimo 8 caracteres, con mayúscula, minúscula y número',
+    hint: 'Mínimo 12 caracteres, con mayúscula, minúscula y número',
   },
   /** Reglas del dispositivo de un validador al iniciar sesión. */
+  mfa: {
+    eyebrow: 'Segundo factor',
+    title: 'Entra con tu llave de acceso',
+    step: 'Usa el botón «Entrar con llave de acceso».',
+  },
+  locked: {
+    eyebrow: 'Cuenta bloqueada',
+    title: 'Demasiados intentos',
+    wait: 'Espera {value} antes de volver a intentar.',
+    passkey: 'Con una llave de acceso puedes entrar ahora.',
+  },
   device: {
     eyebrow: 'Dispositivo',
     unsupported: 'No se pudo registrar el dispositivo',

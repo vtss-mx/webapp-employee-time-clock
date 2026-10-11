@@ -1,0 +1,66 @@
+# Plantilla compartida: no publica ni contiene credenciales de registros/tiendas/cloud.
+# La publicación futura debe necesitar ESTE job y consumir los mismos bytes, sin rebuild.
+# El environment requiere configuración externa de revisores y prohibición de bypass.
+name: Compuerta comercial previa
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Ejecución exitosa que produjo el paquete y expediente revisados
+        required: true
+        type: number
+  workflow_call:
+    inputs:
+      candidate_run_id:
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: commercial-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Verificar integridad de herramienta canónica empaquetada
+        run: sha256sum --check docs/compliance/tooling/commercial-controls.sha256
+      - name: Verificar origen y resultado de la ejecución candidata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          gh api "repos/$GH_REPO/actions/runs/$CANDIDATE_RUN_ID" > /tmp/candidate-run.json
+          jq -e --arg sha "$EXPECTED_SHA" '.status == "completed" and .conclusion == "success" and .head_sha == $sha' /tmp/candidate-run.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: commercial-candidate
+          path: .commercial-candidate
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+      - name: Derechos, dos firmas independientes y archivos finales por SHA-256
+        run: |
+          mkdir -p /tmp/ivp-commercial-tools
+          tar -xzf docs/compliance/tooling/commercial-controls.tar.gz -C /tmp/ivp-commercial-tools
+          python3 /tmp/ivp-commercial-tools/commercial_gate.py --root "$PWD" --manifest .commercial-candidate/release-candidate.json
+      - name: Evidencia previa (ninguna publicación)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commercial-preflight-${{ github.sha }}
+          path: |
+            .commercial-candidate/release-candidate.json
+            docs/compliance/commercial-release.json
+            docs/compliance/closure/release-trust.json
+            /tmp/candidate-run.json
+          if-no-files-found: warn
+          retention-days: 90

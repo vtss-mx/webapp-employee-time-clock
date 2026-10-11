@@ -134,7 +134,7 @@ describe('validation', () => {
     expect(validateEmail('no-es-correo')).toBeDefined();
     expect(validateEmail('a@b.com')).toBeUndefined();
     expect(validatePassword('corta')).toBeDefined();
-    expect(validatePassword('Segura123')).toBeUndefined();
+    expect(validatePassword('Segura123456')).toBeUndefined();
     expect(validateBirthDate('')).toBeDefined();
     expect(validateBirthDate(maxBirthDate())).toBeUndefined();
     // Regresión: a las 23:30 hora local (UTC ya es el día siguiente) la fecha máxima sigue siendo válida.
@@ -189,7 +189,7 @@ describe('RFC', () => {
   });
 
   it('el formulario acepta el RFC vacío y, si se captura, exige que coincida con la fecha', () => {
-    const base = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'E1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123', password_confirm: 'Segura123' };
+    const base = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'E1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123456', password_confirm: 'Segura123456' };
     expect(validateEmployeeForm({ ...base, rfc: '' })).toEqual({});
     expect(validateEmployeeForm({ ...base, rfc: '', curp: '', nss: '' })).toEqual({});
     expect(validateEmployeeForm({ ...base, rfc: 'RUAA900102AB1' })).toHaveProperty('rfc');
@@ -326,13 +326,13 @@ describe('haptic', () => {
 });
 
 describe('confirmar contraseña', () => {
-  const employee = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123', password_confirm: 'Segura123' };
+  const employee = { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'EMP-1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123456', password_confirm: 'Segura123456' };
 
   it('toda contraseña que se asigna se repite y debe coincidir', () => {
-    expect(validatePasswordConfirm('Segura123', 'Segura123')).toBeUndefined();
-    expect(validatePasswordConfirm('Segura123', '')).toBe('Repite la contraseña');
-    expect(validatePasswordConfirm('Segura123', 'Segura124')).toBe('Las contraseñas no coinciden');
-    expect(validateEmployeeForm({ ...employee, password_confirm: 'Otra1234' }).password_confirm).toBe('Las contraseñas no coinciden');
+    expect(validatePasswordConfirm('Segura123456', 'Segura123456')).toBeUndefined();
+    expect(validatePasswordConfirm('Segura123456', '')).toBe('Repite la contraseña');
+    expect(validatePasswordConfirm('Segura123456', 'Segura124456')).toBe('Las contraseñas no coinciden');
+    expect(validateEmployeeForm({ ...employee, password_confirm: 'Otra12345678' }).password_confirm).toBe('Las contraseñas no coinciden');
     // Edición sin cambiar la contraseña: no se pide repetirla.
     expect(validateEmployeeForm({ ...employee, password: '', password_confirm: '' }, { passwordOptional: true }).password_confirm).toBeUndefined();
   });

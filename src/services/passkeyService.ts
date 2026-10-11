@@ -6,9 +6,21 @@ import { apiRequest } from './apiClient';
 const BASE = '/auth/passkeys';
 const isPasskey = hasKeys<Passkey>('id', 'name', 'created_at', 'transports', 'backed_up');
 const isPasskeys = isPage<PasskeyList>(isPasskey);
-/** El reto sellado y las opciones del navegador (con su `challenge` en base64url). */
-const isOptions = <T extends { token: string; options: { challenge: string } }>(value: unknown): value is T =>
+
+/** El reto sellado (`token`) y unas opciones del navegador con su `challenge` en base64url: lo mínimo de las dos ceremonias. */
+const hasSealedChallenge = (value: unknown): value is { token: string; options: Record<string, unknown> } =>
   isRecord(value) && typeof value.token === 'string' && isRecord(value.options) && typeof value.options.challenge === 'string';
+
+/** Opciones para ENTRAR con una llave (`navigator.credentials.get`): basta el reto sellado y el `challenge`. */
+const isLoginOptions = (value: unknown): value is PasskeyLoginOptions => hasSealedChallenge(value);
+
+/**
+ * Opciones para REGISTRAR (`navigator.credentials.create`): además del reto, `createPasskey` lee `options.user.id` y
+ * `options.pubKeyCredParams`. Se exigen aquí para que un despliegue gradual con otra forma dé `INVALID_RESPONSE` (y su
+ * popup) en vez de un TypeError al abrir la ceremonia del sistema.
+ */
+const isRegistrationOptions = (value: unknown): value is PasskeyRegistrationOptions =>
+  hasSealedChallenge(value) && isRecord(value.options.user) && typeof value.options.user.id === 'string' && Array.isArray(value.options.pubKeyCredParams);
 
 /**
  * Llaves de acceso de la cuenta (WebAuthn / passkeys, antifraude fase 3): registrar una en este dispositivo, listar,
@@ -18,7 +30,7 @@ const isOptions = <T extends { token: string; options: { challenge: string } }>(
 export const passkeyService = {
   /** El reto y las opciones para `navigator.credentials.create` (excluye las llaves que ya tiene la cuenta). */
   registrationOptions(): Promise<PasskeyRegistrationOptions> {
-    return apiRequest<PasskeyRegistrationOptions>(`${BASE}/options`, { method: 'POST', validate: isOptions });
+    return apiRequest<PasskeyRegistrationOptions>(`${BASE}/options`, { method: 'POST', validate: isRegistrationOptions });
   },
 
   register(body: PasskeyRegistration): Promise<Passkey> {
@@ -40,6 +52,6 @@ export const passkeyService = {
 
   /** El reto para entrar con una llave (sin sesión; la persona elige la llave en su dispositivo). */
   loginOptions(): Promise<PasskeyLoginOptions> {
-    return apiRequest<PasskeyLoginOptions>('/auth/login/passkey/options', { method: 'POST', auth: false, validate: isOptions });
+    return apiRequest<PasskeyLoginOptions>('/auth/login/passkey/options', { method: 'POST', auth: false, validate: isLoginOptions });
   },
 };

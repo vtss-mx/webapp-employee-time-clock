@@ -1,8 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { LOCALES, setLocale, t } from '../../i18n/core';
 import { renderPage } from '../../test/companyPages';
-import { apiFail, apiOk, mockFetch, type MockCall } from '../../test/http';
+import { apiFail, apiOk, envelope, jsonResponse, mockFetch, type MockCall } from '../../test/http';
 import type { EmployeeDocument } from '../../types/employeeDocuments';
 import { EmployeeDocumentsReview } from './EmployeeDocumentsReview';
 
@@ -24,6 +25,7 @@ const doc = (over: Partial<EmployeeDocument> = {}): EmployeeDocument => ({
   confirmed: false,
   confirmed_by: null,
   confirmed_at: null,
+  can_delete: true,
   deleted_at: null,
   deleted_by: null,
   data: { full_name: 'Juan', document_number: 'PEXJ900510HSRRNN09', birth_date: '1990-05-10', expiry_date: null, nationality: 'MEX', sex: 'M', curp: 'PEXJ900510HSRRNN09', voter_key: null, postal_code: '83000', address: null },
@@ -46,6 +48,7 @@ describe('Expediente de documentos del empleado (empresa)', () => {
     renderReview();
     expect(await screen.findByRole('heading', { name: 'ine.jpg' })).toBeInTheDocument();
     expect(screen.getByText('Por revisar')).toBeInTheDocument();
+    expect(screen.queryByText('Dígitos MRZ correctos')).not.toBeInTheDocument();
     const name = screen.getByLabelText<HTMLInputElement>('Nombre completo');
     expect(name.value).toBe('Juan');
     await userEvent.clear(name);
@@ -61,14 +64,32 @@ describe('Expediente de documentos del empleado (empresa)', () => {
     expect(await screen.findByText('Confirmado')).toBeInTheDocument();
   });
 
-  it('insignias: zona de lectura verificada, sin lectura automática y confirmado sin revisor conocido', async () => {
+  it('insignias: controles MRZ completos sin afirmar autenticidad, sin lectura automática y confirmado sin revisor conocido', async () => {
     server({ list: () => apiOk(page([doc({ mrz_verified: true, ocr_processed: false, ocr_confidence: null, confirmed: true, confirmed_by: null })])) });
     renderReview();
     await screen.findByRole('heading', { name: 'ine.jpg' });
-    expect(screen.getByText('Zona de lectura verificada')).toBeInTheDocument();
+    expect(screen.getByText('Dígitos MRZ correctos')).toHaveAccessibleDescription('Los controles de lectura coinciden; no prueban la autenticidad del documento.');
+    expect(screen.getByText('Los controles de lectura coinciden; no prueban la autenticidad del documento.')).toBeVisible();
     expect(screen.getByText('Sin lectura automática')).toBeInTheDocument();
     expect(screen.getByText('Confirmado')).toBeInTheDocument();
     expect(screen.getByTitle('Confirmado por —')).toBeInTheDocument();
+  });
+
+  it('traduce la integridad MRZ y su límite en los siete idiomas sin perder correcciones', async () => {
+    server({ list: () => apiOk(page([doc({ mrz_verified: true })])) });
+    renderReview();
+    await screen.findByRole('heading', { name: 'ine.jpg' });
+    const name = screen.getByLabelText('Nombre completo');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Corrección pendiente');
+    for (const locale of LOCALES) {
+      await act(() => setLocale(locale));
+      const badge = screen.getByText(t('employeeDocuments.review.mrz'));
+      expect(badge).toHaveAccessibleDescription(t('employeeDocuments.review.mrzHelp'));
+      expect(screen.getByText(t('employeeDocuments.review.mrzHelp'))).toBeVisible();
+      expect(screen.getByLabelText(t('employeeDocuments.review.fields.fullName'))).toBe(name);
+      expect(name).toHaveValue('Corrección pendiente');
+    }
   });
 
   it('al confirmar un documento, los demás del expediente no cambian', async () => {
@@ -112,6 +133,42 @@ describe('Expediente de documentos del empleado (empresa)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar datos' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Confirmar los datos de ine.jpg?' })).getByRole('button', { name: 'Confirmar datos' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudieron guardar los datos' })).toHaveTextContent('No se pudo guardar');
+  });
+
+  it('una fecha completa pero inválida (p. ej. mal leída por OCR) se rechaza en el cliente: no se envía', async () => {
+    const { calls } = server({ list: () => apiOk(page([doc({ data: { ...doc().data, birth_date: '2026-13-40' } })])) });
+    renderReview();
+    await screen.findByRole('heading', { name: 'ine.jpg' });
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar datos' }));
+    expect(await screen.findByRole('alertdialog', { name: 'Revisa los datos' })).toHaveTextContent('Escribe una fecha válida');
+    expect(calls.some((call) => call.init.method === 'PATCH')).toBe(false); // nada se envía
+  });
+
+  it('el backend rechaza una fecha: el error vuelve bajo su campo (DateField)', async () => {
+    const birthError = { code: 'VALUE_ERROR', message: 'La fecha de nacimiento no es válida', field: 'birth_date', details: null };
+    server({ save: () => jsonResponse(envelope(null, { status: 422, code: 'VALIDATION_ERROR', message: 'Datos inválidos', errors: [birthError] }), 422) });
+    renderReview();
+    await screen.findByRole('heading', { name: 'ine.jpg' });
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar datos' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Confirmar los datos de ine.jpg?' })).getByRole('button', { name: 'Confirmar datos' }));
+    await screen.findByRole('alertdialog', { name: 'No se pudieron guardar los datos' });
+    expect(screen.getByLabelText('Fecha de nacimiento')).toHaveAccessibleDescription('La fecha de nacimiento no es válida');
+  });
+
+  it('al corregir el campo que el backend rechazó, su error se retira (el siguiente intento parte limpio)', async () => {
+    const birthError = { code: 'VALUE_ERROR', message: 'La fecha de nacimiento no es válida', field: 'birth_date', details: null };
+    server({ save: () => jsonResponse(envelope(null, { status: 422, code: 'VALIDATION_ERROR', message: 'Datos inválidos', errors: [birthError] }), 422) });
+    renderReview();
+    await screen.findByRole('heading', { name: 'ine.jpg' });
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar datos' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Confirmar los datos de ine.jpg?' })).getByRole('button', { name: 'Confirmar datos' }));
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'No se pudieron guardar los datos' })).getAllByRole('button').at(-1)!);
+    const birth = screen.getByLabelText('Fecha de nacimiento');
+    expect(birth).toHaveAccessibleDescription('La fecha de nacimiento no es válida');
+    await userEvent.clear(birth);
+    await userEvent.type(birth, '23071995');
+    expect(birth).toHaveValue('23/07/1995');
+    expect(birth).not.toHaveAccessibleDescription('La fecha de nacimiento no es válida'); // ya se corrigió: el error del servidor se fue
   });
 
   it('corrige una fecha del expediente: el valor editable se actualiza', async () => {

@@ -35,10 +35,6 @@ export default {
       text: "Questo validatore può accedere solo nel suo luogo di attività e l'autorizzazione alla posizione è bloccata.",
       next: "Torna all'applicazione e accedi di nuovo.",
     },
-    attendance: {
-      text: "La registrazione della tua presenza richiede la tua posizione e l'autorizzazione è bloccata in questo browser.",
-      next: 'Torna qui e tocca «Riprova».',
-    },
     map: {
       text: "Per individuarti sulla mappa serve l'autorizzazione alla posizione, che è bloccata in questo browser.",
       next: 'Tocca di nuovo «La mia posizione» (o segna il punto sulla mappa).',

@@ -51,9 +51,9 @@ const challenge: VoiceChallenge = {
 const clip = (type = 'video/webm') => new Blob(['video'], { type });
 const handlers = { onDone: vi.fn(), onRestart: vi.fn(), onFatal: vi.fn(), onCancel: vi.fn() };
 const answered = (position: number, next: number | null) => apiOk({ token: `tok-${position + 2}`, position, done: next === null, next_position: next });
-/** Un rechazo del servidor (422) con el token renovado y los intentos que quedan en `details`. */
-const rejected = (code: string, message: string, details: Record<string, unknown> | null) =>
-  jsonResponse(envelope(null, { status: 422, code, message, errors: [{ code, message, field: null, details }] }), 422);
+/** Un rechazo del servidor (422 por omisión) con el token renovado y los intentos que quedan en `details`. */
+const rejected = (code: string, message: string, details: Record<string, unknown> | null, status = 422) =>
+  jsonResponse(envelope(null, { status, code, message, errors: [{ code, message, field: null, details }] }), status);
 
 function renderVoice(catalogs?: Parameters<typeof renderWithProviders>[1], session: VoiceChallenge = challenge) {
   return renderWithProviders(<VoiceVerificationFlow challenge={session} {...handlers} />, catalogs);
@@ -189,6 +189,48 @@ describe('VoiceVerificationFlow: tres preguntas en video, una respuesta a la vez
     await userEvent.click(answer());
     await vi.waitFor(() => expect(handlers.onFatal).toHaveBeenCalledOnce());
     expect(handlers.onFatal.mock.calls[0][0]).toBeInstanceOf(ApiError);
+  });
+
+  it('un clip demasiado grande (413 VIDEO_TOO_LARGE) repite la MISMA pregunta con el aviso del servidor, sin abortar', async () => {
+    mockFetch(apiFail(413, 'VIDEO_TOO_LARGE', 'El video es demasiado grande. Grábalo más corto.'), answered(0, 1));
+    renderVoice();
+    await userEvent.click(answer());
+    expect(await screen.findByText('Repite la respuesta')).toBeInTheDocument();
+    expect(message()).toHaveTextContent('El video es demasiado grande. Grábalo más corto.');
+    expect(screen.getByText('Pregunta 1 de 3')).toBeInTheDocument(); // la misma pregunta
+    expect(handlers.onFatal).not.toHaveBeenCalled();
+    await userEvent.click(answer());
+    expect(await screen.findByText('Pregunta 2 de 3')).toBeInTheDocument();
+  });
+
+  it('una respuesta ya aceptada (409 ANSWER_ALREADY_ACCEPTED) en una pregunta intermedia avanza a la siguiente', async () => {
+    mockFetch(apiFail(409, 'ANSWER_ALREADY_ACCEPTED', 'Esa respuesta ya se registró'));
+    renderVoice();
+    await userEvent.click(answer());
+    expect(await screen.findByText('Pregunta 2 de 3')).toBeInTheDocument();
+    expect(question()).toHaveTextContent('¿Cuál es tu fecha de nacimiento?');
+    expect(handlers.onFatal).not.toHaveBeenCalled();
+    expect(handlers.onRestart).not.toHaveBeenCalled();
+    expect(handlers.onDone).not.toHaveBeenCalled();
+  });
+
+  it('una respuesta ya aceptada (409) que trae el token renovado: la siguiente pregunta se envía con ese token', async () => {
+    const { calls } = mockFetch(rejected('ANSWER_ALREADY_ACCEPTED', 'Esa respuesta ya se registró', { token: 'tok-renovado' }, 409), answered(1, 2));
+    renderVoice();
+    await userEvent.click(answer());
+    expect(await screen.findByText('Pregunta 2 de 3')).toBeInTheDocument();
+    await userEvent.click(answer());
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect((calls[1].init.body as FormData).get('token')).toBe('tok-renovado'); // no el de la sesión original (tok-1)
+    expect((calls[1].init.body as FormData).get('position')).toBe('1');
+  });
+
+  it('una respuesta ya aceptada (409) en la última pregunta pendiente da el registro por terminado', async () => {
+    mockFetch(apiFail(409, 'ANSWER_ALREADY_ACCEPTED', 'Esa respuesta ya se registró'));
+    renderVoice(undefined, { ...challenge, questions: challenge.questions.slice(2), answered: 2 });
+    await userEvent.click(answer());
+    await vi.waitFor(() => expect(handlers.onDone).toHaveBeenCalledOnce());
+    expect(handlers.onFatal).not.toHaveBeenCalled();
   });
 
   it.each(['denied', 'unsupported', 'error'] as const)('la grabadora en «%s» no deja hacer la verificación aquí: onFatal con su explicación', (status) => {

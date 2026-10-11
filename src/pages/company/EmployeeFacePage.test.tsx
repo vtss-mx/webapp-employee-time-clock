@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CapturedFace } from '../../components/LiveFaceFlow';
 import { resetPolicyCache } from '../../hooks/useVerificationPolicy';
 import { ApiError } from '../../services/apiClient';
@@ -11,6 +11,9 @@ import { renderWithProviders } from '../../test/render';
 import type { Employee } from '../../types';
 import { config } from '../../utils/config';
 import { EmployeeFacePage } from './EmployeeFacePage';
+
+/** Lo que el flujo facial recibe de vuelta cuando la pantalla no atiende el error (lo explica y reintenta él). */
+const flow = vi.hoisted(() => ({ errors: [] as unknown[] }));
 
 interface FlowProps {
   title: string;
@@ -30,7 +33,7 @@ vi.mock('../../components/LiveFaceFlow', () => ({
     <div data-testid="flow" data-facing={facing} data-headwear={String(allowHeadwear)} data-frames={frontalFrames} data-photo={frontalPhoto?.maxSide ?? 'normal'}>
       <h1>{title}</h1>
       <p>{submittingMessage}</p>
-      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] })}>capturar rostro</button>
+      <button onClick={() => void onSubmit({ frontal: [new Blob(['x'])] }).catch((error: unknown) => flow.errors.push(error))}>capturar rostro</button>
       <button onClick={() => onFatal(new ApiError({ statusCode: 503, code: 'FACE_SERVICE_UNAVAILABLE', message: 'El motor facial no responde' }))}>falla del flujo</button>
       <button onClick={onCancel}>salir del flujo</button>
     </div>
@@ -67,6 +70,9 @@ function renderFace(mode: 'enroll' | 'verify') {
   );
 }
 
+beforeEach(() => {
+  flow.errors = [];
+});
 afterEach(() => resetPolicyCache());
 
 describe('EmployeeFacePage: registro en persona', () => {
@@ -87,6 +93,25 @@ describe('EmployeeFacePage: registro en persona', () => {
     expect(popup).toHaveTextContent('Ana Ruiz ya puede identificarse con su rostro.');
     expect(popup).toHaveTextContent('Queda constancia de quién lo registró.');
     expect(calls.find((c) => c.init.method === 'POST')?.url).toBe('/api/employees/7/face/enroll');
+  });
+
+  it('sin el consentimiento del empleado (403): dice de quién falta y dónde lo otorga, y vuelve al expediente', async () => {
+    serve(() => apiFail(403, 'BIOMETRIC_CONSENT_REQUIRED', 'Falta tu consentimiento para tratar datos biométricos. Otórgalo para continuar.'));
+    renderFace('enroll');
+    await userEvent.click(await screen.findByRole('button', { name: 'capturar rostro' }));
+    const popup = await screen.findByRole('alertdialog', { name: 'Falta el consentimiento de Ana Ruiz' });
+    expect(popup).toHaveTextContent('Debe otorgarlo desde Mi perfil para registrar su rostro.');
+    expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
+    expect(flow.errors).toEqual([]); // no vuelve al flujo facial: ahí no hay nada que reintentar
+  });
+
+  it('otra falla al registrar vuelve al flujo facial, que la explica', async () => {
+    serve(() => apiFail(422, 'TOO_DARK', 'Hay poca luz'));
+    renderFace('enroll');
+    await userEvent.click(await screen.findByRole('button', { name: 'capturar rostro' }));
+    await vi.waitFor(() => expect(flow.errors).toHaveLength(1));
+    expect(flow.errors[0]).toMatchObject({ code: 'TOO_DARK' });
+    expect(screen.getByTestId('flow')).toBeInTheDocument();
   });
 
   it('si el flujo no puede continuar lo explica y vuelve al expediente', async () => {

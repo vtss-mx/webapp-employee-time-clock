@@ -23,10 +23,19 @@ export default {
     applied: '{name} level applied',
   },
   risk: {
+    readiness: {
+      title: 'Risk engine readiness',
+      score: 'Score upper bound: {maximum}. Observe-only signals: {observed}. Required signals: {enforced}.',
+      cannotReject: 'Scoring cannot reject attempts with this configuration.',
+      calibration: 'Calibration is still pending; this count does not prove accuracy.',
+      independent: 'Critical controls apply even when their signal or the engine is off.',
+      critical: 'Independent control: {action}',
+    },
     title: 'Risk engine',
     hint: 'Adds up the points of each attempt’s signals and applies the action for its risk level. Each signal family has a cap, so no single signal ever denies on its own.',
     points: '{points} pts',
     fields: {
+      familyCap: 'Family score cap',
       mediumScore: 'Medium risk from',
       highScore: 'High risk from',
       criticalScore: 'Critical risk from',
@@ -38,6 +47,15 @@ export default {
       deviceMode: 'Employee device',
       minConfidence: 'Confidence level',
       identifyConfidence: 'Confidence level to identify among everyone',
+    },
+    familyCap: {
+      description: 'Limits the total score from signals in the same family.',
+      saved: 'Risk score cap updated',
+      savedText: 'Family score cap: {points}.',
+    },
+    changeReason: {
+      label: 'Reason for the risk change',
+      hint: 'Explain the change; it is recorded in the company history.',
     },
     scores: {
       medium: 'Lower means more attempts ask for one more step.',
@@ -52,7 +70,7 @@ export default {
       savedText: '{tier}: {action}.',
     },
     fallback: {
-      description: 'It can only allow, alert, or ask for one more step: it never denies blindly.',
+      description: 'An engine failure never approves identity. The server defines the safe options.',
       saved: 'Engine fallback updated',
       savedText: 'If the engine fails: {action}.',
     },
@@ -170,7 +188,7 @@ export default {
     },
     siteCodes: {
       label: 'Site code',
-      hint: 'At sites that turn it on, check-in and check-out include the kiosk code.',
+      hint: 'At sites that turn it on, every verification includes the kiosk code.',
       enforceWarning: 'First set up a kiosk at each site that turns it on: without the code, nothing is recorded.',
     },
   },

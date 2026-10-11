@@ -5,7 +5,7 @@ import { useT } from '../../i18n';
 import type { DiscountRecurrence, DiscountType, PricePeriod, PricingMode } from '../../types';
 import { PLAN_LIMITS } from '../../utils/billing';
 import { catalogOptions } from '../../utils/catalogs';
-import { SelectField } from '../shifts/formFields';
+import { SelectField } from '../ui/formFields';
 import { ChoiceGroup } from '../ui/ChoiceGroup';
 import { DateField } from '../ui/DateField';
 import { NumberField } from '../ui/NumberField';

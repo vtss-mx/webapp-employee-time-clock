@@ -22,18 +22,11 @@ export const CATALOG_KEYS = [
   'confidence_levels',
   'antispoof_levels',
   'flash_modes',
+  'liveness_actions',
   'face_errors',
   'enrollment_flags',
   'voice_questions',
   'voice_profiles',
-  'work_modes',
-  'attendance_actions',
-  'work_session_statuses',
-  'shift_request_statuses',
-  'board_states',
-  'assignment_states',
-  'day_off_types',
-  'attendance_edit_reasons',
   'pricing_modes',
   'price_periods',
   'discount_types',
@@ -51,7 +44,8 @@ export const CATALOG_KEYS = [
   'review_reasons',
   'risk_tiers',
   'risk_actions',
-  'attendance_review_statuses',
+  'risk_fallback_actions',
+  'verification_statuses',
   'employee_device_modes',
   'policy_presets',
   'policy_change_statuses',
@@ -59,6 +53,12 @@ export const CATALOG_KEYS = [
   'fraud_case_event_kinds',
   'company_document_types',
   'employee_document_types',
+  // Pasos del registro de identidad (migración 0093): sus nombres y descripciones, para el flujo del empleado y para
+  // la configuración del ADMIN. Son la única fuente de esos textos (decisión del dueño, 2026-10-08).
+  'enrollment_steps',
+  // Bitácora de auditoría (migración 0095): nombre de cada acción y de cada resultado, con su tono.
+  'audit_actions',
+  'audit_outcomes',
 ] as const satisfies readonly CatalogKey[];
 
 const isItemList = isArrayOf<CatalogItem[]>(hasKeys('code', 'name', 'sort_order', 'active'));

@@ -56,7 +56,7 @@ describe('DeviceGate', () => {
     Object.assign(navigator, { clipboard: { writeText } });
     mockFetch(deviceRejected());
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('recepcion@empresa.com', 'Valida1234').catch(() => undefined));
+    await act(() => result.current.login('recepcion@empresa.com', 'Valida123456').catch(() => undefined));
 
     const popup = await screen.findByRole('dialog', { name: 'Continúa desde una tableta o un teléfono' });
     expect(within(popup).getByText('Estás usando una computadora')).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe('DeviceGate', () => {
       call.url.endsWith('/auth/login') ? apiOk(tokenResponse()) : call.url.endsWith('/auth/logout') ? apiOk(null) : deviceRejected(),
     );
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('ana@empresa.com', 'Clave123'));
+    await act(() => result.current.login('ana@empresa.com', 'Clave1234569'));
     await act(() => apiRequest('/users/me').catch(() => undefined));
 
     const popup = await screen.findByRole('dialog', { name: 'Continúa desde una tableta o un teléfono' });
@@ -98,7 +98,7 @@ describe('DeviceGate en inglés (en-US)', () => {
     setLocation('http://localhost:8080/login');
     mockFetch(deviceRejected());
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('recepcion@empresa.com', 'Valida1234').catch(() => undefined));
+    await act(() => result.current.login('recepcion@empresa.com', 'Valida123456').catch(() => undefined));
     await screen.findByRole('dialog', { name: 'Continúa desde una tableta o un teléfono' });
     await act(() => setLocale('en-US'));
     const popup = screen.getByRole('dialog', { name: 'Continue on a tablet or phone' });

@@ -35,10 +35,6 @@ export default {
       text: 'Este validador só pode entrar no local onde opera e a permissão de localização está bloqueada.',
       next: 'Volte ao aplicativo e entre novamente.',
     },
-    attendance: {
-      text: 'O registro da sua presença precisa da sua localização e a permissão está bloqueada neste navegador.',
-      next: 'Volte aqui e toque em “Tentar novamente”.',
-    },
     map: {
       text: 'Para localizar você no mapa é preciso a permissão de localização, e ela está bloqueada neste navegador.',
       next: 'Toque de novo em “Minha localização” (ou marque o ponto no mapa).',

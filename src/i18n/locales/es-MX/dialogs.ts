@@ -1,4 +1,4 @@
-/** Textos de popups de mensajes y confirmaciones, formularios con motivo y resultados masivos (es-MX). */
+/** Textos de popups de mensajes y confirmaciones, formularios con motivo (es-MX). */
 export default {
   /** Etiqueta sobre el título de cada tipo de mensaje. */
   hero: {
@@ -23,17 +23,5 @@ export default {
     after: 'Después:',
     details: 'Detalles',
     typeToConfirm: 'Escribe «{text}» para confirmar',
-  },
-  bulk: {
-    employeeNumber: 'No. {number}',
-    more: 'y {count} más',
-    withOmissions: '{title} con omisiones',
-  },
-  reject: {
-    back: 'Solicitudes',
-    noteLabel: 'Nota para el empleado',
-    noteShown: 'Nota que verá',
-    noteTooShort: 'Explica el motivo (al menos {min} caracteres). El empleado lo verá.',
-    errorTitle: 'No se pudo rechazar la solicitud',
   },
 } as const;

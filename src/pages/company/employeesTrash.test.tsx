@@ -7,7 +7,6 @@ import { apiOk, mockFetch, type MockCall } from '../../test/http';
 import { sampleUser } from '../../test/render';
 import { withScreens } from '../../test/screens';
 import type { Employee } from '../../types';
-import { EmployeeShiftsPage } from './shifts/EmployeeShiftsPage';
 import { EmployeeDetailPage } from './EmployeeDetailPage';
 import { EmployeesListPage } from './EmployeesListPage';
 
@@ -127,16 +126,6 @@ describe('Empleados: «Eliminados»', () => {
     await userEvent.click(within(banner).getByRole('button', { name: 'Restaurar Luis Paz' }));
     const dialog = await screen.findByRole('dialog', { name: '¿Restaurar a Luis Paz?' });
     expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent(/^Correoluis@empresa\.com$/);
-  });
-
-  it('los turnos de un eliminado: el aviso y su expediente, sin pedir sus turnos', async () => {
-    const { calls } = server();
-    renderPage('/company/employees/:id/shifts', '/company/employees/8/shifts', <EmployeeShiftsPage />, { targets: { '/company/employees/:id': 'Expediente del empleado' } });
-    expect(await screen.findByRole('status')).toHaveTextContent('Empleado eliminado');
-    expect(screen.queryByRole('link', { name: 'Asignar turno' })).toBeNull();
-    expect(calls.map((call) => call.url)).toEqual(['/api/employees/8']);
-    await userEvent.click(within(screen.getByRole('status')).getByRole('link', { name: 'Expediente' }));
-    expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
   });
 
   it('en inglés: el filtro, la fila y la confirmación', async () => {

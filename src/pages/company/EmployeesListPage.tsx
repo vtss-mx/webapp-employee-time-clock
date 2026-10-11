@@ -33,7 +33,7 @@ export function EmployeesListPage() {
   const restoreEmployee = (employee: Employee) => void restore(employee.id, () => employeeService.restore(employee.id), () => employeeRestore(employee), list.retry);
   const columns = trash
     ? [t('common.fields.employee'), t('employees.email'), ...trashColumns()]
-    : [t('common.fields.employee'), t('employees.email'), t('common.fields.department'), t('employees.list.face'), t('common.fields.status')];
+    : [t('common.fields.employee'), t('employees.email'), t('employees.list.face'), t('common.fields.status')];
 
   return (
     <div className="page">
@@ -101,7 +101,6 @@ export function EmployeesListPage() {
                   <TrashCells record={emp} name={emp.full_name} busy={restoring === emp.id} disabled={restoring !== null} onRestore={() => restoreEmployee(emp)} />
                 ) : (
                   <>
-                    <td data-label={t('common.fields.department')}>{emp.department_name ?? <span className="muted">{t('departments.noDepartment')}</span>}</td>
                     <td data-label={t('employees.list.face')}>
                       <FaceStatusBadge status={emp.face_status} />
                     </td>

@@ -45,7 +45,7 @@ describe('SuspensionGate (empresa suspendida)', () => {
   it('al iniciar sesión (403): pantalla completa con el mensaje del servidor; volver lleva al login sin otro aviso', async () => {
     mockFetch(suspended(403));
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('ana@pan.com', 'Clave1234').catch(() => undefined));
+    await act(() => result.current.login('ana@pan.com', 'Clave1234567').catch(() => undefined));
 
     const gate = screen.getByRole('alert');
     expect(gate).toHaveTextContent('Acceso suspendido');
@@ -64,7 +64,7 @@ describe('SuspensionGate (empresa suspendida)', () => {
   it('con sesión, un 401 COMPANY_SUSPENDED cierra la sesión y muestra la pantalla; el login no repite "Tu sesión terminó"', async () => {
     mockFetch((call) => (call.url.endsWith('/auth/login') ? apiOk(tokenResponse()) : suspended(401)));
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('ana@pan.com', 'Clave1234'));
+    await act(() => result.current.login('ana@pan.com', 'Clave1234567'));
     expect(screen.getByText('La app')).toBeInTheDocument();
     await act(() => apiRequest('/employees').catch(() => undefined));
 
@@ -83,7 +83,7 @@ describe('SuspensionGate (empresa suspendida)', () => {
       return suspended(403);
     });
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('ana@pan.com', 'Clave1234'));
+    await act(() => result.current.login('ana@pan.com', 'Clave1234567'));
     await act(() => apiRequest('/employees').catch(() => undefined));
     expect(result.current.isAuthenticated).toBe(true);
 
@@ -108,7 +108,7 @@ describe('pantallas completas de error en inglés (en-US)', () => {
   it('suspensión: sus textos siguen al idioma al cambiarlo en caliente; el mensaje del servidor queda tal cual', async () => {
     mockFetch(suspended(403));
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('ana@pan.com', 'Clave1234').catch(() => undefined));
+    await act(() => result.current.login('ana@pan.com', 'Clave1234567').catch(() => undefined));
     await act(() => setLocale('en-US'));
     const gate = screen.getByRole('alert');
     expect(gate).toHaveTextContent('Access suspended');

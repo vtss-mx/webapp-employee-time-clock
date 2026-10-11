@@ -47,7 +47,7 @@ const company = { ...sampleUser, role: 'COMPANY' as const, employee: null };
 describe('rutas (armadas con las pantallas que envía el backend)', () => {
   it('helpers de rutas: el inicio lo decide el backend', () => {
     expect(homeForUser(withScreens(company))).toBe(paths.company.dashboard);
-    expect(homeForUser(sampleUser)).toBe(paths.employee.attendance); // aprobado: su primera pantalla es "Mi asistencia"
+    expect(homeForUser(sampleUser)).toBe(paths.employee.dashboard); // aprobado: su primera pantalla es «Identificación»
     expect(homeForUser({ home: null })).toBe(paths.profile);
     expect(paths.company.employee(3)).toBe('/company/employees/3');
     expect(paths.company.editEmployee(3)).toBe('/company/employees/3/edit');
@@ -57,7 +57,7 @@ describe('rutas (armadas con las pantallas que envía el backend)', () => {
   it('la raíz lleva al inicio del usuario tras restaurar la sesión', async () => {
     renderApp('/');
     expect(screen.getByText('Cargando…')).toBeInTheDocument(); // restaurando la sesión
-    expect(await screen.findByText('MyAttendancePage')).toBeInTheDocument();
+    expect(await screen.findByText('VerificationMenuPage')).toBeInTheDocument();
   });
 
   it.each([
@@ -71,12 +71,12 @@ describe('rutas (armadas con las pantallas que envía el backend)', () => {
 
   it('un empleado aprobado no vuelve al registro', async () => {
     renderApp(paths.employee.enroll, withFace('APPROVED'));
-    expect(await screen.findByText('MyAttendancePage')).toBeInTheDocument();
+    expect(await screen.findByText('VerificationMenuPage')).toBeInTheDocument();
   });
 
   it('una pantalla que el backend no le da lleva a su inicio; una ruta inexistente, a "no encontrada"', async () => {
     renderApp(paths.company.dashboard);
-    expect(await screen.findByText('MyAttendancePage')).toBeInTheDocument();
+    expect(await screen.findByText('VerificationMenuPage')).toBeInTheDocument();
     expect(screen.queryByText('DashboardPage')).toBeNull();
   });
 

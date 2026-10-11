@@ -9,6 +9,8 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useFeedback } from '../../hooks/useFeedback';
 import { t, Trans, useT } from '../../i18n';
 import { homeForUser } from '../../routes/paths';
+import { ApiError } from '../../services/apiClient';
+import { COMPANY_SELECT_SAFE_CODES } from '../../services/authService';
 import type { UserMembership } from '../../types';
 import { useConfirmLogout } from '../../components/auth/logoutConfirm';
 
@@ -46,7 +48,10 @@ export function CompanySelectPage() {
       void navigate(homeForUser(updated), { replace: true });
     } catch (err) {
       setEntering(null);
-      void feedback.fromError(err, { title: () => t('auth.companySelect.enterFailed', { company: membership.company.name }) });
+      // Empresa inactiva o acceso desactivado: el servidor responde 401 pero la sesión SIGUE viva (no se cerró); se
+      // muestra su mensaje aquí (`showAuthErrors`) y la persona se queda en el selector para elegir otra empresa.
+      const kept = err instanceof ApiError && COMPANY_SELECT_SAFE_CODES.has(err.code);
+      void feedback.fromError(err, { title: () => t('auth.companySelect.enterFailed', { company: membership.company.name }), showAuthErrors: kept });
     }
   };
 

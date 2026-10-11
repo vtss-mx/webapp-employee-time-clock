@@ -89,7 +89,7 @@ export default {
     adminEmail: 'Correo del administrador',
     adminEmailHint: 'Con este correo iniciará sesión; es también el correo de la empresa',
     adminPassword: 'Contraseña inicial',
-    adminPasswordHint: 'Mínimo 8 caracteres, con mayúscula, minúscula y número',
+    adminPasswordHint: 'Mínimo 12 caracteres, con mayúscula, minúscula y número',
   },
   create: {
     adminSection: 'Administrador de la empresa',
@@ -203,6 +203,8 @@ export default {
       message: 'Se eliminan la empresa, sus administradores, sus validadores y su configuración.',
       detailsTitle: 'Se eliminará',
       confirmLabel: 'Eliminar empresa',
+      /** No se puede eliminar porque tiene cobranza o empleados: el popup sugiere desactivarla (el motivo lo da el servidor). */
+      inUse: 'La empresa está en uso: desactívala',
     },
     admin: {
       eyebrow: 'Administrador de la empresa',
@@ -261,7 +263,6 @@ export default {
     emptyTitle: 'Sin empleados',
     emptyDescription: 'Aquí verás al personal que registre la empresa.',
     noPhone: 'Sin teléfono',
-    noDepartment: 'Sin departamento',
     forget: {
       button: 'Olvidar',
       none: 'Sin aprender',

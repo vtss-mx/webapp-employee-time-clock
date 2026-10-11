@@ -9,7 +9,7 @@ import { t } from '../i18n';
 import type { ConfirmSource } from '../types/confirm';
 import type { FieldLabels } from '../utils/changes';
 import { formatDate } from '../utils/format';
-import { CURP_LENGTH, NSS_LENGTH, RFC_LENGTH, normalizeCurp, normalizeRfc, type FieldErrors, validateEmail } from '../utils/validation';
+import { CURP_LENGTH, NSS_LENGTH, RFC_LENGTH, normalizeCurp, normalizeRfc, passwordErrorFields, type FieldErrors, validateEmail } from '../utils/validation';
 
 const UNIQUE_FIELDS: EmployeeUniqueField[] = ['employee_number', 'rfc', 'curp', 'nss', 'email', 'phone'];
 
@@ -25,7 +25,7 @@ const ERROR_FIELDS: Partial<Record<string, keyof EmployeeFormValues>> = {
   PHONE_TAKEN: 'phone',
   ACCOUNT_PHONE_MISMATCH: 'phone',
   ACCOUNT_PHONE_MISSING: 'phone',
-  PASSWORD_REQUIRED: 'password',
+  ...passwordErrorFields<EmployeeFormValues>('password'),
 };
 
 /**

@@ -1,0 +1,15 @@
+{
+  "purpose": "Canonical commercial controls; generated identical copies, no independent forks",
+  "sha256": "d24466d06999d427f81d77a5365570796fb2bd8859121d112e812ea6f0eac111",
+  "members": [
+    {
+      "name": "artifact_inventory.py",
+      "sha256": "785049442e46426a6274d99c6cb0dc32aa03a563d5313da8715ba5655051f1a3"
+    },
+    {
+      "name": "commercial_gate.py",
+      "sha256": "ca0e0e3ef612b16c62342a3fd903f15499116662e92e2428c328671ca106b209"
+    }
+  ],
+  "commercial_approval": false
+}

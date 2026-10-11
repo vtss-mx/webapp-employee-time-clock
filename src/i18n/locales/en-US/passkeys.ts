@@ -8,6 +8,20 @@ export default {
   unsupported: "This browser doesn't support passkeys. Use an up-to-date Safari, Chrome or Edge.",
   loadError: "Couldn't load your passkeys",
   add: 'Add passkey',
+  mfa: {
+    title: 'Your account needs a passkey',
+    daysLeft_one: 'You have {count} day left to register it.',
+    daysLeft_other: 'You have {count} days left to register it.',
+    expiredTitle: 'Register your passkey to continue',
+    expiredText: 'The grace period ended: no screen works until you register it.',
+    action: 'Register passkey',
+  },
+  gate: {
+    badge: 'Two-factor',
+    title: 'Register your passkey',
+    footnote: 'Your session stays open: once registered, everything works again.',
+    action: 'Register passkey',
+  },
   empty: {
     title: 'No passkeys',
     description: 'Add one to sign in with your face, fingerprint or PIN.',

@@ -10,10 +10,11 @@ import { useResource } from '../../hooks/useResource';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
-import { errorMessage } from '../../services/apiClient';
 import { employeeService } from '../../services/employeeService';
 import type { Employee } from '../../types';
+import { verificationFailure } from '../../utils/verificationOutcome';
 import { config } from '../../utils/config';
+import { isConsentRequired } from '../../utils/consents';
 
 const loadError = () => t('employees.loadError');
 const verifyFailed = (employee: Employee) => () => t('employees.face.verifyFailed', { name: employee.first_name });
@@ -26,6 +27,18 @@ const enrolledMessage = (employee: Employee): MessageInput => ({
   text: t('employees.face.enrolledText', { name: employee.full_name }),
   details: [t('employees.face.approved'), t('employees.face.loggedBy')],
   detailsStyle: 'checks',
+});
+
+/**
+ * Registro en persona sin el consentimiento del empleado (403 `BIOMETRIC_CONSENT_REQUIRED`): quien opera la cámara no
+ * puede otorgarlo por él (las APIs del consentimiento son del titular), así que se dice de quién falta y dónde lo
+ * otorga, en lugar del mensaje del servidor —escrito para el titular— y de un «Reintentar» que no puede funcionar
+ * (regla 7 de la raíz).
+ */
+const consentMissingMessage = (employee: Employee): MessageInput => ({
+  variant: 'warning',
+  title: t('consents.inPersonTitle', { name: employee.full_name }),
+  text: t('consents.inPersonText'),
 });
 
 /**
@@ -64,7 +77,7 @@ export function EmployeeFacePage() {
             frontalFrames={config.verificationFrames}
             submittingMessage={t('employees.face.verifying')}
             onSubmit={async (captured) => finish({ result: await employeeService.verifyFaceInPerson(employee.id, captured), error: null })}
-            onFatal={(err) => finish({ result: null, error: errorMessage(err) })}
+            onFatal={(err) => finish(verificationFailure(err))}
           />
         )}
       </VerificationAttempt>
@@ -78,7 +91,14 @@ export function EmployeeFacePage() {
       {...enrollmentCapture()}
       submittingMessage={t('employees.face.enrolling')}
       onSubmit={async (captured) => {
-        await employeeService.enrollFaceInPerson(employee.id, captured);
+        try {
+          await employeeService.enrollFaceInPerson(employee.id, captured);
+        } catch (error) {
+          if (!isConsentRequired(error)) throw error; // el resto lo explica el flujo facial
+          void feedback.show(() => consentMissingMessage(employee));
+          back();
+          return;
+        }
         void feedback.show(() => enrolledMessage(employee));
         back();
       }}

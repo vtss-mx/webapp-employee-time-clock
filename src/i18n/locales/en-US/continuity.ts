@@ -1,0 +1,73 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/continuity';
+
+/** Service continuity ("Continuity" section of the ADMIN Performance screen; backend migration 0097), en-US. */
+export default {
+  loadError: "Couldn't load the continuity data",
+  drillsError: "Couldn't load the drill history",
+  commitment: 'Recovery commitment',
+  commitmentIntro: 'What the platform commits to and what is on today.',
+  rto: 'Maximum time to be back (RTO)',
+  rpo: 'Maximum data loss (RPO)',
+  interval: 'How often a drill is required',
+  backupUpload: 'Backup copy to storage',
+  pitr: 'Point-in-time recovery',
+  backupInterval: 'How often a backup runs',
+  backupRetention: 'Backups kept',
+  pitrArchive: 'How often the log is archived',
+  pitrRetention: 'Archive kept',
+  enabled: 'On',
+  disabled: 'Off',
+  days_one: '{count} day',
+  days_other: '{count} days',
+  rpoUnreachable: 'The promised RPO is shorter than the log archive interval: it cannot be met.',
+  drills: 'Restore drills',
+  drillsIntro: 'One mechanism per way to restore. Never drilled counts as overdue.',
+  kinds: {
+    PITR: 'Point in time',
+    BUCKET_DUMP: 'Encrypted copy in storage',
+  },
+  states: {
+    never: 'Never drilled',
+    overdue: 'Overdue',
+    failed: 'Last one failed',
+    ok: 'Up to date',
+  },
+  neverDrilled: 'Never drilled: it is due now.',
+  lastSuccess: 'Last successful drill: {date}',
+  dueOn: 'next on {date}',
+  dueNow: 'due now',
+  lastFailed: 'The attempt on {date} failed.',
+  rtoMeasured: 'Back in {value}',
+  rpoMeasured: 'Lost {value}',
+  dataset: 'With {value}',
+  targetsAt: 'Committed then: {rto} and {rpo}',
+  notMeasured: 'Not measured',
+  overdue_one: '{count} mechanism is overdue or has never been drilled.',
+  overdue_other: '{count} mechanisms are overdue or have never been drilled.',
+  history: 'Drill history',
+  historyIntro: 'Every drill with its outcome and what it measured. Failed ones too.',
+  columns: {
+    kind: 'Mechanism',
+    when: 'When',
+    result: 'Outcome',
+    measures: 'Measured',
+  },
+  results: {
+    met: 'Met',
+    missed: 'Restored, off target',
+    failed: 'Failed',
+  },
+  noun: {
+    one: 'drill',
+    other: 'drills',
+  },
+  empty: {
+    title: 'No drills',
+    description: 'Every restore and what it measured will appear here.',
+  },
+  noKinds: {
+    title: 'No mechanisms',
+    description: 'The state of each way to restore will appear here.',
+  },
+} satisfies Translation<typeof es>;

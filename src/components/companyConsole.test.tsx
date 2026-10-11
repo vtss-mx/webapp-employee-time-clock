@@ -56,8 +56,8 @@ const validCompany: CompanyFormValues = {
   max_employees: '',
   max_validators: '0',
   admin_email: 'admin@pan.com',
-  admin_password: 'Empresa1234',
-  admin_password_confirm: 'Empresa1234',
+  admin_password: 'Empresa123456',
+  admin_password_confirm: 'Empresa123456',
 };
 const available = () => liveCheck();
 
@@ -87,13 +87,13 @@ describe('adminService', () => {
   it('envía los datos limpios: sin espacios, límite numérico o null y el primer administrador', async () => {
     const { calls } = mockFetch(apiOk(company));
     await adminService.create({ ...validCompany, name: '  Panificadora ', tax_id: ' PNO120315AB1 ', max_employees: '25', admin_email: ' admin@pan.com ' });
-    expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ name: 'Panificadora', ...RFC, max_employees: 25, admin_email: 'admin@pan.com', admin_password: 'Empresa1234' });
+    expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ name: 'Panificadora', ...RFC, max_employees: 25, admin_email: 'admin@pan.com', admin_password: 'Empresa123456' });
     // El identificador fiscal es opcional: el número vacío viaja como null (sin capturar; al editar, lo borra).
     await adminService.update(4, { max_employees: '', phone: '+526621234567', tax_country: 'US', tax_id_type: 'US_EIN', tax_id: '  ' });
     expect(JSON.parse(calls[1].init.body as string)).toEqual({ max_employees: null, phone: '+526621234567', tax_country: 'US', tax_id_type: 'US_EIN', tax_id: null });
-    await adminService.addAdmin(4, ' rh@pan.com ', 'Recursos123');
+    await adminService.addAdmin(4, ' rh@pan.com ', 'Recursos12345');
     expect(calls[2].url).toBe('/api/admin/companies/4/admins');
-    expect(JSON.parse(calls[2].init.body as string)).toEqual({ admin_email: 'rh@pan.com', admin_password: 'Recursos123' });
+    expect(JSON.parse(calls[2].init.body as string)).toEqual({ admin_email: 'rh@pan.com', admin_password: 'Recursos12345' });
   });
 });
 
@@ -173,7 +173,7 @@ describe('useCompanyForm', () => {
   });
 
   it('alta: la contraseña del administrador se repite y deben coincidir', () => {
-    expect(validateCompanyForm({ ...validCompany, admin_password_confirm: 'Otra1234' }).admin_password_confirm).toBe('Las contraseñas no coinciden');
+    expect(validateCompanyForm({ ...validCompany, admin_password_confirm: 'Otra12345678' }).admin_password_confirm).toBe('Las contraseñas no coinciden');
     expect(validateCompanyForm({ ...validCompany, admin_password_confirm: '' }).admin_password_confirm).toBe('Repite la contraseña');
   });
 
@@ -352,6 +352,16 @@ describe('CompanyDetailPage: eliminar empresa', () => {
     await userEvent.click((await askToRemove()).confirm);
     expect(await screen.findByText('Listado de empresas')).toBeInTheDocument();
     expect(calls.filter((c) => c.init.method === 'DELETE').map((c) => c.url)).toEqual(['/api/admin/companies/4', '/api/admin/companies/4']);
+  });
+
+  it('un rechazo porque sigue en uso (COMPANY_HAS_BILLING) sugiere desactivarla en su lugar, no el error genérico', async () => {
+    renderDetail({ ...company, employee_count: 0 }, [admin], () => apiFail(409, 'COMPANY_HAS_BILLING', 'La empresa tiene cargos o pagos'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Eliminar' }));
+    const dialog = await screen.findByRole('alertdialog', { name: '¿Eliminar Panificadora?' });
+    await userEvent.type(within(dialog).getByLabelText(/Escribe «Panificadora»/), 'Panificadora');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Eliminar empresa' }));
+    const popup = await screen.findByRole('alertdialog', { name: 'La empresa está en uso: desactívala' });
+    expect(popup).toHaveTextContent('La empresa tiene cargos o pagos');
   });
 
   it('administradores paginados: desactivar pide confirmación (cancelar no envía nada) y vuelve a cargar la página', async () => {

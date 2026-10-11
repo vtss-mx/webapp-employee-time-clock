@@ -1,14 +1,28 @@
-import { BadgeCheck, Maximize2, QrCode, RefreshCw, ShieldCheck, Sun, X } from 'lucide-react';
-import { useState } from 'react';
+import { BadgeCheck, Maximize2, QrCode, RefreshCw, ScanFace, ShieldCheck, Sun, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { DynamicQrCode, QrCountdown } from '../../components/DynamicQrCode';
 import { Modal } from '../../components/Modal';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { Panel, PanelFooter, PanelHero, PanelSection } from '../../components/ui/Panel';
 import { useAuth } from '../../hooks/useAuth';
 import { useDynamicQr } from '../../hooks/useDynamicQr';
 import { useErrorPopup } from '../../hooks/useFeedback';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { t, useLocale } from '../../i18n';
+import { ApiError, errorMessage } from '../../services/apiClient';
+
+/**
+ * Si el QR no puede generarse por una REGLA de la empresa (no un fallo pasajero), el estado vacío que lo explica (sin
+ * «Reintentar», que nunca pasaría): QR deshabilitado o registro facial aún no aprobado. null: no es una regla (un fallo
+ * pasajero o de servidor se muestra con su popup y «Reintentar»).
+ */
+function qrUnavailable(error: unknown): { title: string; icon: ReactNode } | null {
+  if (!(error instanceof ApiError)) return null;
+  if (error.code === 'QR_DISABLED') return { title: t('employee.myQr.unavailable.qrTitle'), icon: <QrCode /> };
+  if (error.code === 'FACE_NOT_APPROVED') return { title: t('employee.myQr.unavailable.faceTitle'), icon: <ScanFace /> };
+  return null;
+}
 
 /**
  * Credencial digital del empleado: un QR DINÁMICO que se renueva solo (vigencia de la política de
@@ -21,7 +35,23 @@ export function MyQrPage() {
   const { policy } = useVerificationPolicy();
   const code = useDynamicQr();
   const [fullscreen, setFullscreen] = useState(false);
-  useErrorPopup(code.error, { title: () => t('employee.myQr.errorTitle'), retry: () => void code.renew() });
+  // Una regla de la empresa (QR deshabilitado, rostro sin aprobar) no se reintenta: se explica con un estado vacío.
+  // Un fallo pasajero o de servidor sí: su popup con «Reintentar».
+  const unavailable = qrUnavailable(code.error);
+  useErrorPopup(unavailable ? null : code.error, { title: () => t('employee.myQr.errorTitle'), retry: () => void code.renew() });
+
+  if (unavailable) {
+    return (
+      <div className="page page-transition">
+        <Panel>
+          <PanelHero eyebrow={t('employee.myQr.eyebrow')} title={t('employee.myQr.title')} />
+          <PanelSection>
+            <EmptyState icon={unavailable.icon} title={unavailable.title} description={errorMessage(code.error)} />
+          </PanelSection>
+        </Panel>
+      </div>
+    );
+  }
 
   const fullName = user?.employee?.full_name ?? user?.email ?? '';
   const lifetime = code.qr?.lifetime_seconds ?? policy.qr_lifetime_seconds;

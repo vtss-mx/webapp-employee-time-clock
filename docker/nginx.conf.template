@@ -87,6 +87,86 @@ map $uri $cache_control {
   ~\.(png|ico|webmanifest)$  "public, max-age=86400";
 }
 
+# ---------- Cabeceras de seguridad de la página que EJECUTA JavaScript ----------
+# Brecha A1 de `backend-employee-time-clock/docs/rd/certificaciones-seguridad-2026-10-08.md` (SOC 2 CC6.6 y CC6.7;
+# ISO/IEC 27001 A.8.20, A.8.23 y A.8.26): la API ya pone su CSP y su HSTS (`app/middleware/security.py`), pero la
+# página de la aplicación —la que corre en el navegador de la persona— no las ponía, y es la que más las necesita.
+#
+# ¿A qué respuestas se les pone? SOLO a las de la aplicación web. Un `add_header` dentro de un `location` anularía
+# TODAS las cabeceras heredadas del `server` (ya advertido arriba), así que la distinción se hace con un `map` y una
+# sola cabecera: vacío = no se agrega (así lo hace Nginx cuando el valor queda vacío, igual que $cache_control).
+#   - `/api/` (incluido `/api/ws/`): la API manda su propia CSP `default-src 'none'`, más estricta; duplicarla aquí
+#     solo confundiría a un escáner.
+#   - `/docs`, `/redoc`, `/openapi.json`: Swagger UI se dibuja con un script en línea y hojas de un CDN; con la CSP
+#     de la aplicación encima quedaría en blanco (el backend la excluye por la misma razón).
+map $uri $served_by_app {
+  default                        1;
+  ~^/api/                        0;
+  ~^/(docs|redoc|openapi\.json)$ 0;
+}
+
+# CSP real de la aplicación, acotada a lo que el código pide de verdad (verificado contra `src/`):
+#   default-src 'self' .......... todo lo demás, del mismo origen (la API va por este mismo gateway).
+#   script-src .................. 'self' (el paquete de Vite y sus `modulepreload`); 'wasm-unsafe-eval' porque el
+#       detector facial compila WebAssembly en el navegador (`@mediapipe/tasks-vision`: `instantiateStreaming`) y sin
+#       él se cae la captura; el hash del ÚNICO script EN LÍNEA del `index.html` construido (el aviso «Actualiza tu
+#       navegador», decisión D-C1, que `vite.config.ts` inserta al final del `<body>`) — lo calcula al arrancar
+#       `15-gateway-config.sh` del archivo REALMENTE publicado, así nunca queda desalineado con una compilación nueva;
+#       y los dos orígenes que cargan código de Google: `maps.googleapis.com`/`maps.gstatic.com` (el SDK del mapa, que
+#       se inyecta en `src/services/maps/googleMaps.ts`) y `www.googletagmanager.com` (gtag.js, que carga
+#       `@firebase/analytics`). SIN 'unsafe-inline' y SIN 'unsafe-eval': nada del código los necesita.
+#   style-src ................... con 'unsafe-inline', y es una decisión medida: el `<style>` del aviso de navegador y
+#       los `<style>` que el SDK del mapa inyecta en tiempo de ejecución. Un hash aquí APAGARÍA 'unsafe-inline' (regla
+#       de la propia CSP) y dejaría el mapa sin estilos. Un estilo en línea no ejecuta código; lo que de verdad frena
+#       un ataque son script-src, object-src y base-uri, que sí quedan cerrados.
+#   img-src ..................... 'self' + `data:` (el QR que se dibuja en el navegador, la evidencia y las fotos que
+#       la API manda en base64) + `blob:` (foto de perfil y recortes, que viven solo en memoria) + los dominios de
+#       imágenes de Google (mosaicos del mapa).
+#   font-src .................... las fuentes propias son locales; `fonts.gstatic.com` es la Roboto de los rótulos del
+#       mapa (si no llega, el mapa solo cambia de tipografía).
+#   media-src ................... `blob:` por el clip de video de la verificación por voz.
+#   worker-src .................. hoy la aplicación no crea ninguno; `blob:` queda para el renderizador vectorial del
+#       mapa, que sí los crea desde código del propio origen.
+#   connect-src ................. 'self' cubre la API y el canal en vivo (CSP 3 hace coincidir `wss://` del MISMO host
+#       con 'self' en todos los navegadores que la app admite: Safari 16.4, Chrome/Edge 111, Firefox 114), más los
+#       servicios de Google que el código llama: mapa, Places y Geocoding, `www.googleapis.com` (Geolocation),
+#       `storage.googleapis.com` (respaldo del modelo facial), Firebase y la analítica. NO se permite
+#       `odml.pa.googleapis.com`: es la telemetría propia del SDK de MediaPipe y bloquearla es justo lo que pide la
+#       regla 13 (los datos no salen hacia terceros); el SDK la hace en un try/catch y no se entera.
+#   frame-ancestors 'none' ...... nadie nos puede enmarcar (con X-Frame-Options para navegadores viejos).
+#   frame-src ................... el SDK del mapa crea un `<iframe>` propio dentro de `.gm-style`.
+#   object-src 'none', base-uri 'self', form-action 'self' ... sin plugins, sin reescribir la base de las URL
+#       relativas y sin enviar un formulario a otro origen.
+# Lo que depende del despliegue es variable del `.env` de la raíz (regla 19): el modo (bloquear u observar), los
+# orígenes extra de connect-src (una API en otro dominio) y las directivas extra del final (p. ej. `report-uri`). Una
+# directiva repetida la ignora el navegador, así que NGINX_CSP_EXTRA puede añadir, nunca relajar.
+map $served_by_app $app_csp {
+  default "";
+  1       "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'wasm-unsafe-eval' ${NGINX_CSP_SCRIPT_HASHES} https://maps.googleapis.com https://maps.gstatic.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com; font-src 'self' https://fonts.gstatic.com; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://www.googleapis.com https://storage.googleapis.com https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com ${NGINX_CSP_CONNECT_EXTRA}; frame-src 'self' https://*.google.com; manifest-src 'self'; ${NGINX_CSP_EXTRA}";
+}
+
+# Aislamiento del contexto del navegador. COOP corta la relación con cualquier ventana que nos abra o que abramos
+# (los enlaces a Google Maps o a db-ip.com salen con `target="_blank"` y no necesitan `window.opener`).
+# COEP va en `credentialless`, NO en `require-corp`: nada de la aplicación necesita `crossOriginIsolated` (no hay
+# SharedArrayBuffer ni hilos; MediaPipe corre en el hilo principal), y `require-corp` bloquearía el SDK del mapa,
+# gtag.js y el modelo de `storage.googleapis.com`, que no envían `Cross-Origin-Resource-Policy`. `credentialless`
+# pide los recursos de terceros SIN credenciales y no exige esa cabecera: endurece sin romper nada. Un despliegue sin
+# Google puede subirlo a `require-corp`, o dejarlo vacío para no enviarlo.
+map $served_by_app $app_coop {
+  default "";
+  1       "${NGINX_COOP}";
+}
+map $served_by_app $app_coep {
+  default "";
+  1       "${NGINX_COEP}";
+}
+# HSTS solo cuando la página se sirve por HTTPS (detrás de ngrok o de un balanceador se mira el esquema original),
+# como hace la API en producción. Vacío = no se envía (un entorno por http:// no debe fijar la política).
+map "$served_by_app$forwarded_proto" $app_hsts {
+  default "";
+  1https  "${NGINX_HSTS}";
+}
+
 server {
   listen 80;
   listen 443 ssl;
@@ -119,10 +199,18 @@ server {
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-Frame-Options "DENY" always;
   add_header Referrer-Policy "no-referrer" always;
-  # La app usa la cámara (rostro, QR) y la ubicación (inicio de sesión del validador, "Mi ubicación"
-  # del domicilio) solo desde su propio origen; `geolocation=()` la bloquearía también para nosotros.
-  add_header Permissions-Policy "camera=(self), microphone=(), geolocation=(self)" always;
+  # La app usa la cámara (rostro, QR), el micrófono (video con preguntas del registro de identidad) y la ubicación
+  # (inicio de sesión del validador, "Mi ubicación" del domicilio) solo desde su propio origen; una lista vacía como
+  # `geolocation=()` o `microphone=()` lo bloquearía también para nosotros.
+  add_header Permissions-Policy "camera=(self), microphone=(self), geolocation=(self)" always;
   add_header Cache-Control $cache_control;
+
+  # Cabeceras de seguridad de la aplicación web (los `map` de arriba explican cada directiva y dejan el valor vacío
+  # en /api y /docs, donde no deben ir). Con el valor vacío Nginx no agrega la cabecera.
+  add_header ${NGINX_CSP_HEADER} $app_csp always;
+  add_header Cross-Origin-Opener-Policy $app_coop always;
+  add_header Cross-Origin-Embedder-Policy $app_coep always;
+  add_header Strict-Transport-Security $app_hsts always;
 
   # Hacia la API (cabeceras en proxy-headers.conf, incluido en cada location que hace proxy).
   proxy_http_version 1.1;

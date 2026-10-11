@@ -30,12 +30,10 @@ export const ana: Employee = {
   latest_enrollment_id: 3,
   has_face: true,
   face_samples: 5,
-  department_id: 3,
-  department_name: 'Producción',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-10-01T10:00:00Z',
 };
-export const luis: Employee = { ...ana, id: 8, employee_number: 'EMP-8', first_name: 'Luis', last_name: 'Paz', full_name: 'Luis Paz', email: 'luis@empresa.com', active: false, face_status: 'NOT_ENROLLED', department_id: null, department_name: null };
+export const luis: Employee = { ...ana, id: 8, employee_number: 'EMP-8', first_name: 'Luis', last_name: 'Paz', full_name: 'Luis Paz', email: 'luis@empresa.com', active: false, face_status: 'NOT_ENROLLED' };
 
 export const page = (items: Employee[]) => ({ items, total: items.length, page: 1, size: 10 });
 export const posted = (calls: MockCall[], method: string) => {
@@ -87,8 +85,8 @@ export async function fillEmployee({ password = true } = {}) {
   for (const [label, value] of Object.entries(VALID)) await userEvent.type(screen.getByLabelText(label), value);
   await userEvent.type(screen.getByLabelText('Fecha de nacimiento'), '01011990');
   if (password) {
-    await userEvent.type(screen.getByLabelText('Contraseña'), 'Segura123');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Segura123');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Segura123456');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Segura123456');
   }
 }
 

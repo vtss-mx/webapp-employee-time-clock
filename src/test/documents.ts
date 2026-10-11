@@ -1,4 +1,5 @@
 import type { CompanyDocument } from '../types/documents';
+import type { EmployeeDocument } from '../types/employeeDocuments';
 import { apiOk, type MockCall } from './http';
 
 /** Documentos de las pruebas (como los envía el backend). */
@@ -31,8 +32,8 @@ export const platformContract: CompanyDocument = {
   can_delete: false,
 };
 
-/** Página de documentos. */
-export const documentsPage = (items: CompanyDocument[]) => ({ items, total: items.length, page: 1, size: 10 });
+/** Página de documentos (de una empresa o de un empleado: la misma forma del contrato). */
+export const documentsPage = <T>(items: T[]) => ({ items, total: items.length, page: 1, size: 10 });
 
 /** Ya en «Eliminados». */
 export const trashed = (document: CompanyDocument): CompanyDocument => ({ ...document, deleted_at: '2026-10-06T15:00:00Z', deleted_by: 'ana@empresa.com' });
@@ -41,3 +42,41 @@ export const trashed = (document: CompanyDocument): CompanyDocument => ({ ...doc
 export function documentsReply(call: MockCall): Response | null {
   return call.url.includes('/documents') ? apiOk(documentsPage([])) : null;
 }
+
+/**
+ * Un documento de identidad del empleado (el onboarding con OCR; desde el 2026-10-08 es un PASO del registro de
+ * identidad). `data` llega con lo que el OCR leyó; la empresa lo confirma o lo corrige en el expediente.
+ */
+export const employeeDocument = (over: Partial<EmployeeDocument> = {}): EmployeeDocument => ({
+  id: 7,
+  employee_id: 7,
+  type: 'PASSPORT',
+  file_name: 'pasaporte.jpg',
+  content_type: 'image/jpeg',
+  size: 262_144, // 0.25 MB
+  uploaded_by: 'ana@empresa.com',
+  uploaded_by_employee: true,
+  uploaded_at: '2026-10-05T10:00:00Z',
+  ocr_processed: true,
+  ocr_confidence: 0.91,
+  mrz_verified: false,
+  confirmed: false,
+  confirmed_by: null,
+  confirmed_at: null,
+  can_delete: true,
+  deleted_at: null,
+  deleted_by: null,
+  data: {
+    full_name: 'Ana Ruiz',
+    document_number: 'G12345678',
+    birth_date: '1990-05-10',
+    expiry_date: null,
+    nationality: 'MEX',
+    sex: 'F',
+    curp: null,
+    voter_key: null,
+    postal_code: null,
+    address: null,
+  },
+  ...over,
+});

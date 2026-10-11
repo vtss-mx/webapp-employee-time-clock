@@ -185,7 +185,6 @@ describe('CompanyEmployeesPage en inglés', () => {
     employee_number: 'E-001',
     first_name: 'Ana',
     last_name: 'López',
-    department_name: null,
     email: 'ana@pan.com',
     phone: null,
     active: true,
@@ -201,7 +200,6 @@ describe('CompanyEmployeesPage en inglés', () => {
     expect(await screen.findByText('1 registered · view only')).toBeInTheDocument();
     for (const column of ['Face enrollment', 'Learning']) expect(screen.getByRole('columnheader', { name: column })).toBeInTheDocument();
     expect(screen.getByText('No phone')).toBeInTheDocument();
-    expect(screen.getByText('No department')).toBeInTheDocument();
     expect(screen.getByText('1 sample')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Forget' }));
     const confirm = await screen.findByRole('alertdialog', { name: 'Forget what was learned from Ana López?' });

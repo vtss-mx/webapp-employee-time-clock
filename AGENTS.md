@@ -254,50 +254,67 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
     (sigue a la cabeza en el que va). Por eso **el reto se pide al empezar el escaneo**, en paralelo a las fotos (su
     vida corre desde que llega: `challengeDeadline(reto, llegada)`), y el de un escaneo que se detuvo no cambia el anillo
     del siguiente (`scanRef`). Al enviar queda completo con la ✓.
-  - **Registro facial en un orden fijo (decisión del dueño, 2026-10-06, que no se altera): foto inicial válida → 32 capturas
-    VÁLIDAS con los movimientos → video con tres preguntas → listo.** Las páginas de registro pasan `{...enrollmentCapture()}`
-    (`frontalFrames` = `config.enrollmentValidPhotos`, `frontalPhoto` con `config.enrollmentPhotoPx` y
-    `config.enrollmentPhotoGapMs`) y el indicador de pasos fijo de su pantalla (`EnrollmentStepper`: Foto inicial →
-    Capturas → Video → Listo; sin el paso del video cuando la política no lo exige; estados fijos).
-    - **Tres opciones independientes y retomables** (decisión del dueño, 2026-10-07: «una opción para tomar la foto, otra
-      para el enrolamiento y otra para tomar el video y contestar las preguntas»; el orden lo exige el SERVIDOR). La pantalla
-      `EMPLOYEE_ENROLL` (sin cambios en `catalog.screens`) tiene su índice y una ruta hija por paso, registradas en la misma
-      entrada de `SCREEN_VIEWS` (`paths.employee.enroll`, `enrollPhoto`, `enrollCapture`, `enrollVoice`):
+  - **Registro de identidad DINÁMICO: los pasos y su orden los decide el ADMIN por empresa** (decisión del dueño,
+    2026-10-08: «el proceso de registro facial debe ser DINÁMICO y un SOLO módulo»; migración 0093, que reemplaza el orden
+    fijo del 2026-10-06 y la pantalla «Mis documentos» del empleado). La app **no sabe** cuáles pasos existen ni cuántos
+    son: dibuja `steps` de `GET /enrollment/progress` EN SU ORDEN (uno a cinco: `OFFICIAL_ID`, `PROOF_OF_ADDRESS`,
+    `INITIAL_PHOTO`, `FACE_CAPTURES`, `VOICE_VIDEO`) y el NOMBRE y la descripción de cada paso salen del catálogo
+    `enrollment_steps` (ya traducido; **nunca** de los diccionarios, que solo tienen los textos de la app). Las páginas de
+    cámara pasan `{...enrollmentCapture()}` (`frontalFrames` = `config.enrollmentValidPhotos`, `frontalPhoto` con
+    `config.enrollmentPhotoPx` y `config.enrollmentPhotoGapMs`).
+    - **Un solo módulo, retomable paso a paso** (el orden lo exige el SERVIDOR). La pantalla `EMPLOYEE_ENROLL` (sin
+      cambios en `catalog.screens`) tiene su índice y una ruta hija por paso en la misma entrada de `SCREEN_VIEWS`
+      (`paths.employee.enroll`, `enrollPhoto`, `enrollCapture`, `enrollVoice`, `enrollDocument(':step')` y
+      `newEnrollmentDocument(':step')`: el código del paso de documentos viaja en la ruta, así un paso de documentos
+      nuevo no agrega rutas). Las reglas puras viven en `src/utils/enrollmentStepRules.ts` (índice, candado de cada
+      pantalla y configuración del ADMIN) y los tipos en `src/types/enrollmentSteps.ts`.
       - Índice (`EnrollmentPage` + `components/enrollments/EnrollmentSteps`): el estado de cada paso lo dice el servidor
-        (`enrollmentService.progress` con `useResource`: pendiente, completado con su fecha, bloqueado con lo que falta,
-        vencido, intentos agotados, «2 de 3 respondidas»); `enrollmentStepRules.ts` solo lo traduce a etiqueta, aviso y
-        botón (`enrollmentStepViews`; nada se calcula: un estado nuevo va primero al backend). Cada botón confirma ANTES de
-        abrir la cámara (`enrollmentStepConfirm`: «Repetir foto» dice que reemplaza la anterior; un registro rechazado o
-        una nueva verificación, que reemplaza el registro anterior) y navega con `state.confirmed`. **Lo hecho, completo
-        en verde** (adenda del dueño, 2026-10-07: «se debe marcar todo en verde siempre y cuando se haya procesado de
-        manera correcta»): un paso cuyo estado del SERVIDOR es «hecho» se dibuja entero en verde (`.enroll-index__step--done`:
-        palomita en lugar del número, ícono, título, etiqueta «Completado · fecha», borde y fondo `--success-soft`,
-        contraste AA) y su acción secundaria («Repetir foto») queda neutra, nunca el azul de la acción principal, que
-        conserva solo un paso pendiente; uno bloqueado va en gris. Nunca verde por un estado local u optimista: solo por
-        lo que responde `GET /enrollment/progress` (al volver de un paso el índice lo pide de nuevo antes de pintar). La
-        misma regla en `EnrollmentStepper` (pasos hechos en verde con palomita, el activo en azul, los demás en gris) y en
-        «En validación» (`PendingValidationPage`: `current="done"`, los tres hechos; el paso del video según la política).
+        (`enrollmentService.progress` con `useResource`: `done`, `pending`, `blocked` con `blocked_by`, `expired`,
+        `exhausted`, «2 de 3 respondidas»); `enrollmentStepViews` solo lo traduce a etiqueta, aviso y botón (nada se
+        calcula: un estado nuevo va primero al backend). Un paso de CÁMARA confirma ANTES de abrirla
+        (`enrollmentStepConfirm`: «Repetir foto» dice que reemplaza la anterior; un registro rechazado o una nueva
+        verificación, que reemplaza el registro anterior) y navega con `state.confirmed`; uno de DOCUMENTOS va directo a
+        su formulario, que confirma antes de subir el archivo. **Lo hecho, completo en verde** (adenda del dueño,
+        2026-10-07): un paso cuyo estado del SERVIDOR es «hecho» se dibuja entero en verde
+        (`.enroll-index__step--done`: palomita en lugar del número, ícono, título, etiqueta «Completado · fecha», borde y
+        fondo `--success-soft`, contraste AA) y su acción secundaria («Repetir foto», «Reemplazar documento») queda
+        neutra, nunca el azul de la acción principal, que conserva solo un paso pendiente; uno bloqueado va en gris.
+        Nunca verde por un estado local u optimista: solo por lo que responde `GET /enrollment/progress` (al volver de un
+        paso el índice lo pide de nuevo antes de pintar). La misma regla en `EnrollmentStepper` (recibe los pasos del
+        servidor y «Listo» al final) y en «En validación» (`PendingValidationPage`: `completedSteps(policy.enrollment_steps)`
+        con `current={null}`).
+      - **Un código que esta versión no conoce** (un backend más nuevo) se dibuja atenuado, con su nombre del catálogo y
+        SIN botón, con el aviso de actualizar la app: la pantalla nunca se rompe ni oculta un paso.
       - Pantallas de los pasos (`pages/employee/EnrollmentStepPages.tsx`, `StepGate`): vuelven a pedir el estado; si el paso
-        no toca (`enrollmentStepBlock`: falta el anterior, ya se hizo, intentos agotados, sin video en la política) lo dicen
-        con su `EmptyState` y «Volver al registro» en lugar de abrir la cámara; abiertas a mano (sin `state.confirmed`:
-        un enlace, recargar) piden la confirmación con «Abrir cámara» (nunca un popup al montar: StrictMode lo cancelaría).
+        no toca (`enrollmentStepBlock`: `blocked` con el paso que falta por su nombre, `done` que no se repite, `disabled`
+        porque la empresa dejó de pedirlo, `exhausted` o `unknown`) lo dicen con su `EmptyState` y «Volver al registro» en
+        lugar de abrir la cámara; las de cámara abiertas a mano (sin `state.confirmed`: un enlace, recargar) piden la
+        confirmación con «Abrir cámara» (nunca un popup al montar: StrictMode lo cancelaría).
         Al terminar, cancelar o fallar regresan al índice (`replace`), que pide el estado de nuevo; el último paso deja el
-        registro en validación (`useFinished`: releer el usuario con `refreshWithRetry`, aviso y «En validación»).
-      - Paso 1, `LiveFaceFlow enrollmentStep="photo"`: la foto inicial se toma a MANO (decisión del dueño, 2026-10-07: «debe
+        registro en validación (`useFinished`: releer el usuario con `refreshWithRetry`, aviso y «En validación»). Un 409
+        `ENROLLMENT_STEP_BLOCKED`/`ENROLLMENT_STEP_DISABLED` al enviar se explica con el mensaje del servidor y regresa al
+        índice (`useStepGone`), nunca al flujo facial: ahí solo quedaría un «Reintentar» que no puede funcionar.
+      - Pasos de DOCUMENTOS (`components/enrollments/EnrollmentDocumentStep.tsx`): la pantalla del paso muestra su nombre
+        y su descripción del catálogo, si el documento ya llegó (`done_at`) y la lista de lo que el empleado subió
+        (`EmployeeDocumentList`, con «Eliminados» y restaurar); su formulario es el de siempre
+        (`EmployeeDocumentUploadForm` con `DocumentScanner`), limitado a los `document_types` que manda el paso y de
+        vuelta a la pantalla del paso. No hay pantalla «Mis documentos» del empleado (se eliminó con la migración 0093);
+        la de la empresa que revisa el expediente no cambia.
+      - `INITIAL_PHOTO`, `LiveFaceFlow enrollmentStep="photo"`: la foto inicial se toma a MANO (decisión del dueño, 2026-10-07: «debe
         haber una opción para tomar la foto»): un obturador «Tomar foto» (`FlowActions` `shutter`, ≥ 44 px) que solo se
         habilita con el cuadro VÁLIDO (borde verde; `isSteadyGuidance`, sin relajar la posición/pose/nitidez) y, al
         presionarlo, toma UNA foto (`onPhotoStable` → `shot()`) y la envía con `enrollmentService.photo` (`POST /enrollment/photo`:
         la valida y SE PROCESA después; rechazada —borrosa, oscura, accesorio bloqueado…— muestra el mensaje del servidor y
         deja volver a tomarla, con las insignias de accesorios continuas). Sin reto ni `/face/check` previo; cuatro etapas;
-        `onStable` NO se auto-dispara en este paso. Paso 2, `enrollmentStep="captures"`: las fotos válidas y los cuatro
+        `onStable` NO se auto-dispara en este paso. `FACE_CAPTURES`, `enrollmentStep="captures"`: las fotos válidas y los cuatro
         movimientos SIN la foto inicial (ya guardada) con `enrollmentService.submit`, AUTOMÁTICO (es una secuencia). Sin
         `enrollmentStep` (el registro en persona de la empresa) el flujo de siempre: foto inicial validada y, en la misma
         toma, capturas y movimientos (auto).
-      - Paso 3: la pantalla pide su sesión con `enrollmentService.startVoice()` (`POST /enrollment/voice/start`, una vez:
+      - `VOICE_VIDEO`: la pantalla pide su sesión con `enrollmentService.startVoice()` (`POST /enrollment/voice/start`, una vez:
         `useAction` en un efecto con marca) y la responde con `VoiceVerificationFlow`; una sesión vencida o inválida se
         avisa y se pide otra (las respuestas aceptadas se conservan: llegan solo las que faltan y la cuenta sigue, «Pregunta
         2 de 3» = `answered` + la actual de `total`); intentos agotados o sin registro pendiente regresan al índice.
-    - **Foto inicial** (`LiveFaceFlow.photographs`, el registro en persona; el propio la toma en su paso 1, arriba): con el
+    - **Foto inicial** (`LiveFaceFlow.photographs`, el registro en persona; el propio la toma en su paso, arriba): con el
       rostro estable se toma UNA foto (`shot()`) y se valida en el servidor (`faceService.check`) ANTES de las demás; rechazada (borrosa, oscura, quemada, sin rostro o con un
       accesorio que la empresa bloquea: los códigos del catálogo `face_errors`), se explica con el mensaje del servidor
       (`blocked`) —salvo los accesorios, cuyo aviso es la insignia— y se vuelve a pedir sin tomar ninguna más; aceptada,
@@ -347,8 +364,13 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
       apagarla relaja → regla de dos personas); `useVerificationPolicy` la trae en `STRICT_RULES` como encendida.
   - **Destello de colores: RETIRADO de la experiencia** (decisión del dueño del producto, 2026-10-06; README «Destello de
     colores retirado»): la pantalla NUNCA se pinta de un color, ni completa ni parcial, en ningún flujo (registro,
-    verificación, asistencia, validador). No existen `FlashOverlay`, `useScreenFlash`, `flashPacingService` ni la fase
-    `flash` del flujo (código eliminado, no excluido); el plan del anillo no cuenta colores; el envío no lleva
+    verificación, asistencia, validador). **OJO, la copia de trabajo NO coincide con esta regla** (verificado el 2026-10-09): `FlashOverlay.tsx`,
+    `useScreenFlash.ts` y `flashPacingService.ts` SIGUEN EXISTIENDO y `LiveFaceFlow.tsx` los usa
+    (`setPhase('flash')` cuando el reto trae `flash` o `flash_pace`, y dibuja `<FlashOverlay>`). Lo que sí es
+    cierto hoy: la política de toda empresa tiene el destello APAGADO (migración `0080`), así que el servidor
+    nunca lo pide y la fase no se activa en la práctica. **Queda pendiente eliminar ese código de verdad**
+    (es la decisión del dueño y lo exige «el código que no se puede ejecutar se elimina»); mientras tanto, esta
+    regla describe la intención, no el estado. El plan del anillo no cuenta colores; el envío no lleva
     `flash_image` ni comprobante; un reto que aún traiga `flash`, `flash_required` o `flash_pace` se responde sin ellos
     (`LiveFaceFlow.liveness.test.tsx` lo exige; la política de toda empresa está en OFF y el servidor no los pide). En la
     política del ADMIN «Destello de colores» (`PolicyTuning` → `RetiredRow`) y «Destello dictado por el servidor»
@@ -375,7 +397,10 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
     frente (`onStable(sample)`), más el margen de la app (`faceTurnMargin`, `facePitchMargin`,
     `faceCloserMargin`).
   - Tiempo: cada movimiento `faceChallengeTimeoutMs`, sin pasar del vencimiento del reto (`expires_in`
-    menos `faceChallengeMarginMs`); al agotarse se pide otro reto conservando el escaneo (hasta dos).
+    menos `faceChallengeMarginMs`); al agotarse se pide otro reto conservando el escaneo (las veces que el ADMIN calibra por
+    empresa, `liveness_max_retries` del reto; por omisión tres). Cuánto hay que SOSTENER cada movimiento antes de capturarlo
+    también lo calibra el ADMIN (`liveness_hold_ms` del reto; `moveStableFrames` lo vuelve cuadros, ~110 ms cada uno): un
+    sostén deliberado hace que la foto refleje el movimiento (el servidor lo vuelve a medir con otro motor).
     Las reglas puras del visor (mensaje, títulos "Prueba de vida · paso 2 de 3", qué se mide) viven en
     `components/liveFaceView.ts`; las pruebas del flujo usan `test/faceFlow.tsx` (+ `faceFlowMocks.ts`).
   - **Telemetría de la toma** (antifraude 1b; solo mide, el servidor la valida estricta y nunca niega por ella):
@@ -429,6 +454,31 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
   accesorios del catálogo son interruptores (`CompanyPolicyPage.faceSection` sobre `ruledAccessories` de
   `components/accessories.ts`, el mismo módulo de la insignia); «Retirar los lentes» nace apagado en toda empresa
   (decisión del dueño, 2026-10-07; `STRICT_RULES.block_glasses = false`) y ningún nivel lo enciende.
+  - **Los PASOS del registro de identidad y su orden** (decisión del dueño, 2026-10-08; migración 0093) son su sección
+    `components/policy/EnrollmentStepsSection.tsx`, que edita `enrollment_steps` de la política (lista ORDENADA de
+    códigos de `catalog.enrollment_steps`: estar en la lista = el paso se pide, el orden = el orden del flujo). Los
+    cinco pasos del catálogo con su interruptor, su lugar y «Subir»/«Bajar» (`Button iconOnly` con su `aria-label` que
+    nombra el paso, ≥ 44 px, foco de teclado: **ningún control nativo ni librería de arrastre**, regla 12). Pedir un
+    paso lo agrega al final; reordenar confirma con el orden antes → después (nunca relaja: se piden los mismos).
+    `FACE_CAPTURES` tiene su interruptor FIJO con el motivo como ayuda (el servidor responde 422
+    `INVALID_ENROLLMENT_STEPS`), quitar un paso advierte que relaja y pasa por la regla de dos personas, y ese 422 se
+    marca en el campo (`FieldMessage`; lo demás, en el popup del guardado). El historial lo nombra «Orden del registro»
+    con los nombres del catálogo (`policyFields.ts`). Las reglas puras (`enrollmentFlowRows`, `toggleEnrollmentStep`,
+    `moveEnrollmentStep`) viven con las del empleado en `utils/enrollmentStepRules.ts`: son la misma lista.
+- **Historial de verificaciones** (migración `0106` del backend; encargo del dueño, 2026-10-09): UNA implementación
+  para las dos pantallas (regla 6) —el ADMIN con todas las empresas (`ADMIN_VERIFICATIONS`,
+  `pages/admin/verifications/VerificationsPage.tsx`) y la empresa con la suya, que conserva su mapa
+  (`COMPANY_VERIFICATIONS`)—: piezas compartidas en `components/verifications` (`VerificationParts` las tarjetas del
+  periodo, la persona, el resultado, el lugar y el detalle completo; `VerificationToolbar` los filtros y sus reglas
+  puras `filtersOf`/`choiceKey`/`isFiltered`), el detalle como UNA pantalla con la base de cada rol
+  (`pages/verifications/VerificationDetailPages.tsx`, que es otra ruta de la MISMA entrada de `SCREEN_VIEWS`) y el
+  servicio `verificationsService` / `adminVerificationsService` (`historyService(base)`: mismas rutas y formas). Las
+  señales del motor y la red de la IP se dibujan con las piezas del caso de fraude (`RiskSignalLine`, `NetworkLine`,
+  `RiskBadge`, `DbIpCredit`): nunca se duplican. **Ningún número es de la app** (regla 25): el periodo por omisión
+  (`window_days`), el tope del conteo (`count_cap`) y los niveles de riesgo filtrables
+  (`filterable_risk_tiers`) llegan en el resumen, y los nombres de métodos, motivos, niveles, acciones y señales
+  salen de sus catálogos. **Ninguna imagen**: solo el `avatar` con `Avatar`; si el intento abrió un caso de fraude,
+  el detalle enlaza a su pantalla (la evidencia vive allá, tras confirmar).
 - **Seguridad facial** (`ADMIN_FACE_SECURITY`, `FaceSecurityPage`, `faceSecurityService`, secciones en
   `components/faceSecurity`, reglas puras en `utils/faceSecurity.ts`): solo dibuja lo que la
   plataforma calibró sola (cada umbral con `RangeMeter` entre su mínimo y su tope), las empresas
@@ -555,9 +605,31 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
 - **Fechas y horas en la zona del negocio** (hora del Centro, `user.timezone`): solo con
   `formatDate`/`formatDateTime`/`timeAgo` y "hoy" con `businessToday`/`businessDate`/`businessHour`
   (`utils/format.ts`); nunca `new Date().getHours()` ni formatos con la zona del dispositivo.
-- Valores para copiar (llaves, URL, comandos) solo con `CopyField` / `useCopy`. Un secreto que el
-  backend entrega una sola vez (llave de la API) se muestra en un popup que solo se cierra
-  confirmando que se guardó (`apiKeySecretMessage`).
+- Valores para copiar (llaves, URL, comandos) solo con `CopyField` / `useCopy`.
+- **Un secreto que el servidor entrega UNA sola vez** (el secreto de una llave de la API y la clave PRIVADA de un par
+  de firma que la plataforma genera, migración `0105`) se muestra con `oneTimeSecretMessage`
+  (`components/integrations/oneTimeSecret.tsx`), la ÚNICA implementación de ese patrón
+  (`apiKeySecretMessage` y `signingKeyPrivateMessage` la usan). Reglas, por si alguna vez aparece un tercer secreto:
+  - **No se guarda en ninguna parte del navegador**: ni `localStorage`, ni `sessionStorage`, ni IndexedDB, ni en el
+    estado de una ruta (`navigate(..., { state })`, que sobrevive a recargar). Viaja de la respuesta a la función que
+    arma el popup; esa función vive en la cola de `FeedbackProvider` y, al cerrarlo, la cola la suelta y con ella el
+    valor. Por eso tampoco se guarda en un `useState` de la pantalla ni en un `useRef`.
+  - **El popup no es cerrable** (`dismissible: false`): solo con «Ya la guardé», para que nadie lo pierda con Escape
+    o un clic fuera. Lleva su `key` (no se repite) y, con `multiline`, el `CopyField` dibuja un `PEM` completo.
+  - **Sustituye al aviso de éxito**: un resultado, un popup; nunca el secreto y además «se registró».
+- **Credenciales de la API de una empresa, las cuatro en la pantalla `COMPANY_API`** (regla 24 de la raíz): la URL
+  base y las **llaves** en `ApiKeysPage` (`/company/integrations`) y las **claves de firma** en `SigningKeysPage`
+  (`/company/integrations/signing-keys`, con su formulario en `…/signing-keys/new`). Son dos rutas MÁS de la misma
+  entrada de `SCREEN_VIEWS`, no una pantalla nueva: el seed del backend y `screens.contract.test.ts` no cambian.
+  Piezas en `components/integrations` (`signingKeyParts` la fila y la clave de la plataforma, `signingKeyFields` las
+  secciones del formulario, `signingKeyMessages` los popups y confirmaciones, `ExpiryBadge` el aviso de vencimiento
+  que comparten los dos tipos de credencial), reglas puras en `utils/signingKeys.ts` y tipos en `types/signingKeys.ts`.
+  Lo que no se negocia: la interfaz recomienda registrar la clave pública propia y dice POR QUÉ (la privada no toca
+  el servidor); el archivo de la clave se lee en el navegador y solo viaja su texto; revocar avisa que es inmediato y
+  rotar, que la anterior sigue firmando sus días de gracia. **Ningún número es de la app** (regla 25): el tope de
+  claves vigentes, cuántas hay, la vigencia por omisión, su tope y los días de gracia llegan en `limits` del `GET`.
+  Los textos de fila que significan lo mismo en los dos tipos (vencimiento, último uso, quién la creó o la revocó,
+  «Rotar», «Revocar») se reutilizan de `apiKeys.row.*`: es la misma pantalla y no se traducen dos veces.
 - Dispositivos de validadores, empleados y kioscos: la llave vive en `utils/deviceKey.ts` (WebCrypto, no exportable; una
   por navegador, la misma para todos los usos). El login del validador firma el reto cuando el backend lo pide
   (`AuthContext`) y cada identificación la vuelve a firmar (`sendSigned`, antifraude 2b); el kiosco firma cada petición
@@ -593,6 +665,11 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
   `VERIFICATION` el formulario (`ApiKeyFormPage` → `VerificationWarning`, un `callout` con `role="note"`) advierte que una
   llave dentro de una aplicación se puede extraer; si además se marcó un permiso de lectura, pide una llave SOLO con
   «Verificación» para la app y otra para el servidor. Textos en los siete idiomas (`apiKeys.form.verificationWarning`).
+  **Los permisos crecen solos** (regla 24 de la raíz, decisión del dueño, 2026-10-09: toda API de datos de una
+  empresa se expone también por su llave, solo con los datos de esa empresa): el formulario dibuja los permisos
+  DESDE el catálogo `api_scopes` y el detalle los lista igual, así que un permiso nuevo del backend aparece sin
+  tocar la app. Nunca se escribe un permiso en el código ni se agrupa a mano: si hiciera falta agrupar por módulo,
+  el orden y el nombre salen del catálogo (`sort_order`, `name`).
   La bitácora puede traer el método `API_FACE` (`VerificationMethod`); su nombre viene del catálogo
   `verification_methods`, nunca escrito en la app.
 - **Validadores por empresa** (decisión del dueño; el backend decide, la app solo lo refleja):
@@ -892,6 +969,16 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
 
 ## 3. Resiliencia y rendimiento (en toda función)
 
+- **El frontend responde a TODO lo que devuelve una API (OBLIGATORIO; regla 7 de la raíz)**: cada endpoint que
+  se consume maneja TODAS sus respuestas posibles —el `data` de cada éxito con su *guard* (tolerante a campos
+  nuevos o nulos), cada código y estado de error (401; 403 y sus códigos de negocio —`FACE_NOT_APPROVED`,
+  `QR_DISABLED`, `VALIDATORS_DISABLED`, `COMPANY_SUSPENDED`, `TOUCH_DEVICE_REQUIRED`…—; 404, 405, 409, 413, 422
+  por campo, 429 con `Retry-After`, 5xx, 0/tiempo agotado), los vacíos y límites (paginación fuera de rango,
+  listas vacías, campos nulos u opcionales) y las fallas pasajeras (reintento de GET, recuperación al volver la
+  red)— sin pantallas rotas ni promesas tragadas. Todo pasa por `apiClient` (contrato único → datos validados o
+  `ApiError`) y termina en popup o error de campo; un código que necesita una acción propia (un paso más,
+  ubicación obligatoria, refrescar `user.screens`, regresar a un paso del flujo) la tiene, NUNCA un «Reintentar»
+  que no puede funcionar. Una API o pantalla nueva no se da por terminada sin auditar esto endpoint por endpoint.
 - **Nada se queda colgado**: cada petición tiene tiempo límite (`apiClient`; opción `timeoutMs`);
   solo los GET (y lo idempotente) se reintentan, con espera creciente y respetando `Retry-After`
   (opción `retries`; `/validation` usa 0). Toda espera es cancelable (`utils/waits.ts`: `sleep`
@@ -925,7 +1012,7 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
 - Calidad global de ambos proyectos: script de la raíz del repositorio (ver
   `../scripts/quality/README.md`).
 - **Dependencias al día sin romper nada** (regla 11 de la raíz): cada actualización mayor se prueba antes de adoptarse.
-  Versiones que se retienen a propósito (revisadas el 2026-10-07; se vuelven a revisar en cada limpieza):
+  Versiones que se retienen a propósito (revisadas el 2026-10-08; se vuelven a revisar en cada limpieza):
   - **TypeScript se queda en la versión más nueva que soporta typescript-eslint**: hoy `~6.0.x`, no 7.0.2
     (typescript-eslint 8.71.1 declara `typescript >=4.8.4 <6.1.0`). Con TypeScript 6 los tipos globales se declaran en
     `tsconfig` (`types`), y con React 19 una referencia de `useRef(null)` es `RefObject<T | null>` y el envío de un
@@ -939,6 +1026,11 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
   largas, imports ordenados por el lint).
 
 ## 5. Interfaz
+
+**Cumplimiento (regla 22 de la raíz).** Lo que la persona ve también es cumplimiento: un consentimiento se pide con su
+texto completo y en el idioma de la persona (nunca una casilla decorativa), un aviso de privacidad se muestra antes de
+capturar nada, y toda pantalla que enseñe un dato personal nuevo tiene su camino para consultarlo, exportarlo y
+borrarlo. El mapa está en el README de la raíz §10.1.
 
 - Mobile first; todo usable en teléfono (menú hamburguesa) y escritorio (sidebar contraíble con un
   botón redondo montado sobre su borde: mitad sobre el menú y mitad sobre el contenido).
@@ -979,6 +1071,31 @@ omisión, en-US, pt-BR, fr-FR, de-DE, it-IT y es-ES; regla 16 de la raíz): sus 
   vacías (nunca van al repositorio; `.env` está en `.gitignore`); el `.env` local tiene exactamente esas
   variables. Vacío = valor por defecto.
 - Las `VITE_*` se incrustan en el bundle: son públicas, nunca un secreto del servidor.
+
+## 6.1 Lo que se distribuye al navegador (avisos de terceros e integridad del modelo)
+
+El paquete que `npm run build` produce **es una distribución**: cada navegador recibe una copia del software. Eso
+cambia las obligaciones respecto al backend, cuya imagen hoy no sale de nuestra infraestructura. Dos reglas nacen de
+ahí (auditoría del 2026-10-10, `docs/compliance/17-auditoria-licencias-modelos-ia.md`):
+
+- **Los avisos de terceros se GENERAN, nunca se escriben a mano.** `npm run build` ejecuta primero
+  `npm run notices` (`scripts/generate-third-party-notices.mjs`), que recorre **solo el árbol de producción**
+  (`npm ls --omit=dev`) y escribe `public/third-party-notices.txt` con el texto de licencia de cada componente. El
+  motivo: MIT exige que su aviso viaje «in all copies», Apache-2.0 §4(d) que se reproduzca el NOTICE, y el
+  minificador de Vite **borra todos los comentarios** —se midió: cero avisos de copyright en `dist/assets`—. Un
+  archivo escrito a mano envejece en silencio con cada dependencia nueva; uno generado avisa de lo que falta. Una
+  dependencia de producción nueva no necesita nada manual, pero si su paquete no trae su licencia, el generador lo
+  dice en consola y hay que traerla de su origen.
+  Los textos de las licencias quedan **en su idioma original** y eso NO viola la regla 16: una licencia es un
+  documento legal que se reproduce verbatim, traducirla la invalidaría, y es un anexo, no interfaz. Lo único nuestro
+  en ese archivo es la introducción, que sí está en español.
+- **Todo modelo que se ejecute en el navegador se verifica con su SHA-256 antes de servirse.**
+  `scripts/copy-mediapipe-assets.mjs` fija la huella y el tamaño de `blaze_face_short_range.tflite` y **falla con
+  código 1** si lo que hay en disco o lo que responde el origen no coincide (se verificó alterando un byte). Sin red
+  y sin copia solo avisa y sigue: la verificación de identidad no depende de ese modelo, porque el servidor vuelve a
+  detectar con YuNet. Un modelo nuevo en el navegador sigue el mismo patrón, igual que `app/speech/model_store.py`
+  hace en el backend. **Nunca un respaldo remoto que eluda la verificación**: traer el archivo de un tercero expone
+  la IP de la persona (regla 13) y sirve código que no auditamos.
 
 ## 7. Idiomas: siete idiomas (regla 16 de la raíz)
 
@@ -1244,3 +1361,26 @@ importa; uno breve y preciso se entiende y genera confianza. Rige para cada text
   mensajes del backend, y la misma guía de estilo que es-MX.
 - No cambian por estilo: llaves, `{marcadores}`, formas de plural, códigos, textos legales o de privacidad (aviso de
   privacidad, consentimiento, atribuciones de licencias) ni el sentido de una regla. Se acorta; no se inventa.
+
+### Avisos y controles comerciales (2026-10-10)
+
+`scripts/generate-third-party-notices.mjs` identifica cada componente por su ruta física, nombre y versión,
+contrastados con el manifiesto instalado y `package-lock.json`: dos versiones o instalaciones anidadas no se
+colapsan. Conserva los textos originales de LICENSE/NOTICE y sus atribuciones, sin traducirlos ni recortarlos.
+Una licencia, atribución o evidencia ausente, vacía o inconsistente detiene la generación antes de escribir.
+`node scripts/generate-third-party-notices.mjs --check` verifica sin escribir; no actualiza ni aprueba derechos.
+El cierre acreditó 39 pruebas con cobertura del 100 % de líneas, ramas y funciones del generador; la CI exige
+esas tres coberturas antes de generar y verificar los avisos que acompañan al build.
+
+La fuente canónica de `commercial_gate.py` y `artifact_inventory.py` son los dos archivos de `scripts/` en la
+raíz del espacio de trabajo. `docs/compliance/tooling/commercial-controls.tar.gz` y sus huellas son copias
+generadas para este repositorio; no se mantienen implementaciones independientes. La plantilla
+`.github/workflows/commercial-preflight.yml` también se copia de la raíz y comprueba el artefacto candidato
+exacto antes de una futura publicación. No publica ni equivale a protecciones de GitHub ya configuradas:
+revisores externos, protección de ramas y prohibición de omitir la compuerta requieren configuración y evidencia
+externas. Se mantiene `RELEASE_BLOCKED` mientras falten derechos, revisores y aprobaciones acreditadas.
+
+
+## Adenda autorizada: identidad, historial y avisos (2026-10-10)
+
+El dueño autoriza como marca visible `Identity Verification Platform` (IVP) y como proveedor `VT Software Solutions`. Son excepciones de idioma por frase completa; no autorizan préstamos sueltos ni renombres de rutas, clases o paquetes. `LegalNoticesLink` es el enlace compartido a los avisos originales en los siete idiomas; su etiqueta se traduce y el documento legal conserva su texto. La evidencia histórica nullable se muestra como ausente, nunca se rellena con la política vigente; las acciones se nombran desde `catalogs.liveness_actions` respetando su orden. `risk_failure_policy` usa el catálogo seguro del backend; el campo heredado se conserva para el historial y no sirve para aprobar fallas. Los estados de revisión, error, bloqueo o incertidumbre no muestran éxito. La corrección del destello es exclusivamente del arnés de prueba, sin ampliar tiempos límite. Los controles comerciales y `RELEASE_BLOCKED` siguen vigentes.

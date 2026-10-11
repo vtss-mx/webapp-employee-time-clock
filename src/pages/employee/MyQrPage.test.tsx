@@ -57,19 +57,36 @@ describe('MyQrPage (QR dinámico)', () => {
     expect(dialog).not.toHaveTextContent('null');
   });
 
-  it('si no se puede generar lo explica y permite reintentar', async () => {
+  it('QR deshabilitado por la empresa: estado no reintentable con el mensaje del servidor (sin popup)', async () => {
+    mockFetch((call) => (call.url.includes('/settings/') ? apiOk(samplePolicy) : apiFail(403, 'QR_DISABLED', 'La verificación por QR está deshabilitada')));
+    renderWithProviders(<MyQrPage />);
+    expect(await screen.findByText('QR no disponible')).toBeInTheDocument();
+    expect(screen.getByText('La verificación por QR está deshabilitada')).toBeInTheDocument();
+    // No es un fallo pasajero: no abre popup ni «Reintentar» (que nunca pasaría).
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull();
+  });
+
+  it('registro facial sin aprobar: estado no reintentable con la clave del rostro', async () => {
+    mockFetch((call) => (call.url.includes('/settings/') ? apiOk(samplePolicy) : apiFail(403, 'FACE_NOT_APPROVED', 'Tu registro facial aún no está aprobado')));
+    renderWithProviders(<MyQrPage />);
+    expect(await screen.findByText('Registro facial pendiente')).toBeInTheDocument();
+    expect(screen.getByText('Tu registro facial aún no está aprobado')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('un fallo pasajero sí lo explica en un popup y permite reintentar', async () => {
     let failed = false;
     mockFetch((call) => {
       if (call.url.includes('/settings/')) return apiOk(samplePolicy);
       if (call.init.method === 'POST' && !failed) {
         failed = true;
-        return apiFail(403, 'QR_DISABLED', 'La verificación por QR está deshabilitada');
+        return apiFail(503, 'SERVER_BUSY', 'Servicio ocupado');
       }
       return call.init.method === 'POST' ? apiOk(qr(1)) : apiOk({ id: 1, status: 'ACTIVE' });
     });
     renderWithProviders(<MyQrPage />);
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo generar tu código QR' });
-    expect(screen.getByText('No se pudo generar tu código')).toBeInTheDocument();
     await userEvent.click(within(popup).getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByAltText('Código QR de Ana Ruiz')).toBeInTheDocument();
   });

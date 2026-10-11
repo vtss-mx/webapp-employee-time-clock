@@ -107,6 +107,41 @@ describe('PolicyTuning', () => {
     expect(lastSave(onSave)).toEqual(expect.objectContaining({ changes: { liveness_timeout_seconds: 180 }, detail: 'Cada reto vencerá a los 3 min.', relaxes: true }));
   });
 
+  it('sostén de cada movimiento y reintentos del reto: los calibra el ADMIN, con su explicación', async () => {
+    const onSave = vi.fn<(save: TuningSave) => void>();
+    renderWithProviders(<PolicyTuning policy={samplePolicy} saving={null} onSave={onSave} />);
+    // Sostén más largo: no protege menos (no relaja); más corto, sí.
+    expect(screen.getByRole('button', { name: /Tiempo para sostener cada movimiento/ })).toHaveTextContent('550 ms');
+    await choose(/Tiempo para sostener cada movimiento/, '900 ms');
+    expect(lastSave(onSave)).toEqual(
+      expect.objectContaining({
+        key: 'liveness_hold_ms',
+        changes: { liveness_hold_ms: 900 },
+        title: 'Tiempo para sostener actualizado',
+        detail: 'Cada movimiento se sostiene 900 ms antes de capturar.',
+        change: { label: 'Tiempo para sostener cada movimiento', before: '550 ms', after: '900 ms' },
+        relaxes: false,
+      }),
+    );
+    await choose(/Tiempo para sostener cada movimiento/, '300 ms');
+    expect(lastSave(onSave)).toEqual(expect.objectContaining({ changes: { liveness_hold_ms: 300 }, relaxes: true }));
+    // Reintentos del reto: más reintentos relajan (menos estricto); menos, no.
+    expect(screen.getByRole('button', { name: /Reintentos del reto/ })).toHaveTextContent('3');
+    await choose(/Reintentos del reto/, '5');
+    expect(lastSave(onSave)).toEqual(
+      expect.objectContaining({
+        key: 'liveness_max_retries',
+        changes: { liveness_max_retries: 5 },
+        title: 'Reintentos del reto actualizados',
+        detail: 'Reintentos permitidos antes de reiniciar: 5.',
+        change: { label: 'Reintentos del reto', before: '3', after: '5' },
+        relaxes: true,
+      }),
+    );
+    await choose(/Reintentos del reto/, '1');
+    expect(lastSave(onSave)).toEqual(expect.objectContaining({ changes: { liveness_max_retries: 1 }, relaxes: false }));
+  });
+
   it('destello de colores: retirado por decisión del dueño (2026-10-06): se muestra apagado, con su nota y sin control', () => {
     const onSave = vi.fn<(save: TuningSave) => void>();
     renderWithProviders(<PolicyTuning policy={{ ...samplePolicy, flash_liveness: 'OFF' }} saving={null} onSave={onSave} />);

@@ -46,7 +46,7 @@ describe('UsagePage (consumo de la plataforma)', () => {
     expect(screen.getByRole('img', { name: /^Datos por día\. 2 días\. Total Entrada: 5\.00 MB; Salida: 2,048\.00 MB/ })).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Almacenamiento por categoría' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Biometría20.00 MB1,000 registros',
-      'Asistencia10.00 MB8,000 registros',
+      'Verificaciones10.00 MB8,000 registros',
     ]);
     expect(screen.getByText('Foto del 4 oct 2026 · 30.00 MB en 9,000 registros')).toBeInTheDocument();
     const row = (await screen.findByText('Panificadora')).closest('tr') as HTMLElement;

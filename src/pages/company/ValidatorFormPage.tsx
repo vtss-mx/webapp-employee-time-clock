@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AddressFields } from '../../components/location/AddressFields';
 import { LocationPicker } from '../../components/location/LocationPicker';
 import type { MessageInput } from '../../components/MessageDialog';
-import { metersText } from '../../components/shifts/shiftRules';
+import { metersText } from '../../utils/numbers';
 import { ValidatorAccountFields, ValidatorLocationRule } from '../../components/ValidatorForm';
 import { Button } from '../../components/ui/Button';
 import { Panel, PanelFooter, PanelHeader, PanelSection } from '../../components/ui/Panel';

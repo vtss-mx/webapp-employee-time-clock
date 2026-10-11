@@ -5,11 +5,11 @@ import { apiRequest } from './apiClient';
 import { sha256Hex } from '../utils/digest';
 import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 import { sendSigned, signingNonce } from './http/requestSigning';
+import { isVerificationResult as isResult } from './verificationService';
 
 const isProfile = hasKeys<CheckpointProfile>('id', 'name', 'mode', 'company');
 const isHolder = hasKeys<CheckpointEmployee>('employee_id', 'name', 'employee_number');
 const isEvents = isPage<CheckpointEventList>(hasKeys('id', 'created_at', 'success', 'method'));
-const isResult = hasKeys<VerificationResult>('verified', 'method', 'message');
 
 /** Huella del texto de un QR (UTF-8): lo que firma la identificación por QR. */
 const textDigest = (text: string) => () => sha256Hex(new Blob([text]));

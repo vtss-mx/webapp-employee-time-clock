@@ -1,12 +1,12 @@
 import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Wallet } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CountUp } from '../CountUp';
 import { BarList } from './BarList';
 import { ColumnChart } from './ColumnChart';
-import { FilePicker } from './FilePicker';
+import { FilePicker, type FilePickerHandle } from './FilePicker';
 import { KpiCard } from './KpiCard';
 import { digitsOf, NumberField, parseNumber, steppedValue } from './NumberField';
 
@@ -77,6 +77,24 @@ describe('FilePicker (selector de archivo propio)', () => {
     drop(container.querySelector('.file-picker__box') as HTMLElement, [pdf]);
     expect(onChange).not.toHaveBeenCalled();
     expect(container.querySelector('.file-picker')).toHaveClass('is-disabled');
+  });
+
+  it('el ref expone open(): abre el selector del sistema (el mismo input oculto)', async () => {
+    function WithRef() {
+      const ref = useRef<FilePickerHandle>(null);
+      return (
+        <>
+          <FilePicker ref={ref} label="Comprobante" value={null} onChange={() => undefined} />
+          <button type="button" onClick={() => ref.current?.open()}>
+            abrir
+          </button>
+        </>
+      );
+    }
+    render(<WithRef />);
+    const click = vi.spyOn(screen.getByLabelText('Comprobante'), 'click').mockImplementation(() => undefined);
+    await userEvent.click(screen.getByRole('button', { name: 'abrir' }));
+    expect(click).toHaveBeenCalledTimes(1);
   });
 });
 

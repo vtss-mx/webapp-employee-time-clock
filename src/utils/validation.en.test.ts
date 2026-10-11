@@ -40,13 +40,13 @@ describe('validación en inglés (en-US)', () => {
     expect(validateEmail('')).toBe('Email is required');
     expect(validateEmail('no-es-correo')).toBe('Enter a valid email');
     expect(validatePassword('')).toBe('Password is required');
-    expect(validatePassword('Ab1')).toBe('Minimum 8 characters');
+    expect(validatePassword('Ab1')).toBe('Minimum 12 characters');
     expect(validatePassword('a'.repeat(129) + 'A1')).toBe('Maximum 128 characters');
-    expect(validatePassword('SOLOMAYUS1')).toBe('Must include a lowercase letter');
-    expect(validatePassword('solominus1')).toBe('Must include an uppercase letter');
-    expect(validatePassword('SinNumeros')).toBe('Must include a number');
-    expect(validatePasswordConfirm('Segura123', '')).toBe('Re-enter the password');
-    expect(validatePasswordConfirm('Segura123', 'Segura124')).toBe('Passwords do not match');
+    expect(validatePassword('SOLOMAYUS12345')).toBe('Must include a lowercase letter');
+    expect(validatePassword('solominus12345')).toBe('Must include an uppercase letter');
+    expect(validatePassword('SinNumerosAqui')).toBe('Must include a number');
+    expect(validatePasswordConfirm('Segura123456', '')).toBe('Re-enter the password');
+    expect(validatePasswordConfirm('Segura123456', 'Segura124456')).toBe('Passwords do not match');
   });
 
   it('formulario del empleado: etiquetas traducidas, fecha de nacimiento y número de empleado', () => {
@@ -141,7 +141,7 @@ describe('errores que se traducen al leerse (siguen al idioma activo)', () => {
 });
 
 function validEmployee() {
-  return { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'E1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123', password_confirm: 'Segura123' };
+  return { first_name: 'Ana', last_name: 'Ruiz', birth_date: '1990-01-01', employee_number: 'E1', rfc: 'RUAA900101AB1', curp: 'RUAA900101MSRRZL09', nss: '12345678903', phone: '+526621234567', email: 'a@e.com', password: 'Segura123456', password_confirm: 'Segura123456' };
 }
 
 function validCompany() {

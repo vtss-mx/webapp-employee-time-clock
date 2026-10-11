@@ -86,8 +86,8 @@ describe('ValidatorFormPage: alta', () => {
 
     await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Recepción planta 1');
     await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'recepcion@empresa.com');
-    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Valida1234');
+    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida123456');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Valida123456');
 
     const search = screen.getByRole('combobox', { name: 'Buscar un lugar o una dirección' });
     await userEvent.type(search, 'Plaza Zar');
@@ -116,7 +116,7 @@ describe('ValidatorFormPage: alta', () => {
       'Punto en el mapa29.07000, -110.95000',
       'Exige ubicaciónSí, a 200 m',
     ]);
-    expect(confirm).not.toHaveTextContent('Valida1234');
+    expect(confirm).not.toHaveTextContent('Valida123456');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Agregar validador' }));
 
     expect(await screen.findByText('Lista de validadores')).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe('ValidatorFormPage: alta', () => {
       name: 'Recepción planta 1',
       mode: 'QR_OR_FACE',
       email: 'recepcion@empresa.com',
-      password: 'Valida1234',
+      password: 'Valida123456',
       address: { ...FOUND, interior_number: null, reference_notes: null, latitude: 29.07, longitude: -110.95 },
       location_required: true,
       location_radius_m: 200,
@@ -265,6 +265,22 @@ describe('ValidatorFormPage: edición', () => {
     expect(screen.getByLabelText('Código postal')).not.toHaveAccessibleDescription('Ese código postal no existe');
   });
 
+  it('el punto que exige el servidor (LOCATION_POINT_REQUIRED) se muestra bajo el mapa, no en un campo inexistente', async () => {
+    mockFetch(apiOk(sampleValidator), apiFail(409, 'LOCATION_POINT_REQUIRED', 'Marca el punto exacto del acceso en el mapa'));
+    renderAt('/company/validators/3/edit');
+    await screen.findByDisplayValue('Recepción planta 1');
+    await userEvent.clear(screen.getByLabelText(/Nombre o ubicación/));
+    await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Acceso norte');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Guardar los cambios de Recepción planta 1?' })).getByRole('button', { name: 'Guardar cambios' }));
+    await closePopup('No se pudo guardar el validador');
+    // El mensaje del servidor queda bajo el mapa (el error del punto), no en un campo del formulario.
+    expect(screen.getByRole('alert')).toHaveTextContent('Marca el punto exacto del acceso en el mapa');
+    // Al marcar un punto nuevo, el error del punto desaparece.
+    await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
+    await waitFor(() => expect(screen.queryByText('Marca el punto exacto del acceso en el mapa')).toBeNull());
+  });
+
   it('sin ubicación exigida: puede iniciar sesión desde cualquier lugar y su sesión sigue abierta', async () => {
     const { calls } = mockFetch(apiOk(sampleValidator), apiOk({ ...sampleValidator, name: 'Acceso sur' }));
     renderAt('/company/validators/3/edit');
@@ -310,8 +326,8 @@ describe('ValidatorFormPage: confirmación antes de guardar', () => {
     renderAt('/company/validators/new');
     await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Comedor');
     await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'comedor@empresa.com');
-    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Valida1234');
+    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida123456');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Valida123456');
     for (const [label, value] of [['Calle o vialidad', 'Juárez'], ['Número exterior', 'S/N'], ['Colonia o barrio', 'Centro'], ['Código postal', '83000'], ['Estado o provincia', 'Sonora'], ['Municipio o alcaldía', 'Hermosillo'], ['Ciudad o localidad', 'Hermosillo']]) {
       await userEvent.type(screen.getByLabelText(label), value);
     }
@@ -354,8 +370,8 @@ describe('ValidatorFormPage: fallas e inglés', () => {
     renderAt('/company/validators/new');
     await userEvent.type(screen.getByLabelText(/Nombre o ubicación/), 'Recepción planta 1');
     await userEvent.type(screen.getByLabelText(/Correo de acceso/), 'recepcion@empresa.com');
-    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida1234');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Valida1234');
+    await userEvent.type(screen.getByLabelText(/Contraseña inicial/), 'Valida123456');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Valida123456');
     await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
     await waitFor(() => expect(screen.getByLabelText('Calle o vialidad')).toHaveValue('Calle Dr. Paliza'));
     expect(await screen.findByText('Disponible')).toBeInTheDocument(); // el correo ya se verificó (mientras tanto no se envía)

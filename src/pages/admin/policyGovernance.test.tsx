@@ -104,27 +104,10 @@ describe('Política: regla de dos personas', () => {
     await waitFor(() => expect(calls.filter((c) => c.url.includes('/changes?')).length).toBe(2));
   });
 
-  it('asistencia con el QR solo: encenderla protege menos (rojo, con su advertencia); apagarla, verde', async () => {
-    const { calls } = serve({ write: (call) => apiOk({ policy: withChanges(sampleAdminPolicy, body(call) as object), change: null }) });
+  it('apagar el motor de riesgo o la evidencia se confirma con lo que se pierde', async () => {
+    serve({ write: (call) => apiOk({ policy: withChanges(sampleAdminPolicy, body(call) as object), change: null }) });
     renderPage();
-    const qrOnly = await screen.findByRole('switch', { name: 'Asistencia con el QR solo' });
-    await userEvent.click(qrOnly);
-    const on = await screen.findByRole('alertdialog', { name: '¿Activar «Asistencia con el QR solo»?' });
-    expect(on).toHaveTextContent('Quien tenga el teléfono de otro empleado podrá registrar su asistencia sin mostrar el rostro');
-    expect(on).toHaveTextContent('Protección recomendada');
-    await userEvent.click(within(on).getByRole('button', { name: 'Activar' }));
-    await waitFor(() => expect(qrOnly).toHaveAttribute('aria-checked', 'true'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
-    await userEvent.click(qrOnly);
-    const off = await screen.findByRole('dialog', { name: '¿Desactivar «Asistencia con el QR solo»?' });
-    expect(off).toHaveClass('msg--success');
-    expect(off).toHaveTextContent('Aplica en segundos a todo el personal de Panificadora.');
-    await userEvent.click(within(off).getByRole('button', { name: 'Desactivar' }));
-    await waitFor(() => expect(writes(calls).map(body)).toEqual([{ qr_only_attendance: true }, { qr_only_attendance: false }]));
-
-    // Motor de riesgo (protección) y evidencia (neutral).
-    await userEvent.click(await screen.findByRole('button', { name: 'Entendido' }));
-    await userEvent.click(screen.getByRole('switch', { name: 'Motor de riesgo' }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Motor de riesgo' }));
     expect(await screen.findByRole('alertdialog', { name: '¿Desactivar «Motor de riesgo»?' })).toHaveTextContent('Las señales dejarán de sumarse');
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     await userEvent.click(screen.getByRole('switch', { name: 'Guardar evidencia de los intentos sospechosos' }));
@@ -196,10 +179,10 @@ describe('Política: motor de riesgo', () => {
     await choose(/Con riesgo alto/, /^Negar/);
     await save('¿Cambiar «Con riesgo alto» a Negar?');
     await userEvent.click(screen.getByRole('button', { name: /Si el motor falla/ }));
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('Un paso más')]));
-    expect(screen.queryByRole('option', { name: /Negar/ })).toBeNull();
-    await userEvent.click(screen.getByRole('option', { name: /^Un paso más/ }));
-    await save('¿Cambiar «Si el motor falla» a Un paso más?');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('Reintentar'), expect.stringContaining('Bloquear la operación')]));
+    expect(screen.queryByRole('option', { name: /^Permitir/ })).toBeNull();
+    await userEvent.click(screen.getByRole('option', { name: /^Reintentar/ }));
+    await save('¿Cambiar «Si el motor falla» a Reintentar?', 'alertdialog');
     await choose(/Sospecha de rostro duplicado/, /95/);
     await save('¿Cambiar «Sospecha de rostro duplicado» a 95 %?');
     await choose(/Dispositivo del empleado/, /Aprobación de la empresa/);
@@ -217,7 +200,7 @@ describe('Política: motor de riesgo', () => {
       { risk_medium_score: 25 },
       { risk_critical_score: 90 },
       { risk_high_action: 'DENY' },
-      { risk_fallback_action: 'STEP_UP' },
+      { risk_failure_policy: 'RETRY' },
       { duplicate_confidence: 0.95 },
       { employee_device_mode: 'APPROVAL' },
       { risk_signals: { SPOOF_PROB_LOW: { mode: 'OBSERVE' } } },

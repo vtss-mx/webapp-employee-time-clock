@@ -4,7 +4,7 @@ import { useFormState } from '../hooks/useFormState';
 import { t, useT } from '../i18n';
 import { fieldErrorsFrom } from '../services/apiClient';
 import { authService } from '../services/authService';
-import { validatePassword, validatePasswordConfirm, type FieldErrors } from '../utils/validation';
+import { passwordErrorFields, validatePassword, validatePasswordConfirm, type FieldErrors } from '../utils/validation';
 import { ConfirmPasswordField, FormField } from './FormField';
 import { Button } from './ui/Button';
 import { PanelSection } from './ui/Panel';
@@ -29,7 +29,7 @@ function validate(values: PasswordValues): FieldErrors<PasswordValues> {
 
 /** Errores del servidor llevados al campo correspondiente. */
 const serverErrors = (err: unknown) =>
-  fieldErrorsFrom<PasswordValues>(err, { CURRENT_PASSWORD_INVALID: 'current', PASSWORD_REUSED: 'next', new_password: 'next' });
+  fieldErrorsFrom<PasswordValues>(err, { CURRENT_PASSWORD_INVALID: 'current', ...passwordErrorFields<PasswordValues>('next') });
 
 /** Sección "Cambiar contraseña" (Mi perfil). Al guardar, se cierran las sesiones de otros dispositivos. */
 export function ChangePasswordSection({ onChanged }: { onChanged?: () => void }) {

@@ -1,0 +1,220 @@
+{
+  "@firebase/analytics@0.10.25": {
+    "name": "@firebase/analytics",
+    "version": "0.10.25",
+    "declaredLicense": "Apache-2.0",
+    "files": [
+      {
+        "file": "firebase-9045b759b70e9d19b8cf007d69d988893d845a1e-LICENSE",
+        "sha256": "065e45b5674f9bf76670496e5472611b3fbd87fbeaf99336725430a9909cb687",
+        "url": "https://raw.githubusercontent.com/firebase/firebase-js-sdk/9045b759b70e9d19b8cf007d69d988893d845a1e/LICENSE"
+      }
+    ],
+    "attributions": [
+      {
+        "file": "dist/esm/index.esm.js",
+        "sha256": "f38e73639f72880d5db0c6493228088ac5af0288cafa3ccaaa42766f846ee6f4",
+        "comments": [
+          "/**\n * @license\n * Copyright 2019 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2020 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      }
+    ],
+    "registryEvidence": "https://registry.npmjs.org/@firebase/analytics/0.10.25",
+    "gitHead": "9045b759b70e9d19b8cf007d69d988893d845a1e",
+    "upstreamNoticeStatus": "NOTICE not present at repository root in pinned git tree"
+  },
+  "@firebase/app@0.16.2": {
+    "name": "@firebase/app",
+    "version": "0.16.2",
+    "declaredLicense": "Apache-2.0",
+    "files": [
+      {
+        "file": "firebase-9045b759b70e9d19b8cf007d69d988893d845a1e-LICENSE",
+        "sha256": "065e45b5674f9bf76670496e5472611b3fbd87fbeaf99336725430a9909cb687",
+        "url": "https://raw.githubusercontent.com/firebase/firebase-js-sdk/9045b759b70e9d19b8cf007d69d988893d845a1e/LICENSE"
+      }
+    ],
+    "attributions": [
+      {
+        "file": "dist/app/src/api.d.ts",
+        "sha256": "c8996b363abaf4f4154e91dd67e6bd803cf5f03fef1c21630de5c690deae76cd",
+        "comments": [
+          "/**\n * @license\n * Copyright 2019 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      },
+      {
+        "file": "dist/app/src/firebaseServerApp.d.ts",
+        "sha256": "8c1dab76ed0f3aaeae7ad66f726260d237d694af34d43f4e55187f615088e4bc",
+        "comments": [
+          "/**\n * @license\n * Copyright 2023 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      },
+      {
+        "file": "dist/app/src/global_index.d.ts",
+        "sha256": "f99189fe21388a02eb93526d7be0d75905afdfd0b5b5c2489c54b9915d2a1dbc",
+        "comments": [
+          "/**\n * @license\n * Copyright 2020 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2017 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      },
+      {
+        "file": "dist/app/src/heartbeatService.d.ts",
+        "sha256": "99704bff5971dc51dc3676d6e8dff4aa242da91179996a4adcc504bc90a55282",
+        "comments": [
+          "/**\n * @license\n * Copyright 2021 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      }
+    ],
+    "registryEvidence": "https://registry.npmjs.org/@firebase/app/0.16.2",
+    "gitHead": "9045b759b70e9d19b8cf007d69d988893d845a1e",
+    "upstreamNoticeStatus": "NOTICE not present at repository root in pinned git tree"
+  },
+  "@firebase/component@0.7.5": {
+    "name": "@firebase/component",
+    "version": "0.7.5",
+    "declaredLicense": "Apache-2.0",
+    "files": [
+      {
+        "file": "firebase-6cde0c0230b4c1da01d4a058333daa7663322fd1-LICENSE",
+        "sha256": "065e45b5674f9bf76670496e5472611b3fbd87fbeaf99336725430a9909cb687",
+        "url": "https://raw.githubusercontent.com/firebase/firebase-js-sdk/6cde0c0230b4c1da01d4a058333daa7663322fd1/LICENSE"
+      }
+    ],
+    "attributions": [
+      {
+        "file": "dist/esm/index.d.ts",
+        "sha256": "5c252941b1299551ad4f3f44ef995ee7a79585aebe2c5318271297496f2611c6",
+        "comments": [
+          "/**\n * @license\n * Copyright 2017 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      },
+      {
+        "file": "dist/esm/index.esm.js",
+        "sha256": "edfe167f6cebf2aca3031410a5f6bca96dd2d841065772b01bcf3616721cc69a",
+        "comments": [
+          "/**\n * @license\n * Copyright 2019 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      }
+    ],
+    "registryEvidence": "https://registry.npmjs.org/@firebase/component/0.7.5",
+    "gitHead": "6cde0c0230b4c1da01d4a058333daa7663322fd1",
+    "upstreamNoticeStatus": "NOTICE not present at repository root in pinned git tree"
+  },
+  "@firebase/installations@0.6.24": {
+    "name": "@firebase/installations",
+    "version": "0.6.24",
+    "declaredLicense": "Apache-2.0",
+    "files": [
+      {
+        "file": "firebase-6cde0c0230b4c1da01d4a058333daa7663322fd1-LICENSE",
+        "sha256": "065e45b5674f9bf76670496e5472611b3fbd87fbeaf99336725430a9909cb687",
+        "url": "https://raw.githubusercontent.com/firebase/firebase-js-sdk/6cde0c0230b4c1da01d4a058333daa7663322fd1/LICENSE"
+      }
+    ],
+    "attributions": [
+      {
+        "file": "dist/esm/index.esm.js",
+        "sha256": "48507769ec0af44148e5e41cf4f10228f65de9142c62128ea791475267226d10",
+        "comments": [
+          "/**\n * @license\n * Copyright 2019 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2020 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      }
+    ],
+    "registryEvidence": "https://registry.npmjs.org/@firebase/installations/0.6.24",
+    "gitHead": "6cde0c0230b4c1da01d4a058333daa7663322fd1",
+    "upstreamNoticeStatus": "NOTICE not present at repository root in pinned git tree"
+  },
+  "@firebase/logger@0.5.2": {
+    "name": "@firebase/logger",
+    "version": "0.5.2",
+    "declaredLicense": "Apache-2.0",
+    "files": [
+      {
+        "file": "firebase-6cde0c0230b4c1da01d4a058333daa7663322fd1-LICENSE",
+        "sha256": "065e45b5674f9bf76670496e5472611b3fbd87fbeaf99336725430a9909cb687",
+        "url": "https://raw.githubusercontent.com/firebase/firebase-js-sdk/6cde0c0230b4c1da01d4a058333daa7663322fd1/LICENSE"
+      }
+    ],
+    "attributions": [
+      {
+        "file": "dist/esm/index.d.ts",
+        "sha256": "b7b58b11be801068222c596659957f4defdeec281974feb02a28d9c9ea38cd51",
+        "comments": [
+          "/**\n * @license\n * Copyright 2017 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      },
+      {
+        "file": "dist/esm/test/custom-logger.test.d.ts",
+        "sha256": "174b3a17591b53b5ffa90e47c7dc75136f274eff4810a6926658947297dd9890",
+        "comments": [
+          "/**\n * @license\n * Copyright 2018 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      }
+    ],
+    "registryEvidence": "https://registry.npmjs.org/@firebase/logger/0.5.2",
+    "gitHead": "6cde0c0230b4c1da01d4a058333daa7663322fd1",
+    "upstreamNoticeStatus": "NOTICE not present at repository root in pinned git tree"
+  },
+  "@firebase/util@1.15.3": {
+    "name": "@firebase/util",
+    "version": "1.15.3",
+    "declaredLicense": "Apache-2.0",
+    "files": [
+      {
+        "file": "firebase-6cde0c0230b4c1da01d4a058333daa7663322fd1-LICENSE",
+        "sha256": "065e45b5674f9bf76670496e5472611b3fbd87fbeaf99336725430a9909cb687",
+        "url": "https://raw.githubusercontent.com/firebase/firebase-js-sdk/6cde0c0230b4c1da01d4a058333daa7663322fd1/LICENSE"
+      }
+    ],
+    "attributions": [
+      {
+        "file": "dist/index.cjs.js",
+        "sha256": "f35274bd59b2f255bc850f55ceb29c358dca6092d4d876198fd97e8108ee3446",
+        "comments": [
+          "/**\n * @license\n * Copyright 2017 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2022 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2021 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2019 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2020 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */",
+          "/**\n * @license\n * Copyright 2025 Google LLC\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *   http://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */"
+        ]
+      }
+    ],
+    "registryEvidence": "https://registry.npmjs.org/@firebase/util/1.15.3",
+    "gitHead": "6cde0c0230b4c1da01d4a058333daa7663322fd1",
+    "upstreamNoticeStatus": "NOTICE not present at repository root in pinned git tree"
+  },
+  "@mediapipe/tasks-vision@1.0.1": {
+    "name": "@mediapipe/tasks-vision",
+    "version": "1.0.1",
+    "declaredLicense": "Apache-2.0",
+    "files": [
+      {
+        "file": "Apache-2.0.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+      }
+    ],
+    "attributions": [
+      {
+        "file": "vision.d.ts",
+        "sha256": "dc272aff0a1b53c375815c6ef475c02c0a4892032683770d571e530ffded3d48",
+        "comments": [
+          "/**\r\n * Copyright 2022 The MediaPipe Authors.\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *     http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */",
+          "/**\r\n * Copyright 2023 The MediaPipe Authors.\r\n *\r\n * Licensed under the Apache License, Version 2.0 (the \"License\");\r\n * you may not use this file except in compliance with the License.\r\n * You may obtain a copy of the License at\r\n *\r\n *     http://www.apache.org/licenses/LICENSE-2.0\r\n *\r\n * Unless required by applicable law or agreed to in writing, software\r\n * distributed under the License is distributed on an \"AS IS\" BASIS,\r\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\r\n * See the License for the specific language governing permissions and\r\n * limitations under the License.\r\n */"
+        ]
+      },
+      {
+        "file": "vision_bundle.cjs.map",
+        "sha256": "5ec14a440b7c4344d8d823729a9dfbb7dfe3fec2ee7183137cf0f4448ce513bb",
+        "comments": [
+          "/*\n\n Copyright The Closure Library Authors.\n SPDX-License-Identifier: Apache-2.0\n*/",
+          "/*\n\n Copyright Google LLC\n SPDX-License-Identifier: Apache-2.0\n*/"
+        ]
+      }
+    ],
+    "upstreamNoticeStatus": "No independently version-bound upstream NOTICE identified; shipped source declarations conserved; native WASM third-party review remains open"
+  }
+}

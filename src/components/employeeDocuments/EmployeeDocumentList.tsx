@@ -1,4 +1,4 @@
-import { Download, IdCard, Trash2, Upload } from 'lucide-react';
+import { Download, IdCard, Trash2 } from 'lucide-react';
 import { useAction } from '../../hooks/useAction';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useSearchList, type SearchList } from '../../hooks/useSearchList';
@@ -9,7 +9,7 @@ import { base64ToBlob, saveFile } from '../../utils/download';
 import { formatDateTime } from '../../utils/format';
 import { listEmpty, TrashCells, trashColumns } from '../trash/TrashParts';
 import { useRestore } from '../trash/useRestore';
-import { Button, ButtonLink } from '../ui/Button';
+import { Button } from '../ui/Button';
 import { ListToolbar } from '../ui/ListControls';
 import { ListResults } from '../ui/ListResults';
 import { deleteDocumentConfirm, documentRestore, type EmployeeDocumentTypeName } from './employeeDocumentConfirms';
@@ -34,7 +34,7 @@ export function useMyDocumentList(): SearchList<EmployeeDocument> {
  * se subió. «Descargar» no cambia datos (no se confirma). Eliminar solo si la empresa aún no lo confirmó; restaurar
  * desde «Eliminados». En pantallas angostas cada fila es una tarjeta.
  */
-export function EmployeeDocumentList({ list, uploadTo }: { list: SearchList<EmployeeDocument>; uploadTo: string }) {
+export function EmployeeDocumentList({ list }: { list: SearchList<EmployeeDocument> }) {
   const t = useT();
   const { nameOf } = useCatalogs();
   const typeName: EmployeeDocumentTypeName = (code) => nameOf('employee_document_types', code);
@@ -60,11 +60,6 @@ export function EmployeeDocumentList({ list, uploadTo }: { list: SearchList<Empl
   const restoreDocument = (doc: EmployeeDocument) => void restore(doc.id, () => myDocumentService.restore(doc.id), () => documentRestore(doc, typeName), list.retry);
 
   const columns = [t('employeeDocuments.columns.file'), t('employeeDocuments.columns.type'), t('employeeDocuments.columns.status')];
-  const upload = (
-    <ButtonLink to={uploadTo} variant="primary" icon={<Upload size={18} />}>
-      {t('employeeDocuments.add')}
-    </ButtonLink>
-  );
   return (
     <>
       <ListToolbar filter={list.filter} onFilter={list.setFilter} trash statuses={false} />
@@ -72,12 +67,12 @@ export function EmployeeDocumentList({ list, uploadTo }: { list: SearchList<Empl
         list={list}
         columns={list.trash ? [...columns, ...trashColumns()] : [...columns, t('employeeDocuments.columns.uploaded'), t('employeeDocuments.columns.actions')]}
         pager={{ noun: { one: t('employeeDocuments.noun.one'), other: t('employeeDocuments.noun.other') } }}
-        empty={listEmpty(list, { empty: { icon: <IdCard />, title: t('employeeDocuments.empty.title'), description: t('employeeDocuments.empty.description'), action: upload } })}
+        empty={listEmpty(list, { empty: { icon: <IdCard />, title: t('employeeDocuments.empty.title'), description: t('employeeDocuments.empty.description') } })}
         renderCells={(doc) => (
           <>
             <DocumentFacts doc={doc} typeName={typeName} />
             {list.trash ? (
-              <TrashCells record={doc} name={doc.file_name} restorable busy={restoring === doc.id} disabled={restoring !== null} onRestore={() => restoreDocument(doc)} />
+              <TrashCells record={doc} name={doc.file_name} restorable={doc.can_delete} busy={restoring === doc.id} disabled={restoring !== null} onRestore={() => restoreDocument(doc)} />
             ) : (
               <>
                 <td data-label={t('employeeDocuments.columns.uploaded')} className="table__wide">
@@ -95,7 +90,7 @@ export function EmployeeDocumentList({ list, uploadTo }: { list: SearchList<Empl
                   >
                     {t('employeeDocuments.download')}
                   </Button>
-                  {!doc.confirmed && (
+                  {doc.can_delete && (
                     <Button
                       size="sm"
                       variant="ghost"

@@ -1,5 +1,5 @@
 import { FileText, Upload, X } from 'lucide-react';
-import { useId, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { forwardRef, useId, useImperativeHandle, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { useT, type Translate } from '../../i18n';
 import { formatBytes } from '../../utils/numbers';
 import { describedBy, FieldLabel, FieldMessage } from '../FormField';
@@ -38,17 +38,27 @@ interface FilePickerProps {
   labels?: Partial<FilePickerLabels>;
 }
 
+/** Control imperativo del selector: abrir el diálogo del sistema desde fuera (p. ej. «Elegir otro archivo» de un popup). */
+export interface FilePickerHandle {
+  open: () => void;
+}
+
 /**
  * Selector de archivo propio (nunca el control del navegador): el `<input type="file">` queda oculto
  * pero es el que se enfoca y se anuncia; se dibuja una zona para elegir o soltar el archivo y, ya
- * elegido, su nombre y tamaño con "Cambiar" y "Quitar". Un archivo a la vez.
+ * elegido, su nombre y tamaño con "Cambiar" y "Quitar". Un archivo a la vez. Con un `ref` expone `open()`
+ * para abrir el diálogo del sistema desde fuera (debe salir de un gesto del usuario, como un clic).
  */
-export function FilePicker({ label, value, onChange, accept, hint, error, disabled = false, required, icon = <FileText size={22} />, ...props }: FilePickerProps) {
+export const FilePicker = forwardRef<FilePickerHandle, FilePickerProps>(function FilePicker(
+  { label, value, onChange, accept, hint, error, disabled = false, required, icon = <FileText size={22} />, ...props },
+  ref,
+) {
   const t = useT();
   const labels = { ...defaultLabels(t), ...props.labels };
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  useImperativeHandle(ref, () => ({ open: () => input.current?.click() }), []);
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
@@ -106,4 +116,4 @@ export function FilePicker({ label, value, onChange, accept, hint, error, disabl
       <FieldMessage id={id} error={error} hint={hint} />
     </div>
   );
-}
+});

@@ -292,7 +292,7 @@ export const usageOverview: UsageOverview = {
     bytes: 30 * 1024 * 1024,
     items: [
       { category: 'BIOMETRICS', rows: 1000, bytes: 20 * 1024 * 1024 },
-      { category: 'ATTENDANCE', rows: 8000, bytes: 10 * 1024 * 1024 },
+      { category: 'VERIFICATION', rows: 8000, bytes: 10 * 1024 * 1024 },
     ],
   },
   companies_with_traffic: 3,

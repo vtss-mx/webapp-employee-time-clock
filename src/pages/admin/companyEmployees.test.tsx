@@ -34,7 +34,6 @@ const ana: CompanyEmployee = {
   employee_number: 'E-001',
   first_name: 'Ana',
   last_name: 'López',
-  department_name: 'Ventas',
   email: 'ana@pan.com',
   phone: '+526621234567',
   active: true,
@@ -49,7 +48,6 @@ const beto: CompanyEmployee = {
   employee_number: 'E-002',
   first_name: 'Beto',
   last_name: 'Ruiz',
-  department_name: null,
   phone: null,
   active: false,
   face_status: 'NOT_ENROLLED',
@@ -84,12 +82,10 @@ describe('CompanyEmployeesPage (el ADMIN consulta el personal de una empresa)', 
 
     const [first, second] = screen.getAllByRole('row').slice(1);
     expect(first).toHaveTextContent('E-001');
-    expect(first).toHaveTextContent('Ventas');
     expect(first).toHaveTextContent('ana@pan.com');
     expect(first).not.toHaveAttribute('tabindex'); // no hay detalle que abrir
     expect(first.closest('table')).toHaveClass('table--readonly');
     expect(within(second).getByText('Sin teléfono')).toBeInTheDocument();
-    expect(within(second).getByText('Sin departamento')).toBeInTheDocument();
     expect(within(second).getByText('Inactivo')).toBeInTheDocument();
     expect(within(first).getByText('2 muestras')).toBeInTheDocument();
     expect(within(second).getByText('Sin aprender')).toBeInTheDocument();

@@ -81,7 +81,7 @@ export default {
     adminEmail: "E-mail de l'administrateur",
     adminEmailHint: "Cet e-mail servira à se connecter; c'est aussi l'e-mail de l'entreprise",
     adminPassword: 'Mot de passe initial',
-    adminPasswordHint: 'Au moins 8 caractères, avec une majuscule, une minuscule et un chiffre',
+    adminPasswordHint: 'Au moins 12 caractères, avec une majuscule, une minuscule et un chiffre',
   },
   create: {
     adminSection: "Administrateur de l'entreprise",
@@ -192,6 +192,7 @@ export default {
       message: "L'entreprise, ses administrateurs, ses validateurs et sa configuration seront supprimés.",
       detailsTitle: 'Sera supprimé',
       confirmLabel: "Supprimer l'entreprise",
+      inUse: "L'entreprise est utilisée: désactivez-la",
     },
     admin: {
       eyebrow: "Administrateur de l'entreprise",
@@ -248,7 +249,6 @@ export default {
     emptyTitle: 'Aucun employé',
     emptyDescription: "Le personnel enregistré par l'entreprise apparaîtra ici.",
     noPhone: 'Sans téléphone',
-    noDepartment: 'Sans service',
     forget: {
       button: 'Oublier',
       none: 'Rien appris',

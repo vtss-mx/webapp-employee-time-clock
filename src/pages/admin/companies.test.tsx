@@ -22,8 +22,8 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     await userEvent.type(screen.getByLabelText('Identificador fiscal'), 'PNO120315AB1');
     await userEvent.type(screen.getByLabelText('Teléfono'), '6621234567');
     await userEvent.type(screen.getByLabelText('Correo del administrador'), 'Admin@Pan.com');
-    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Empresa1234');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa1234');
+    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Empresa123456');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa123456');
     await userEvent.type(screen.getByLabelText('Precio por empleado activo'), '120');
   }
   const server = (create: () => Response) => mockFetch((call) => (call.url.includes('/validation') ? liveCheck() : (billingReply(call) ?? create())));
@@ -67,7 +67,7 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
       'IVA16 %',
       'Días de gracia10 días',
     ]);
-    expect(dialog).not.toHaveTextContent('Empresa1234');
+    expect(dialog).not.toHaveTextContent('Empresa123456');
     expect(dialog).toHaveTextContent('Comparte la contraseña inicial por un medio seguro.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -77,7 +77,7 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
     await confirmCreate();
     expect(await screen.findByText('Detalle de empresa')).toBeInTheDocument();
     const popup = await screen.findByRole('dialog', { name: 'Empresa registrada' });
-    expect(popup).toHaveTextContent('Panificadora ya puede usar Employee Time Clock.');
+    expect(popup).toHaveTextContent('Panificadora ya puede usar Identity Verification Platform.');
     expect(popup).toHaveTextContent('Su administrador inicia sesión con admin@pan.com.');
     expect(popup).toHaveTextContent('Sin acceso a Integraciones (API); puedes dárselo desde su ficha.');
     expect(popup).toHaveTextContent('Sin validadores; puedes darle lugares al editar la empresa.');
@@ -91,7 +91,7 @@ describe('CompanyCreatePage (alta de empresa con su administrador)', () => {
       max_employees: null,
       max_validators: 0,
       api_enabled: false,
-      admin_password: 'Empresa1234',
+      admin_password: 'Empresa123456',
       billing: { pricing_mode: 'PER_USER', unit_price: '120.00', price_period: 'MONTH', interval_months: 1, starts_on: businessToday(), trial_days: 0, discount: null, tax_rate: '16.00', grace_days: 10 },
     });
   });
@@ -418,8 +418,8 @@ describe('consola de empresas en inglés (en-US)', () => {
     const add = await screen.findByRole('button', { name: 'Add' });
     expect(screen.getByRole('heading', { name: 'Add admin' })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Admin email'), 'rh@pan.com');
-    await userEvent.type(screen.getByLabelText('Initial password'), 'Recursos123');
-    await userEvent.type(screen.getByLabelText(/Confirm password/), 'Recursos123');
+    await userEvent.type(screen.getByLabelText('Initial password'), 'Recursos12345');
+    await userEvent.type(screen.getByLabelText(/Confirm password/), 'Recursos12345');
     await waitFor(() => expect(add).toBeEnabled());
     await userEvent.click(add);
     const dialog = await screen.findByRole('dialog', { name: 'Add rh@pan.com as an admin?' });
@@ -443,8 +443,8 @@ describe('consola de empresas en inglés (en-US)', () => {
     renderFrom('/admin/companies/:id/admins/:adminId/password', '/admin/companies/4/admins/9/password', <CompanyAdminFormPage />);
     expect(await screen.findByRole('heading', { name: 'Reset password' })).toBeInTheDocument();
     expect(screen.getByText('Assign a new password and share it through a secure channel. Their open sessions will end.')).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText('New password'), 'Nueva12345');
-    await userEvent.type(screen.getByLabelText(/Confirm password/), 'Nueva12345');
+    await userEvent.type(screen.getByLabelText('New password'), 'Nueva1234567');
+    await userEvent.type(screen.getByLabelText(/Confirm password/), 'Nueva1234567');
     await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
     const dialog = await screen.findByRole('alertdialog', { name: 'Reset the password for admin@pan.com?' });
     expect(dialog).toHaveTextContent('Account security');

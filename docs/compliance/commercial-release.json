@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-10-10",
+  "approved": false,
+  "status": "RELEASE_BLOCKED",
+  "approval_evidence": null,
+  "blockers": [
+    "FaceNet: derechos de pesos/dataset no acreditados; bloqueo preventivo",
+    "YuNet/SFace/CLIP: procedencia y alcance comercial pendientes",
+    "Candara: sin licencia de redistribución web/apps acreditada",
+    "SDK: cesiones, términos de publicación y ML Kit pendientes",
+    "Cierre de transitivas/nativos y obligaciones de avisos pendientes"
+  ],
+  "scope": "webapp-employee-time-clock",
+  "inputs_count": 12
+}

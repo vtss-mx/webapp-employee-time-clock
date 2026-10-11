@@ -1,7 +1,7 @@
 {
-  "name": "Employee Time Clock",
-  "short_name": "ETC",
-  "description": "Gestione delle presenze e della giornata lavorativa.",
+  "name": "Identity Verification Platform",
+  "short_name": "IVP",
+  "description": "Piattaforma di verifica dell'identità digitale e biometrica",
   "lang": "it-IT",
   "start_url": "/",
   "scope": "/",

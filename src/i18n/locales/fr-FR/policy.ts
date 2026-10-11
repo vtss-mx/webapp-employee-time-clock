@@ -40,8 +40,8 @@ export default {
       hint: "Chaque identification sûre apprend l'apparence actuelle de chaque employé. Les échantillons validés par l'entreprise ne sont jamais remplacés.",
     },
     location: {
-      title: 'Position des pointages',
-      hint: "Chaque pointage inclut la position du téléphone et l'heure du serveur; ajustez ci-dessous la précision et la vitesse.",
+      title: 'Position des vérifications',
+      hint: "Chaque vérification inclut la position du téléphone et l'heure du serveur; ajustez ci-dessous la précision et la vitesse.",
     },
     methods: {
       title: "Méthodes d'identification",
@@ -49,7 +49,7 @@ export default {
     },
     antifraud: {
       title: 'Antifraude',
-      hint: "En cas de doute, le moteur exige une étape supplémentaire ou soumet le pointage à l'examen de l'entreprise. Les preuves des tentatives suspectes ne sont visibles que par l'administrateur dans «Cas de fraude».",
+      hint: "En cas de doute, le moteur exige une étape supplémentaire ou soumet la vérification à l'examen de l'entreprise. Les preuves des tentatives suspectes ne sont visibles que par l'administrateur dans «Cas de fraude».",
     },
     capture: {
       title: 'Protocole de capture',
@@ -153,8 +153,8 @@ export default {
     },
     detectImpossibleTravel: {
       label: 'Détecter les trajets impossibles',
-      on: 'Un pointage trop éloigné du précédent pour le temps écoulé est refusé (fausse position ou compte partagé).',
-      off: "La position d'un pointage n'est pas comparée à celle du précédent.",
+      on: 'Une vérification trop éloignée de la précédente pour le temps écoulé est refusée (fausse position ou compte partagé).',
+      off: "La position d'une vérification n'est pas comparée à celle de la précédente.",
     },
     qrEnabled: {
       label: 'Vérification par code QR',
@@ -165,11 +165,6 @@ export default {
       label: 'Autoriser les appareils des validateurs',
       on: "Chaque tablette ou téléphone d'un validateur doit être autorisé dans Validateurs › Appareils.",
       off: "Les validateurs peuvent se connecter sur n'importe quel appareil avec leur e-mail et leur mot de passe.",
-    },
-    qrOnlyAttendance: {
-      label: 'Pointage avec le QR seul',
-      on: "Un validateur en mode QR enregistre l'entrée et la sortie avec le code, sans visage.",
-      off: 'Le QR seul sert uniquement à identifier; pour enregistrer le pointage, le visage est nécessaire.',
     },
     riskEngine: {
       label: 'Moteur de risque',
@@ -209,10 +204,9 @@ export default {
   },
   warnings: {
     spoofing: "Cela réduit la protection contre l'usurpation d'identité (photos, écrans ou vidéos).",
-    impossibleTravel: 'Un pointage avec une fausse position ou depuis un autre lieu ne sera pas détecté par la distance.',
+    impossibleTravel: 'Une vérification avec une fausse position ou depuis un autre lieu ne sera pas détectée par la distance.',
     deviceApproval: "Toute personne disposant de l'e-mail et du mot de passe d'un validateur pourra opérer depuis n'importe quel appareil.",
     mobileOnly: 'Les validateurs pourront opérer depuis des ordinateurs, dont la caméra est généralement plus facile à tromper avec des photos ou des écrans.',
-    qrOnly: "Une personne ayant le téléphone d'un autre employé pourra enregistrer son pointage sans montrer son visage.",
     riskEngine: "Les signaux ne s'additionneront plus: une tentative présentant plusieurs indices de fraude passera si aucun verrou ne l'arrête à lui seul.",
     captureProtocol: "Une vidéo préparée à l'avance sera plus difficile à détecter.",
     voiceVerification: 'Un enregistrement avec les photos d\'une autre personne n\'aura plus la seconde vérification de la voix et du visage en vidéo.',
@@ -241,6 +235,35 @@ export default {
       confirmLabel: 'Enregistrer la voix',
     },
     preview: 'Tester la voix',
+  },
+  /** Étapes de l’enregistrement d’identité et leur ordre : l’ADMIN décide lesquelles et dans quel ordre, par entreprise. */
+  enrollment: {
+    title: 'Étapes de l’enregistrement d’identité',
+    hint: 'Choisissez ce qui est demandé à chaque employé et dans quel ordre. L’employé suit les étapes dans cet ordre.',
+    label: 'Étapes de l’enregistrement, dans l’ordre',
+    required: 'Obligatoire',
+    locked: 'Toujours demandée : c’est l’enregistrement que l’entreprise valide.',
+    position: 'Étape {position} sur {total}',
+    notAsked: 'Non demandée',
+    moveUp: 'Monter « {name} »',
+    moveDown: 'Descendre « {name} »',
+    note: 'L’étape « {step} » est toujours demandée et reste à la fin du parcours.',
+    warning: 'Demander moins d’étapes réduit les preuves que la personne est bien celle qu’elle prétend être.',
+    confirm: {
+      enableTitle: 'Demander « {name} » ?',
+      enableText: 'Chaque employé devra terminer « {name} » dans son enregistrement.',
+      disableTitle: 'Ne plus demander « {name} » ?',
+      moveTitle: 'Déplacer « {name} » à l’étape {position} ?',
+      moveText: 'Les mêmes étapes sont demandées, dans un autre ordre.',
+      order: 'Ordre de l’enregistrement',
+      save: 'Enregistrer l’ordre',
+    },
+    notice: {
+      enabled: '{name} : désormais demandée',
+      disabled: '{name} : plus demandée',
+      moved: '{name} : déplacée',
+      text: 'S’applique à l’enregistrement de qui ne l’a pas encore terminé.',
+    },
   },
   tuning,
   ...antifraud,

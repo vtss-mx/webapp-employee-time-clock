@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { Route, Routes } from 'react-router-dom';
@@ -32,6 +32,9 @@ vi.mock('../../hooks/useWarmLocation', () => ({
   },
 }));
 
+// Error no corregible que el flujo entrega por `onFatal`: lo fija cada prueba (p. ej. un ApiError con su código).
+const flow = vi.hoisted((): { fatal: unknown } => ({ fatal: null }));
+
 interface FlowProps {
   title: string;
   alternative?: FlowAlternative;
@@ -49,6 +52,7 @@ vi.mock('../../components/LiveFaceFlow', () => ({
         capturar rostro
       </button>
       <button onClick={() => onFatal(new Error('No se pudo abrir la cámara'))}>falla de cámara</button>
+      <button onClick={() => onFatal(flow.fatal)}>fatal configurado</button>
       <button onClick={onCancel}>salir</button>
       {alternative && <button onClick={alternative.onSelect}>{alternative.label}</button>}
     </div>
@@ -66,6 +70,7 @@ function renderAt(route: string, page: ReactElement) {
       <Route path={route} element={page} />
       <Route path={paths.employee.dashboard} element={<p>Menú del empleado</p>} />
       <Route path={paths.employee.myQr} element={<p>Mi código QR</p>} />
+      <Route path={paths.employee.enroll} element={<p>Registro facial</p>} />
     </Routes>,
     { route },
   );
@@ -76,6 +81,7 @@ beforeEach(() => {
   session.user = sampleUser;
   session.flowErrors = [];
   session.refreshUser.mockResolvedValue(undefined);
+  flow.fatal = null;
   warm.enabled = false;
   warm.onProblem = () => {};
   warm.take.mockReset();
@@ -97,10 +103,10 @@ describe('FaceVerificationPage (el empleado se identifica con su rostro)', () =>
   });
 
   it('rostro no reconocido: el motivo del backend y "Intentar de nuevo" vuelve a la cámara', async () => {
-    server({}, () => apiOk({ ...identifiedResult, verified: false, message: 'Rostro no reconocido', employee_id: null }));
+    server({}, () => apiOk({ ...identifiedResult, verified: false, verification_status: 'REJECTED', message: 'Rostro no reconocido', employee_id: null }));
     renderVerification();
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
-    expect(await screen.findByText('No se pudo verificar tu identidad')).toBeInTheDocument();
+    expect(await screen.findByText('Rechazado')).toBeInTheDocument();
     expect(screen.getByText('Rostro no reconocido')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Intentar de nuevo' }));
     expect(screen.getByRole('heading', { name: 'Verificación facial' })).toBeInTheDocument();
@@ -186,6 +192,29 @@ describe('FaceVerificationPage: ubicación de la verificación (verification_loc
     // ENFORCE sí explica el permiso bloqueado (una vez), con los pasos para permitirlo.
     act(() => warm.onProblem('denied'));
     expect(await screen.findByRole('alertdialog', { name: 'Permite el acceso a tu ubicación' })).toHaveTextContent('Esta verificación necesita tu ubicación');
+  });
+
+  it('ENFORCE: una respuesta LOCATION_REQUIRED que el flujo da como fatal ofrece reintentar con otra lectura (no una falla terminal)', async () => {
+    flow.fatal = new ApiError({ statusCode: 422, code: 'LOCATION_REQUIRED', message: 'Se necesita tu ubicación' });
+    server({ verification_location: 'ENFORCE' });
+    renderVerification();
+    await userEvent.click(screen.getByRole('button', { name: 'fatal configurado' }));
+    const popup = await screen.findByRole('alertdialog', { name: 'Se necesita tu ubicación' });
+    await userEvent.click(within(popup).getByRole('button', { name: 'Reintentar' }));
+    // Sigue en la cámara (vuelve a intentar con una lectura nueva), no en una tarjeta de falla.
+    expect(screen.getByRole('heading', { name: 'Verificación facial' })).toBeInTheDocument();
+    expect(screen.queryByText('No se pudo verificar tu identidad')).toBeNull();
+  });
+});
+
+describe('FaceVerificationPage: el registro facial dejó de servir', () => {
+  it('rostro no aprobado o sin registro: refresca al usuario y lleva al registro (no un reintento que nunca pasaría)', async () => {
+    flow.fatal = new ApiError({ statusCode: 403, code: 'FACE_NOT_APPROVED', message: 'Tu registro no está aprobado' });
+    server();
+    renderVerification();
+    await userEvent.click(screen.getByRole('button', { name: 'fatal configurado' }));
+    await waitFor(() => expect(session.refreshUser).toHaveBeenCalledOnce());
+    expect(await screen.findByText('Registro facial')).toBeInTheDocument();
   });
 });
 

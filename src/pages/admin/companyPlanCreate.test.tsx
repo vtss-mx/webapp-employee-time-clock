@@ -13,8 +13,8 @@ async function fillCompany({ taxId = 'PNO120315AB1' } = {}) {
   if (taxId) await userEvent.type(screen.getByLabelText('Identificador fiscal'), taxId);
   await userEvent.type(screen.getByLabelText('Teléfono'), '6621234567');
   await userEvent.type(screen.getByLabelText('Correo del administrador'), 'admin@pan.com');
-  await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Empresa1234');
-  await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa1234');
+  await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Empresa123456');
+  await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa123456');
 }
 
 /** Servidor: validación en vivo, vista previa (personalizable) y el alta. */

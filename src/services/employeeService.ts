@@ -2,7 +2,6 @@ import type {
   Employee,
   EnrollmentSubmitResponse,
   EmployeeCreatePayload,
-  EmployeeIdList,
   EmployeeList,
   EmployeeListParams,
   EmployeeQrSummary,
@@ -35,14 +34,6 @@ export const employeeService = {
 
   list(params: EmployeeListParams = {}, signal?: AbortSignal): Promise<EmployeeList> {
     return apiRequest<EmployeeList>('/employees', { query: { ...params }, signal, validate: isPage(isEmployee) });
-  },
-
-  /**
-   * Los ids de los empleados de un filtro (los mismos filtros de `list`), a lo más el tope de una
-   * operación masiva: "seleccionar los N de este filtro" sin cargar todas las páginas.
-   */
-  ids(params: Omit<EmployeeListParams, 'page' | 'size'> = {}, signal?: AbortSignal): Promise<EmployeeIdList> {
-    return apiRequest<EmployeeIdList>('/employees/ids', { query: { ...params }, signal, validate: hasKeys<EmployeeIdList>('ids', 'total', 'limit') });
   },
 
   get(id: number, signal?: AbortSignal): Promise<Employee> {

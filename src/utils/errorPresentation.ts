@@ -1,5 +1,5 @@
 import { t } from '../i18n/core';
-import { ApiError, COMPANY_SUSPENDED, DEVICE_NOT_ALLOWED_CODES } from '../services/apiClient';
+import { ApiError, COMPANY_SUSPENDED, DEVICE_NOT_ALLOWED_CODES, MFA_ENROLLMENT_REQUIRED } from '../services/apiClient';
 import type { Messages } from '../types/i18n';
 
 export type MessageVariant = 'error' | 'warning' | 'info' | 'success';
@@ -57,11 +57,13 @@ export function describeError(error: unknown, title?: string): ErrorPresentation
 /**
  * Errores que la app ya presenta de forma global y no deben repetirse en cada pantalla:
  * dispositivo no permitido (aviso de teléfono), empresa suspendida (pantalla completa, también en el
- * login) y sesión vencida (aviso al volver al login).
+ * login), segundo factor con la gracia vencida (pantalla completa que lleva a registrar la llave) y sesión
+ * vencida (aviso al volver al login).
  * En el login los 401 sí se muestran (credenciales incorrectas, cuenta desactivada).
  */
 export function isHandledGlobally(error: unknown, { showAuthErrors = false } = {}): boolean {
   if (!(error instanceof ApiError)) return false;
   if (DEVICE_NOT_ALLOWED_CODES.has(error.code) || error.code === COMPANY_SUSPENDED) return true;
+  if (error.status === 403 && error.code === MFA_ENROLLMENT_REQUIRED) return true;
   return error.status === 401 && !showAuthErrors;
 }

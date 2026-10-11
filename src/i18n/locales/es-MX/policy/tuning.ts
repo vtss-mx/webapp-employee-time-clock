@@ -34,6 +34,20 @@ export default {
     saved: 'Tiempo de la prueba de vida actualizado',
     savedText: 'Cada reto vencerá a los {time}.',
   },
+  /** Tiempo para sostener cada movimiento del reto antes de capturarlo (decisión del dueño, 2026-10-08). */
+  hold: {
+    label: 'Tiempo para sostener cada movimiento',
+    description: 'Cuánto debe sostenerse cada movimiento del reto antes de capturarlo; un poco más evita que se rechace al final.',
+    saved: 'Tiempo para sostener actualizado',
+    savedText: 'Cada movimiento se sostiene {time} antes de capturar.',
+  },
+  /** Reintentos del reto (pedir otro conservando el escaneo) antes de reiniciarlo. */
+  retries: {
+    label: 'Reintentos del reto',
+    description: 'Cuántas veces se pide otro reto, sin repetir el escaneo, antes de reiniciarlo.',
+    saved: 'Reintentos del reto actualizados',
+    savedText: 'Reintentos permitidos antes de reiniciar: {count}.',
+  },
   flash: {
     label: 'Destello de colores',
     retired: 'Desactivado por decisión del producto (2026-10-06): la pantalla ya no destella colores. La prueba de vida la cubren los movimientos, la ráfaga y la verificación por voz.',

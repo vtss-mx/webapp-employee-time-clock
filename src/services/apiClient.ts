@@ -23,6 +23,22 @@ export const DEVICE_NOT_ALLOWED_CODES: ReadonlySet<string> = new Set([TOUCH_DEVI
  */
 export const COMPANY_SUSPENDED = 'COMPANY_SUSPENDED';
 
+/**
+ * Códigos 403 que indican que una pantalla del menú dejó de estar disponible para esta cuenta (el ADMIN apagó el QR o
+ * el registro facial ya no está aprobado, el módulo de validadores se desactivó). No son un error de la cuenta: la app
+ * vuelve a pedir al usuario (`onScreenUnavailable`) para que el backend recalcule `screens`/`home` y la pantalla salga
+ * del menú. Defensa en profundidad: cada pantalla afectada además lo resuelve a su manera.
+ */
+export const SCREEN_UNAVAILABLE_CODES: ReadonlySet<string> = new Set(['FACE_NOT_APPROVED', 'QR_DISABLED', 'VALIDATORS_DISABLED']);
+
+/**
+ * Segundo factor obligatorio con la gracia VENCIDA (migración 0096 del backend): la cuenta sigue dentro, pero
+ * ninguna pantalla responde (403 en todas) hasta que registre su llave de acceso. Lo único abierto es lo de la
+ * cuenta, que es justo lo que necesita para cumplir. La app lo presenta de forma global (`MfaGate`) con la acción
+ * que SÍ sirve —ir a registrar la llave—, nunca con un «Reintentar» que no podría funcionar (regla 7 de la raíz).
+ */
+export const MFA_ENROLLMENT_REQUIRED = 'MFA_ENROLLMENT_REQUIRED';
+
 interface ApiClientHooks {
   getToken: () => string | null;
   /** Sesión rechazada (401 sin renovación posible). Sin quien la escuche, la petición solo se rechaza. */
@@ -31,6 +47,10 @@ interface ApiClientHooks {
   onDeviceNotAllowed?: (error: ApiError) => void;
   /** Respuesta COMPANY_SUSPENDED (401 o 403, en el login o en cualquier petición): pantalla completa. */
   onCompanySuspended?: (error: ApiError) => void;
+  /** Una pantalla dejó de estar disponible (403 con `SCREEN_UNAVAILABLE_CODES`): refrescar al usuario (una sola vez). */
+  onScreenUnavailable?: () => void;
+  /** Respuesta MFA_ENROLLMENT_REQUIRED (403 en cualquier pantalla): pantalla completa para registrar la llave. */
+  onMfaEnrollmentRequired?: (error: ApiError) => void;
   /** Renueva el access token (refresh token en cookie). true si se obtuvo uno nuevo. */
   refreshSession: () => Promise<boolean>;
 }
@@ -88,6 +108,12 @@ export interface RequestOptions<T> {
   retries?: number;
   /** Valida la forma de `data`; si no coincide se lanza ApiError INVALID_RESPONSE. */
   validate?: (data: unknown) => data is T;
+  /**
+   * Códigos de un 401 que NO cierran la sesión: son un rechazo normal de ESTA petición, no una sesión inválida (p. ej.
+   * elegir una empresa inactiva o con el acceso desactivado: la sesión del empleado sigue viva en la pantalla anterior).
+   * Solo se rechazan con su error; nunca disparan `onUnauthorized`.
+   */
+  sessionSafeCodes?: ReadonlySet<string>;
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -224,12 +250,15 @@ async function attempt<T>(path: string, options: RequestOptions<T>, token: strin
  * - TOKEN_EXPIRED: se renueva UNA vez (refresh compartido entre peticiones simultáneas) y se repite.
  * - Cualquier otro caso cierra la sesión (revocada, reemplazada, vencida).
  */
-async function recoverFromUnauthorized(error: ApiError, usedToken: string, alreadyRetried: boolean, signal?: AbortSignal): Promise<boolean> {
+async function recoverFromUnauthorized(error: ApiError, usedToken: string, alreadyRetried: boolean, signal?: AbortSignal, sessionSafe?: ReadonlySet<string>): Promise<boolean> {
   if (signal?.aborted) return false;
   const current = hooks.getToken();
   if (current !== usedToken) return current !== null && !alreadyRetried;
   if (error.code === 'TOKEN_EXPIRED' && !alreadyRetried && (await hooks.refreshSession())) return true;
   if (signal?.aborted) return false;
+  // Un 401 "seguro para la sesión" (p. ej. elegir una empresa inactiva) es un rechazo de esta petición, no una sesión
+  // inválida: no se cierra la sesión, solo se rechaza con su error para que la pantalla lo muestre.
+  if (sessionSafe?.has(error.code)) return false;
   hooks.onUnauthorized?.(error.message);
   return false;
 }
@@ -241,6 +270,11 @@ async function recoverFromUnauthorized(error: ApiError, usedToken: string, alrea
 function notifyGlobalHandlers(error: ApiError): void {
   if (DEVICE_NOT_ALLOWED_CODES.has(error.code)) hooks.onDeviceNotAllowed?.(error);
   if (error.code === COMPANY_SUSPENDED) hooks.onCompanySuspended?.(error);
+  // Una pantalla dejó de estar disponible (403): refrescar al usuario para que el menú se recalcule (el hook se
+  // protege contra bucles). No aplica a un 401 con el mismo código (ese cierra o renueva la sesión por su cuenta).
+  if (error.status === 403 && SCREEN_UNAVAILABLE_CODES.has(error.code)) hooks.onScreenUnavailable?.();
+  // Segundo factor vencido: lo presenta la app completa; ninguna pantalla repite el error (`isHandledGlobally`).
+  if (error.status === 403 && error.code === MFA_ENROLLMENT_REQUIRED) hooks.onMfaEnrollmentRequired?.(error);
 }
 
 /**
@@ -260,7 +294,7 @@ export async function apiEnvelope<T>(path: string, options: RequestOptions<T> = 
       if (!(error instanceof ApiError)) throw error;
       notifyGlobalHandlers(error);
       if (token !== null && error.status === 401) {
-        if (!(await recoverFromUnauthorized(error, token, retriedAuth, options.signal))) throw error;
+        if (!(await recoverFromUnauthorized(error, token, retriedAuth, options.signal, options.sessionSafeCodes))) throw error;
         retriedAuth = true;
         i--; // el reintento tras renovar no consume reintentos por errores transitorios
         continue;

@@ -35,10 +35,6 @@ export default {
       text: 'This validator can only sign in at its operating location, and location permission is blocked.',
       next: 'Return to the app and sign in again.',
     },
-    attendance: {
-      text: 'Recording your attendance requires your location, and permission is blocked in this browser.',
-      next: 'Come back here and tap “Retry.”',
-    },
     map: {
       text: 'Locating you on the map requires location permission, and it is blocked in this browser.',
       next: 'Tap “My location” again (or mark the point on the map).',

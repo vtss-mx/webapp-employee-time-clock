@@ -5,12 +5,12 @@ import { FormField } from '../../../components/FormField';
 import { FormFooter } from '../../../components/FormFooter';
 import { AddressFields } from '../../../components/location/AddressFields';
 import { LocationPicker } from '../../../components/location/LocationPicker';
-import { QuickChoices } from '../../../components/shifts/formFields';
-import { RecordLoader } from '../../../components/shifts/PageStates';
-import { RecordStatus, type RecordStatusTexts } from '../../../components/shifts/RecordStatus';
-import { DeletedSite } from '../../../components/shifts/RecordTrash';
-import { metersText, SITE_NAME_MAX } from '../../../components/shifts/shiftRules';
-import { useSiteForm, type SiteForm } from '../../../components/shifts/useSiteForm';
+import { QuickChoices } from '../../../components/ui/formFields';
+import { RecordLoader } from '../../../components/ui/PageStates';
+import { RecordStatus, type RecordStatusTexts } from '../../../components/sites/RecordStatus';
+import { DeletedSite } from '../../../components/sites/SiteTrash';
+import { SITE_NAME_MAX } from '../../../components/sites/siteRules';
+import { useSiteForm, type SiteForm } from '../../../components/sites/useSiteForm';
 import { NumberField } from '../../../components/ui/NumberField';
 import { Panel, PanelHeader, PanelSection } from '../../../components/ui/Panel';
 import { Switch } from '../../../components/ui/Switch';
@@ -21,6 +21,7 @@ import { paths } from '../../../routes/paths';
 import { siteService } from '../../../services/siteService';
 import type { WorkSite } from '../../../types';
 import { pickAddress } from '../../../utils/address';
+import { metersText } from '../../../utils/numbers';
 
 /** Radios sugeridos (m): de una oficina a una planta o un predio grande. */
 const RADIUS_SUGGESTIONS = [50, 100, 200, 300, 500, 1000];
@@ -43,8 +44,8 @@ const statusTexts = (name: string): RecordStatusTexts => ({
 });
 
 /**
- * Alta (/company/sites/new) o edición (/company/sites/:id/edit) de un sitio de trabajo: su nombre,
- * su domicilio con el punto en el mapa y el radio desde ese punto en que se puede checar "en sitio".
+ * Alta (/company/sites/new) o edición (/company/sites/:id/edit) de un punto de verificación: su nombre,
+ * su domicilio con el punto en el mapa y el radio desde ese punto en que una verificación cuenta como «en sitio».
  * Un sitio en «Eliminados» no se edita: solo su aviso con «Restaurar».
  */
 export function SiteFormPage() {

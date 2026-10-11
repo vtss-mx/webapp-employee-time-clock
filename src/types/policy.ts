@@ -33,6 +33,14 @@ export interface VerificationPolicy {
   enable_look_down: boolean;
   /** Segundos para responder el reto completo (destello y movimientos; 20 a 180). */
   liveness_timeout_seconds: number;
+  /**
+   * Prueba de vida calibrada por el ADMIN por empresa (decisión del dueño, 2026-10-08): cuánto hay que SOSTENER cada
+   * movimiento del reto antes de capturarlo (ms; la app lo convierte en cuadros estables) y cuántos retos más se piden
+   * conservando el escaneo antes de reiniciarlo. Viajan además en cada reto (`FaceChallenge`): la app los lee de ahí, no
+   * de esta política (como `liveness_timeout_seconds`).
+   */
+  liveness_hold_ms: number;
+  liveness_max_retries: number;
   /** Destello de colores en la pantalla: código del catálogo flash_modes (OFF, OBSERVE, ENFORCE). */
   flash_liveness: string;
   block_virtual_cameras: boolean;
@@ -67,7 +75,15 @@ export interface VerificationPolicy {
    * en la app (`PROFILE_PARAMS` de `utils/speech.ts`); el servidor solo valida el código contra el catálogo.
    */
   voice_profile: string;
-  // --- Ubicación de los registros de asistencia (las evalúa solo el servidor) ---
+  /**
+   * Pasos del registro de identidad que pide la empresa y EN QUÉ ORDEN (decisión del dueño, 2026-10-08; migración
+   * 0093): una lista ORDENADA de códigos de `catalog.enrollment_steps` —estar en la lista = el paso se pide, el orden
+   * del arreglo = el orden del flujo—. La configura el ADMIN (`CompanyPolicyPage`); la empresa y su personal solo la
+   * leen (la pantalla «En validación» dibuja con ella los pasos que el empleado completó). `FACE_CAPTURES` siempre
+   * está (es el registro que la empresa aprueba: el servidor responde 422 `INVALID_ENROLLMENT_STEPS` si se quita).
+   */
+  enrollment_steps: string[];
+  // --- Ubicación de cada verificación (la evalúa solo el servidor) ---
   /** Precisión mínima (m) que debe informar el navegador; más imprecisa, se pide repetir. */
   max_location_accuracy_m: number;
   /** Rechazar un registro a una distancia imposible de recorrer desde el anterior. */
@@ -84,14 +100,15 @@ export interface VerificationPolicy {
   verification_location: string;
   /** Nombres de cámaras virtuales que no se aceptan (la app avisa antes de capturar). */
   blocked_cameras: string[];
-  /** Un validador en modo QR registra asistencia con el QR solo (decisión del dueño: apagado en empresas nuevas). */
-  qr_only_attendance: boolean;
   updated_at: string | null;
   updated_by: string | null;
 }
 
 /** Una señal del motor de riesgo en esta empresa: la de la plataforma, la vigente y su línea base de casos. */
 export interface RiskSignalSetting {
+  /** Piso independiente del puntaje, informado por el servidor. */
+  critical_action?: string | null;
+  calibration_required?: boolean;
   code: string;
   name: string;
   description: string | null;
@@ -116,6 +133,15 @@ export interface RiskSignalSetting {
  * riesgo y los controles antifraude (nunca viajan a la empresa).
  */
 export interface AdminVerificationPolicy extends VerificationPolicy {
+  /** Diagnóstico del servidor: contar señales no certifica su calibración. */
+  risk_readiness?: {
+    maximum_score: number;
+    observed_signals: number;
+    enforced_signals: number;
+    score_can_reject: boolean;
+    calibration_required: boolean;
+    critical_controls: Record<string, string>;
+  };
   /** Nivel de SOSPECHA de duplicado al registrarse (solo marca para la revisión): un `value` de confidence_levels. */
   duplicate_confidence: number;
   /** Dispositivo del empleado (catálogo `employee_device_modes`; la vinculación llega en la fase 2). */
@@ -123,6 +149,9 @@ export interface AdminVerificationPolicy extends VerificationPolicy {
   /** Último nivel predefinido aplicado (catálogo `policy_presets`); null = a la medida. */
   preset: string | null;
   risk_engine: boolean;
+  /** Tope efectivo por familia y opciones autorizadas del servidor para esta empresa. */
+  risk_family_max_points?: number;
+  risk_family_max_points_options?: number[];
   risk_medium_score: number;
   risk_high_score: number;
   risk_critical_score: number;
@@ -130,8 +159,10 @@ export interface AdminVerificationPolicy extends VerificationPolicy {
   risk_medium_action: string;
   risk_high_action: string;
   risk_critical_action: string;
-  /** Si el motor falla: permitir, permitir y avisar o un paso más. */
+  /** Valor heredado conservado por el backend para el historial; no gobierna nuevas fallas. */
   risk_fallback_action: string;
+  /** Política segura enviada por el backend; ausente indica servidor anterior sin este control. */
+  risk_failure_policy?: string;
   /** Guardar fotogramas de evidencia de los intentos sospechosos (cifrados en el bucket). */
   fraud_evidence: boolean;
   /** Antifraude 2a: destello dictado por el servidor y ráfaga de recortes del rostro (nacen midiendo). */
@@ -139,7 +170,7 @@ export interface AdminVerificationPolicy extends VerificationPolicy {
   capture_burst: boolean;
   /**
    * Antifraude 2b (códigos del catálogo `signal_modes`): firma de cada identificación con la llave del dispositivo
-   * del validador, su ubicación en cada identificación y el código de sitio al checar la entrada y la salida.
+   * del validador, su ubicación en cada identificación y el código de sitio al verificar en un sitio.
    */
   validator_signing: string;
   validator_location: string;
@@ -167,13 +198,14 @@ export type AdminPolicyUpdate = VerificationPolicyUpdate &
       | 'duplicate_confidence'
       | 'employee_device_mode'
       | 'risk_engine'
+      | 'risk_family_max_points'
       | 'risk_medium_score'
       | 'risk_high_score'
       | 'risk_critical_score'
       | 'risk_medium_action'
       | 'risk_high_action'
       | 'risk_critical_action'
-      | 'risk_fallback_action'
+      | 'risk_failure_policy'
       | 'fraud_evidence'
       | 'flash_paced'
       | 'capture_burst'
@@ -246,7 +278,7 @@ export interface PolicyUpdateResult {
 export type RiskPolicyCandidate = Partial<
   Pick<
     AdminVerificationPolicy,
-    'risk_engine' | 'risk_medium_score' | 'risk_high_score' | 'risk_critical_score' | 'risk_medium_action' | 'risk_high_action' | 'risk_critical_action'
+    'risk_engine' | 'risk_family_max_points' | 'risk_medium_score' | 'risk_high_score' | 'risk_critical_score' | 'risk_medium_action' | 'risk_high_action' | 'risk_critical_action'
   >
 > & { risk_signals?: Record<string, RiskSignalUpdate> };
 
@@ -263,13 +295,15 @@ export type VerificationRules = Omit<
   | 'detect_impossible_travel'
   | 'max_travel_kmh'
   | 'liveness_timeout_seconds'
+  // El tiempo de sostener cada movimiento y el tope de reintentos viajan en cada reto (`FaceChallenge`), no en pantalla.
+  | 'liveness_hold_ms'
+  | 'liveness_max_retries'
   | 'flash_liveness'
   // Los movimientos de la prueba de vida los decide el servidor en cada reto (`FaceChallenge`), no la app en pantalla.
   | 'enable_turn_right'
   | 'enable_turn_left'
   | 'enable_look_up'
   | 'enable_look_down'
-  | 'qr_only_attendance'
   | 'updated_at'
   | 'updated_by'
 >;

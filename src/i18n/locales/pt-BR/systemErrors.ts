@@ -122,11 +122,13 @@ export default {
     intro:
       'O limite se ajusta sozinho à latência real (entre {min} e {max}). O que é crítico (identificar, entrar) passa primeiro; quando há saturação, o menos importante é descartado.',
     components: {
+      schema: 'Estrutura do banco de dados',
       database: 'Banco de dados',
       faceEngine: 'Mecanismo facial',
     },
     component: '{name}: {status}',
     available: 'disponível',
+    unavailable: 'indisponível',
     tiers: {
       critical: 'crítica',
       normal: 'normal',

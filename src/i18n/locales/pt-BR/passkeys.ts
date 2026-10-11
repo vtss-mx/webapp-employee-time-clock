@@ -8,6 +8,20 @@ export default {
   unsupported: 'Este navegador não aceita chaves de acesso. Use o Safari, o Chrome ou o Edge atualizados.',
   loadError: 'Não foi possível carregar suas chaves de acesso',
   add: 'Adicionar chave de acesso',
+  mfa: {
+    title: 'Sua conta precisa de uma chave de acesso',
+    daysLeft_one: 'Falta {count} dia para cadastrá-la.',
+    daysLeft_other: 'Faltam {count} dias para cadastrá-la.',
+    expiredTitle: 'Cadastre sua chave de acesso para continuar',
+    expiredText: 'O prazo terminou: nenhuma tela responde até você cadastrá-la.',
+    action: 'Cadastrar chave',
+  },
+  gate: {
+    badge: 'Segundo fator',
+    title: 'Cadastre sua chave de acesso',
+    footnote: 'Sua sessão continua aberta: ao cadastrá-la, tudo volta a funcionar.',
+    action: 'Cadastrar chave de acesso',
+  },
   empty: {
     title: 'Sem chaves de acesso',
     description: 'Adicione uma para entrar com o rosto, a digital ou o PIN.',

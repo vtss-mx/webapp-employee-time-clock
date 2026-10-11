@@ -61,7 +61,8 @@ export function ValidatorPasswordPage() {
         back();
       },
       resetError,
-      { confirm: () => resetConfirm(validator) },
+      // Lo que el servidor rechace de la contraseña (largo, filtrada) se marca en su campo, además del popup.
+      { confirm: () => resetConfirm(validator), onError: form.showServerError },
     );
   };
 

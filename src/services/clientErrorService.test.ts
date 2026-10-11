@@ -51,10 +51,10 @@ describe('reportClientError', () => {
 
     await reportClientError({ kind: 'CRASH', error: new TypeError('x is not a function') }); // la misma: no se repite
     expect(sent(calls)).toHaveLength(1);
-    window.history.pushState(null, '', '/company/departments');
+    window.history.pushState(null, '', '/company/verifications');
     await reportClientError({ kind: 'CRASH', error });
     expect(sent(calls)).toHaveLength(2); // en otra pantalla es otra falla
-    expect(bodyOf(sent(calls)[1])).toMatchObject({ path: '/company/departments', component: null, detail: null });
+    expect(bodyOf(sent(calls)[1])).toMatchObject({ path: '/company/verifications', component: null, detail: null });
   });
 
   it('es de mejor esfuerzo: un 429, un 500 o sin red no lanzan, no se reintentan ni avisan', async () => {

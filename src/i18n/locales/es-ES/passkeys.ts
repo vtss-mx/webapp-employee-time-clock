@@ -11,6 +11,16 @@ export default derive(es, {
   unsupported: 'Este navegador no admite claves de acceso. Usa Safari, Chrome o Edge actualizados.',
   loadError: 'No se pudieron cargar tus claves de acceso',
   add: 'Añadir clave de acceso',
+  mfa: {
+    title: 'Tu cuenta necesita una clave de acceso',
+    expiredTitle: 'Registra tu clave de acceso para continuar',
+    expiredText: 'El plazo caducó: ninguna pantalla responde hasta que la registres.',
+    action: 'Registrar clave',
+  },
+  gate: {
+    title: 'Registra tu clave de acceso',
+    action: 'Registrar clave de acceso',
+  },
   empty: {
     title: 'Sin claves de acceso',
     description: 'Añade una para entrar con el rostro, la huella o el PIN.',

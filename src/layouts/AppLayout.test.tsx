@@ -7,10 +7,8 @@ import { renderWithProviders, tokenResponse, sampleUser } from '../test/render';
 import { withScreens } from '../test/screens';
 import { AppLayout } from './AppLayout';
 import { DashboardPage } from '../pages/company/DashboardPage';
+import { ProfilePage } from '../pages/ProfilePage';
 import { useAuth } from '../hooks/useAuth';
-import { notifyAbsenceRequestsChanged } from '../hooks/usePendingAbsenceRequests';
-import { notifyShiftRequestsChanged } from '../hooks/usePendingShiftRequests';
-import { notifyAttendanceReviewsChanged } from '../hooks/usePendingAttendanceReviews';
 import { notifyFraudCasesChanged } from '../hooks/usePendingFraudCases';
 import { useEffect } from 'react';
 import { setLocale } from '../i18n/core';
@@ -52,6 +50,32 @@ function companyServer(pending = 0, extra: (call: MockCall) => Response | null =
 
 const preferenceCalls = (calls: MockCall[]) =>
   calls.filter((c) => c.url.endsWith('/users/me/preferences')).map((c) => JSON.parse(c.init.body as string) as unknown);
+
+describe('AppLayout: aviso de llave de acceso en Mi perfil', () => {
+  it.each([
+    { pending: true, until: new Date(Date.now() + 7 * 86_400_000).toISOString(), title: 'Tu cuenta necesita una llave de acceso' },
+    { pending: true, until: null, title: 'Registra tu llave de acceso para continuar' },
+    { pending: false, until: null, title: null },
+  ])('el perfil completo muestra un solo aviso del servidor (pendiente: $pending, plazo: $until)', async ({ pending, until, title }) => {
+    const account = withScreens({ ...sampleUser, role: 'ADMIN', employee: null, company: null, mfa_pending: pending, mfa_grace_until: until });
+    // Solo el perfil habilitado: el aviso depende del servidor, no de otros módulos o contadores del menú.
+    const user = { ...account, screens: account.screens.filter((item) => item.code === 'PROFILE'), home: '/profile' };
+    mockFetch((call) => {
+      if (call.url.endsWith('/auth/login')) return apiOk(tokenResponse(user));
+      if (call.url.endsWith('/users/me')) return apiOk(user);
+      return apiOk({ items: [], total: 0, page: 1, size: 10 });
+    });
+    renderLayout(<ProfilePage />, '/profile');
+    expect(await screen.findByRole('heading', { name: 'Mi perfil' })).toBeInTheDocument();
+    const notices = document.querySelectorAll('.mfa-notice');
+    expect(notices).toHaveLength(pending ? 1 : 0);
+    if (title) {
+      expect(notices[0]).toHaveTextContent(title);
+      expect(within(notices[0] as HTMLElement).getByRole('link', { name: 'Registrar llave' })).toHaveAttribute('href', '/profile/passkeys/new');
+    }
+    expect(screen.getByRole('heading', { name: 'Llaves de acceso' })).toBeInTheDocument();
+  });
+});
 
 describe('AppLayout: menú lateral contraíble', () => {
   it('contrae y expande (botón y Ctrl/⌘ + B); la preferencia se guarda en la BD, no en el navegador', async () => {
@@ -138,16 +162,12 @@ describe('AppLayout: menú lateral contraíble', () => {
   });
 
   it('el menú son las pantallas que envía el backend, en menús y submenús (orden, nombres y contadores)', async () => {
-    const { calls } = companyServer(4, (call) => {
-      if (call.url.endsWith('/shift-requests/summary')) return apiOk({ pending: 2 });
-      if (call.url.endsWith('/attendance/reviews/count')) return apiOk({ pending: 1 });
-      return call.url.endsWith('/calendar/absences/summary') ? apiOk({ pending: 3 }) : null;
-    });
+    companyServer(4);
     renderLayout();
     const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
     // Lo más simple: un módulo con una sola pantalla es una opción directa; con varias, un submenú (cerrado).
     const top = () => [...sidebar.querySelectorAll('.sidebar__nav > * > .nav-item')].map((item) => item.textContent);
-    await waitFor(() => expect(top()).toEqual(['Panel', 'Personal4', 'Asistencia6', 'Validadores', 'Integraciones (API)', 'Cuenta']));
+    await waitFor(() => expect(top()).toEqual(['Panel', 'Personal4', 'Verificación', 'Validadores', 'Integraciones (API)', 'Cuenta']));
     // «Cuenta» reúne los documentos de la empresa y Mi perfil (módulo ACCOUNT del backend).
     await userEvent.click(within(sidebar).getByRole('button', { name: 'Cuenta' }));
     expect(within(sidebar).getByRole('link', { name: 'Documentos' })).toHaveAttribute('href', '/company/documents');
@@ -159,39 +179,26 @@ describe('AppLayout: menú lateral contraíble', () => {
     expect(within(sidebar).getByRole('link', { name: 'Empleados' })).toHaveAttribute('href', '/company/employees');
     expect(people).not.toHaveTextContent('4'); // abierto, el pendiente está en su opción
     // Solo un submenú abierto a la vez.
-    await userEvent.click(within(sidebar).getByRole('button', { name: /Asistencia/ }));
+    await userEvent.click(within(sidebar).getByRole('button', { name: /Verificación/ }));
     expect(within(sidebar).queryByRole('link', { name: 'Empleados' })).toBeNull();
-    expect(within(sidebar).getByRole('link', { name: /Turnos/ })).toHaveTextContent('2');
-    expect(within(sidebar).getByRole('link', { name: /Calendario/ })).toHaveTextContent('3');
-    // Registros "en revisión" que la empresa confirma o rechaza (contador del tablero).
-    expect(within(sidebar).getByRole('link', { name: /Tablero del día/ })).toHaveTextContent('1');
-    await userEvent.click(within(sidebar).getByRole('button', { name: /Asistencia/ }));
-    expect(within(sidebar).queryByRole('link', { name: /Turnos/ })).toBeNull();
-    // Solicitudes de cambio de turno pendientes: una consulta periódica, que se repite al avisar un cambio.
-    const asked = calls.filter((c) => c.url.endsWith('/shift-requests/summary')).length;
-    act(() => notifyShiftRequestsChanged());
-    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/shift-requests/summary')).length).toBe(asked + 1));
-    // Igual las solicitudes de vacaciones o permisos (contador de Calendario).
-    const absences = calls.filter((c) => c.url.endsWith('/calendar/absences/summary')).length;
-    act(() => notifyAbsenceRequestsChanged());
-    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/calendar/absences/summary')).length).toBe(absences + 1));
-    const reviews = calls.filter((c) => c.url.endsWith('/attendance/reviews/count')).length;
-    act(() => notifyAttendanceReviewsChanged());
-    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/attendance/reviews/count')).length).toBe(reviews + 1));
+    expect(within(sidebar).getByRole('link', { name: /Verificaciones/ })).toHaveAttribute('href', '/company/verifications');
+    expect(within(sidebar).getByRole('link', { name: /Sitios/ })).toHaveAttribute('href', '/company/sites');
+    await userEvent.click(within(sidebar).getByRole('button', { name: /Verificación/ }));
+    expect(within(sidebar).queryByRole('link', { name: /Sitios/ })).toBeNull();
   });
 
   it('el submenú de la pantalla actual se abre solo; con el menú contraído (solo íconos) se ven todas las pantallas', async () => {
     companyServer();
-    renderLayout(<p>contenido</p>, '/company/shifts/new');
+    renderLayout(<p>contenido</p>, '/company/sites/new');
     const sidebar = await screen.findByRole('complementary', { name: 'Navegación principal' });
-    expect(await within(sidebar).findByRole('button', { name: /Asistencia/ })).toHaveAttribute('aria-expanded', 'true');
-    expect(within(sidebar).getByRole('link', { name: 'Turnos' })).toBeInTheDocument();
+    expect(await within(sidebar).findByRole('button', { name: /Verificación/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(within(sidebar).getByRole('link', { name: /Sitios/ })).toBeInTheDocument();
     expect(within(sidebar).queryByRole('link', { name: 'Empleados' })).toBeNull();
     // Al ir a una pantalla de otro submenú, se abre ese y se cierra el anterior.
     await userEvent.click(within(sidebar).getByRole('button', { name: /Personal/ }));
     await userEvent.click(within(sidebar).getByRole('link', { name: 'Empleados' }));
     expect(within(sidebar).getByRole('button', { name: /Personal/ })).toHaveAttribute('aria-expanded', 'true');
-    expect(within(sidebar).getByRole('button', { name: /Asistencia/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(sidebar).getByRole('button', { name: /Verificación/ })).toHaveAttribute('aria-expanded', 'false');
 
     const user = { ...sampleUser, role: 'COMPANY' as const, employee: null, preferences: { sidebar_collapsed: true } };
     mockFetch((call) => (call.url.includes('/enrollments') ? apiOk({ items: [], total: 0, page: 1, size: 1 }) : apiOk(tokenResponse(user))));
@@ -199,7 +206,7 @@ describe('AppLayout: menú lateral contraíble', () => {
     renderLayout();
     const compact = await screen.findByRole('complementary', { name: 'Navegación principal' });
     expect(await within(compact).findByRole('link', { name: 'Empleados' })).toBeInTheDocument();
-    expect(within(compact).getByRole('link', { name: 'Turnos' })).toBeInTheDocument();
+    expect(within(compact).getByRole('link', { name: /Sitios/ })).toBeInTheDocument();
     expect(within(compact).queryByRole('button', { name: /Personal/ })).toBeNull();
   });
 
@@ -230,9 +237,9 @@ describe('AppLayout: menú lateral contraíble', () => {
     // "Plataforma" abre su submenú porque la pantalla actual (Panel) es suya.
     await waitFor(() => expect(labels()).toEqual(['Panel', 'Empresas', 'Mi perfil']));
     expect(within(sidebar).getByRole('button', { name: 'Plataforma' })).toHaveAttribute('aria-expanded', 'true');
-    // "Operación" (errores del sistema, seguridad facial, casos de fraude y rendimiento) se abre a demanda; un submenú a la vez.
+    // "Operación" (errores, seguridad facial, fraude, rendimiento, deriva, auditoría y accesos) se abre a demanda; un submenú a la vez.
     await userEvent.click(within(sidebar).getByRole('button', { name: /Operación/ }));
-    await waitFor(() => expect(labels()).toEqual(['Errores del sistema3', 'Seguridad facial', 'Casos de fraude4', 'Rendimiento2', 'Deriva de señales', 'Mi perfil']));
+    await waitFor(() => expect(labels()).toEqual(['Errores del sistema3', 'Seguridad facial', 'Casos de fraude4', 'Rendimiento2', 'Deriva de señales', 'Bitácora de auditoría', 'Revisión de accesos', 'Historial de verificaciones', 'Mi perfil']));
     // Casos de fraude por revisar: una consulta periódica, que se repite al avisar una revisión.
     const fraud = () => mocked.calls.filter((c) => c.url.endsWith('/admin/fraud-cases/count')).length;
     const asked = fraud();

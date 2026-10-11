@@ -1,7 +1,7 @@
 {
-  "name": "Employee Time Clock",
-  "short_name": "ETC",
-  "description": "Attendance and work-hours tracking.",
+  "name": "Identity Verification Platform",
+  "short_name": "IVP",
+  "description": "Digital and biometric identity verification platform",
   "lang": "en-US",
   "start_url": "/",
   "scope": "/",

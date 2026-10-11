@@ -5,7 +5,6 @@ import es from '../es-MX/employee';
 export default derive(es, {
   enrollment: {
     privacy: 'Tus fotos, tu vídeo y tu voz se guardan cifrados y solo los revisa tu empresa; nunca se comparten.',
-    steps: { video: 'Vídeo' },
     tips: {
       light: 'Colócate en un lugar bien iluminado.',
     },
@@ -27,18 +26,11 @@ export default derive(es, {
       },
     },
     index: {
-      video: { title: 'Vídeo con preguntas' },
       state: { expired: 'Caducado' },
       hint: {
         expired: 'Tu foto ha caducado. Hazla de nuevo.',
-        needsPhoto: 'Primero haz tu foto inicial.',
       },
       action: { photo: 'Hacer foto', video: 'Grabar vídeo', resumeVideo: 'Continuar vídeo' },
-    },
-    blocked: {
-      needsPhoto: { text: 'Haz tu foto inicial antes de las capturas.' },
-      needsCaptures: { text: 'Completa las capturas antes del vídeo.' },
-      noVideo: { title: 'Sin vídeo', text: 'Tu empresa no pide el vídeo con preguntas.' },
     },
   },
   myQr: {

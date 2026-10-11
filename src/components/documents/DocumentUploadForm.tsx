@@ -12,7 +12,7 @@ import { DOCUMENT_ACCEPT, DOCUMENT_ERROR_FIELDS, DOCUMENT_NOTE_MAX, documentFile
 import { formatBytes } from '../../utils/numbers';
 import { TextAreaField } from '../FormField';
 import { FormFooter } from '../FormFooter';
-import { SelectField } from '../shifts/formFields';
+import { SelectField } from '../ui/formFields';
 import { FilePicker } from '../ui/FilePicker';
 import { Panel, PanelHeader, PanelSection } from '../ui/Panel';
 import { UploadProgress } from '../ui/UploadProgress';

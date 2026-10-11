@@ -122,11 +122,13 @@ export default {
     intro:
       'Das Limit passt sich selbst an die tatsächliche Latenz an (zwischen {min} und {max}). Kritisches (Identifizieren, Anmelden) hat Vorrang; bei Überlastung wird das Unwichtigste verworfen.',
     components: {
+      schema: 'Datenbankschema',
       database: 'Datenbank',
       faceEngine: 'Modul für Gesichtserkennung',
     },
     component: '{name}: {status}',
     available: 'verfügbar',
+    unavailable: 'nicht verfügbar',
     tiers: {
       critical: 'kritisch',
       normal: 'normal',

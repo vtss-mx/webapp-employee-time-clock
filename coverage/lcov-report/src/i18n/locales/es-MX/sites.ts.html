@@ -166,7 +166,17 @@
 <a name='L101'></a><a href='#L101'>101</a>
 <a name='L102'></a><a href='#L102'>102</a>
 <a name='L103'></a><a href='#L103'>103</a>
-<a name='L104'></a><a href='#L104'>104</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -269,13 +279,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/** Textos de sitios donde se checa: el listado, el alta y la edición, su estado y sus confirmaciones (es-MX). */
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/** Textos de los puntos de verificación: el listado, el alta y la edición, su estado y sus confirmaciones (es-MX). */
 export default {
   list: {
-    title: 'Sitios de trabajo',
+    title: 'Sitios de verificación',
     loadError: 'No se pudieron cargar los sitios',
-    subtitle_one: '{count} sitio · dónde se checa en persona y con qué radio',
-    subtitle_other: '{count} sitios · dónde se checa en persona y con qué radio',
+    subtitle_one: '{count} sitio · dónde se verifica la identidad y con qué radio',
+    subtitle_other: '{count} sitios · dónde se verifica la identidad y con qué radio',
     new: 'Nuevo sitio',
     searchPlaceholder: 'Buscar por nombre',
     searchLabel: 'Buscar sitios',
@@ -284,7 +304,6 @@ export default {
       site: 'Sitio',
       address: 'Domicilio',
       radius: 'Radio',
-      employees: 'Empleados hoy',
       code: 'Código',
     },
     /** Botón a los kioscos del sitio (lo lee el lector de pantalla). */
@@ -295,23 +314,23 @@ export default {
       description: 'Prueba con otra búsqueda o filtro.',
     },
     empty: {
-      title: 'Sin sitios de trabajo',
-      description: 'Crea un sitio para indicar dónde checa tu personal.',
+      title: 'Sin sitios de verificación',
+      description: 'Crea un sitio para acotar dónde se verifica.',
     },
   },
   form: {
     loadError: 'No se pudo cargar el sitio',
     newTitle: 'Nuevo sitio',
     editTitle: 'Editar sitio',
-    newSubtitle: 'Un lugar donde tu personal checa en persona: planta, sucursal, oficina…',
+    newSubtitle: 'Un lugar donde se verifica la identidad: planta, sucursal, oficina…',
     create: 'Crear sitio',
     createError: 'No se pudo crear el sitio',
     saveError: 'No se pudo guardar el sitio',
     /** La regla del radio, en el aviso al guardar. */
-    rule: 'Radio para checar: {distance}.',
+    rule: 'Radio para verificar: {distance}.',
     created: {
       title: 'Sitio creado',
-      text: '{name} ya se puede agregar a tus turnos. {rule}',
+      text: '{name} ya se puede usar al verificar. {rule}',
     },
     updated: {
       title: 'Sitio actualizado',
@@ -324,11 +343,11 @@ export default {
     name: 'Nombre del sitio',
     nameExample: 'Planta Hermosillo',
     nameHint: 'Único en tu empresa: p. ej. “Planta Hermosillo”',
-    radius: 'Radio para checar (metros)',
+    radius: 'Radio para verificar (metros)',
     radiusHint: 'Entre {min} y {max} m: el tamaño del lugar más el margen del GPS.',
     suggestedRadii: 'Radios sugeridos',
-    onSiteNote: 'En sitio se checa con el rostro y la ubicación del teléfono, dentro de este radio.',
-    locationIntro: 'Busca el lugar o toca el mapa. El círculo marca el radio para checar.',
+    onSiteNote: 'En sitio se verifica con el rostro y la ubicación del teléfono, dentro de este radio.',
+    locationIntro: 'Busca el lugar o toca el mapa. El círculo marca el radio para verificar.',
     pointRequired: 'Marca en el mapa el punto del sitio',
   },
   /** Lo que se confirma de un sitio (alta: lo que se crea; edición: "antes → después"). */
@@ -336,21 +355,21 @@ export default {
     address: 'Domicilio',
     references: 'Referencias',
     point: 'Punto en el mapa',
-    radius: 'Radio para checar',
+    radius: 'Radio para verificar',
   },
   confirm: {
     createTitle: '¿Crear el sitio {name}?',
-    createMessage: 'Se podrá agregar a tus turnos; quien los tenga checará aquí.',
+    createMessage: 'Se podrá usar para acotar dónde se verifica la identidad.',
     willCreate: 'Se creará',
     editTitle: '¿Guardar los cambios del sitio {name}?',
   },
   /** Estado de un sitio (su sección en la edición). */
   status: {
     title: 'Estado del sitio',
-    activeMeaning: 'Se puede agregar a los turnos y quien los tenga puede checar aquí.',
-    inactiveMeaning: 'Nadie puede checar en este sitio y no se puede agregar a un turno.',
-    deactivateWarning: 'Nadie podrá checar aquí ni agregarlo a un turno hasta que lo actives. Los turnos que lo incluyen y lo ya registrado no cambian.',
-    removeWarning: 'Solo se puede eliminar si ningún turno lo usa y nadie ha checado ahí. Si un turno lo usa, quítalo del turno; si ya se checó ahí, desactívalo.',
+    activeMeaning: 'Acepta verificaciones de identidad en este lugar.',
+    inactiveMeaning: 'No acepta verificaciones de identidad en este lugar.',
+    deactivateWarning: 'No aceptará verificaciones aquí hasta que lo actives. Lo ya registrado no cambia.',
+    removeWarning: 'Solo se puede eliminar si nadie se ha verificado ahí. Si ya hay verificaciones, desactívalo.',
     activateQuestion: '¿Activar el sitio {name}?',
     deactivateQuestion: '¿Desactivar el sitio {name}?',
     removeQuestion: '¿Eliminar el sitio {name}?',
@@ -359,15 +378,26 @@ export default {
     removed: 'Sitio eliminado',
     inUse: 'El sitio está en uso: desactívalo',
   },
+  /** Títulos de los popups cuando falla activar, desactivar o eliminar el registro. */
+  recordStatus: {
+    activateError: 'No se pudo activar {name}',
+    deactivateError: 'No se pudo desactivar {name}',
+    removeError: 'No se pudo eliminar {name}',
+  },
+  /** Errores de lo capturado (solo para guiar: el servidor vuelve a validar). */
+  validation: {
+    nameRequired: 'Escribe el nombre del sitio, p. ej. “{example}”',
+    nameMax: 'A lo más {max} caracteres',
+  },
   /** «Eliminados»: restaurar y el aviso de un sitio eliminado. */
   trash: {
     restoreTitle: '¿Restaurar el sitio {name}?',
     banner: 'Sitio eliminado',
   },
-  /** Código de sitio (antifraude 2b): la entrada y la salida piden el código del kiosco del sitio. */
+  /** Código de sitio (antifraude 2b): la verificación pide el código del kiosco del sitio. */
   presence: {
     label: 'Código de sitio',
-    hint: 'Pide en la entrada y la salida el código que muestra el kiosco del sitio.',
+    hint: 'Pide al verificar el código que muestra el kiosco del sitio.',
     on: 'Pide código',
     off: 'Sin código',
   },
@@ -379,7 +409,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-08T15:45:41.852Z
+                at 2026-10-11T02:30:57.323Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

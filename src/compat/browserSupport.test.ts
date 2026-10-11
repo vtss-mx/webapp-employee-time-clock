@@ -70,7 +70,7 @@ describe('el aviso de index.html', () => {
     expect(blocks.map((block) => block.lang)).toEqual([...LOCALES]);
     for (const block of blocks) {
       expect(block.hidden).toBe(true);
-      expect(block.querySelector('.browser-notice__brand')?.textContent).toBe('Employee Time Clock');
+      expect(block.querySelector('.browser-notice__brand')?.textContent).toBe('Identity Verification Platform');
       expect(block.querySelector('h1')?.textContent?.trim().length).toBeGreaterThan(0);
       expect(block.querySelectorAll('p')).toHaveLength(3);
     }

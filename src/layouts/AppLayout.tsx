@@ -3,6 +3,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { PageLoader } from '../components/Spinner';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { MfaNotice } from '../components/passkeys/MfaNotice';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { Avatar } from '../components/ui/Avatar';
 import { BrandLogo } from '../components/ui/BrandLogo';
@@ -12,10 +13,7 @@ import { useCatalogs } from '../hooks/useCatalogs';
 import { t, useT } from '../i18n';
 import { PendingEnrollmentsContext, usePendingEnrollments } from '../hooks/usePendingEnrollments';
 import { usePendingErrors } from '../hooks/usePendingErrors';
-import { usePendingAbsenceRequests } from '../hooks/usePendingAbsenceRequests';
-import { usePendingAttendanceReviews } from '../hooks/usePendingAttendanceReviews';
 import { usePendingFraudCases } from '../hooks/usePendingFraudCases';
-import { usePendingShiftRequests } from '../hooks/usePendingShiftRequests';
 import { useSlowAlerts } from '../hooks/useSlowAlerts';
 import { homeForUser } from '../routes/paths';
 import type { User } from '../types';
@@ -80,11 +78,8 @@ export function AppLayout() {
   // contexto, a las pantallas que la muestran (dashboard). Solo si el menú del usuario lo lleva.
   const pending = usePendingEnrollments(usesBadge(user, 'PENDING_ENROLLMENTS'));
   const pendingErrors = usePendingErrors(usesBadge(user, 'PENDING_ERRORS'));
-  const pendingShiftRequests = usePendingShiftRequests(usesBadge(user, 'PENDING_SHIFT_REQUESTS'));
-  const pendingAbsences = usePendingAbsenceRequests(usesBadge(user, 'PENDING_ABSENCE_REQUESTS'));
-  // Antifraude: casos por revisar (ADMIN) y registros "en revisión" que la empresa confirma o rechaza.
+  // Antifraude: casos de fraude por revisar (ADMIN).
   const openFraudCases = usePendingFraudCases(usesBadge(user, 'OPEN_FRAUD_CASES'));
-  const pendingReviews = usePendingAttendanceReviews(usesBadge(user, 'PENDING_ATTENDANCE_REVIEWS'));
   // Alertas de peticiones lentas (regla 18): una consulta para el contador y el aviso en vivo.
   const openSlowAlerts = useSlowAlerts(usesBadge(user, 'OPEN_SLOW_ALERTS'));
 
@@ -99,11 +94,8 @@ export function AppLayout() {
   const nav = navFor(user, {
     PENDING_ENROLLMENTS: pending,
     PENDING_ERRORS: pendingErrors,
-    PENDING_SHIFT_REQUESTS: pendingShiftRequests,
-    PENDING_ABSENCE_REQUESTS: pendingAbsences,
     OPEN_SLOW_ALERTS: openSlowAlerts,
     OPEN_FRAUD_CASES: openFraudCases,
-    PENDING_ATTENDANCE_REVIEWS: pendingReviews,
   });
   const role = nameOf('roles', user.role);
   const toggleLabel = collapsed ? t('layout.menu.expand') : t('layout.menu.collapse');
@@ -162,6 +154,8 @@ export function AppLayout() {
 
       <div className="main">
         <main className="content">
+          {/* Segundo factor pendiente: el aviso se ve desde cualquier pantalla, con los días que quedan. */}
+          <MfaNotice />
           {/* La key reinicia la animación de entrada en cada cambio de ruta. */}
           <div key={location.pathname} className="page-transition">
             {/* Un error en una pantalla no tumba el menú ni la sesión; se reinicia al navegar. */}

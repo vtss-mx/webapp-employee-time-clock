@@ -1,0 +1,73 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/continuity';
+
+/** Continuità del servizio (sezione «Continuità» della schermata Prestazioni dell'ADMIN; migrazione 0097), it-IT. */
+export default {
+  loadError: 'Impossibile caricare la continuità',
+  drillsError: 'Impossibile caricare lo storico delle prove',
+  commitment: 'Impegno di ripristino',
+  commitmentIntro: 'A cosa si impegna la piattaforma e cosa è attivo oggi.',
+  rto: 'Tempo massimo per tornare (RTO)',
+  rpo: 'Perdita massima di dati (RPO)',
+  interval: 'Ogni quanto bisogna fare una prova',
+  backupUpload: "Copia del backup nell'archiviazione",
+  pitr: 'Ripristino a un istante',
+  backupInterval: 'Ogni quanto si fa il backup',
+  backupRetention: 'Backup conservati',
+  pitrArchive: 'Ogni quanto si archivia il registro',
+  pitrRetention: 'Archivio conservato',
+  enabled: 'Attiva',
+  disabled: 'Disattivata',
+  days_one: '{count} giorno',
+  days_other: '{count} giorni',
+  rpoUnreachable: "L'RPO promesso è minore dell'intervallo di archiviazione del registro: non si può rispettare.",
+  drills: 'Prove di ripristino',
+  drillsIntro: 'Un meccanismo per ogni modo di ripristinare. Mai provato conta come scaduto.',
+  kinds: {
+    PITR: 'Istante preciso',
+    BUCKET_DUMP: "Copia cifrata nell'archiviazione",
+  },
+  states: {
+    never: 'Mai provato',
+    overdue: 'Scaduto',
+    failed: "L'ultima non è riuscita",
+    ok: 'In regola',
+  },
+  neverDrilled: 'Mai provato: va fatto ora.',
+  lastSuccess: 'Ultima prova riuscita: {date}',
+  dueOn: 'prossima il {date}',
+  dueNow: 'da fare ora',
+  lastFailed: 'Il tentativo del {date} non è riuscito.',
+  rtoMeasured: 'Tornato in {value}',
+  rpoMeasured: 'Persi {value}',
+  dataset: 'Con {value}',
+  targetsAt: 'Impegno di allora: {rto} e {rpo}',
+  notMeasured: 'Non misurato',
+  overdue_one: '{count} meccanismo è scaduto o non è mai stato provato.',
+  overdue_other: '{count} meccanismi sono scaduti o non sono mai stati provati.',
+  history: 'Storico delle prove',
+  historyIntro: 'Ogni prova con il suo esito e le sue misure. Anche quelle non riuscite.',
+  columns: {
+    kind: 'Meccanismo',
+    when: 'Quando',
+    result: 'Esito',
+    measures: 'Misure',
+  },
+  results: {
+    met: 'Rispettato',
+    missed: 'Ripristinato, fuori obiettivo',
+    failed: 'Non riuscito',
+  },
+  noun: {
+    one: 'prova',
+    other: 'prove',
+  },
+  empty: {
+    title: 'Nessuna prova',
+    description: 'Qui vedrai ogni ripristino con le sue misure.',
+  },
+  noKinds: {
+    title: 'Nessun meccanismo',
+    description: 'Qui vedrai lo stato di ogni modo di ripristinare.',
+  },
+} satisfies Translation<typeof es>;

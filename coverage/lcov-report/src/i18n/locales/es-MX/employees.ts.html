@@ -253,67 +253,7 @@
 <a name='L188'></a><a href='#L188'>188</a>
 <a name='L189'></a><a href='#L189'>189</a>
 <a name='L190'></a><a href='#L190'>190</a>
-<a name='L191'></a><a href='#L191'>191</a>
-<a name='L192'></a><a href='#L192'>192</a>
-<a name='L193'></a><a href='#L193'>193</a>
-<a name='L194'></a><a href='#L194'>194</a>
-<a name='L195'></a><a href='#L195'>195</a>
-<a name='L196'></a><a href='#L196'>196</a>
-<a name='L197'></a><a href='#L197'>197</a>
-<a name='L198'></a><a href='#L198'>198</a>
-<a name='L199'></a><a href='#L199'>199</a>
-<a name='L200'></a><a href='#L200'>200</a>
-<a name='L201'></a><a href='#L201'>201</a>
-<a name='L202'></a><a href='#L202'>202</a>
-<a name='L203'></a><a href='#L203'>203</a>
-<a name='L204'></a><a href='#L204'>204</a>
-<a name='L205'></a><a href='#L205'>205</a>
-<a name='L206'></a><a href='#L206'>206</a>
-<a name='L207'></a><a href='#L207'>207</a>
-<a name='L208'></a><a href='#L208'>208</a>
-<a name='L209'></a><a href='#L209'>209</a>
-<a name='L210'></a><a href='#L210'>210</a>
-<a name='L211'></a><a href='#L211'>211</a>
-<a name='L212'></a><a href='#L212'>212</a>
-<a name='L213'></a><a href='#L213'>213</a>
-<a name='L214'></a><a href='#L214'>214</a>
-<a name='L215'></a><a href='#L215'>215</a>
-<a name='L216'></a><a href='#L216'>216</a>
-<a name='L217'></a><a href='#L217'>217</a>
-<a name='L218'></a><a href='#L218'>218</a>
-<a name='L219'></a><a href='#L219'>219</a>
-<a name='L220'></a><a href='#L220'>220</a>
-<a name='L221'></a><a href='#L221'>221</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L191'></a><a href='#L191'>191</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -508,9 +448,6 @@ export default {
   noun: { one: 'empleado', other: 'empleados' },
   /** El número del empleado en una línea secundaria ("No. EMP-7"). */
   number: 'No. {number}',
-  /** Cuántos empleados ("12 empleados"). */
-  count_one: '{count} empleado',
-  count_other: '{count} empleados',
   email: 'Correo',
   loadError: 'No se pudo cargar el empleado',
   back: 'Empleados',
@@ -549,7 +486,7 @@ export default {
     phoneHint: 'Elige el país y escribe el número',
     password: 'Contraseña',
     newPassword: 'Nueva contraseña',
-    passwordHint: 'Mínimo 8 caracteres, con mayúscula, minúscula y número',
+    passwordHint: 'Mínimo 12 caracteres, con mayúscula, minúscula y número',
     keepPassword: 'Déjala vacía para no cambiarla',
     sharedAccount: 'Cuenta compartida con otra empresa: solo la persona puede cambiarlo',
     headwear: 'Excepción de prenda de cabeza',
@@ -599,9 +536,7 @@ export default {
     title: 'Empleado',
     sharedAccount: 'Cuenta compartida',
     sharedAccountHint: 'Trabaja también en otra empresa con la misma cuenta',
-    shifts: 'Turnos',
     info: 'Información',
-    managerOf: 'Responsable de',
     registered: 'Registrado',
     history: 'Bitácora de verificaciones',
     activate: 'Activar empleado',
@@ -692,31 +627,6 @@ export default {
       },
     },
   },
-  /** Elegir uno o varios empleados (asignar un turno, registrar una ausencia). */
-  picker: {
-    label: 'Empleados',
-    searchPlaceholder: 'Buscar por nombre, número o correo',
-    allDepartments: 'Todos los departamentos',
-    departmentFilter: 'Filtrar por departamento',
-    chosen_one: '{count} empleado elegido',
-    chosen_other: '{count} empleados elegidos',
-    nobody: 'Nadie elegido',
-    selectFiltered_one: 'Seleccionar el único de este filtro',
-    selectFiltered_other: 'Seleccionar los {count} de este filtro',
-    selectAll_one: 'Seleccionar al único empleado',
-    selectAll_other: 'Seleccionar a los {count}',
-    clear: 'Quitar selección',
-    selectError: 'No se pudieron seleccionar los empleados',
-    limit: {
-      title: 'Se alcanzó el límite',
-      text: 'El filtro tiene {total} empleados y el máximo por operación es {limit}: se eligieron los primeros {chosen} de la lista.',
-    },
-    noMatch: 'Prueba con otra búsqueda o filtro.',
-    empty: 'Registra a tu personal en Empleados para elegirlo.',
-    /** A quiénes afecta una acción, en su confirmación. */
-    affected_one: 'Empleado',
-    affected_other: 'Empleados ({count})',
-  },
   /** «Eliminados»: restaurar y el aviso del expediente de un empleado eliminado. */
   trash: {
     restoreTitle: '¿Restaurar a {name}?',
@@ -730,7 +640,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-08T15:45:41.852Z
+                at 2026-10-11T02:30:57.323Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

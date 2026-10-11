@@ -1,4 +1,4 @@
-import type { AdminVerificationPolicy, CheckpointProfile, RiskSignalSetting, Validator, VerificationPolicy, VerificationResult } from '../types';
+import type { AdminVerificationPolicy, CheckpointProfile, RiskSignalSetting, Validator, VerificationDetail, VerificationPolicy, VerificationResult, VerificationSummary } from '../types';
 import { STRICT_RULES } from '../hooks/useVerificationPolicy';
 
 export const sampleValidator: Validator = {
@@ -43,6 +43,7 @@ export const sampleCheckpoint: CheckpointProfile = {
 
 export const identifiedResult: VerificationResult = {
   verified: true,
+  verification_status: 'APPROVED',
   method: 'FACE',
   message: 'Identificación exitosa',
   employee_id: 7,
@@ -69,8 +70,10 @@ export const samplePolicy: VerificationPolicy = {
   detect_impossible_travel: true,
   max_travel_kmh: 200,
   liveness_timeout_seconds: 60,
+  // Prueba de vida calibrada por el ADMIN (decisión del dueño, 2026-10-08): respaldos del contrato (0.55 s de sostén, 3 reintentos).
+  liveness_hold_ms: 550,
+  liveness_max_retries: 3,
   flash_liveness: 'OBSERVE',
-  qr_only_attendance: false,
   updated_at: null,
   updated_by: null,
 };
@@ -108,6 +111,7 @@ export const sampleAdminPolicy: AdminVerificationPolicy = {
   risk_high_action: 'REVIEW',
   risk_critical_action: 'DENY',
   risk_fallback_action: 'ALERT',
+  risk_failure_policy: 'INCONCLUSIVE',
   fraud_evidence: true,
   // Destello dictado por el servidor (antifraude 2a): interruptor del ADMIN, apagado por omisión como en el backend.
   flash_paced: false,
@@ -123,4 +127,86 @@ export const sampleAdminPolicy: AdminVerificationPolicy = {
   ],
   pending_changes: 0,
   two_person_rule: true,
+};
+
+/**
+ * Historial de verificaciones (migración 0106 del backend): el resumen del periodo y el detalle de un intento con
+ * todo lo que se midió. Son NÚMEROS, códigos y veredictos: ninguna imagen, ninguna plantilla (regla 13).
+ */
+export const sampleVerificationSummary: VerificationSummary = {
+  since: '2026-09-05T06:00:00Z',
+  until: '2026-10-05T06:00:00Z',
+  total: 12,
+  succeeded: 10,
+  failed: 2,
+  located: 11,
+  by_method: [{ method: 'FACE', total: 11, succeeded: 10 }, { method: 'QR', total: 1, succeeded: 0 }],
+  by_reason: [{ reason: 'NO_MATCH', total: 2 }],
+  by_risk_tier: [{ tier: 'HIGH', total: 1 }],
+  count_cap: 10000,
+  filterable_risk_tiers: ['MEDIUM', 'HIGH', 'CRITICAL'],
+  window_days: 30,
+};
+
+export const sampleVerificationDetail: VerificationDetail = {
+  id: 1,
+  created_at: '2026-10-05T10:00:00Z',
+  method: 'FACE',
+  success: true,
+  reason: null,
+  confidence: 0.99,
+  company_id: 1,
+  company_name: 'Acme',
+  employee: { id: 7, full_name: 'Ana Ruiz', employee_number: 'EMP-7', deleted: false, avatar: null },
+  actor: { role: 'EMPLOYEE', email: 'ana@acme.mx', name: null, device: null },
+  place: {
+    latitude: 29.1,
+    longitude: -110.9,
+    location_accuracy_m: 12,
+    site: { id: 1, name: 'Planta Hermosillo', deleted: false },
+    presence_code_used: true,
+    ip_address: '187.188.1.10',
+    network: { country: 'MX', asn: 22884, organization: 'Acme Networks', hosting: false },
+    user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1',
+  },
+  measurement: {
+    steps: 2,
+    flash_mode: 'OFF',
+    response_seconds: 1.4,
+    frontal_real_min: 0.91,
+    frontal_real_mean: 0.95,
+    step_real_min: 0.9,
+    yaw_min: 0.3,
+    pitch_min: null,
+    closer_min: null,
+    flash_score: null,
+    flash_magnitude: null,
+    flash_background: null,
+    flash_ratio: null,
+    quality_mean: 0.77,
+    brightness_mean: 120,
+    burst_frames: 8,
+    burst_motion: 0.4,
+    pulse_snr: null,
+    moire: 0.12,
+    noise_ratio: 1.1,
+    parallax: 0.6,
+    flash_pace_ms: null,
+    burst_consensus: 0.88,
+    platform: 'IOS_SAFARI',
+    pad: { texture: 0.12 },
+    fraud_label: null,
+  },
+  risk: {
+    score: 20,
+    tier: 'LOW',
+    action: 'ALLOW',
+    step_up: false,
+    fallback: false,
+    policy_version: 'abc123',
+    engine: 'rules',
+    fraud_label: null,
+    signals: [{ code: 'MOIRE_HIGH', name: 'Moiré alto', description: null, points: 20, mode: 'ENFORCE', kind: 'PRESENTATION', value: 0.8, threshold: 0.5 }],
+  },
+  case: null,
 };

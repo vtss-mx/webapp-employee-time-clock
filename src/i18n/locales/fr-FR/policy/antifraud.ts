@@ -24,10 +24,19 @@ export default {
     applied: 'Niveau {name} appliqué',
   },
   risk: {
+    readiness: {
+      title: 'État du moteur de risque',
+      score: 'Limite supérieure du score : {maximum}. Signaux uniquement observés : {observed}. Signaux obligatoires : {enforced}.',
+      cannotReject: 'Le score ne permet pas de rejeter avec cette configuration.',
+      calibration: 'La calibration reste à effectuer ; ce décompte ne prouve pas la précision.',
+      independent: 'Les contrôles critiques restent actifs même si leur signal ou le moteur est désactivé.',
+      critical: 'Contrôle indépendant : {action}',
+    },
     title: 'Moteur de risque',
     hint: "Additionne les points des signaux de chaque tentative et applique l'action correspondant à son niveau de risque. Chaque famille de signaux est plafonnée: un seul signal ne refuse jamais à lui seul.",
     points: '{points} points',
     fields: {
+      familyCap: 'Plafond par famille',
       mediumScore: 'Risque moyen à partir de',
       highScore: 'Risque élevé à partir de',
       criticalScore: 'Risque critique à partir de',
@@ -39,6 +48,15 @@ export default {
       deviceMode: "Appareil de l'employé",
       minConfidence: 'Niveau de confiance',
       identifyConfidence: 'Niveau de confiance pour identifier parmi tous les employés',
+    },
+    familyCap: {
+      description: 'Limite la somme des signaux d’une même famille.',
+      saved: 'Plafond de risque modifié',
+      savedText: 'Plafond par famille: {points}.',
+    },
+    changeReason: {
+      label: 'Motif du changement de risque',
+      hint: 'Expliquez le changement; il figure dans le journal de l’entreprise.',
     },
     scores: {
       medium: 'Plus il est bas, plus de tentatives exigent une étape supplémentaire.',
@@ -154,7 +172,7 @@ export default {
   },
   presence: {
     title: 'Preuve de présence',
-    hint: 'Vérifie que chaque identification et chaque pointage ont lieu au bon endroit et sur le bon appareil.',
+    hint: 'Vérifie que chaque identification et chaque vérification ont lieu au bon endroit et sur le bon appareil.',
     saved: '{label}: {mode}',
     signing: {
       label: 'Signature par requête',
@@ -173,8 +191,8 @@ export default {
     },
     siteCodes: {
       label: 'Code du site',
-      hint: "Sur les sites qui l'activent, l'entrée et la sortie incluent le code de la borne.",
-      enforceWarning: "Installez d'abord une borne sur chaque site qui l'active: sans le code, le pointage n'est pas enregistré.",
+      hint: "Sur les sites qui l'activent, chaque vérification inclut le code de la borne.",
+      enforceWarning: "Installez d'abord une borne sur chaque site qui l'active: sans le code, la vérification n'est pas enregistrée.",
     },
   },
 } satisfies Translation<typeof es>;

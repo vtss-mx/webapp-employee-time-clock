@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ApiError } from '../services/apiClient';
 import { meService } from '../services/meService';
 import type { DynamicQr } from '../types';
 import { config } from '../utils/config';
@@ -93,10 +94,21 @@ export function useDynamicQr() {
     async (signal) => {
       // Solo se consulta en la fase 'ready', que `renew` fija junto con el código: siempre hay uno en pantalla.
       const shown = current.current.qr as DynamicQr;
-      const status = await meService.qrStatus(shown.id, signal);
-      if (!mounted.current || current.current.qr?.id !== status.id || current.current.phase !== 'ready') return;
-      if (status.status === 'USED') setPhase('used');
-      else if (status.status === 'REVOKED') setPhase('replaced');
+      const stillShown = () => mounted.current && current.current.qr?.id === shown.id && current.current.phase === 'ready';
+      try {
+        const status = await meService.qrStatus(shown.id, signal);
+        if (!mounted.current || current.current.qr?.id !== status.id || current.current.phase !== 'ready') return;
+        if (status.status === 'USED') setPhase('used');
+        else if (status.status === 'REVOKED') setPhase('replaced');
+      } catch (error) {
+        // 404 QR_NOT_FOUND: el código que se mostraba ya no existe (lo reemplazó otro dispositivo o la empresa lo
+        // invalidó). Se trata como 'replaced' (aviso + «Generar otro»), nunca se traga en silencio.
+        if (error instanceof ApiError && error.status === 404 && error.code === 'QR_NOT_FOUND') {
+          if (stillShown()) setPhase('replaced');
+          return;
+        }
+        throw error; // otras fallas (red, 5xx): el sondeo las ignora y reintenta en el siguiente tic
+      }
     },
     { intervalMs: config.qrStatusPollSeconds * 1000, enabled: phase === 'ready', immediate: false },
   );

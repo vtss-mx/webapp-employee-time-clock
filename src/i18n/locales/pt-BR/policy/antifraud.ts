@@ -23,10 +23,19 @@ export default {
     applied: 'Nível {name} aplicado',
   },
   risk: {
+    readiness: {
+      title: 'Estado do motor de risco',
+      score: 'Limite superior da pontuação: {maximum}. Sinais apenas observados: {observed}. Sinais obrigatórios: {enforced}.',
+      cannotReject: 'A pontuação não permite rejeitar com esta configuração.',
+      calibration: 'A calibração continua pendente; esta contagem não comprova a precisão.',
+      independent: 'Os controles críticos se aplicam mesmo com seu sinal ou o motor desligados.',
+      critical: 'Controle independente: {action}',
+    },
     title: 'Mecanismo de risco',
     hint: 'Soma os pontos dos sinais de cada tentativa e aplica a ação do nível de risco correspondente. Cada família de sinais tem um teto: um sinal sozinho nunca nega por conta própria.',
     points: '{points} pontos',
     fields: {
+      familyCap: 'Limite por família',
       mediumScore: 'Risco médio a partir de',
       highScore: 'Risco alto a partir de',
       criticalScore: 'Risco crítico a partir de',
@@ -38,6 +47,15 @@ export default {
       deviceMode: 'Dispositivo do funcionário',
       minConfidence: 'Nível de confiança',
       identifyConfidence: 'Nível de confiança para identificar entre todos',
+    },
+    familyCap: {
+      description: 'Limita a soma dos sinais de uma mesma família.',
+      saved: 'Limite de risco atualizado',
+      savedText: 'Limite por família: {points}.',
+    },
+    changeReason: {
+      label: 'Motivo da alteração de risco',
+      hint: 'Explique a alteração; ela fica no histórico da empresa.',
     },
     scores: {
       medium: 'Quanto mais baixo, mais tentativas exigem uma etapa a mais.',
@@ -52,7 +70,7 @@ export default {
       savedText: '{tier}: {action}.',
     },
     fallback: {
-      description: 'Só pode permitir, avisar ou exigir uma etapa a mais: nunca nega às cegas.',
+      description: 'Uma falha do motor nunca aprova a identidade. O servidor define as opções seguras.',
       saved: 'Alternativa do mecanismo atualizada',
       savedText: 'Se o mecanismo falhar: {action}.',
     },
@@ -170,8 +188,8 @@ export default {
     },
     siteCodes: {
       label: 'Código do local',
-      hint: 'Nos locais que o ativarem, a entrada e a saída levam o código do quiosque.',
-      enforceWarning: 'Antes, instale um quiosque em cada local que o ativar: sem o código, o ponto não é registrado.',
+      hint: 'Nos locais que o ativarem, cada verificação leva o código do quiosque.',
+      enforceWarning: 'Antes, instale um quiosque em cada local que o ativar: sem o código, a verificação não é registrada.',
     },
   },
 } satisfies Translation<typeof es>;

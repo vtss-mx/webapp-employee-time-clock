@@ -27,7 +27,18 @@ export default {
   },
   password: {
     new: 'Nouveau mot de passe',
-    hint: 'Au moins 8 caractères, avec une majuscule, une minuscule et un chiffre',
+    hint: 'Au moins 12 caractères, avec une majuscule, une minuscule et un chiffre',
+  },
+  mfa: {
+    eyebrow: 'Second facteur',
+    title: "Connectez-vous avec votre clé d'accès",
+    step: "Utilisez le bouton « Se connecter avec une clé d'accès ».",
+  },
+  locked: {
+    eyebrow: 'Compte bloqué',
+    title: 'Trop de tentatives',
+    wait: 'Attendez {value} avant de réessayer.',
+    passkey: "Avec une clé d'accès, vous pouvez vous connecter maintenant.",
   },
   device: {
     eyebrow: 'Appareil',

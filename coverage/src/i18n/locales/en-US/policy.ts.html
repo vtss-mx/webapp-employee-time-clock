@@ -309,7 +309,53 @@
 <a name='L244'></a><a href='#L244'>244</a>
 <a name='L245'></a><a href='#L245'>245</a>
 <a name='L246'></a><a href='#L246'>246</a>
-<a name='L247'></a><a href='#L247'>247</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -596,8 +642,8 @@ export default {
       hint: 'Each secure identification teaches how each employee looks today. Samples validated by the company are never replaced.',
     },
     location: {
-      title: 'Attendance location',
-      hint: "Each attendance record carries the phone's location and the server's time; adjust accuracy and speed below.",
+      title: 'Verification location',
+      hint: "Each verification carries the phone's location and the server's time; adjust accuracy and speed below.",
     },
     methods: {
       title: 'Identification methods',
@@ -722,11 +768,6 @@ export default {
       on: 'Each validator tablet or phone must be approved in Validators › Devices.',
       off: 'Validators can sign in on any device with their email and password.',
     },
-    qrOnlyAttendance: {
-      label: 'Attendance with the QR code alone',
-      on: 'A validator in QR mode records check-in and check-out with the code, without a face.',
-      off: 'The QR code alone only identifies; recording attendance requires the face.',
-    },
     riskEngine: {
       label: 'Risk engine',
       on: 'Each attempt is scored with its signals and decided by its risk level (adjust it below).',
@@ -768,7 +809,6 @@ export default {
     impossibleTravel: "A record with a fake location or from another place won't be detected by distance.",
     deviceApproval: "Anyone with a validator's email and password will be able to operate from any device.",
     mobileOnly: 'Validators will be able to operate from computers, whose cameras are usually easier to fool with photos or screens.',
-    qrOnly: 'Anyone holding another employee’s phone will be able to record their attendance without showing a face.',
     riskEngine: 'Signals will no longer add up: an attempt with several signs of spoofing will pass if no single lock stops it.',
     captureProtocol: 'Video prepared in advance will be harder to detect.',
     voiceVerification: 'An enrollment with someone else\'s photos will no longer get the second voice-and-face check on video.',
@@ -798,6 +838,35 @@ export default {
     },
     preview: 'Test voice',
   },
+  /** Steps of the identity enrollment and their order: the ADMIN decides which ones and in what order per company. */
+  enrollment: {
+    title: 'Identity enrollment steps',
+    hint: 'Choose what each employee is asked for and in what order. The employee does the steps in that order.',
+    label: 'Enrollment steps, in order',
+    required: 'Required',
+    locked: 'Always requested: it is the enrollment the company validates.',
+    position: 'Step {position} of {total}',
+    notAsked: 'Not requested',
+    moveUp: 'Move “{name}” up',
+    moveDown: 'Move “{name}” down',
+    note: 'The “{step}” step is always requested and stays at the end of the flow.',
+    warning: 'Asking for fewer steps reduces the proof that the person is who they claim to be.',
+    confirm: {
+      enableTitle: 'Request “{name}”?',
+      enableText: 'Every employee will have to complete “{name}” in their enrollment.',
+      disableTitle: 'Stop requesting “{name}”?',
+      moveTitle: 'Move “{name}” to step {position}?',
+      moveText: 'The same steps are requested, in a different order.',
+      order: 'Enrollment order',
+      save: 'Save order',
+    },
+    notice: {
+      enabled: '{name}: now requested',
+      disabled: '{name}: no longer requested',
+      moved: '{name}: moved',
+      text: 'Applies to the enrollment of anyone who has not finished it yet.',
+    },
+  },
   tuning,
   ...antifraud,
 } satisfies Translation&lt;typeof es&gt;;
@@ -808,7 +877,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-08T15:45:41.274Z
+                at 2026-10-11T02:30:56.944Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

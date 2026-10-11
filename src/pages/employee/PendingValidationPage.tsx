@@ -10,12 +10,14 @@ import { usePolling } from '../../hooks/usePolling';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { t, useLocale } from '../../i18n';
 import { config } from '../../utils/config';
+import { completedSteps } from '../../utils/enrollmentStepRules';
 
 /**
- * Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. Arriba, los pasos del registro con los tres
- * hechos en verde (adenda del dueño, 2026-10-07): esta pantalla solo llega cuando el servidor dejó el registro en
- * validación (`face_status` PENDING_REVIEW en `user.screens`), así que lo verde es lo que el servidor procesó. El paso
- * del video se muestra según la política de la empresa (la misma lectura compartida de las demás pantallas).
+ * Pantalla de espera mientras COMPANY valida la identidad. Se actualiza sola. Arriba, los pasos del registro TODOS en
+ * verde (adenda del dueño, 2026-10-07): esta pantalla solo llega cuando el servidor dejó el registro en validación
+ * (`face_status` PENDING_REVIEW en `user.screens`), así que lo verde es lo que el servidor procesó. Cuáles pasos son
+ * sale del flujo que configuró el ADMIN para la empresa (`policy.enrollment_steps`, decisión del dueño del 2026-10-08),
+ * con la misma lectura compartida de las demás pantallas; sus nombres, del catálogo.
  */
 export function PendingValidationPage() {
   useLocale(); // textos con `t` al dibujarse: un cambio de idioma los traduce
@@ -33,7 +35,7 @@ export function PendingValidationPage() {
   return (
     <div className="page page--narrow page-transition">
       <div className="result-card">
-        <EnrollmentStepper current="done" withVideo={policy.voice_verification} />
+        <EnrollmentStepper steps={completedSteps(policy.enrollment_steps, policy.voice_verification)} current={null} />
         <StatusMark kind="pending" />
         <div className="stack" style={{ gap: 8 }}>
           <span style={{ justifySelf: 'center' }}>

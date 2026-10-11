@@ -43,7 +43,19 @@ export const USERS = {
 } satisfies Record<string, User>;
 
 /** Valor de cada parámetro de las rutas (un registro de los datos de prueba). */
-const PARAMS: Record<string, string> = { id: '1', mode: 'enroll', role: 'employees', status: 'CONFIRMED', action: 'check-in', changeId: '2', adminId: '2', paymentId: '3', chargeId: '3' };
+const PARAMS: Record<string, string> = {
+  id: '1',
+  mode: 'enroll',
+  role: 'employees',
+  status: 'CONFIRMED',
+  action: 'check-in',
+  changeId: '2',
+  adminId: '2',
+  paymentId: '3',
+  chargeId: '3',
+  // Paso de documentos del registro de identidad (decisión del dueño, 2026-10-08): su código del catálogo va en la ruta.
+  step: 'OFFICIAL_ID',
+};
 
 export interface ScreenCase {
   /** Código de la pantalla (`SCREEN_VIEWS`). */

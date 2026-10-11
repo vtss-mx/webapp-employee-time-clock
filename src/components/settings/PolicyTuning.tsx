@@ -1,4 +1,4 @@
-import { Aperture, Clock, Crosshair, Gauge, Lock, Palette, QrCode, Repeat, ScanFace, Timer } from 'lucide-react';
+import { Aperture, Clock, Crosshair, Gauge, Hand, Lock, Palette, QrCode, Repeat, RotateCcw, ScanFace, Timer } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { t, useT } from '../../i18n';
@@ -16,6 +16,11 @@ const STEP_DESCRIPTIONS: Partial<Record<number, 'one' | 'two' | 'three'>> = { 1:
 const movesLabel = (n: number) => t('policy.tuning.steps.option', { count: n });
 /** Tiempo para responder el reto completo (s, el backend acepta de 20 a 180). */
 const CHALLENGE_TIMEOUTS = [20, 30, 45, 60, 90, 120, 180];
+/** Tiempo para SOSTENER cada movimiento del reto antes de capturarlo (ms, el backend acepta de 200 a 3000). */
+const HOLD_TIMES = [200, 300, 400, 550, 700, 900, 1200, 1500, 2000, 3000];
+const holdLabel = (ms: number) => `${formatNumber(ms)} ms`;
+/** Reintentos del reto (pedir otro conservando el escaneo) antes de reiniciarlo (el backend acepta de 0 a 5). */
+const CHALLENGE_RETRIES = [0, 1, 2, 3, 4, 5];
 const LOCKOUT_FAILURES = [3, 5, 7, 10];
 const LOCKOUT_MINUTES = [5, 15, 30, 60, 120];
 const QR_LIFETIMES = [15, 30, 60, 120, 300];
@@ -141,6 +146,36 @@ function tuningsOf(policy: VerificationPolicy, { active, byCode, nameOf }: Catal
         changes: { liveness_timeout_seconds: Number(value) },
         title: () => t('policy.tuning.timeout.saved'),
         detail: () => t('policy.tuning.timeout.savedText', { time: secondsLabel(Number(value)) }),
+      }),
+    },
+    {
+      key: 'liveness_hold_ms',
+      icon: <Hand size={20} />,
+      label: () => t('policy.tuning.hold.label'),
+      description: t('policy.tuning.hold.description'),
+      enabled: policy.liveness_challenge,
+      value: String(policy.liveness_hold_ms),
+      options: () => numbered(withCurrent(HOLD_TIMES, policy.liveness_hold_ms), holdLabel),
+      stricter: 'higher',
+      pick: (value) => ({
+        changes: { liveness_hold_ms: Number(value) },
+        title: () => t('policy.tuning.hold.saved'),
+        detail: () => t('policy.tuning.hold.savedText', { time: holdLabel(Number(value)) }),
+      }),
+    },
+    {
+      key: 'liveness_max_retries',
+      icon: <RotateCcw size={20} />,
+      label: () => t('policy.tuning.retries.label'),
+      description: t('policy.tuning.retries.description'),
+      enabled: policy.liveness_challenge,
+      value: String(policy.liveness_max_retries),
+      options: () => numbered(withCurrent(CHALLENGE_RETRIES, policy.liveness_max_retries), formatNumber),
+      stricter: 'lower',
+      pick: (value) => ({
+        changes: { liveness_max_retries: Number(value) },
+        title: () => t('policy.tuning.retries.saved'),
+        detail: () => t('policy.tuning.retries.savedText', { count: Number(value) }),
       }),
     },
     {

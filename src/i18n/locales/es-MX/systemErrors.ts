@@ -130,12 +130,14 @@ export default {
     intro:
       'El límite se ajusta solo a la latencia real (entre {min} y {max}). Lo crítico (identificar, iniciar sesión) pasa primero; al saturarse, se descarta lo menos importante.',
     components: {
+      schema: 'Esquema de la base de datos',
       database: 'Base de datos',
       faceEngine: 'Motor facial',
     },
     /** Una dependencia y su estado: "Base de datos: disponible". */
     component: '{name}: {status}',
     available: 'disponible',
+    unavailable: 'no disponible',
     tiers: {
       critical: 'crítica',
       normal: 'normal',

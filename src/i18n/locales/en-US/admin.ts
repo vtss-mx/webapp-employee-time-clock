@@ -81,7 +81,7 @@ export default {
     adminEmail: 'Admin email',
     adminEmailHint: "They'll sign in with this email; it's also the company's email",
     adminPassword: 'Initial password',
-    adminPasswordHint: 'At least 8 characters, with uppercase, lowercase, and a number',
+    adminPasswordHint: 'At least 12 characters, with uppercase, lowercase, and a number',
   },
   create: {
     adminSection: 'Company admin',
@@ -190,6 +190,7 @@ export default {
       message: 'This deletes the company, its admins, its validators, and its settings.',
       detailsTitle: 'To be deleted',
       confirmLabel: 'Delete company',
+      inUse: 'The company is in use: deactivate it',
     },
     admin: {
       eyebrow: 'Company admin',
@@ -246,7 +247,6 @@ export default {
     emptyTitle: 'No employees',
     emptyDescription: 'Staff the company adds will appear here.',
     noPhone: 'No phone',
-    noDepartment: 'No department',
     forget: {
       button: 'Forget',
       none: 'Nothing learned',

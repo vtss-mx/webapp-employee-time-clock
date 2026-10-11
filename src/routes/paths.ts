@@ -8,6 +8,8 @@ export const paths = {
   /** Llaves de acceso (WebAuthn) de la cuenta: registrar una en este dispositivo y renombrar una existente. */
   profilePasskeyNew: '/profile/passkeys/new',
   profilePasskeyRename: (id: number | string) => `/profile/passkeys/${id}/rename`,
+  /** Consentimiento biométrico: el texto completo del servidor y los botones para otorgarlo (regla 22 de la raíz). */
+  profileConsents: '/profile/consents',
   forbidden: '/forbidden',
   /** Pantalla pública de la tableta de un sitio (sin sesión): muestra el código del sitio (`#pair=` la vincula). */
   kiosk: '/kiosk',
@@ -48,7 +50,13 @@ export const paths = {
     performance: '/admin/performance',
     performanceMetric: '/admin/performance/metric',
     performanceAlert: (id: number | string) => `/admin/performance/alerts/${id}`,
+    /** Bitácora de auditoría: quién hizo qué, sobre qué y desde dónde, con su exportación para el auditor. */
+    audit: '/admin/audit',
+    /** Revisión de accesos: cada cuenta con su rol, su último acceso, su segundo factor y sus sesiones. */
+    accessReview: '/admin/access-review',
     /** Casos de fraude: la bandeja (filtros en la pantalla), un caso y su decisión o nota (formularios con motivo). */
+    verifications: '/admin/verifications',
+    verification: (id: number | string) => `/admin/verifications/${id}`,
     fraudCases: '/admin/fraud-cases',
     fraudCase: (id: number | string) => `/admin/fraud-cases/${id}`,
     fraudCaseDecision: (id: number | string, status: string) => `/admin/fraud-cases/${id}/decision/${status}`,
@@ -65,12 +73,6 @@ export const paths = {
     reverifyAll: '/company/employees/reverify-all',
     /** Rostro en persona: registrar (enroll) o verificar (verify) con el empleado presente. */
     employeeFace: (id: number | string, mode: 'enroll' | 'verify' | ':mode') => `/company/employees/${id}/face/${mode}`,
-    departments: '/company/departments',
-    newDepartment: '/company/departments/new',
-    department: (id: number | string) => `/company/departments/${id}`,
-    editDepartment: (id: number | string) => `/company/departments/${id}/edit`,
-    /** Elegir empleados para asignar al departamento o nombrar responsables. */
-    assignDepartment: (id: number | string, role: 'employees' | 'managers' | ':role') => `/company/departments/${id}/assign/${role}`,
     validations: '/company/validations',
     validation: (id: number | string) => `/company/validations/${id}`,
     rejectValidation: (id: number | string) => `/company/validations/${id}/reject`,
@@ -81,42 +83,23 @@ export const paths = {
     validatorPassword: (id: number | string) => `/company/validators/${id}/password`,
     /** Verificaciones de identidad con su ubicación en el mapa (decisión del dueño, 2026-10-07). */
     verifications: '/company/verifications',
-    /** Asistencia: tablero del día, historial de jornadas y la evidencia de cada una. */
-    attendance: '/company/attendance',
-    attendanceHistory: '/company/attendance/history',
-    attendanceSession: (id: number | string) => `/company/attendance/sessions/${id}`,
-    /** La empresa registra la jornada de quien no checó (`?employee=&date=`) o corrige una (solo la empresa). */
-    newAttendanceSession: '/company/attendance/sessions/new',
-    correctAttendanceSession: (id: number | string) => `/company/attendance/sessions/${id}/correct`,
-    /** Rechazar (con nota que verá el empleado) una jornada que el motor de riesgo dejó "en revisión". */
-    rejectAttendanceReview: (id: number | string) => `/company/attendance/sessions/${id}/reject`,
-    /** Turnos: catálogo, asignación por empleado y solicitudes de cambio. */
-    shifts: '/company/shifts',
-    newShift: '/company/shifts/new',
-    editShift: (id: number | string) => `/company/shifts/${id}/edit`,
-    shiftRequests: '/company/shifts/requests',
-    approveShiftRequest: (id: number | string) => `/company/shifts/requests/${id}/approve`,
-    rejectShiftRequest: (id: number | string) => `/company/shifts/requests/${id}/reject`,
-    /** Turnos de un empleado (vigente, programados y anteriores) y asignarle uno. */
-    employeeShifts: (id: number | string) => `/company/shifts/employees/${id}`,
-    assignShift: (id: number | string) => `/company/shifts/employees/${id}/assign`,
-    /** Asignar un turno a varios empleados a la vez (`?shift=` lo deja elegido). */
-    bulkAssignShift: '/company/shifts/assign',
-    /** Calendario: festivos, ausencias, solicitudes de vacaciones o permisos y días laborables (`?tab=`). */
-    calendar: '/company/calendar',
-    newHoliday: '/company/calendar/holidays/new',
-    newAbsence: '/company/calendar/absences/new',
-    rejectAbsence: (id: number | string) => `/company/calendar/absences/${id}/reject`,
-    newWorkday: '/company/calendar/workdays/new',
-    /** Sitios de trabajo con su geocerca. */
+    verification: (id: number | string) => `/company/verifications/${id}`,
+    /** Puntos de verificación con su geocerca. */
     sites: '/company/sites',
     newSite: '/company/sites/new',
     editSite: (id: number | string) => `/company/sites/${id}/edit`,
-    /** Kioscos del sitio (la tableta que muestra el código que se pide al checar) y alta de uno. */
+    /** Kioscos del sitio (la tableta que muestra el código que se pide al verificar) y alta de uno. */
     siteKiosks: (id: number | string) => `/company/sites/${id}/kiosks`,
     newSiteKiosk: (id: number | string) => `/company/sites/${id}/kiosks/new`,
     integrations: '/company/integrations',
     newApiKey: '/company/integrations/new',
+    /**
+     * Claves de FIRMA de la empresa (migración 0105): su clave pública y la de la plataforma. Es una SECCIÓN de la
+     * misma pantalla `COMPANY_API` (no una pantalla nueva: el seed del backend no cambia). «Rotar» llega al
+     * formulario con `?replaces=<id>`.
+     */
+    signingKeys: '/company/integrations/signing-keys',
+    newSigningKey: '/company/integrations/signing-keys/new',
     /** Documentos de la empresa para su facturación (lista con «Eliminados») y subir uno. */
     documents: '/company/documents',
     newDocument: '/company/documents/new',
@@ -126,27 +109,22 @@ export const paths = {
     checkpoint: '/validator/checkpoint',
   },
   employee: {
-    /** Mi asistencia: qué puedo registrar ahora, registrar (rostro + ubicación), historial y cambios de turno. */
-    attendance: '/employee/attendance',
-    recordAttendance: (action: 'check-in' | 'break-start' | 'break-end' | 'check-out' | ':action') => `/employee/attendance/record/${action}`,
-    attendanceHistory: '/employee/attendance/history',
-    shiftRequests: '/employee/attendance/requests',
-    newShiftRequest: '/employee/attendance/requests/new',
-    /** Mis días libres (ausencias y próximos festivos) y pedir vacaciones o un permiso. */
-    daysOff: '/employee/attendance/days-off',
-    newAbsenceRequest: '/employee/attendance/days-off/new',
     dashboard: '/employee/dashboard',
     verify: '/employee/verify',
     verifyFace: '/employee/verify/face',
     myQr: '/employee/qr',
-    /** Registro facial: el índice de los tres pasos independientes y la pantalla de cada uno (decisión del dueño, 2026-10-07). */
+    /**
+     * Registro de identidad: el índice del flujo que pide su empresa y la pantalla de cada paso (decisión del dueño,
+     * 2026-10-08: el flujo es dinámico; el ADMIN elige qué pasos y en qué orden). Los documentos de identidad son
+     * pasos de este flujo (la pantalla «Mis documentos» del empleado desapareció el mismo día).
+     */
     enroll: '/employee/enroll',
     enrollPhoto: '/employee/enroll/photo',
     enrollCapture: '/employee/enroll/capture',
     enrollVoice: '/employee/enroll/voice',
-    /** Documentos del onboarding: comprobante de domicilio e identificación oficial (decisión del dueño, 2026-10-07). */
-    documents: '/employee/documents',
-    newDocument: '/employee/documents/new',
+    /** Paso de un documento de identidad (su código del catálogo en la ruta) y subir el archivo de ese paso. */
+    enrollDocument: (step: string) => `/employee/enroll/document/${step}`,
+    newEnrollmentDocument: (step: string) => `/employee/enroll/document/${step}/new`,
     pending: '/employee/pending',
   },
 } as const;

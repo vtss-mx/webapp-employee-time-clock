@@ -172,31 +172,6 @@ describe('CheckpointPage (VALIDATOR)', () => {
     await waitFor(() => expect(list).not.toHaveClass('is-loading'));
   });
 
-  it('la identificación registra la asistencia: el resultado dice qué quedó registrado (entrada o salida)', async () => {
-    server(sampleCheckpoint, {
-      '/api/checkpoint/identify/face': () => apiOk({ ...identifiedResult, attendance: { action: 'CHECK_OUT', message: 'Salida registrada a las 16:02.' } }),
-    });
-    renderWithProviders(<CheckpointPage />);
-    await userEvent.click(await screen.findByRole('button', { name: FACE_CARD }));
-    await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
-    const note = await screen.findByText('Salida registrada a las 16:02.');
-    expect(note).toHaveClass('result-card__attendance', 'is-recorded');
-    expect(note.querySelector('.lucide-log-out')).not.toBeNull();
-    expect(screen.getByText('Empleado identificado')).toBeInTheDocument();
-  });
-
-  it('sin turno que registrar: el resultado lo explica sin marcarlo como registrado', async () => {
-    server(sampleCheckpoint, {
-      '/api/checkpoint/identify/qr': () => apiOk({ ...identifiedResult, method: 'QR', attendance: { action: null, message: 'Sin turno para registrar en este momento.' } }),
-    });
-    renderWithProviders(<CheckpointPage />);
-    await userEvent.click(await screen.findByRole('button', { name: QR_CARD }));
-    await userEvent.click(screen.getByRole('button', { name: 'leer QR' }));
-    const note = await screen.findByText('Sin turno para registrar en este momento.');
-    expect(note).toHaveClass('result-card__attendance');
-    expect(note).not.toHaveClass('is-recorded');
-  });
-
   it('un método nuevo del catálogo: ícono genérico y su código mientras el catálogo no lo describe', async () => {
     const modes = catalogsWith({}).validator_modes.map((mode): ValidatorModeItem => (mode.code === 'FACE' ? { ...mode, methods: ['FACE', 'NFC' as ValidatorModeItem['methods'][number]] } : mode));
     server({ ...sampleCheckpoint, mode: 'FACE' });

@@ -115,7 +115,6 @@ function CompanyEmployees({ company }: { company: CompanyDetail }) {
                     <span className="truncate">{emp.email}</span>
                   </td>
                   <td data-label={t('common.fields.phone')}>{emp.phone ? formatPhone(emp.phone) : <span className="muted">{t('admin.employees.noPhone')}</span>}</td>
-                  <td data-label={t('common.fields.department')}>{emp.department_name ?? <span className="muted">{t('admin.employees.noDepartment')}</span>}</td>
                   <td data-label={t('admin.employees.face')}>
                     <FaceStatusBadge status={emp.face_status} />
                   </td>

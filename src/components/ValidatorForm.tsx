@@ -4,8 +4,8 @@ import { RADIUS_MAX_M, RADIUS_MIN_M, radiusLimits, radiusText } from '../hooks/u
 import { useT } from '../i18n';
 import { config } from '../utils/config';
 import { ConfirmPasswordField, FormField } from './FormField';
-import { QuickChoices } from './shifts/formFields';
-import { metersText } from './shifts/shiftRules';
+import { QuickChoices } from './ui/formFields';
+import { metersText } from '../utils/numbers';
 import { NumberField } from './ui/NumberField';
 import { Switch } from './ui/Switch';
 import { ValidatorModePicker } from './ValidatorModes';

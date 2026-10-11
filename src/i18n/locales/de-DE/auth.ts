@@ -27,7 +27,18 @@ export default {
   },
   password: {
     new: 'Neues Passwort',
-    hint: 'Mindestens 8 Zeichen mit Groß- und Kleinbuchstaben und einer Ziffer',
+    hint: 'Mindestens 12 Zeichen mit Groß- und Kleinbuchstaben und einer Ziffer',
+  },
+  mfa: {
+    eyebrow: 'Zweiter Faktor',
+    title: 'Melden Sie sich mit Ihrem Zugangsschlüssel an',
+    step: 'Verwenden Sie die Schaltfläche „Mit Zugangsschlüssel anmelden“.',
+  },
+  locked: {
+    eyebrow: 'Konto gesperrt',
+    title: 'Zu viele Versuche',
+    wait: 'Warten Sie {value}, bevor Sie es erneut versuchen.',
+    passkey: 'Mit einem Zugangsschlüssel können Sie sich jetzt anmelden.',
   },
   device: {
     eyebrow: 'Gerät',

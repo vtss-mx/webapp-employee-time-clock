@@ -4,24 +4,26 @@
  *
  *   Tipado ............ tsc estricto + ESLint (any explícito/implícito, operaciones inseguras)
  *   Calidad ........... ESLint (APIs obsoletas, promesas sin manejar, hooks, complejidad)
- *   Ortografía ........ cspell sobre los textos de la interfaz (es-MX con español, en-US con inglés de
- *                       Estados Unidos y la lista revisada cspell-words.txt): una palabra desconocida falla
+ *   Ortografía ........ cspell sobre los textos de la interfaz con el diccionario y la lista revisada
+ *                       de cada idioma configurado: una palabra desconocida falla
  *   Duplicidad ........ jscpd (umbral en .jscpd.json)
  *   Ciclos ............ importaciones circulares entre módulos de src/ (API del compilador de
  *                       TypeScript; no cuentan `import type` ni las cargas diferidas `import()`)
  *   Pruebas/coverage .. vitest + umbrales mínimos (vitest.config.ts); cualquier
  *                       DeprecationWarning durante las pruebas también falla
  *   Dependencias ...... npm outdated (desactualizadas), registro npm (versiones deprecadas) y
- *                       npm audit (vulnerabilidades)
+ *                       npm audit (CUALQUIER vulnerabilidad falla, como pip-audit en el backend)
+ *   Cadena de sumin. .. SBOM CycloneDX por versión en reports/sbom/ (scripts/supply-chain.mjs)
  *   Marcadores ........ @ts-ignore, eslint-disable, TODO/FIXME, console.log en el código
  *
  * Opciones:  --strict  también falla con dependencias desactualizadas o marcadores.
- *            --skip=coverage,deps   omite verificaciones.
+ *            --skip=coverage,deps,sbom   omite verificaciones.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
+import { auditDependencies, writeSbom } from './supply-chain.mjs';
 
 const args = process.argv.slice(2);
 const strict = args.includes('--strict');
@@ -131,7 +133,7 @@ check('Lint (tipado/obsoletos)', 'npx', ['eslint', '.', '--max-warnings=0', '-f'
 });
 
 check('Ortografía (cspell)', 'npx', ['cspell', '--no-progress', '--no-summary', '--show-suggestions'], (out, code) => {
-  if (code === 0) return 'sin palabras desconocidas (es-MX y en-US)';
+  if (code === 0) return 'sin palabras desconocidas (todos los idiomas configurados)';
   return `${(out.match(/Unknown word/g) ?? []).length} palabras desconocidas`;
 });
 
@@ -184,16 +186,16 @@ if (!skip.has('deps')) {
     record('Librerías deprecadas (npm)', 'warn', `no se pudo consultar el registro (${error.message})`);
   }
 
-  const audit = run('npm', ['audit', '--json']);
-  let vulns = {};
-  try {
-    vulns = JSON.parse(audit.out || '{}').metadata?.vulnerabilities ?? {};
-  } catch {
-    vulns = {};
-  }
-  const serious = (vulns.high ?? 0) + (vulns.critical ?? 0);
-  const total = Object.values(vulns).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) - (vulns.total ?? 0);
-  record('Vulnerabilidades (npm audit)', serious > 0 ? 'fail' : total > 0 ? 'warn' : 'ok', total > 0 ? JSON.stringify(vulns) : 'sin vulnerabilidades');
+  // Cualquier vulnerabilidad falla, con el mismo criterio que pip-audit en el backend (scripts/supply-chain.mjs).
+  const audit = auditDependencies();
+  record('Vulnerabilidades (npm audit)', audit.status, audit.detail);
+}
+
+// Cadena de suministro: inventario CycloneDX de lo que se envía al navegador, conservado por versión.
+if (skip.has('sbom')) record('SBOM (CycloneDX)', 'warn', 'omitido');
+else {
+  const sbom = writeSbom();
+  record('SBOM (CycloneDX)', sbom.status, sbom.detail);
 }
 
 // Marcadores que suelen ocultar deuda técnica o tipado débil.

@@ -26,11 +26,20 @@ export default {
     applied: 'Nivel {name} aplicado',
   },
   risk: {
+    readiness: {
+      title: 'Estado del motor de riesgo',
+      score: 'Límite superior del puntaje: {maximum}. Señales que solo se observan: {observed}. Señales obligatorias: {enforced}.',
+      cannotReject: 'La puntuación no permite rechazar con esta configuración.',
+      calibration: 'La calibración sigue pendiente; este conteo no demuestra su precisión.',
+      independent: 'Los controles críticos se aplican aunque su señal o el motor estén apagados.',
+      critical: 'Control independiente: {action}',
+    },
     title: 'Motor de riesgo',
     hint: 'Suma los puntos de las señales de cada intento y aplica la acción de su nivel de riesgo. Cada familia de señales tiene tope: una sola nunca niega por sí misma.',
     /** Puntos del motor (0-100). */
     points: '{points} pts',
     fields: {
+      familyCap: 'Tope por familia',
       mediumScore: 'Riesgo medio desde',
       highScore: 'Riesgo alto desde',
       criticalScore: 'Riesgo crítico desde',
@@ -42,6 +51,15 @@ export default {
       deviceMode: 'Dispositivo del empleado',
       minConfidence: 'Nivel de confianza',
       identifyConfidence: 'Nivel de confianza para identificar entre todos',
+    },
+    familyCap: {
+      description: 'Limita la suma de señales de una misma familia.',
+      saved: 'Tope de riesgo actualizado',
+      savedText: 'Tope por familia: {points}.',
+    },
+    changeReason: {
+      label: 'Motivo del cambio de riesgo',
+      hint: 'Explica el cambio; queda en el historial de la empresa.',
     },
     scores: {
       medium: 'Más bajo, más intentos piden un paso más.',
@@ -56,7 +74,7 @@ export default {
       savedText: '{tier}: {action}.',
     },
     fallback: {
-      description: 'Solo puede permitir, avisar o pedir un paso más: nunca niega a ciegas.',
+      description: 'Una falla del motor no aprueba la identidad. El servidor define las opciones seguras.',
       saved: 'Respaldo del motor actualizado',
       savedText: 'Si el motor falla: {action}.',
     },
@@ -176,7 +194,7 @@ export default {
     },
     siteCodes: {
       label: 'Código de sitio',
-      hint: 'En los sitios que lo activen, la entrada y la salida llevan el código del kiosco.',
+      hint: 'En los sitios que lo activen, cada verificación lleva el código del kiosco.',
       enforceWarning: 'Antes, instala un kiosco en cada sitio que lo active: sin el código no se registra.',
     },
   },

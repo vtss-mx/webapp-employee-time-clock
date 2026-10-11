@@ -1,17 +1,20 @@
+import accessReview from './accessReview';
 import admin from './admin';
 import apiKeys from './apiKeys';
 import app from './app';
-import attendance from './attendance';
+import audit from './audit';
 import auth from './auth';
 import avatar from './avatar';
 import billing from './billing';
-import calendar from './calendar';
 import checkpoint from './checkpoint';
 import common from './common';
 import companyHome from './companyHome';
-import departments from './departments';
+import consents from './consents';
+import continuity from './continuity';
+import dataExport from './dataExport';
 import devices from './devices';
 import dialogs from './dialogs';
+import docScan from './docScan';
 import documents from './documents';
 import drift from './drift';
 import employee from './employee';
@@ -29,14 +32,13 @@ import kiosk from './kiosk';
 import language from './language';
 import layout from './layout';
 import location from './location';
-import myAttendance from './myAttendance';
 import passkeys from './passkeys';
 import performance from './performance';
 import policy from './policy';
 import profile from './profile';
 import qr from './qr';
 import services from './services';
-import shifts from './shifts';
+import signingKeys from './signingKeys';
 import sites from './sites';
 import system from './system';
 import systemErrors from './systemErrors';
@@ -52,20 +54,23 @@ import voice from './voice';
  * crece, se parte en subarchivos que su archivo importa). Las mismas llaves existen en `../en-US`.
  */
 const esMX = {
+  accessReview,
   admin,
   apiKeys,
   app,
-  attendance,
+  audit,
   auth,
   avatar,
   billing,
-  calendar,
   checkpoint,
   common,
   companyHome,
-  departments,
+  consents,
+  continuity,
+  dataExport,
   devices,
   dialogs,
+  docScan,
   documents,
   drift,
   employee,
@@ -83,14 +88,13 @@ const esMX = {
   language,
   layout,
   location,
-  myAttendance,
   passkeys,
   performance,
   policy,
   profile,
   qr,
   services,
-  shifts,
+  signingKeys,
   sites,
   system,
   systemErrors,

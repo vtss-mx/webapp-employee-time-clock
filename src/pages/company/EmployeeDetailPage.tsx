@@ -1,9 +1,10 @@
-import { Activity, CalendarClock, Camera, ClipboardCheck, MonitorSmartphone, Pause, Pencil, Play, RotateCcw, ScanFace, ShieldCheck, Trash2, UserCheck } from 'lucide-react';
+import { Activity, Camera, ClipboardCheck, MonitorSmartphone, Pause, Pencil, Play, RotateCcw, ScanFace, ShieldCheck, Trash2, UserCheck } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { VerificationHistory } from '../../components/VerificationHistory';
 import { EmployeeInfo } from '../../components/employees/EmployeeInfo';
 import { DeletedEmployee } from '../../components/employees/EmployeeTrash';
 import { deleteNote } from '../../components/trash/TrashParts';
+import { DataExportSection } from '../../components/dataExport/DataExportSection';
 import { EmployeeDevices } from '../../components/devices/EmployeeDevices';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../../components/ui/Panel';
 import { QrCodePanel } from '../../components/QrCodePanel';
@@ -11,7 +12,6 @@ import { FaceStatusBadge, StatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useAction, type SuccessNotice } from '../../hooks/useAction';
-import { useAuth } from '../../hooks/useAuth';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useResource } from '../../hooks/useResource';
@@ -158,7 +158,6 @@ export function EmployeeDetailPage() {
   const action = useAction<'status' | 'delete'>();
   const busy = action.busy !== null;
   // Los turnos del empleado se ven solo si el backend le dio al usuario la pantalla de Turnos.
-  const canSeeShifts = useAuth().user?.screens.some((screen) => screen.code === 'COMPANY_SHIFTS') ?? false;
 
   if (!employee) {
     return error ? (
@@ -202,11 +201,6 @@ export function EmployeeDetailPage() {
           }
           actions={
             <>
-              {canSeeShifts && (
-                <ButtonLink to={paths.company.employeeShifts(employee.id)} variant="ghost" icon={<CalendarClock size={18} />}>
-                  {t('employees.detail.shifts')}
-                </ButtonLink>
-              )}
               <ButtonLink to={paths.company.editEmployee(employee.id)} variant="primary" icon={<Pencil size={18} />}>
                 {t('common.actions.edit')}
               </ButtonLink>
@@ -224,6 +218,9 @@ export function EmployeeDetailPage() {
           <PanelSection title={t('employees.detail.history')} icon={<Activity size={20} />}>
             <VerificationHistory employeeId={employee.id} />
           </PanelSection>
+
+          {/* Datos del empleado (RGPD arts. 15 y 20): la empresa responde por escrito cuando él los pide. */}
+          <DataExportSection subject={{ kind: 'employee', employeeId: employee.id, name: employee.full_name }} />
 
           <PanelSection title={t('devices.title')} icon={<MonitorSmartphone size={20} />}>
             <p className="muted small">{t('devices.intro')}</p>

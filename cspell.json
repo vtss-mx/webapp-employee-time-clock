@@ -54,5 +54,5 @@
     { "filename": "public/site.es-ES.webmanifest", "language": "es", "dictionaries": ["project-words-es-ES"] }
   ],
   "loadDefaultConfiguration": false,
-  "ignoreRegExpList": ["/Employee Time Clock/g", "/\\bX-[A-Za-z]+(?:-[A-Za-z]+)*\\b/g", "/[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+/g"]
+  "ignoreRegExpList": ["/Employee Time Clock/g", "/Identity Verification Platform/g", "/VT Software Solutions/g", "/\\bX-[A-Za-z]+(?:-[A-Za-z]+)*\\b/g", "/[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+/g"]
 }

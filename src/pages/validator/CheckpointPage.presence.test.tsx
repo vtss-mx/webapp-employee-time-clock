@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CapturedFace } from '../../components/LiveFaceFlow';
@@ -84,6 +84,8 @@ describe('punto de control: prueba de presencia (antifraude 2b)', () => {
     );
     renderWithProviders(<CheckpointPage />);
     await screen.findByRole('button', { name: QR_CARD });
+    // El botón puede existir antes del efecto que registra el observador: esperar ese estado real.
+    await waitFor(() => expect(watchers).toHaveLength(1));
     act(() => watchers.forEach((w) => w.fail({ code: 1 } as GeolocationPositionError)));
     const popup = await screen.findByRole('alertdialog', { name: 'Permite el acceso a tu ubicación' });
     expect(popup).toHaveTextContent('Este validador envía su ubicación en cada identificación');
@@ -104,6 +106,7 @@ describe('punto de control: prueba de presencia (antifraude 2b)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'capturar rostro' }));
     expect(await screen.findByText('No se pudo identificar')).toBeInTheDocument();
     expect(screen.getAllByText('Inicia sesión de nuevo en este dispositivo.').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Intentar de nuevo' })).not.toBeInTheDocument();
   });
 
   it('en inglés: el aviso del permiso bloqueado', async () => {
@@ -111,6 +114,8 @@ describe('punto de control: prueba de presencia (antifraude 2b)', () => {
     server(located);
     renderWithProviders(<CheckpointPage />);
     await screen.findAllByRole('button', { name: /Start/ });
+    // El botón puede existir antes del efecto que registra el observador: esperar ese estado real.
+    await waitFor(() => expect(watchers).toHaveLength(1));
     act(() => watchers.forEach((w) => w.fail({ code: 1 } as GeolocationPositionError)));
     expect(await screen.findByRole('alertdialog', { name: /location/i })).toHaveTextContent('This validator sends its location with each identification');
   });

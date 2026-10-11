@@ -13,6 +13,13 @@ import { BYTES_PER_MB, formatBytes } from './numbers';
 /** Tipos que ofrece el selector del sistema (en móvil, con `image/*` también la cámara): los mismos que la empresa. */
 export const EMPLOYEE_DOCUMENT_ACCEPT = DOCUMENT_ACCEPT;
 
+/**
+ * El servidor revisa la imagen en una sola pasada de OCR y, si NO reconoce un documento, responde 422 con este código
+ * (no guarda nada). No es un error de campo ni terminal: la pantalla muestra el motivo del servidor y deja volver a
+ * tomar la foto o elegir otro archivo (`EmployeeDocumentUploadForm`).
+ */
+export const DOCUMENT_NOT_RECOGNIZED = 'DOCUMENT_NOT_RECOGNIZED';
+
 /** Tamaño máximo antes de subirlo (bytes), el mismo `EMPLOYEE_DOCUMENT_MAX_MB` del backend. */
 export const employeeDocumentMaxBytes = (): number => config.employeeDocumentMaxMb * BYTES_PER_MB;
 

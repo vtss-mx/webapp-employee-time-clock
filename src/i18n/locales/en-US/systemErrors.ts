@@ -122,11 +122,13 @@ export default {
     intro:
       'The limit adjusts itself to real latency (between {min} and {max}). Critical work (identifying, signing in) goes first; when saturated, the least important work is shed.',
     components: {
+      schema: 'Database schema',
       database: 'Database',
       faceEngine: 'Face engine',
     },
     component: '{name}: {status}',
     available: 'available',
+    unavailable: 'unavailable',
     tiers: {
       critical: 'critical',
       normal: 'normal',

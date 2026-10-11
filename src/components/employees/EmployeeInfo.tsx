@@ -1,7 +1,5 @@
 import { UserRound } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { t, useT } from '../../i18n';
-import { paths } from '../../routes/paths';
 import type { Employee } from '../../types';
 import { formatDate, formatDateTime } from '../../utils/format';
 import { formatPhone } from '../../utils/phone';
@@ -13,7 +11,7 @@ const orMissing = (value: string | null | undefined) => value || <span className
 
 /**
  * Datos personales del expediente (los mismos en el expediente vigente y en el de un empleado eliminado):
- * nombre, nacimiento, número, documentos, contacto, departamento y desde cuándo está registrado.
+ * nombre, nacimiento, número, documentos, contacto y desde cuándo está registrado.
  */
 export function EmployeeInfo({ employee }: { employee: Employee }) {
   const t = useT();
@@ -56,28 +54,6 @@ export function EmployeeInfo({ employee }: { employee: Employee }) {
           <dt>{t('employees.email')}</dt>
           <dd>{employee.email}</dd>
         </div>
-        <div>
-          <dt>{t('common.fields.department')}</dt>
-          <dd>
-            {employee.department_id && employee.department_name ? (
-              <Link to={paths.company.department(employee.department_id)}>{employee.department_name}</Link>
-            ) : (
-              <span className="muted">{t('departments.noDepartment')}</span>
-            )}
-          </dd>
-        </div>
-        {employee.managed_departments && employee.managed_departments.length > 0 && (
-          <div>
-            <dt>{t('employees.detail.managerOf')}</dt>
-            <dd className="inline-links">
-              {employee.managed_departments.map((d) => (
-                <Link key={d.id} to={paths.company.department(d.id)}>
-                  {d.name}
-                </Link>
-              ))}
-            </dd>
-          </div>
-        )}
         <div>
           <dt>{t('employees.detail.registered')}</dt>
           <dd>{formatDateTime(employee.created_at)}</dd>

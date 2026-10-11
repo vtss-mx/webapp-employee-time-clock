@@ -25,16 +25,11 @@ export type StatusCatalog =
   | 'api_key_statuses'
   | 'error_statuses'
   | 'error_severities'
-  | 'work_session_statuses'
-  | 'shift_request_statuses'
-  | 'board_states'
-  | 'assignment_states'
   | 'billing_statuses'
   | 'charge_statuses'
   | 'payment_statuses'
   | 'slow_alert_statuses'
   | 'risk_tiers'
-  | 'attendance_review_statuses'
   | 'policy_change_statuses'
   | 'fraud_case_statuses';
 

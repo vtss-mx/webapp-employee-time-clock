@@ -28,11 +28,14 @@ export interface SpeechCue {
  * códigos estables (fase, paso y la instrucción del servidor, que no cambia en memoria con el idioma), nunca con el
  * texto traducido.
  */
-export function faceSpeechCue(input: { phase: Phase; step: number; instruction?: string | null }): SpeechCue | null {
+export function faceSpeechCue(input: { phase: Phase; step: number; instruction?: string | null; holding?: boolean }): SpeechCue | null {
   switch (input.phase) {
     case 'frontal':
       return { key: 'position', text: () => t('face.speak.position') };
     case 'challenge':
+      // Al llegar el movimiento (`holding`) un «sostén» corto para que la persona lo mantenga mientras se captura; antes,
+      // la instrucción del servidor del paso. El `key` es estable (nunca el texto traducido): un cambio de idioma no repite.
+      if (input.holding) return { key: `hold:${input.step}`, text: () => t('face.speak.hold') };
       return input.instruction ? { key: `move:${input.step}:${input.instruction}`, text: () => input.instruction as string } : null;
     case 'recenter':
       return { key: `recenter:${input.step}`, text: () => t('face.speak.recenter') };
@@ -53,6 +56,8 @@ export interface FaceSpeechInput {
   step: number;
   /** El reto vigente: de él sale la instrucción del movimiento, ya localizada por el servidor (como en `liveFaceView`). */
   challenge?: FaceChallenge | null;
+  /** El movimiento del reto ya se logró y se está sosteniendo: se dice un «sostén» corto mientras se captura. */
+  holding?: boolean;
 }
 
 /** Lo que la guía por voz entrega al flujo: si silenciar/activar está disponible, el estado y cómo alternarlo. */
@@ -100,7 +105,7 @@ export function useFaceSpeech(input: FaceSpeechInput): FaceSpeech {
   const active = ready && input.enabled && !muted && supported;
   // La instrucción del movimiento se deriva igual que el visor (`liveFaceView.ts`): la del paso o, sin ella, la general.
   const instruction = input.challenge?.instructions?.[input.step] ?? input.challenge?.instruction;
-  const cue = faceSpeechCue({ phase: input.phase, step: input.step, instruction });
+  const cue = faceSpeechCue({ phase: input.phase, step: input.step, instruction, holding: input.holding });
   // El texto y el perfil se leen por referencia al hablar (nunca se guarda el texto traducido en las dependencias).
   const cueRef = useRef(cue);
   cueRef.current = cue;

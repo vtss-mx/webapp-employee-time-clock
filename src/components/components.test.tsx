@@ -18,7 +18,7 @@ import { emptyEmployeeForm } from '../utils/formRules';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FaceRequirements } from './FaceRequirements';
 import { GlobalErrorHandler } from './GlobalErrorHandler';
-import { captureDetail, challengeActions, detectionMode, flowStatus, introFor, scannerView } from './liveFaceView';
+import { autoCaptureFlags, captureDetail, challengeActions, detectionMode, flowStatus, introFor, moveStableFrames, scannerView } from './liveFaceView';
 import { ConfirmDialog, Modal } from './Modal';
 import { OfflineBanner } from './OfflineBanner';
 import { PageHeader } from './PageHeader';
@@ -37,6 +37,7 @@ import { forgetServerTexts, rememberServerTexts } from '../i18n/serverTexts';
 
 const verified: VerificationResult = {
   verified: true,
+  verification_status: 'APPROVED',
   method: 'FACE',
   message: 'Identidad confirmada',
   employee_id: 1,
@@ -253,7 +254,9 @@ describe('verificación', () => {
     expect(flowStatus({ ...base, phase: 'blocked', blockedMessage: 'Hay poca luz' })).toEqual({ message: 'Hay poca luz', tone: 'warn' });
     // Bloqueo por un accesorio: la insignia es el aviso; la indicación grande es de colocación, nunca «Quítate…».
     expect(flowStatus({ ...base, phase: 'blocked', blockedByAccessory: true })).toEqual({ message: 'Muestra tu rostro completo', tone: 'warn' });
-    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'hold_still' }).tone).toBe('ok');
+    // Al sostener el movimiento, un aviso de ánimo propio del reto (distinto de la quietud de frente) para no regresar aún.
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'hold_still' })).toEqual({ message: 'Sostén así', tone: 'ok' });
+    expect(flowStatus({ ...base, phase: 'challenge', guidance: 'ready' })).toEqual({ message: 'Sostén así', tone: 'ok' });
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha' }).message).toBe('Gira a la derecha');
     // A medio movimiento se anima a terminarlo.
     expect(flowStatus({ ...base, phase: 'challenge', guidance: 'move', instruction: 'Gira a la derecha', moveProgress: 0.6 }).message).toBe('Un poco más');
@@ -282,6 +285,25 @@ describe('verificación', () => {
     expect(flowStatus({ ...base, phase: 'frontal' }).tone).toBe('warn'); // verificación: ámbar
   });
 
+  it('sostener un movimiento: los cuadros estables los calibra el ADMIN (liveness_hold_ms del reto)', () => {
+    // De frente siempre 6 cuadros; en un movimiento/recentrado, los que calibra el ADMIN (convertidos de ms a cuadros).
+    const flags = (phase: 'frontal' | 'challenge' | 'recenter' | 'checking', moveFrames: number) => autoCaptureFlags(phase, true, true, true, false, moveFrames);
+    expect(flags('frontal', 5).stableFrames).toBe(6);
+    expect(flags('challenge', 5).stableFrames).toBe(5);
+    expect(flags('recenter', 8).stableFrames).toBe(8);
+    expect(flags('checking', 5)).toMatchObject({ continuous: true, quality: true });
+    expect(autoCaptureFlags('frontal', false, false, true, false, 5).enabled).toBe(false); // sin cámara lista
+    expect(autoCaptureFlags('frontal', false, true, true, true, 5).enabled).toBe(false); // cámara virtual
+    // ms → cuadros (~110 ms), acotado a 2..20; sin valor del servidor, 550 ms (5 cuadros).
+    const hold = (ms: number | null) => moveStableFrames({ liveness_hold_ms: ms } as unknown as FaceChallenge);
+    expect(moveStableFrames(null)).toBe(5);
+    expect(hold(null)).toBe(5);
+    expect(hold(550)).toBe(5);
+    expect(hold(900)).toBe(8);
+    expect(hold(100)).toBe(2); // piso
+    expect(hold(5000)).toBe(20); // tope
+  });
+
   it('reto de varios movimientos: orden, título por paso y cámara virtual', () => {
     const challenge: FaceChallenge = {
       liveness_required: true,
@@ -296,6 +318,8 @@ describe('verificación', () => {
       flash: ['#FF0000', '#00FF00', '#0000FF'],
       flash_required: false,
       expires_in: 90,
+      liveness_hold_ms: 550,
+      liveness_max_retries: 3,
     };
     expect(challengeActions(challenge)).toEqual(['LOOK_UP', 'TURN_RIGHT', 'MOVE_CLOSER']);
     expect(challengeActions(null)).toEqual([]);
@@ -329,7 +353,7 @@ describe('verificación', () => {
 
   it('qué mide el detector en cada fase: el movimiento contra el rostro en reposo (con los mínimos del reto o los pisos)', () => {
     const baseline = { pitch: 0.5, width: 200 };
-    const bare: FaceChallenge = { liveness_required: true, challenge_id: 'c', action: null, instruction: null, actions: [], instructions: [], min_yaw_ratio: null, min_pitch_delta: null, min_closer_scale: null, flash: [], flash_required: false, expires_in: null };
+    const bare: FaceChallenge = { liveness_required: true, challenge_id: 'c', action: null, instruction: null, actions: [], instructions: [], min_yaw_ratio: null, min_pitch_delta: null, min_closer_scale: null, flash: [], flash_required: false, expires_in: null, liveness_hold_ms: null, liveness_max_retries: null };
     // De frente: al alinearse por primera vez sin rostro en reposo; en las fotos y la vuelta al frente, contra él.
     expect(detectionMode('frontal', bare, 'TURN_LEFT', baseline)).toEqual({ kind: 'frontal', baseline: null });
     expect(detectionMode('challenge', bare, null, baseline)).toEqual({ kind: 'frontal', baseline: null });

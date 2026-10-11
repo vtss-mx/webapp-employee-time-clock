@@ -12,6 +12,8 @@ export interface VerificationOutcome {
    * escribe al dibujarse: el resultado en pantalla sigue al idioma activo.
    */
   error: LazyText | null;
+  /** false cuando una nueva captura no corrige la denegación recibida. */
+  retryable?: boolean;
 }
 
 interface VerificationAttemptProps {
@@ -42,6 +44,7 @@ export function VerificationAttempt({ failureTitle, onBack, onOutcome, kiosk, ch
         <VerificationResultCard
           result={outcome.result}
           error={outcome.error}
+          retryable={outcome.retryable}
           failureTitle={failureTitle(outcome)}
           kiosk={kiosk}
           onRetry={() => {

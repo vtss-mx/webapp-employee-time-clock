@@ -31,6 +31,18 @@ export default {
     saved: 'Zeit der Lebenderkennung aktualisiert',
     savedText: 'Jede Aufgabe läuft nach {time} ab.',
   },
+  hold: {
+    label: 'Haltezeit je Bewegung',
+    description: 'Wie lange jede Bewegung vor der Aufnahme gehalten werden muss; etwas länger verhindert eine Ablehnung am Ende.',
+    saved: 'Haltezeit aktualisiert',
+    savedText: 'Jede Bewegung wird {time} vor der Aufnahme gehalten.',
+  },
+  retries: {
+    label: 'Wiederholungen der Aufgabe',
+    description: 'Wie oft eine neue Aufgabe gestellt wird, ohne erneut zu scannen, bevor neu begonnen wird.',
+    saved: 'Wiederholungen der Aufgabe aktualisiert',
+    savedText: 'Erlaubte Wiederholungen vor dem Neustart: {count}.',
+  },
   flash: {
     label: 'Farbblitz',
     retired: 'Durch Produktentscheidung deaktiviert (2026-10-06): der Bildschirm blitzt nicht mehr in Farben. Die Bewegungen, die Serie und die Stimmprüfung decken die Lebenderkennung ab.',
@@ -72,12 +84,12 @@ export default {
     description: 'Größte Abweichung, die das Telefon melden darf; strengere Werte können verlangen, die genaue Standortbestimmung zu aktivieren.',
     option: 'Bis {distance}',
     saved: 'Genauigkeit aktualisiert',
-    savedText: 'Bei einer Abweichung der Position über {distance} muss die Zeitbuchung wiederholt werden.',
+    savedText: 'Bei einer Abweichung der Position über {distance} muss die Prüfung wiederholt werden.',
   },
   speed: {
     label: 'Maximale plausible Geschwindigkeit',
-    description: 'Zwischen zwei aufeinanderfolgenden Zeitbuchungen; was eine höhere Geschwindigkeit erfordert, wird als unmögliche Reise abgelehnt.',
+    description: 'Zwischen zwei aufeinanderfolgenden Prüfungen; was eine höhere Geschwindigkeit erfordert, wird als unmögliche Reise abgelehnt.',
     saved: 'Geschwindigkeit aktualisiert',
-    savedText: 'Zeitbuchungen, die seit der vorherigen eine Geschwindigkeit über {speed} erfordern, werden abgelehnt.',
+    savedText: 'Prüfungen, die seit der vorherigen eine Geschwindigkeit über {speed} erfordern, werden abgelehnt.',
   },
 } satisfies Translation<typeof es>;

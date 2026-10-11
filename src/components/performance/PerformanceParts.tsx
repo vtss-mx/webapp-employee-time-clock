@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import type { PerfPeriod, Vital } from '../../types/performance';
 import { formatAxisCount, formatDuration } from '../../utils/numbers';
 import { PERIOD_KEYS, PERIODS, periodFrom, pointLabel, RATING_CLASS, vitalThresholds, vitalValue } from '../../utils/performance';
-import { QuickChoices } from '../shifts/formFields';
+import { QuickChoices } from '../ui/formFields';
 import { ColumnChart } from '../ui/ColumnChart';
 
 /** Bloque con título dentro de una pestaña (la pestaña ya vive en una sección del panel: no se anidan secciones). */

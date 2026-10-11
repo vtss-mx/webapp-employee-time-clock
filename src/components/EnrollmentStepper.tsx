@@ -1,36 +1,40 @@
 import { Check } from 'lucide-react';
+import { useCatalogs } from '../hooks/useCatalogs';
 import { useT } from '../i18n';
+import type { StepperStep } from '../utils/enrollmentStepRules';
 
 /**
- * Los pasos del registro facial (decisión del dueño del producto, 2026-10-06; el orden no se altera): foto inicial
- * válida → 32 capturas válidas con los movimientos → video con tres preguntas → listo. Desde el 2026-10-07 cada uno es
- * una pantalla aparte (índice en `EnrollmentPage`, pantallas en `EnrollmentStepPages`): el indicador dice cuál es.
+ * Indicador de los pasos del registro de identidad, DINÁMICO (decisión del dueño del producto, 2026-10-08: el ADMIN
+ * decide, por empresa, cuáles pasos se piden y en qué orden). Recibe los pasos tal como los reporta el servidor y su
+ * NOMBRE sale del catálogo `enrollment_steps` (traducido por el backend); al final siempre va «Listo».
+ *
+ * Estados fijos, sin animaciones: un número en un círculo y su nombre; el actual con el color de la marca, los HECHOS
+ * completos en verde con la palomita (adenda del dueño, 2026-10-07: «se debe marcar todo en verde siempre y cuando se
+ * haya procesado de manera correcta») y los que faltan atenuados. Lo verde solo sale de `done` del SERVIDOR, nunca de
+ * un estado local u optimista. En «En validación» se dibuja con `current = null`: todos hechos y «Listo» en curso.
  */
-export type EnrollmentStep = 'photo' | 'captures' | 'video' | 'done';
-
-export const ENROLLMENT_STEPS: readonly EnrollmentStep[] = ['photo', 'captures', 'video', 'done'];
-
-/**
- * Indicador sobrio de los pasos (estados fijos, sin animaciones): un número en un círculo y su nombre; el actual con el
- * color de la marca, los hechos COMPLETOS en verde con la palomita (adenda del dueño, 2026-10-07: «se debe marcar todo en
- * verde siempre y cuando se haya procesado de manera correcta»), los que faltan atenuados. En «En validación» se dibuja
- * con `current="done"`: los tres pasos hechos. Sin la verificación por voz de la política, el paso del video no se
- * muestra.
- */
-export function EnrollmentStepper({ current, withVideo }: { current: EnrollmentStep; withVideo: boolean }) {
+export function EnrollmentStepper({ steps, current }: { steps: readonly StepperStep[]; current: string | null }) {
   const t = useT();
-  const steps = ENROLLMENT_STEPS.filter((step) => withVideo || step !== 'video');
-  const index = steps.indexOf(current);
+  const { nameOf } = useCatalogs();
+  // «Listo» no es un paso del flujo: es el final (el registro queda con la empresa), así que su nombre sí es de la app.
+  const index = current === null ? steps.length : steps.findIndex((step) => step.code === current);
+  const total = steps.length + 1;
   return (
-    <ol className="enroll-steps" aria-label={t('employee.enrollment.steps.label', { current: index + 1, total: steps.length })}>
+    <ol className="enroll-steps" aria-label={t('employee.enrollment.steps.label', { current: index + 1, total })}>
       {steps.map((step, i) => (
-        <li key={step} className={i < index ? 'is-done' : i === index ? 'is-current' : ''} aria-current={i === index ? 'step' : undefined}>
+        <li key={step.code} className={step.done ? 'is-done' : i === index ? 'is-current' : ''} aria-current={i === index ? 'step' : undefined}>
           <span className="enroll-steps__dot" aria-hidden>
-            {i < index ? <Check size={14} strokeWidth={2.5} /> : i + 1}
+            {step.done ? <Check size={14} strokeWidth={2.5} /> : i + 1}
           </span>
-          <span className="enroll-steps__name">{t(`employee.enrollment.steps.${step}`)}</span>
+          <span className="enroll-steps__name">{nameOf('enrollment_steps', step.code)}</span>
         </li>
       ))}
+      <li className={index === steps.length ? 'is-current' : ''} aria-current={index === steps.length ? 'step' : undefined}>
+        <span className="enroll-steps__dot" aria-hidden>
+          {total}
+        </span>
+        <span className="enroll-steps__name">{t('employee.enrollment.steps.done')}</span>
+      </li>
     </ol>
   );
 }

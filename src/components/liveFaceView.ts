@@ -144,7 +144,10 @@ const isSteady = isSteadyGuidance;
 /** Mensaje durante un movimiento: la instrucción, ánimo a medio camino o lo que impide medirlo. */
 function challengeStatus(input: FlowStatusInput): { message: string; tone: Tone } {
   const { guidance } = input;
-  if (isSteady(guidance)) return { message: t('face.flow.holdPosition'), tone: 'ok' };
+  // Al llegar (y mientras se sostiene) el movimiento, un aviso distinto y de ánimo para que la persona NO regrese al
+  // frente todavía: la foto se toma durante este sostén (decisión del dueño, 2026-10-08). Es propio del reto, distinto de
+  // la quietud de frente (`face.guidance.holdStill`) y de «Mantén la posición».
+  if (isSteady(guidance)) return { message: t('face.flow.holdPose'), tone: 'ok' };
   if (guidance !== 'move') return { message: guidanceMessage(guidance), tone: 'idle' };
   // A medio movimiento se anima a terminarlo (el avance también se ve en la barra y en el anillo).
   if ((input.moveProgress ?? 0) >= 0.4) return { message: t('face.flow.almost'), tone: 'idle' };
@@ -308,13 +311,25 @@ export interface AutoCaptureFlags {
   /** Evalúa la nitidez del cuadro (solo el registro, al alinear y al tomar). */
   quality: boolean;
 }
-export function autoCaptureFlags(phase: Phase, enrollment: boolean, cameraReady: boolean, detecting: boolean, virtualCamera: boolean): AutoCaptureFlags {
+export function autoCaptureFlags(phase: Phase, enrollment: boolean, cameraReady: boolean, detecting: boolean, virtualCamera: boolean, moveFrames: number): AutoCaptureFlags {
   return {
     enabled: cameraReady && detecting && !virtualCamera,
-    stableFrames: phase === 'frontal' ? 6 : 3,
+    // De frente, 6 cuadros; en un movimiento del reto y al volver al frente, el sostén que calibra el ADMIN por empresa
+    // (`moveStableFrames`): un sostén más largo hace que la foto refleje el movimiento (el servidor lo vuelve a medir).
+    stableFrames: phase === 'frontal' ? 6 : moveFrames,
     continuous: phase === 'checking',
     quality: enrollment && (phase === 'frontal' || phase === 'checking'),
   };
+}
+
+/**
+ * Cuántos cuadros estables hay que sostener un movimiento del reto antes de capturar: lo calibra el ADMIN por empresa
+ * (`liveness_hold_ms` del reto; el backend es la fuente de verdad), convertido a cuadros (~110 ms cada uno, acotado a
+ * 2–20). Un sostén más largo y deliberado hace que la foto se tome mientras la persona AÚN sostiene el movimiento —el
+ * servidor lo mide con otro motor—, así deja de rechazarlo al final. Sin valor del servidor (backend anterior), 550 ms.
+ */
+export function moveStableFrames(challenge: FaceChallenge | null): number {
+  return Math.min(20, Math.max(2, Math.round((challenge?.liveness_hold_ms ?? 550) / 110)));
 }
 
 /** La vigilancia de accesorios en vivo corre solo en el registro, con la cámara lista (no virtual), al alinear o al tomar. */

@@ -1,0 +1,73 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/continuity';
+
+/** Dienstkontinuität (Abschnitt „Kontinuität“ im Bereich Leistung des ADMIN; Migration 0097), de-DE. */
+export default {
+  loadError: 'Die Kontinuität konnte nicht geladen werden',
+  drillsError: 'Der Verlauf der Übungen konnte nicht geladen werden',
+  commitment: 'Zusage zur Wiederherstellung',
+  commitmentIntro: 'Worauf sich die Plattform verpflichtet und was heute aktiviert ist.',
+  rto: 'Höchstzeit bis zur Rückkehr (RTO)',
+  rpo: 'Höchster Datenverlust (RPO)',
+  interval: 'Wie oft geübt werden muss',
+  backupUpload: 'Kopie der Sicherung in den Speicher',
+  pitr: 'Wiederherstellung auf einen Zeitpunkt',
+  backupInterval: 'Wie oft gesichert wird',
+  backupRetention: 'Aufbewahrte Sicherungen',
+  pitrArchive: 'Wie oft das Protokoll archiviert wird',
+  pitrRetention: 'Aufbewahrtes Archiv',
+  enabled: 'Aktiviert',
+  disabled: 'Deaktiviert',
+  days_one: '{count} Tag',
+  days_other: '{count} Tage',
+  rpoUnreachable: 'Der zugesagte RPO ist kürzer als der Archivierungsabstand des Protokolls: er ist nicht einzuhalten.',
+  drills: 'Wiederherstellungsübungen',
+  drillsIntro: 'Ein Mechanismus pro Art der Wiederherstellung. Nie geübt gilt als überfällig.',
+  kinds: {
+    PITR: 'Zeitpunkt',
+    BUCKET_DUMP: 'Verschlüsselte Kopie im Speicher',
+  },
+  states: {
+    never: 'Nie geübt',
+    overdue: 'Überfällig',
+    failed: 'Die letzte ist fehlgeschlagen',
+    ok: 'Auf dem Stand',
+  },
+  neverDrilled: 'Nie geübt: jetzt ist es fällig.',
+  lastSuccess: 'Letzte erfolgreiche Übung: {date}',
+  dueOn: 'nächste am {date}',
+  dueNow: 'jetzt fällig',
+  lastFailed: 'Der Versuch vom {date} ist fehlgeschlagen.',
+  rtoMeasured: 'Zurück in {value}',
+  rpoMeasured: 'Verlust von {value}',
+  dataset: 'Mit {value}',
+  targetsAt: 'Damals zugesagt: {rto} und {rpo}',
+  notMeasured: 'Nicht gemessen',
+  overdue_one: '{count} Mechanismus ist überfällig oder wurde nie geübt.',
+  overdue_other: '{count} Mechanismen sind überfällig oder wurden nie geübt.',
+  history: 'Verlauf der Übungen',
+  historyIntro: 'Jede Übung mit ihrem Ergebnis und ihren Messwerten. Auch die fehlgeschlagenen.',
+  columns: {
+    kind: 'Mechanismus',
+    when: 'Wann',
+    result: 'Ergebnis',
+    measures: 'Messwerte',
+  },
+  results: {
+    met: 'Eingehalten',
+    missed: 'Wiederhergestellt, außerhalb des Ziels',
+    failed: 'Fehlgeschlagen',
+  },
+  noun: {
+    one: 'Übung',
+    other: 'Übungen',
+  },
+  empty: {
+    title: 'Keine Übungen',
+    description: 'Hier sehen Sie jede Wiederherstellung mit ihren Messwerten.',
+  },
+  noKinds: {
+    title: 'Keine Mechanismen',
+    description: 'Hier sehen Sie den Stand jeder Art der Wiederherstellung.',
+  },
+} satisfies Translation<typeof es>;

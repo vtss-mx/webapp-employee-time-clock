@@ -14,9 +14,7 @@ describe('Empleados: listado', () => {
     expect(screen.getByText('Cargando…')).toBeInTheDocument();
     const row = (await screen.findByText('Ana Ruiz')).closest('tr')!;
     expect(screen.getByText('2 registrados')).toBeInTheDocument();
-    expect(within(row).getByText('Producción')).toBeInTheDocument();
     expect(within(row).getByText('Validado')).toBeInTheDocument();
-    expect(within(screen.getByText('Luis Paz').closest('tr')!).getByText('Sin departamento')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Solicitar verificación a todos' })).toHaveAttribute('href', '/company/employees/reverify-all');
     await userEvent.click(row);
     expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
@@ -73,7 +71,7 @@ describe('Empleados: alta', () => {
     expect(facts).toHaveTextContent('Fecha de nacimiento');
     expect(facts).toHaveTextContent('Excepción de prenda de cabezaSí');
     expect(facts).toHaveTextContent('Contraseña••••••••');
-    expect(facts).not.toHaveTextContent('Segura123');
+    expect(facts).not.toHaveTextContent('Segura123456');
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false); // cancelar no envía nada
     expect(screen.getByLabelText('Nombres')).toHaveValue('Eva'); // y el formulario sigue igual
     await userEvent.click(register);
@@ -85,7 +83,7 @@ describe('Empleados: alta', () => {
     expect(popup).toHaveTextContent('Recibirás la solicitud en Validaciones');
     const { url, body } = posted(calls, 'POST');
     expect(url).toBe('/api/employees');
-    expect(body).toMatchObject({ first_name: 'Eva', birth_date: '1990-01-01', phone: '+526621234567', password: 'Segura123', headwear_exempt: true });
+    expect(body).toMatchObject({ first_name: 'Eva', birth_date: '1990-01-01', phone: '+526621234567', password: 'Segura123456', headwear_exempt: true });
     expect(body).not.toHaveProperty('password_confirm'); // la confirmación nunca se envía
   });
 
@@ -172,8 +170,8 @@ describe('Empleados: edición', () => {
 
     await userEvent.clear(screen.getByLabelText('Nombres'));
     await userEvent.type(screen.getByLabelText('Nombres'), ' Anita ');
-    await userEvent.type(screen.getByLabelText('Nueva contraseña'), 'Nueva1234');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva1234');
+    await userEvent.type(screen.getByLabelText('Nueva contraseña'), 'Nueva1234568');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva1234568');
     await userEvent.click(screen.getByRole('checkbox', { name: /Excepción de prenda de cabeza/ }));
     await waitFor(() => expect(save).toBeEnabled());
     expect(save).not.toHaveAttribute('title');
@@ -194,7 +192,7 @@ describe('Empleados: edición', () => {
 
     expect(await screen.findByText('Expediente del empleado')).toBeInTheDocument();
     expect(await screen.findByText('Cambios guardados')).toBeInTheDocument();
-    expect(posted(calls, 'PUT')).toEqual({ url: '/api/employees/7', body: { first_name: 'Anita', password: 'Nueva1234', headwear_exempt: true } });
+    expect(posted(calls, 'PUT')).toEqual({ url: '/api/employees/7', body: { first_name: 'Anita', password: 'Nueva1234568', headwear_exempt: true } });
   });
 
   it('sin RFC, CURP ni NSS (opcionales) ni teléfono (cuentas anteriores): solo se pide el teléfono', async () => {
@@ -320,8 +318,7 @@ describe('Empleados en inglés (en-US)', () => {
     await screen.findByText('Ana Ruiz');
     expect(screen.getByRole('heading', { name: 'Employees' })).toBeInTheDocument();
     expect(screen.getByText('2 registered')).toBeInTheDocument();
-    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Employee', 'Email', 'Department', 'Face enrollment', 'Status']);
-    expect(within(screen.getByText('Luis Paz').closest('tr')!).getByText('No department')).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Employee', 'Email', 'Face enrollment', 'Status']);
     expect(screen.getByRole('link', { name: 'Request verification from everyone' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search employees' })).toHaveAttribute('placeholder', 'Search by name, number, RFC or email');
   });
@@ -336,9 +333,9 @@ describe('Empleados en inglés (en-US)', () => {
     const english = { 'First names': 'Eva', 'Last names': 'Sol', CURP: VALID.CURP, RFC: VALID.RFC, 'Social Security No. (NSS)': VALID['No. de Seguridad Social (NSS)'], 'Employee No.': 'EMP-9', 'Mobile phone': '6621234567', Email: 'eva@empresa.com' };
     for (const [label, value] of Object.entries(english)) await userEvent.type(screen.getByLabelText(label), value);
     await userEvent.type(screen.getByLabelText('Date of birth'), '01011990');
-    await userEvent.type(screen.getByLabelText('Password'), 'Segura123');
-    await userEvent.type(screen.getByLabelText('Confirm password'), 'Segura123');
-    expect(screen.getByText('At least 8 characters, with uppercase, lowercase and a number')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Password'), 'Segura123456');
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'Segura123456');
+    expect(screen.getByText('At least 12 characters, with uppercase, lowercase and a number')).toBeInTheDocument();
     const register = screen.getByRole('button', { name: 'Add employee' });
     await waitFor(() => expect(register).toBeEnabled());
     await userEvent.click(register);

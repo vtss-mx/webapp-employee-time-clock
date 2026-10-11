@@ -1,13 +1,13 @@
 import type { Translation } from '../../../types/i18n';
 import type es from '../es-MX/sites';
 
-/** Textos de sitios donde se checa en italiano (it-IT): las mismas llaves que es-MX. */
+/** Testi delle sedi di verifica in italiano (it-IT): le stesse chiavi di es-MX. */
 export default {
   list: {
-    title: 'Sedi di lavoro',
+    title: 'Sedi di verifica',
     loadError: 'Impossibile caricare le sedi',
-    subtitle_one: '{count} sede · dove si timbra di persona e con quale raggio',
-    subtitle_other: '{count} sedi · dove si timbra di persona e con quale raggio',
+    subtitle_one: "{count} sede · dove si verifica l'identità e con quale raggio",
+    subtitle_other: "{count} sedi · dove si verifica l'identità e con quale raggio",
     new: 'Nuova sede',
     searchPlaceholder: 'Cerca per nome',
     searchLabel: 'Cerca sedi',
@@ -16,7 +16,6 @@ export default {
       site: 'Sede',
       address: 'Indirizzo',
       radius: 'Raggio',
-      employees: 'Dipendenti oggi',
       code: 'Codice',
     },
     kiosksOf_one: '{count} chiosco di {name}',
@@ -26,22 +25,22 @@ export default {
       description: "Prova con un'altra ricerca o un altro filtro.",
     },
     empty: {
-      title: 'Nessuna sede di lavoro',
-      description: 'Crea una sede per indicare dove timbra il tuo personale.',
+      title: 'Nessuna sede di verifica',
+      description: "Crea una sede per delimitare dove si verifica l'identità.",
     },
   },
   form: {
     loadError: 'Impossibile caricare la sede',
     newTitle: 'Nuova sede',
     editTitle: 'Modifica sede',
-    newSubtitle: 'Un luogo in cui il tuo personale timbra di persona: stabilimento, filiale, ufficio…',
+    newSubtitle: "Un luogo in cui si verifica l'identità: stabilimento, filiale, ufficio…",
     create: 'Crea sede',
     createError: 'Impossibile creare la sede',
     saveError: 'Impossibile salvare la sede',
-    rule: 'Raggio per timbrare: {distance}.',
+    rule: 'Raggio per verificare: {distance}.',
     created: {
       title: 'Sede creata',
-      text: '{name} si può ora aggiungere ai tuoi turni. {rule}',
+      text: '{name} si può ora usare durante la verifica. {rule}',
     },
     updated: {
       title: 'Sede aggiornata',
@@ -54,31 +53,31 @@ export default {
     name: 'Nome della sede',
     nameExample: 'Stabilimento Hermosillo',
     nameHint: 'Unico nella tua azienda: ad es. «Stabilimento Hermosillo»',
-    radius: 'Raggio per timbrare (metri)',
+    radius: 'Raggio per verificare (metri)',
     radiusHint: 'Tra {min} e {max} m: la dimensione del luogo più il margine del GPS.',
     suggestedRadii: 'Raggi suggeriti',
-    onSiteNote: 'In sede si timbra con il volto e la posizione del telefono, entro questo raggio.',
-    locationIntro: 'Cerca il luogo o tocca la mappa. Il cerchio indica il raggio per timbrare.',
+    onSiteNote: "In sede l'identità si verifica con il volto e la posizione del telefono, entro questo raggio.",
+    locationIntro: 'Cerca il luogo o tocca la mappa. Il cerchio indica il raggio per verificare.',
     pointRequired: 'Segna sulla mappa il punto della sede',
   },
   fields: {
     address: 'Indirizzo',
     references: 'Riferimenti',
     point: 'Punto sulla mappa',
-    radius: 'Raggio per timbrare',
+    radius: 'Raggio per verificare',
   },
   confirm: {
     createTitle: 'Creare la sede {name}?',
-    createMessage: 'Si potrà aggiungere ai tuoi turni; chi li ha timbrerà qui.',
+    createMessage: "Si potrà usare per delimitare dove si verifica l'identità.",
     willCreate: 'Verrà creata',
     editTitle: 'Salvare le modifiche della sede {name}?',
   },
   status: {
     title: 'Stato della sede',
-    activeMeaning: 'Si può aggiungere ai turni e chi li ha può timbrare qui.',
-    inactiveMeaning: 'Nessuno può timbrare in questa sede e non si può aggiungere a un turno.',
-    deactivateWarning: 'Nessuno potrà timbrare qui né aggiungerla a un turno finché non la attivi. I turni che la includono e ciò che è già registrato non cambiano.',
-    removeWarning: 'Si può eliminare solo se nessun turno la usa e nessuno vi ha timbrato. Se un turno la usa, toglila dal turno; se qualcuno vi ha già timbrato, disattivala.',
+    activeMeaning: "Accetta verifiche dell'identità in questo luogo.",
+    inactiveMeaning: "Non accetta verifiche dell'identità in questo luogo.",
+    deactivateWarning: 'Non accetterà verifiche qui finché non la attivi. Ciò che è già registrato non cambia.',
+    removeWarning: 'Si può eliminare solo se nessuno vi è stato verificato. Se ci sono già verifiche, disattivala.',
     activateQuestion: 'Attivare la sede {name}?',
     deactivateQuestion: 'Disattivare la sede {name}?',
     removeQuestion: 'Eliminare la sede {name}?',
@@ -87,13 +86,22 @@ export default {
     removed: 'Sede eliminata',
     inUse: 'La sede è in uso: disattivala',
   },
+  recordStatus: {
+    activateError: 'Impossibile attivare {name}',
+    deactivateError: 'Impossibile disattivare {name}',
+    removeError: 'Impossibile eliminare {name}',
+  },
+  validation: {
+    nameRequired: 'Scrivi il nome della sede, ad es. «{example}»',
+    nameMax: 'Al massimo {max} caratteri',
+  },
   trash: {
     restoreTitle: 'Ripristinare la sede {name}?',
     banner: 'Sede eliminata',
   },
   presence: {
     label: 'Codice della sede',
-    hint: "Richiede all'entrata e all'uscita il codice mostrato dal chiosco della sede.",
+    hint: 'Richiede durante la verifica il codice mostrato dal chiosco della sede.',
     on: 'Richiede il codice',
     off: 'Senza codice',
   },

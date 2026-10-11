@@ -2,10 +2,12 @@ import { Languages, LogOut, MonitorSmartphone, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Panel, PanelFooter, PanelGrid, PanelHeader, PanelSection } from '../components/ui/Panel';
 import { ChangePasswordSection } from '../components/ChangePasswordSection';
+import { ConsentsSection } from '../components/consents/ConsentsSection';
 import { EmployeeDevices } from '../components/devices/EmployeeDevices';
 import { ProfilePhotoSection } from '../components/ProfilePhotoSection';
 import { Avatar } from '../components/ui/Avatar';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { DataExportSection } from '../components/dataExport/DataExportSection';
 import { PasskeysSection } from '../components/passkeys/PasskeysSection';
 import { SessionsPanel } from '../components/SessionsPanel';
 import { FaceStatusBadge, StatusBadge } from '../components/StatusBadge';
@@ -112,6 +114,10 @@ export function ProfilePage() {
             <LanguageSwitcher />
           </PanelSection>
           <PasskeysSection />
+          {employee && <ConsentsSection />}
+          {/* Exportar sus datos (RGPD arts. 15 y 20): solo con una empresa en la sesión; sin ella el servidor
+              responde 403 COMPANY_REQUIRED (una cuenta de la plataforma no tiene expediente en una empresa). */}
+          {user.company && <DataExportSection subject={{ kind: 'mine' }} />}
           {employee && (
             <PanelSection title={t('devices.mineTitle')} icon={<MonitorSmartphone size={20} />}>
               <p className="muted small">{t('devices.mineIntro')}</p>

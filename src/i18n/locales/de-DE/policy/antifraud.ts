@@ -27,11 +27,20 @@ export default {
     applied: 'Stufe {name} angewendet',
   },
   risk: {
+    readiness: {
+      title: 'Stand der Risikoprüfung',
+      score: 'Obergrenze des Wertes: {maximum}. Nur beobachtete Signale: {observed}. Verpflichtende Signale: {enforced}.',
+      cannotReject: 'Die Bewertung erlaubt mit dieser Konfiguration keine Ablehnung.',
+      calibration: 'Die Kalibrierung steht noch aus; diese Anzahl belegt keine Genauigkeit.',
+      independent: 'Kritische Kontrollen gelten auch bei abgeschaltetem Signal oder abgeschalteter Prüfung.',
+      critical: 'Unabhängige Kontrolle: {action}',
+    },
     title: 'Risikobewertung',
     hint:
       'Addiert die Punkte der Signale jedes Versuchs und wendet die Aktion seiner Risikostufe an. Jede Gruppe von Signalen hat eine Obergrenze: Ein einzelnes Signal lehnt nie allein ab.',
     points: '{points} Punkte',
     fields: {
+      familyCap: 'Höchstwert je Gruppe',
       mediumScore: 'Mittleres Risiko ab',
       highScore: 'Hohes Risiko ab',
       criticalScore: 'Kritisches Risiko ab',
@@ -43,6 +52,15 @@ export default {
       deviceMode: 'Gerät des Mitarbeiters',
       minConfidence: 'Vertrauensniveau',
       identifyConfidence: 'Vertrauensniveau zur Identifizierung unter allen',
+    },
+    familyCap: {
+      description: 'Begrenzt die Summe der Signale derselben Gruppe.',
+      saved: 'Risikohöchstwert geändert',
+      savedText: 'Höchstwert je Gruppe: {points}.',
+    },
+    changeReason: {
+      label: 'Grund für die Risikoänderung',
+      hint: 'Begründen Sie die Änderung; sie erscheint im Unternehmensprotokoll.',
     },
     scores: {
       medium: 'Je niedriger, desto mehr Versuche verlangen einen zusätzlichen Schritt.',
@@ -57,7 +75,7 @@ export default {
       savedText: '{tier}: {action}.',
     },
     fallback: {
-      description: 'Sie kann nur erlauben, warnen oder einen zusätzlichen Schritt verlangen: Sie lehnt nie blind ab.',
+      description: 'Ein Ausfall der Prüfung bestätigt niemals die Identität. Der Server legt die sicheren Optionen fest.',
       saved: 'Ersatzaktion der Risikobewertung aktualisiert',
       savedText: 'Wenn die Risikobewertung ausfällt: {action}.',
     },
@@ -158,7 +176,7 @@ export default {
   },
   presence: {
     title: 'Nachweis der Präsenz',
-    hint: 'Prüft, dass jede Identifizierung und jede Zeitbuchung am richtigen Ort und auf dem richtigen Gerät erfolgt.',
+    hint: 'Prüft, dass jede Identifizierung und jede Identitätsprüfung am richtigen Ort und auf dem richtigen Gerät erfolgt.',
     saved: '{label}: {mode}',
     signing: {
       label: 'Signatur pro Anfrage',
@@ -177,7 +195,7 @@ export default {
     },
     siteCodes: {
       label: 'Standortcode',
-      hint: 'An Standorten, die ihn aktivieren, enthalten Kommen und Gehen den Code des Kiosks.',
+      hint: 'An Standorten, die ihn aktivieren, enthält jede Prüfung den Code des Kiosks.',
       enforceWarning: 'Richten Sie zuvor an jedem Standort, der ihn aktiviert, einen Kiosk ein: Ohne den Code wird nichts erfasst.',
     },
   },

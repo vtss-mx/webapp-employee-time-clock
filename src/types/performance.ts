@@ -82,7 +82,7 @@ export interface PerformanceOverview {
   step_seconds: number;
   /** Umbral de una petición lenta (SLOW_REQUEST_THRESHOLD_MS del backend). */
   slow_threshold_ms: number;
-  /** El de las rutas faciales (SLOW_REQUEST_FACE_THRESHOLD_MS: registro, verificación, identificación, reto y asistencia). */
+  /** El de las rutas faciales (SLOW_REQUEST_FACE_THRESHOLD_MS: registro, verificación, identificación y reto). */
   slow_face_threshold_ms: number;
   open_alerts: number;
   totals: PerfTotals;

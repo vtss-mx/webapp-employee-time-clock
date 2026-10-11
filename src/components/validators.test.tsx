@@ -30,7 +30,7 @@ describe('validatorService y checkpointService', () => {
     ['list', () => validatorService.list({ page: 2, size: 20 }), { items: [sampleValidator], total: 21, page: 2, size: 20, active: 3, limit: 5 }, 'GET', '/api/validators?page=2&size=20'],
     ['update', () => validatorService.update(3, { mode: 'QR' }), sampleValidator, 'PUT', '/api/validators/3'],
     ['setStatus', () => validatorService.setStatus(3, false), sampleValidator, 'PATCH', '/api/validators/3/status'],
-    ['resetPassword', () => validatorService.resetPassword(3, 'Nueva1234'), sampleValidator, 'PUT', '/api/validators/3/password'],
+    ['resetPassword', () => validatorService.resetPassword(3, 'Nueva1234568'), sampleValidator, 'PUT', '/api/validators/3/password'],
     ['remove', () => validatorService.remove(3), null, 'DELETE', '/api/validators/3'],
     ['profile', () => checkpointService.profile(), { id: 3, name: 'Recepción', mode: 'QR', company: { id: 1, name: 'Mi empresa' } }, 'GET', '/api/checkpoint/me'],
     ['recent', () => checkpointService.recent({ page: 2, size: 5 }), { items: [], total: 0, page: 2, size: 5 }, 'GET', '/api/checkpoint/recent?page=2&size=5'],
@@ -51,8 +51,8 @@ describe('validatorService y checkpointService', () => {
   it('alta con datos limpios y rostro con el QR del modo "QR y rostro"', async () => {
     const { calls } = mockFetch(apiOk(sampleValidator), apiOk(identified));
     const settings = { address: sampleValidator.address!, location_required: true, location_radius_m: 120 };
-    await validatorService.create({ name: '  Recepción ', email: ' Recepcion@Empresa.com ', password: 'Valida1234', mode: 'FACE', ...settings });
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Recepción', email: 'recepcion@empresa.com', password: 'Valida1234', mode: 'FACE', ...settings });
+    await validatorService.create({ name: '  Recepción ', email: ' Recepcion@Empresa.com ', password: 'Valida123456', mode: 'FACE', ...settings });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Recepción', email: 'recepcion@empresa.com', password: 'Valida123456', mode: 'FACE', ...settings });
     await checkpointService.identifyFace({ frontal: [new Blob(['x'])], challenge: { id: 'c1', images: [new Blob(['y']), new Blob(['z'])] }, camera: 'FaceTime HD Camera' }, 'TCQR1:abc');
     const form = calls[1].init.body as FormData;
     expect(calls[1].url).toBe('/api/checkpoint/identify/face');

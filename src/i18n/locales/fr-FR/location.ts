@@ -36,10 +36,6 @@ export default {
       text: "Ce validateur ne peut se connecter que sur son lieu d'activité et l'autorisation de localisation est bloquée.",
       next: "Revenez à l'application et reconnectez-vous.",
     },
-    attendance: {
-      text: "L'enregistrement de votre présence nécessite votre position et l'autorisation est bloquée dans ce navigateur.",
-      next: 'Revenez ici et touchez «Réessayer».',
-    },
     map: {
       text: "Pour vous situer sur la carte, l'autorisation de localisation est nécessaire et elle est bloquée dans ce navigateur.",
       next: 'Touchez de nouveau «Ma position» (ou marquez le point sur la carte).',

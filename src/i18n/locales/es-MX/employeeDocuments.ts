@@ -5,22 +5,11 @@
  */
 export default {
   title: 'Mis documentos',
-  subtitle: 'Sube tu comprobante de domicilio y una identificación oficial.',
   add: 'Subir documento',
   loadError: 'No se pudieron cargar tus documentos',
   noun: {
     one: 'documento',
     other: 'documentos',
-  },
-  /** Encabezado del onboarding: qué pide la empresa y qué falta. */
-  requirements: {
-    title: 'Documentos que pide tu empresa',
-    officialId: 'Una identificación oficial',
-    proofOfAddress: 'Comprobante de domicilio',
-    done: 'Listo',
-    missing: 'Pendiente',
-    allDone: 'Ya subiste lo que tu empresa pide.',
-    notRequired: 'Tu empresa no pide documentos por ahora.',
   },
   columns: {
     file: 'Documento',
@@ -60,7 +49,7 @@ export default {
     dataSection: 'Tipo de documento',
     typeLabel: 'Tipo de documento',
     typePlaceholder: 'Elige el tipo',
-    uploading: 'Subiendo el documento…',
+    validating: 'Validando documento…',
     error: 'No se pudo subir el documento',
     confirm: {
       title: '¿Subir {name}?',
@@ -74,6 +63,12 @@ export default {
       empty: 'El archivo está vacío. Elige otro.',
       size: 'El archivo pesa {size} y el máximo es {max}.',
       typeMissing: 'Elige el tipo de documento.',
+    },
+    /** 422: el servidor no reconoció un documento (no guardó nada). El motivo lo da el servidor; la app ofrece reintentar. */
+    notRecognized: {
+      title: 'Documento no reconocido',
+      retake: 'Volver a tomar la foto',
+      choose: 'Elegir otro archivo',
     },
   },
   /** Expediente del empleado que revisa la EMPRESA (junto al registro facial). */
@@ -89,7 +84,8 @@ export default {
     confirmedBy: 'Confirmado por {by}',
     pending: 'Por revisar',
     read: 'Lectura {value}',
-    mrz: 'Zona de lectura verificada',
+    mrz: 'Dígitos MRZ correctos',
+    mrzHelp: 'Los controles de lectura coinciden; no prueban la autenticidad del documento.',
     notRead: 'Sin lectura automática',
     download: 'Descargar',
     downloadError: 'No se pudo descargar el documento',

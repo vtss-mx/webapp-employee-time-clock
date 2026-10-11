@@ -28,7 +28,7 @@ describe('locationProblemMessage', () => {
     expect(locationProblemMessage('denied').details?.at(-1)).toBe('Vuelve a la aplicación e inicia sesión de nuevo.');
     expect(locationProblemMessage('denied', 'map')).toMatchObject({ text: expect.stringContaining('mapa') as string });
     expect(locationProblemMessage('denied', 'map').details?.at(-1)).toContain('Mi ubicación');
-    expect(locationProblemMessage('timeout', 'attendance').details).toBeUndefined();
+    expect(locationProblemMessage('timeout', 'verification').details).toBeUndefined();
   });
 });
 

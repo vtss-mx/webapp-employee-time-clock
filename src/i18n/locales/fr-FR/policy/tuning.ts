@@ -31,6 +31,18 @@ export default {
     saved: 'Temps de la détection du vivant mis à jour',
     savedText: 'Chaque défi expirera au bout de {time}.',
   },
+  hold: {
+    label: 'Temps pour maintenir chaque mouvement',
+    description: 'Combien de temps chaque mouvement doit être maintenu avant la capture; un peu plus évite un refus à la fin.',
+    saved: 'Temps de maintien mis à jour',
+    savedText: 'Chaque mouvement est maintenu {time} avant la capture.',
+  },
+  retries: {
+    label: 'Tentatives du défi',
+    description: "Combien de fois un nouveau défi est demandé, sans refaire l'analyse, avant de la recommencer.",
+    saved: 'Tentatives du défi mises à jour',
+    savedText: 'Tentatives autorisées avant de recommencer: {count}.',
+  },
   flash: {
     label: 'Flash coloré',
     retired: "Désactivé par décision produit (2026-10-06): l'écran ne clignote plus en couleurs. Les mouvements, la rafale et la vérification vocale couvrent la détection du vivant.",
@@ -73,12 +85,12 @@ export default {
     description: 'Marge maximale que le téléphone peut indiquer; une valeur plus stricte peut obliger à activer la position précise.',
     option: "Jusqu'à {distance}",
     saved: 'Précision mise à jour',
-    savedText: 'Le pointage devra être refait si la position a une marge supérieure à {distance}.',
+    savedText: 'La vérification devra être refaite si la position a une marge supérieure à {distance}.',
   },
   speed: {
     label: 'Vitesse maximale crédible',
-    description: 'Entre deux pointages consécutifs; ce qui exige un déplacement plus rapide est refusé comme trajet impossible.',
+    description: 'Entre deux vérifications consécutives; ce qui exige un déplacement plus rapide est refusé comme trajet impossible.',
     saved: 'Vitesse mise à jour',
-    savedText: 'Les pointages qui exigent un déplacement à plus de {speed} depuis le précédent seront refusés.',
+    savedText: 'Les vérifications qui exigent un déplacement à plus de {speed} depuis la précédente seront refusées.',
   },
 } satisfies Translation<typeof es>;

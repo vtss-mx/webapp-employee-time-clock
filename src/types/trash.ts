@@ -14,8 +14,8 @@ export interface SoftDeleted {
 }
 
 /**
- * Referencia histórica (un empleado, un turno o un sitio dentro de una jornada, una ausencia o una
- * solicitud): `deleted` dice que ya está en «Eliminados» (se muestra con su marca junto al nombre).
+ * Referencia histórica (una persona o un sitio dentro de una verificación, un documento o un caso):
+ * `deleted` dice que ya está en «Eliminados» (se muestra con su marca junto al nombre).
  */
 export interface DeletedFlag {
   deleted?: boolean;

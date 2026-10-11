@@ -114,7 +114,7 @@ describe('LiveFaceFlow: cambio de idioma en caliente a medio escaneo', () => {
     expect(heading()).toHaveTextContent('Prueba de vida · paso 2 de 2');
     expect(counter()).toHaveAttribute('aria-label', 'Etapa 4 de 5');
     see({ guidance: 'hold_still' });
-    expect(message()).toHaveTextContent('Mantén la posición');
+    expect(message()).toHaveTextContent('Sostén así');
     expect(screen.getByText('Cámara frontal')).toBeInTheDocument();
 
     await act(() => setLocale('en-US'));
@@ -122,7 +122,7 @@ describe('LiveFaceFlow: cambio de idioma en caliente a medio escaneo', () => {
     // Mismo paso, ahora en inglés.
     expect(heading()).toHaveTextContent('Liveness check · step 2 of 2');
     expect(counter()).toHaveAttribute('aria-label', 'Stage 4 of 5');
-    expect(message()).toHaveTextContent('Hold that position');
+    expect(message()).toHaveTextContent('Hold it there');
     expect(screen.getByText('Front camera')).toBeInTheDocument();
     expect(detection.options?.mode).toMatchObject({ kind: 'action', action: 'TURN_RIGHT' });
     // La cámara no se reinició ni se soltó; la página no se recargó.

@@ -55,16 +55,16 @@ describe('administradores de empresa (pantallas)', () => {
     await userEvent.type(screen.getByLabelText('Correo del administrador'), 'rh@pan.com');
     await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'corta');
     await userEvent.tab();
-    expect(screen.getByText(/Mínimo 8 caracteres|al menos 8/)).toBeInTheDocument();
+    expect(screen.getByText(/Mínimo 12 caracteres|al menos 8/)).toBeInTheDocument();
     await userEvent.clear(screen.getByLabelText('Contraseña inicial'));
-    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos123');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Recursos123');
+    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos12345');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Recursos12345');
     await waitFor(() => expect(add).toBeEnabled());
     // Se confirma con qué correo entrará (nunca la contraseña); cancelar no envía nada.
     await userEvent.click(add);
     const dialog = await screen.findByRole('dialog', { name: '¿Agregar a rh@pan.com como administrador?' });
     expect(within(within(dialog).getByRole('region', { name: 'Se registrará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Correorh@pan.com', 'EmpresaPanificadora']);
-    expect(dialog).not.toHaveTextContent('Recursos123');
+    expect(dialog).not.toHaveTextContent('Recursos12345');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'POST')).toBe(false);
     expect(screen.getByLabelText('Correo del administrador')).toHaveValue('rh@pan.com'); // el formulario sigue igual
@@ -84,8 +84,8 @@ describe('administradores de empresa (pantallas)', () => {
     });
     renderAt('/admin/companies/:id/admins/new', '/admin/companies/4/admins/new', <CompanyAdminFormPage />, '/admin/companies/:id');
     await userEvent.type(await screen.findByLabelText('Correo del administrador'), 'RH@pan.com');
-    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos123');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Recursos123');
+    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos12345');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Recursos12345');
     const add = screen.getByRole('button', { name: 'Agregar' });
     await waitFor(() => expect(add).toBeEnabled());
     await userEvent.click(add);
@@ -94,19 +94,37 @@ describe('administradores de empresa (pantallas)', () => {
     expect(screen.getAllByText('El correo ya está registrado').length).toBeGreaterThan(0);
   });
 
+  it('agregar: otra falla del servidor se explica en el popup y el correo queda sin marca', async () => {
+    mockFetch((call) => {
+      if (call.url.includes('/validation')) return liveCheck();
+      return call.init.method === 'POST' ? apiFail(503, 'SERVICE_UNAVAILABLE', 'El servidor no está disponible.') : apiOk(company);
+    });
+    renderAt('/admin/companies/:id/admins/new', '/admin/companies/4/admins/new', <CompanyAdminFormPage />, '/admin/companies/:id');
+    await userEvent.type(await screen.findByLabelText('Correo del administrador'), 'rh@pan.com');
+    await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Recursos12345');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Recursos12345');
+    const add = screen.getByRole('button', { name: 'Agregar' });
+    await waitFor(() => expect(add).toBeEnabled());
+    await userEvent.click(add);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Agregar a rh@pan.com como administrador?' })).getByRole('button', { name: 'Agregar administrador' }));
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo agregar el administrador' })).toBeInTheDocument();
+    // No es un problema del correo: su campo no se marca.
+    expect(screen.getByLabelText('Correo del administrador')).not.toHaveAccessibleDescription(/no está disponible/);
+  });
+
   it('restablecer: solo pide la contraseña nueva del administrador elegido y avisa que cierra sus sesiones', async () => {
     const admin = { id: 9, email: 'admin@pan.com', active: true, last_login_at: null, created_at: '2026-01-01T00:00:00Z' };
     const { calls } = mockFetch((call) => apiOk(call.url.endsWith('/admins/9') ? admin : company));
     renderAt('/admin/companies/:id/admins/:adminId/password', '/admin/companies/4/admins/9/password', <CompanyAdminFormPage />, '/admin/companies/:id');
     expect(await screen.findByText('admin@pan.com · Panificadora')).toBeInTheDocument();
     expect(screen.queryByLabelText('Correo del administrador')).toBeNull();
-    await userEvent.type(screen.getByLabelText('Contraseña nueva'), 'Nueva12345');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva12345');
+    await userEvent.type(screen.getByLabelText('Contraseña nueva'), 'Nueva1234567');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva1234567');
     await userEvent.click(screen.getByRole('button', { name: 'Restablecer' }));
     const dialog = await screen.findByRole('alertdialog', { name: '¿Restablecer la contraseña de admin@pan.com?' });
     expect(dialog).toHaveTextContent('Se cerrarán todas sus sesiones abiertas.');
     expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Administradoradmin@pan.comEmpresaPanificadora');
-    expect(dialog).not.toHaveTextContent('Nueva12345');
+    expect(dialog).not.toHaveTextContent('Nueva1234567');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'PUT')).toBe(false); // cancelar no envía nada
 
@@ -115,7 +133,7 @@ describe('administradores de empresa (pantallas)', () => {
     expect(await screen.findByText('Contraseña restablecida')).toBeInTheDocument();
     const put = calls.find((c) => c.init.method === 'PUT');
     expect(put?.url).toBe('/api/admin/companies/4/admins/9/password');
-    expect(JSON.parse(put?.init.body as string)).toEqual({ admin_password: 'Nueva12345' });
+    expect(JSON.parse(put?.init.body as string)).toEqual({ admin_password: 'Nueva1234567' });
   });
 });
 
@@ -203,20 +221,20 @@ describe('contraseña del validador (pantalla)', () => {
     renderAt('/company/validators/:id/password', '/company/validators/3/password', <ValidatorPasswordPage />, '/company/validators');
     const reset = await screen.findByRole('button', { name: 'Restablecer' });
     expect(reset).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(/Contraseña nueva/), 'Nueva1234');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva12');
+    await userEvent.type(screen.getByLabelText(/Contraseña nueva/), 'Nueva1234568');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva12345');
     await userEvent.tab();
     expect(reset).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), '34');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), '68');
     await userEvent.click(reset);
     let confirm = await screen.findByRole('alertdialog', { name: '¿Restablecer la contraseña de Recepción planta 1?' });
     expect(confirm).toHaveTextContent('Sus sesiones abiertas se cerrarán de inmediato.');
     expect(within(confirm).getByRole('region', { name: 'Detalles' })).toHaveTextContent('Cuentarecepcion@empresa.com');
-    expect(confirm).not.toHaveTextContent('Nueva1234'); // la contraseña nunca se muestra
+    expect(confirm).not.toHaveTextContent('Nueva1234568'); // la contraseña nunca se muestra
     await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(calls.some((c) => c.init.method === 'PUT')).toBe(false);
-    expect(screen.getByLabelText(/Contraseña nueva/)).toHaveValue('Nueva1234');
+    expect(screen.getByLabelText(/Contraseña nueva/)).toHaveValue('Nueva1234568');
 
     await userEvent.click(reset);
     confirm = await screen.findByRole('alertdialog', { name: '¿Restablecer la contraseña de Recepción planta 1?' });

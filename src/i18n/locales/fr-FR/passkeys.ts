@@ -8,6 +8,20 @@ export default {
   unsupported: "Ce navigateur ne prend pas en charge les clés d'accès. Utilisez Safari, Chrome ou Edge à jour.",
   loadError: "Impossible de charger vos clés d'accès",
   add: "Ajouter une clé d'accès",
+  mfa: {
+    title: "Votre compte a besoin d'une clé d'accès",
+    daysLeft_one: 'Il vous reste {count} jour pour l’enregistrer.',
+    daysLeft_other: 'Il vous reste {count} jours pour l’enregistrer.',
+    expiredTitle: "Enregistrez votre clé d'accès pour continuer",
+    expiredText: "Le délai est écoulé : aucun écran ne fonctionne avant de l'enregistrer.",
+    action: 'Enregistrer la clé',
+  },
+  gate: {
+    badge: 'Second facteur',
+    title: "Enregistrez votre clé d'accès",
+    footnote: 'Votre session reste ouverte : une fois enregistrée, tout fonctionne de nouveau.',
+    action: "Enregistrer la clé d'accès",
+  },
   empty: {
     title: "Aucune clé d'accès",
     description: "Ajoutez-en une pour vous connecter avec le visage, l'empreinte ou le code.",

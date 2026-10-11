@@ -102,12 +102,12 @@ describe('EmployeeDevices (antifraude 1b, decisión D2)', () => {
     server([]);
     const view = company();
     expect(await screen.findByText('Sin dispositivos')).toBeInTheDocument();
-    expect(document.querySelector('.empty-state__text')).toHaveTextContent('Aquí verás los navegadores y teléfonos usados para checar.');
+    expect(document.querySelector('.empty-state__text')).toHaveTextContent('Aquí verás los navegadores y teléfonos usados para verificar la identidad.');
     view.unmount();
     await act(() => setLocale('en-US'));
     renderWithProviders(<EmployeeDevices filterKey="mine" load={(query, signal) => employeeDeviceService.mine(query, signal)} />);
     expect(await screen.findByText('No devices')).toBeInTheDocument();
-    expect(screen.getByText('Browsers and phones used to check in will appear here.')).toBeInTheDocument();
+    expect(screen.getByText('Browsers and phones used to verify identity will appear here.')).toBeInTheDocument();
   });
 
   it('al cambiar de página la anterior se ve atenuada mientras llega la nueva', async () => {

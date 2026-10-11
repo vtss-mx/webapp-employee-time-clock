@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../hooks/useAuth';
 import { resolveLazy } from '../i18n';
-import { currentAccessToken, renewAccessToken } from '../services/apiClient';
+import { apiRequest, currentAccessToken, renewAccessToken } from '../services/apiClient';
 import { authService } from '../services/authService';
 import { apiFail, apiOk, envelope, jsonResponse, type MockCall, mockFetch, testSession } from '../test/http';
 import { sampleUser, tokenResponse } from '../test/render';
@@ -34,7 +34,7 @@ describe('AuthProvider: inicio de sesión', () => {
     const crash = new TypeError('Fallo inesperado');
     vi.spyOn(authService, 'login').mockRejectedValue(crash);
     const { result } = renderAuth();
-    await expect(act(() => result.current.login('ana@empresa.com', 'Clave123'))).rejects.toBe(crash);
+    await expect(act(() => result.current.login('ana@empresa.com', 'Clave1234569'))).rejects.toBe(crash);
     expect(deviceKey.deviceProof).not.toHaveBeenCalled();
     expect(result.current.isAuthenticated).toBe(false);
   });
@@ -46,7 +46,7 @@ describe('AuthProvider: inicio de sesión', () => {
     const answers = [challenge, apiOk(tokenResponse())];
     const { calls } = serve({ '/auth/login': () => answers.shift() ?? apiFail(500, 'EXTRA') });
     const { result } = renderAuth();
-    await act(() => result.current.login('ana@empresa.com', 'Clave123'));
+    await act(() => result.current.login('ana@empresa.com', 'Clave1234569'));
     expect(deviceKey.deviceProof).toHaveBeenCalledWith('', expect.any(String));
     expect(JSON.parse(calls[1].init.body as string)).toMatchObject({ device: proof });
     expect(result.current.isAuthenticated).toBe(true);
@@ -63,7 +63,7 @@ describe('AuthProvider: renovación y restauración', () => {
   it('renovación pedida por el canal en vivo con la cookie ya inválida (401): vuelve al login con el aviso de sesión expirada', async () => {
     serve({ '/auth/login': () => apiOk(tokenResponse()), '/auth/refresh': () => apiFail(401, 'SESSION_EXPIRED') });
     const { result } = renderAuth();
-    await act(() => result.current.login('ana@empresa.com', 'Clave123'));
+    await act(() => result.current.login('ana@empresa.com', 'Clave1234569'));
     await act(async () => {
       await expect(renewAccessToken()).resolves.toBe(false);
     });
@@ -92,6 +92,24 @@ describe('AuthProvider: renovación y restauración', () => {
   });
 });
 
+describe('AuthProvider: una pantalla que dejó de estar disponible (403)', () => {
+  it('si el refresco del usuario también falla, la falla no sube ni cierra la sesión (el siguiente 403 vuelve a intentarlo)', async () => {
+    const { calls } = serve({
+      '/auth/login': () => apiOk(tokenResponse()),
+      '/users/me': () => apiFail(404, 'USER_NOT_FOUND', 'No existe'),
+      '/x': () => apiFail(403, 'QR_DISABLED', 'QR deshabilitado'),
+    });
+    const { result } = renderAuth();
+    await act(() => result.current.login('ana@empresa.com', 'Clave1234569'));
+    await act(async () => {
+      await expect(apiRequest('/x')).rejects.toMatchObject({ code: 'QR_DISABLED' });
+    });
+    await waitFor(() => expect(calls.filter((call) => call.url.endsWith('/users/me'))).toHaveLength(1));
+    expect(result.current.isAuthenticated).toBe(true);
+    expect(result.current.user?.id).toBe(1); // el usuario que ya tenía sigue igual
+  });
+});
+
 describe('AuthProvider: datos del usuario sin sesión', () => {
   it('actualizar el usuario sin sesión no consulta al servidor', async () => {
     const { calls } = mockFetch(apiOk(sampleUser));
@@ -109,7 +127,7 @@ describe('AuthProvider: datos del usuario sin sesión', () => {
       '/auth/company': () => new Promise<Response>((resolve) => (answer = resolve)),
     });
     const { result } = renderAuth();
-    await act(() => result.current.login('ana@empresa.com', 'Clave123'));
+    await act(() => result.current.login('ana@empresa.com', 'Clave1234569'));
     let selected: Promise<unknown> = Promise.resolve();
     act(() => {
       selected = result.current.selectCompany(2);

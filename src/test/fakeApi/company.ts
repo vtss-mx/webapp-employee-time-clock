@@ -1,42 +1,14 @@
 /**
  * Rutas de la empresa, del validador y del empleado en el backend falso (ver `core.ts`).
  */
-import type { ApiKey, AttendanceBoard, CheckpointEvent, CompanyVerification, DeviceSession, EmployeeDevice, EmployeeQrSummary, FaceEnrollmentDetail, Kiosk, ValidatorDevice, VerificationLog } from '../../types';
+import type { ApiKey, CheckpointEvent, CompanyVerification, DeviceSession, EmployeeDevice, EmployeeQrSummary, FaceEnrollmentDetail, Kiosk, SigningKey, SigningKeyList, ValidatorDevice, VerificationLog } from '../../types';
 import type { Passkey } from '../../types/passkeys';
-import type { EmployeeDocument, EmployeeDocumentRequirements } from '../../types/employeeDocuments';
+import type { EmployeeDocument } from '../../types/employeeDocuments';
 import { taxCertificate } from '../documents';
-import { production } from '../departments';
-import { sampleCheckpoint, samplePolicy, sampleValidator } from '../fixtures';
-import { morning, plant, weekend } from '../shifts';
+import { sampleCheckpoint, samplePolicy, sampleValidator, sampleVerificationDetail, sampleVerificationSummary } from '../fixtures';
+import { plant } from '../sites';
 import { get, pageOf, route, say, tx, type Ctx, type Route } from './core';
-import { absence, holidays, person, ref, session, sessionDetail, shiftRequest, today, workday } from './people';
-
-const department = { ...production, id: 1, name: 'Operaciones Acme', description: 'Equipo Acme' };
-
-const board = (ctx: Ctx): AttendanceBoard => ({
-  items: [
-    { employee: ref, department: 'Operaciones Acme', shift_name: 'Turno Acme', scheduled_start: session.scheduled_start, scheduled_end: session.scheduled_end, state: 'DONE', session },
-    {
-      employee: { id: 8, full_name: 'Luis Paz', employee_number: 'EMP-8' },
-      department: null,
-      shift_name: 'Turno Acme',
-      scheduled_start: session.scheduled_start,
-      scheduled_end: session.scheduled_end,
-      state: 'DAY_OFF',
-      session: null,
-      day_off: { kind: 'VACATION', name: tx(ctx, say({ 'es-MX': 'Vacaciones', 'en-US': 'Vacation', 'pt-BR': 'Férias', 'fr-FR': 'Congés', 'de-DE': 'Urlaub', 'it-IT': 'Ferie', 'es-ES': 'Vacaciones' })), work_date: '2026-10-05', starts_on: '2026-10-05', ends_on: '2026-10-07' },
-    },
-  ],
-  total: 2,
-  page: 1,
-  size: 10,
-  work_date: '2026-10-05',
-  working: 0,
-  on_break: 0,
-  done: 1,
-  missed_checkout: 0,
-  day_off: 1,
-});
+import { person } from './people';
 
 const enrollment = (): FaceEnrollmentDetail => ({
   id: 1,
@@ -65,7 +37,44 @@ const device = (ctx: Ctx): EmployeeDevice => ({ id: 1, name: tx(ctx, say({ 'es-M
 
 const validatorDevice: ValidatorDevice = { id: 1, name: 'iPad Acme', user_agent: 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1', status: 'PENDING', created_at: '2026-10-01T10:00:00Z', last_seen_at: '2026-10-05T10:00:00Z', last_ip: '187.188.1.10', reviewed_at: null, reviewed_by: null };
 
-const apiKey: ApiKey = { id: 1, name: 'Nómina Acme', prefix: 'tck_Ab3dE9fG', scopes: ['EMPLOYEES_READ'], status: 'ACTIVE', created_at: '2026-10-01T10:00:00Z', created_by: 'admin@acme.mx', expires_at: null, last_used_at: null, last_used_ip: null, revoked_at: null, revoked_by: null };
+const apiKey: ApiKey = { id: 1, name: 'Nómina Acme', prefix: 'tck_Ab3dE9fG', scopes: ['EMPLOYEES_READ'], status: 'ACTIVE', created_at: '2026-10-01T10:00:00Z', created_by: 'admin@acme.mx', expires_at: '2027-04-01T10:00:00Z', days_to_expire: 180, expiring_soon: false, last_used_at: null, last_used_ip: null, revoked_at: null, revoked_by: null };
+
+/**
+ * Clave de FIRMA de la empresa (migración 0105): su huella y su clave pública llevan dígitos, así que no son
+ * palabras de ningún idioma (el revisor del idioma las deja pasar). Las REGLAS (`limits`) las envía el servidor:
+ * la pantalla no lleva escrito ninguno de esos números (regla 25 de la raíz).
+ */
+const signingKey: SigningKey = {
+  id: 1,
+  label: 'Firma Acme',
+  fingerprint: '3b1f7d90a4c25e68b0d14f73a9c82e5106bd4f37c91a8e02d5b6473fa1c80e92',
+  public_key: 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9pL0c4fQ2b1mN7v5R8sT3uW6xY0zA1B2C3D4E5F6g7H8i9J0kL1mN2oP3qR4sT5uV6wX7yZ8a9B0c1D2e3F4g5==',
+  algorithm: 'ES256',
+  generated: false,
+  status: 'ACTIVE',
+  created_at: '2026-10-01T10:00:00Z',
+  created_by: 'admin@acme.mx',
+  expires_at: '2027-10-01T10:00:00Z',
+  days_to_expire: 365,
+  expiring_soon: false,
+  revoked_at: null,
+  revoked_by: null,
+  last_used_at: '2026-10-05T10:00:00Z',
+};
+
+const signingKeys = (): SigningKeyList => ({
+  items: [signingKey],
+  total: 1,
+  page: 1,
+  size: 10,
+  platform: {
+    configured: true,
+    fingerprint: 'c70e4a1826fb5d03941e7c6ab2850f39d1476be02a85c3f914d60b7e285a3f41',
+    public_key: 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R9s0T1u2V3w4X5y6Z7a8B9c0D1e2F3g4H5i==',
+    algorithm: 'ES256',
+  },
+  limits: { active: 1, max_active: 5, default_days: 365, max_days: 730, grace_days: 7 },
+});
 
 const kiosk: Kiosk = { id: 1, site_id: 1, name: 'Entrada Acme', paired: true, paired_at: '2026-10-01T10:00:00Z', device_name: 'iPad · Safari', last_seen_at: '2026-10-05T10:00:00Z', pairing_expires_at: null, created_at: '2026-10-01T10:00:00Z' };
 
@@ -94,24 +103,11 @@ const employeeDoc: EmployeeDocument = {
   confirmed: false,
   confirmed_by: null,
   confirmed_at: null,
+  can_delete: true,
   deleted_at: null,
   deleted_by: null,
   data: { full_name: 'Ana Ruiz', document_number: 'PEXJ900510HSRRNN09', birth_date: '1990-05-10', expiry_date: null, nationality: 'MEX', sex: 'M', curp: 'PEXJ900510HSRRNN09', voter_key: null, postal_code: '83000', address: null },
 };
-const documentRequirements: EmployeeDocumentRequirements = {
-  required: true,
-  types: [
-    { code: 'PASSPORT', category: 'OFFICIAL_ID' },
-    { code: 'NATIONAL_ID', category: 'OFFICIAL_ID' },
-    { code: 'DRIVER_LICENSE', category: 'OFFICIAL_ID' },
-    { code: 'OTHER_OFFICIAL_ID', category: 'OFFICIAL_ID' },
-    { code: 'PROOF_OF_ADDRESS', category: 'PROOF_OF_ADDRESS' },
-  ],
-  documents: [employeeDoc],
-  needs_official_id: false,
-  needs_proof_of_address: true,
-};
-
 const deviceSession: DeviceSession = { id: 'sid-1', created_at: '2026-10-01T10:00:00Z', last_used_at: '2026-10-05T10:00:00Z', expires_at: '2026-10-08T10:00:00Z', ip_address: '187.188.1.10', user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1', current: true };
 const passkey: Passkey = { id: 1, name: 'Mi teléfono', created_at: '2026-10-01T10:00:00Z', last_used_at: '2026-10-05T08:00:00Z', transports: ['internal'], backed_up: true };
 
@@ -119,42 +115,28 @@ export function companyRoutes(): Route[] {
   return [
     // Contadores del menú.
     get('/enrollments', () => pageOf([enrollment()])),
-    get('/shift-requests/summary', () => ({ pending: 1 })),
-    get('/calendar/absences/summary', () => ({ pending: 1 })),
-    get('/attendance/reviews/count', () => ({ pending: 1 })),
     // Empleados.
     get('/employees', () => pageOf([person(7), person(8, { first_name: 'Luis', last_name: 'Paz', full_name: 'Luis Paz', email: 'luis@acme.mx', employee_number: null, face_status: 'NOT_ENROLLED', active: false })])),
-    get('/employees/ids', () => ({ ids: [7, 8], total: 2, limit: 500 })),
     get('/employees/:id', () => person(1)),
     get('/employees/:id/qr', () => qrSummary),
     get('/employees/:id/verifications', () => pageOf([verification])),
-    get('/verifications', () => pageOf([companyVerification])),
+    // Historial de verificaciones de la empresa (migración 0106): su resumen, su página con el periodo y el detalle.
+    get('/verifications/summary', () => sampleVerificationSummary),
+    get('/verifications/:id', () => ({ ...sampleVerificationDetail, company_id: null, company_name: null })),
+    get('/verifications', () => pageOf([companyVerification], { since: sampleVerificationSummary.since, until: sampleVerificationSummary.until, count_cap: 10000 })),
     get('/employees/:id/devices', (ctx) => pageOf([device(ctx)])),
-    get('/employees/:id/shift-assignments', () => pageOf([{ id: 1, shift: morning, valid_from: '2026-10-01', valid_to: null, state: 'CURRENT', created_at: '2026-10-01T10:00:00Z' }])),
-    // Departamentos.
-    get('/departments', () => pageOf([department])),
-    get('/departments/:id', () => department),
-    // Asistencia.
-    get('/attendance/board', (ctx) => board(ctx)),
-    get('/attendance/sessions', () => pageOf([{ ...session, employee: ref }])),
-    get('/attendance/sessions/:id', () => sessionDetail),
-    // Turnos, sitios y solicitudes.
-    get('/shifts', () => pageOf([morning, weekend])),
-    get('/shifts/:id', () => morning),
+    // Puntos de verificación y sus kioscos.
     get('/sites', () => pageOf([plant])),
     get('/sites/:id', () => plant),
     get('/sites/:id/kiosks', () => pageOf([kiosk])),
-    get('/shift-requests', () => pageOf([shiftRequest])),
-    // Calendario.
-    get('/calendar/holidays', (ctx) => pageOf(holidays(ctx))),
-    get('/calendar/absences', () => pageOf([absence])),
-    get('/calendar/workdays', () => pageOf([workday])),
     // Validaciones, validadores, integraciones y documentos.
     get('/enrollments/:id', () => enrollment()),
     get('/validators', () => ({ ...pageOf([sampleValidator]), active: 1, limit: 5 })),
     get('/validators/:id', () => sampleValidator),
     get('/validators/:id/devices', () => pageOf([validatorDevice])),
     get('/api-keys', () => pageOf([apiKey])),
+    // Claves de firma de la empresa (sección de Integraciones) con la clave pública de la plataforma y sus reglas.
+    get('/api-keys/signing-keys', () => signingKeys()),
     get('/documents', () => pageOf([taxCertificate])),
     // Expediente de documentos del empleado que revisa la empresa (sección del registro facial).
     get('/validations/employees/:id/documents', () => pageOf([employeeDoc])),
@@ -165,21 +147,20 @@ export function companyRoutes(): Route[] {
     get('/checkpoint/recent', () => pageOf([checkpointEvent])),
     // Empleado.
     // El registro facial en tres pasos (decisión del dueño, 2026-10-07): la foto hecha y las capturas por hacer.
+    // El flujo de registro de identidad de la empresa (decisión del dueño, 2026-10-08): sus pasos, en su orden.
     get('/enrollment/progress', () => ({
       face_status: 'NOT_ENROLLED',
-      photo: { status: 'done', checked_at: '2026-10-07T15:00:00Z', expires_at: '2026-10-10T15:00:00Z' },
-      capture: { status: 'pending', submitted_at: null },
-      voice: { status: 'locked', answered: 0, total: 0, attempts_left: null },
+      complete: false,
+      current: 'FACE_CAPTURES',
+      steps: [
+        { code: 'OFFICIAL_ID', position: 1, status: 'done', blocked_by: null, done_at: '2026-10-05T10:00:00Z', expires_at: null, answered: null, total: null, attempts_left: null, document_types: ['PASSPORT', 'NATIONAL_ID', 'DRIVER_LICENSE', 'OTHER_OFFICIAL_ID'], document_id: 1 },
+        { code: 'INITIAL_PHOTO', position: 2, status: 'done', blocked_by: null, done_at: '2026-10-07T15:00:00Z', expires_at: '2026-10-10T15:00:00Z', answered: null, total: null, attempts_left: null, document_types: [], document_id: null },
+        { code: 'FACE_CAPTURES', position: 3, status: 'pending', blocked_by: null, done_at: null, expires_at: null, answered: null, total: null, attempts_left: null, document_types: [], document_id: null },
+        { code: 'VOICE_VIDEO', position: 4, status: 'blocked', blocked_by: 'FACE_CAPTURES', done_at: null, expires_at: null, answered: 0, total: 3, attempts_left: 9, document_types: [], document_id: null },
+      ],
     })),
-    // Documentos de identidad del onboarding (el empleado).
-    get('/me/documents/requirements', () => documentRequirements),
+    // Documentos de identidad: los pasos `OFFICIAL_ID` y `PROOF_OF_ADDRESS` del registro usan estos endpoints.
     get('/me/documents', () => pageOf([employeeDoc])),
-    get('/me/attendance/today', (ctx) => today(ctx)),
-    get('/me/attendance/history', () => pageOf([session])),
-    get('/me/shift-requests', () => pageOf([shiftRequest])),
-    get('/me/shifts', () => pageOf([morning, weekend])),
-    get('/me/absences', () => pageOf([absence])),
-    get('/me/holidays', (ctx) => pageOf(holidays(ctx))),
     get('/users/me/devices', (ctx) => pageOf([device(ctx)])),
     route('POST', '/users/me/qr', () => ({ id: 1, employee_number: 'EMP-7', created_at: '2026-10-06T15:00:00Z', expires_at: '2030-10-06T15:01:00Z', lifetime_seconds: 60, content: 'TC-QR:abc' }), true),
     get('/users/me/qr/:id', () => ({ id: 1, status: 'ACTIVE', expires_at: '2030-10-06T15:01:00Z', used_at: null })),

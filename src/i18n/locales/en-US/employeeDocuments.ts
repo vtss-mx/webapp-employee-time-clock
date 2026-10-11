@@ -4,21 +4,11 @@ import type es from '../es-MX/employeeDocuments';
 /** Employee identity documents (en-US): same keys and variables as es-MX. */
 export default {
   title: 'My documents',
-  subtitle: 'Upload your proof of address and an official ID.',
   add: 'Upload document',
   loadError: "Couldn't load your documents",
   noun: {
     one: 'document',
     other: 'documents',
-  },
-  requirements: {
-    title: 'Documents your company asks for',
-    officialId: 'An official ID',
-    proofOfAddress: 'Proof of address',
-    done: 'Done',
-    missing: 'Pending',
-    allDone: "You've uploaded what your company asks for.",
-    notRequired: "Your company isn't asking for documents right now.",
   },
   columns: {
     file: 'Document',
@@ -57,7 +47,7 @@ export default {
     dataSection: 'Document type',
     typeLabel: 'Document type',
     typePlaceholder: 'Choose the type',
-    uploading: 'Uploading the document…',
+    validating: 'Validating document…',
     error: "Couldn't upload the document",
     confirm: {
       title: 'Upload {name}?',
@@ -72,6 +62,11 @@ export default {
       size: 'The file is {size} and the maximum is {max}.',
       typeMissing: 'Choose the document type.',
     },
+    notRecognized: {
+      title: 'Document not recognized',
+      retake: 'Retake photo',
+      choose: 'Choose another file',
+    },
   },
   review: {
     title: 'Employee documents',
@@ -85,7 +80,8 @@ export default {
     confirmedBy: 'Confirmed by {by}',
     pending: 'To review',
     read: 'Reading {value}',
-    mrz: 'Machine-readable zone verified',
+    mrz: 'MRZ check digits match',
+    mrzHelp: 'Reading checks match; they do not prove document authenticity.',
     notRead: 'No automatic reading',
     download: 'Download',
     downloadError: "Couldn't download the document",

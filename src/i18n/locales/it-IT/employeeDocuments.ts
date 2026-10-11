@@ -4,21 +4,11 @@ import type es from '../es-MX/employeeDocuments';
 /** Documenti d’identità del dipendente (it-IT): le stesse chiavi e variabili di es-MX. */
 export default {
   title: 'I miei documenti',
-  subtitle: 'Carica la tua prova di indirizzo e un documento d’identità ufficiale.',
   add: 'Carica documento',
   loadError: 'Non è stato possibile caricare i tuoi documenti',
   noun: {
     one: 'documento',
     other: 'documenti',
-  },
-  requirements: {
-    title: 'Documenti richiesti dalla tua azienda',
-    officialId: 'Un documento d’identità ufficiale',
-    proofOfAddress: 'Prova di indirizzo',
-    done: 'Fatto',
-    missing: 'In sospeso',
-    allDone: 'Hai già caricato ciò che la tua azienda richiede.',
-    notRequired: 'La tua azienda non richiede documenti per ora.',
   },
   columns: {
     file: 'Documento',
@@ -57,7 +47,7 @@ export default {
     dataSection: 'Tipo di documento',
     typeLabel: 'Tipo di documento',
     typePlaceholder: 'Scegli il tipo',
-    uploading: 'Caricamento del documento…',
+    validating: 'Convalida del documento…',
     error: 'Non è stato possibile caricare il documento',
     confirm: {
       title: 'Caricare {name}?',
@@ -72,6 +62,11 @@ export default {
       size: 'Il file pesa {size} e il massimo è {max}.',
       typeMissing: 'Scegli il tipo di documento.',
     },
+    notRecognized: {
+      title: 'Documento non riconosciuto',
+      retake: 'Scatta di nuovo la foto',
+      choose: 'Scegli un altro file',
+    },
   },
   review: {
     title: 'Documenti del dipendente',
@@ -85,7 +80,8 @@ export default {
     confirmedBy: 'Confermato da {by}',
     pending: 'Da verificare',
     read: 'Lettura {value}',
-    mrz: 'Zona di lettura verificata',
+    mrz: 'Cifre MRZ corrette',
+    mrzHelp: 'I controlli di lettura coincidono; non dimostrano l’autenticità del documento.',
     notRead: 'Nessuna lettura automatica',
     download: 'Scarica',
     downloadError: 'Non è stato possibile scaricare il documento',

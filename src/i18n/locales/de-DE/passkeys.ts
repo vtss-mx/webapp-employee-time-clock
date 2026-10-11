@@ -11,6 +11,20 @@ export default {
   unsupported: 'Dieser Browser unterstützt keine Zugangsschlüssel. Verwenden Sie einen aktuellen Safari, Chrome oder Edge.',
   loadError: 'Ihre Zugangsschlüssel konnten nicht geladen werden',
   add: 'Zugangsschlüssel hinzufügen',
+  mfa: {
+    title: 'Ihr Konto benötigt einen Zugangsschlüssel',
+    daysLeft_one: 'Sie haben noch {count} Tag, um ihn zu registrieren.',
+    daysLeft_other: 'Sie haben noch {count} Tage, um ihn zu registrieren.',
+    expiredTitle: 'Registrieren Sie Ihren Zugangsschlüssel, um fortzufahren',
+    expiredText: 'Die Frist ist abgelaufen: Bis zur Registrierung funktioniert kein Bereich.',
+    action: 'Schlüssel registrieren',
+  },
+  gate: {
+    badge: 'Zweiter Faktor',
+    title: 'Registrieren Sie Ihren Zugangsschlüssel',
+    footnote: 'Ihre Sitzung bleibt offen: Nach der Registrierung funktioniert alles wieder.',
+    action: 'Zugangsschlüssel registrieren',
+  },
   empty: {
     title: 'Keine Zugangsschlüssel',
     description: 'Fügen Sie einen hinzu, um sich mit Gesicht, Fingerabdruck oder PIN anzumelden.',

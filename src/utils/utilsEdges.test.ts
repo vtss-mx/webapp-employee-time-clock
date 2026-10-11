@@ -32,9 +32,9 @@ describe('validación de formularios: cada regla con su mensaje', () => {
 
   it.each([
     ['a'.repeat(129) + 'A1', 'Máximo 128 caracteres'],
-    ['SOLOMAYUS1', 'Debe incluir una letra minúscula'],
-    ['solominus1', 'Debe incluir una letra mayúscula'],
-    ['SinNumeros', 'Debe incluir un número'],
+    ['SOLOMAYUS12345', 'Debe incluir una letra minúscula'],
+    ['solominus12345', 'Debe incluir una letra mayúscula'],
+    ['SinNumerosAqui', 'Debe incluir un número'],
   ])('contraseña %s → %s', (value, message) => {
     expect(validatePassword(value)).toBe(message);
   });

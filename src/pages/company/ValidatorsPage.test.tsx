@@ -276,8 +276,8 @@ describe('Validadores: cada falla se explica con su título', () => {
       </Routes>,
       { route: '/company/validators/3/password' },
     );
-    await userEvent.type(await screen.findByLabelText(/Contraseña nueva/), 'Nueva12345');
-    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva12345');
+    await userEvent.type(await screen.findByLabelText(/Contraseña nueva/), 'Nueva1234567');
+    await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Nueva1234567');
     await userEvent.click(screen.getByRole('button', { name: 'Restablecer' }));
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: /^¿Restablecer/ })).getByRole('button', { name: 'Restablecer contraseña' }));
     expect(await screen.findByRole('alertdialog', { name: 'No se pudo restablecer la contraseña' })).toHaveTextContent('Está en uso');

@@ -122,11 +122,13 @@ export default {
     intro:
       "La limite s'ajuste d'elle-même à la latence réelle (entre {min} et {max}). Le travail critique (identifier, se connecter) passe en premier; en cas de saturation, le moins important est rejeté.",
     components: {
+      schema: 'Schéma de la base de données',
       database: 'Base de données',
       faceEngine: 'Moteur facial',
     },
     component: '{name}: {status}',
     available: 'disponible',
+    unavailable: 'indisponible',
     tiers: {
       critical: 'critique',
       normal: 'normale',

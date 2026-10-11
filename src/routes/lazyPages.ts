@@ -24,9 +24,11 @@ export const LoginPage = page(() => import('../pages/LoginPage'), 'LoginPage');
 export const ProfilePage = page(() => import('../pages/ProfilePage'), 'ProfilePage');
 /** Llave de acceso (WebAuthn): registrar una en este dispositivo o renombrarla (Mi perfil → Llaves de acceso). */
 export const PasskeyFormPage = page(() => import('../pages/PasskeyFormPage'), 'PasskeyFormPage');
+/** Consentimiento biométrico: el texto del servidor y su botón para otorgarlo (Mi perfil → Datos biométricos). */
+export const ConsentsPage = page(() => import('../pages/ConsentsPage'), 'ConsentsPage');
 export const ForbiddenPage = page(() => import('../pages/ForbiddenPage'), 'ForbiddenPage');
 export const NotFoundPage = page(() => import('../pages/NotFoundPage'), 'NotFoundPage');
-/** Tableta de un sitio (pública, sin sesión): el código que el personal escanea o escribe al checar. */
+/** Tableta de un sitio (pública, sin sesión): el código que el personal escanea o escribe al verificar su identidad. */
 export const KioskPage = page(() => import('../pages/KioskPage'), 'KioskPage');
 
 // ADMIN (plataforma)
@@ -53,6 +55,13 @@ export const CompanyUsagePage = page(() => import('../pages/admin/usage/CompanyU
 export const PerformancePage = page(() => import('../pages/admin/performance/PerformancePage'), 'PerformancePage');
 export const MetricDetailPage = page(() => import('../pages/admin/performance/MetricDetailPage'), 'MetricDetailPage');
 export const SlowAlertDetailPage = page(() => import('../pages/admin/performance/SlowAlertDetailPage'), 'SlowAlertDetailPage');
+/** Bitácora de auditoría (migración 0095): evidencia de solo lectura, con su exportación por tramos. */
+export const AuditPage = page(() => import('../pages/admin/audit/AuditPage'), 'AuditPage');
+/** Revisión de accesos (migración 0096): el informe trimestral que pide un auditor, con sus controles declarados. */
+export const AccessReviewPage = page(() => import('../pages/admin/accessReview/AccessReviewPage'), 'AccessReviewPage');
+export const AdminVerificationsPage = page(() => import('../pages/admin/verifications/VerificationsPage'), 'AdminVerificationsPage');
+export const AdminVerificationDetailPage = page(() => import('../pages/verifications/VerificationDetailPages'), 'AdminVerificationDetailPage');
+export const CompanyVerificationDetailPage = page(() => import('../pages/verifications/VerificationDetailPages'), 'CompanyVerificationDetailPage');
 export const FraudCasesPage = page(() => import('../pages/admin/fraud/FraudCasesPage'), 'FraudCasesPage');
 export const FraudCaseDetailPage = page(() => import('../pages/admin/fraud/FraudCaseDetailPage'), 'FraudCaseDetailPage');
 export const FraudCaseDecisionPage = page(() => import('../pages/admin/fraud/FraudCaseFormPages'), 'FraudCaseDecisionPage');
@@ -60,24 +69,6 @@ export const FraudCaseNotePage = page(() => import('../pages/admin/fraud/FraudCa
 
 // COMPANY
 export const DashboardPage = page(() => import('../pages/company/DashboardPage'), 'DashboardPage');
-export const AttendancePage = page(() => import('../pages/company/attendance/AttendancePage'), 'AttendancePage');
-export const AttendanceHistoryPage = page(() => import('../pages/company/attendance/AttendanceHistoryPage'), 'AttendanceHistoryPage');
-export const AttendanceSessionPage = page(() => import('../pages/company/attendance/AttendanceSessionPage'), 'AttendanceSessionPage');
-export const RejectAttendanceReviewPage = page(() => import('../pages/company/attendance/RejectAttendanceReviewPage'), 'RejectAttendanceReviewPage');
-export const ShiftsPage = page(() => import('../pages/company/shifts/ShiftsPage'), 'ShiftsPage');
-export const ShiftFormPage = page(() => import('../pages/company/shifts/ShiftFormPage'), 'ShiftFormPage');
-export const ShiftRequestsPage = page(() => import('../pages/company/shifts/ShiftRequestsPage'), 'ShiftRequestsPage');
-export const ShiftRequestApprovePage = page(() => import('../pages/company/shifts/ShiftRequestApprovePage'), 'ShiftRequestApprovePage');
-export const ShiftRequestRejectPage = page(() => import('../pages/company/shifts/ShiftRequestRejectPage'), 'ShiftRequestRejectPage');
-export const EmployeeShiftsPage = page(() => import('../pages/company/shifts/EmployeeShiftsPage'), 'EmployeeShiftsPage');
-export const AssignShiftPage = page(() => import('../pages/company/shifts/AssignShiftPage'), 'AssignShiftPage');
-export const BulkAssignPage = page(() => import('../pages/company/shifts/BulkAssignPage'), 'BulkAssignPage');
-export const ManualSessionPage = page(() => import('../pages/company/attendance/ManualSessionPage'), 'ManualSessionPage');
-export const CalendarPage = page(() => import('../pages/company/calendar/CalendarPage'), 'CalendarPage');
-export const HolidayFormPage = page(() => import('../pages/company/calendar/HolidayFormPage'), 'HolidayFormPage');
-export const AbsenceFormPage = page(() => import('../pages/company/calendar/AbsenceFormPage'), 'AbsenceFormPage');
-export const AbsenceRejectPage = page(() => import('../pages/company/calendar/AbsenceRejectPage'), 'AbsenceRejectPage');
-export const WorkdayFormPage = page(() => import('../pages/company/calendar/WorkdayFormPage'), 'WorkdayFormPage');
 export const SitesPage = page(() => import('../pages/company/sites/SitesPage'), 'SitesPage');
 export const SiteFormPage = page(() => import('../pages/company/sites/SiteFormPage'), 'SiteFormPage');
 export const SiteKiosksPage = page(() => import('../pages/company/sites/SiteKiosksPage'), 'SiteKiosksPage');
@@ -92,6 +83,9 @@ export const VerificationsPage = page(() => import('../pages/company/Verificatio
 export const ValidationReviewPage = page(() => import('../pages/company/ValidationReviewPage'), 'ValidationReviewPage');
 export const ApiKeysPage = page(() => import('../pages/company/ApiKeysPage'), 'ApiKeysPage');
 export const ApiKeyFormPage = page(() => import('../pages/company/ApiKeyFormPage'), 'ApiKeyFormPage');
+/** Claves de firma de la empresa (sección de Integraciones, migración 0105): el listado y el formulario. */
+export const SigningKeysPage = page(() => import('../pages/company/SigningKeysPage'), 'SigningKeysPage');
+export const SigningKeyFormPage = page(() => import('../pages/company/SigningKeyFormPage'), 'SigningKeyFormPage');
 export const DocumentsPage = page(() => import('../pages/company/DocumentsPages'), 'DocumentsPage');
 export const DocumentUploadPage = page(() => import('../pages/company/DocumentsPages'), 'DocumentUploadPage');
 export const ValidatorsPage = page(() => import('../pages/company/ValidatorsPage'), 'ValidatorsPage');
@@ -103,20 +97,15 @@ export const CheckpointPage = page(() => import('../pages/validator/CheckpointPa
 
 // EMPLOYEE
 export const EnrollmentPage = page(() => import('../pages/employee/EnrollmentPage'), 'EnrollmentPage');
-/** Los tres pasos del registro facial, cada uno en su pantalla (decisión del dueño, 2026-10-07). */
+/**
+ * Las pantallas de los pasos del registro de identidad (decisión del dueño, 2026-10-08: el flujo es dinámico y los
+ * documentos de identidad son pasos). Cada una es una ruta hija de la pantalla `EMPLOYEE_ENROLL`.
+ */
 export const EnrollmentPhotoPage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentPhotoPage');
 export const EnrollmentCapturePage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentCapturePage');
 export const EnrollmentVoicePage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentVoicePage');
-/** Documentos de identidad del onboarding (decisión del dueño, 2026-10-07). */
-export const EmployeeDocumentsPage = page(() => import('../pages/employee/EmployeeDocumentsPages'), 'EmployeeDocumentsPage');
-export const EmployeeDocumentUploadPage = page(() => import('../pages/employee/EmployeeDocumentsPages'), 'EmployeeDocumentUploadPage');
-export const MyAttendancePage = page(() => import('../pages/employee/attendance/MyAttendancePage'), 'MyAttendancePage');
-export const AttendanceRecordPage = page(() => import('../pages/employee/attendance/AttendanceRecordPage'), 'AttendanceRecordPage');
-export const MyAttendanceHistoryPage = page(() => import('../pages/employee/attendance/MyAttendanceHistoryPage'), 'MyAttendanceHistoryPage');
-export const MyShiftRequestsPage = page(() => import('../pages/employee/attendance/MyShiftRequestsPage'), 'MyShiftRequestsPage');
-export const ShiftRequestFormPage = page(() => import('../pages/employee/attendance/ShiftRequestFormPage'), 'ShiftRequestFormPage');
-export const MyDaysOffPage = page(() => import('../pages/employee/attendance/MyDaysOffPage'), 'MyDaysOffPage');
-export const AbsenceRequestFormPage = page(() => import('../pages/employee/attendance/AbsenceRequestFormPage'), 'AbsenceRequestFormPage');
+export const EnrollmentDocumentPage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentDocumentPage');
+export const EnrollmentDocumentUploadPage = page(() => import('../pages/employee/EnrollmentStepPages'), 'EnrollmentDocumentUploadPage');
 export const CompanySelectPage = page(() => import('../pages/employee/CompanySelectPage'), 'CompanySelectPage');
 export const PendingValidationPage = page(() => import('../pages/employee/PendingValidationPage'), 'PendingValidationPage');
 export const VerificationMenuPage = page(() => import('../pages/employee/VerificationMenuPage'), 'VerificationMenuPage');
@@ -127,9 +116,5 @@ export const ReverifyIdentityPage = page(() => import('../pages/company/Reverify
 export const ReverifyAllPage = page(() => import('../pages/company/ReverifyIdentityPage'), 'ReverifyAllPage');
 export const RejectEnrollmentPage = page(() => import('../pages/company/RejectEnrollmentPage'), 'RejectEnrollmentPage');
 export const CompanyAdminFormPage = page(() => import('../pages/admin/CompanyAdminFormPage'), 'CompanyAdminFormPage');
-export const DepartmentsPage = page(() => import('../pages/company/DepartmentsPage'), 'DepartmentsPage');
-export const DepartmentFormPage = page(() => import('../pages/company/DepartmentFormPage'), 'DepartmentFormPage');
-export const DepartmentDetailPage = page(() => import('../pages/company/DepartmentDetailPage'), 'DepartmentDetailPage');
-export const DepartmentAssignPage = page(() => import('../pages/company/DepartmentAssignPage'), 'DepartmentAssignPage');
 export const ErrorsPage = page(() => import('../pages/admin/ErrorsPage'), 'ErrorsPage');
 export const ErrorDetailPage = page(() => import('../pages/admin/ErrorDetailPage'), 'ErrorDetailPage');

@@ -73,35 +73,20 @@ export default {
     },
     before: 'Bevor Sie beginnen:',
     privacy: 'Ihre Fotos, Ihr Video und Ihre Stimme werden verschlüsselt gespeichert und nur von Ihrem Unternehmen geprüft; sie werden nie weitergegeben.',
-    /** Los cuatro pasos del registro (decisión del dueño, 2026-10-06), en el indicador sobre el visor. */
+    /** El indicador sobre el visor: los pasos los manda el servidor y su nombre sale del catálogo; «Listo» es el final. */
     steps: {
       label: 'Schritt {current} von {total}',
-      photo: 'Erstes Foto',
-      captures: 'Aufnahmen',
-      video: 'Video',
       done: 'Fertig',
     },
-    /** Mientras se guarda la foto inicial (paso 1). */
+    /** Mientras se guarda la foto inicial. */
     photoSaving: 'Ihr Foto wird gespeichert…',
-    /** El índice de los pasos independientes (decisión del dueño, 2026-10-07): estado, aviso y botón de cada uno. */
+    /** El índice del registro: estado, aviso y botón de cada paso (su nombre y descripción, del catálogo). */
     index: {
       steps_one: '{count} Schritt',
       steps_other: '{count} Schritte',
       resume: 'Erledigen Sie die Schritte der Reihe nach. Sie können nach jedem Schritt aufhören und an einem anderen Tag weitermachen. Ihr Fortschritt bleibt gespeichert.',
       errorTitle: 'Ihre Registrierung konnte nicht geladen werden',
-      label: 'Schritte der Gesichtsregistrierung',
-      photo: {
-        title: 'Erstes Foto',
-        text: 'Ein Foto Ihres Gesichts von vorne, bei gutem Licht.',
-      },
-      captures: {
-        title: 'Aufnahmen und Lebenderkennung',
-        text: '{count} Aufnahmen Ihres Gesichts und vier Kopfbewegungen.',
-      },
-      video: {
-        title: 'Video mit Fragen',
-        text: 'Beantworten Sie laut Fragen zu Ihren Daten und schauen Sie dabei in die Kamera.',
-      },
+      label: 'Schritte Ihrer Registrierung',
       state: {
         pending: 'Offen',
         done: 'Erledigt · {date}',
@@ -112,11 +97,12 @@ export default {
         answered: '{answered} von {total} beantwortet',
       },
       hint: {
+        /** `step`: el nombre del paso que falta, del catálogo. */
+        blocked: 'Schließen Sie zuerst „{step}“ ab.',
         validUntil: 'Gültig bis {date}',
         expired: 'Ihr Foto ist abgelaufen. Nehmen Sie es erneut auf.',
-        needsPhoto: 'Nehmen Sie zuerst Ihr erstes Foto auf.',
-        needsCaptures: 'Schließen Sie zuerst die Aufnahmen ab.',
         exhausted: 'Die Versuche sind aufgebraucht. Wiederholen Sie das erste Foto und die Aufnahmen.',
+        unknown: 'Aktualisieren Sie die App, um diesen Schritt fortzusetzen.',
       },
       action: {
         photo: 'Foto aufnehmen',
@@ -124,35 +110,41 @@ export default {
         captures: 'Aufnahmen starten',
         video: 'Video aufnehmen',
         resumeVideo: 'Video fortsetzen',
+        document: 'Dokument hochladen',
+        replaceDocument: 'Dokument ersetzen',
       },
     },
-    /** Una pantalla de un paso que se abrió fuera de orden: qué falta (su vacío). */
+    /** La pantalla de un paso que ahora no se puede abrir: qué pasa (su vacío) y de vuelta al índice. */
     blocked: {
       back: 'Zurück zur Registrierung',
-      photoUsed: {
-        title: 'Erstes Foto bereit',
-        text: 'Es wurde bereits für Ihre Aufnahmen verwendet. Fahren Sie mit dem nächsten Schritt fort.',
+      blocked: {
+        title: 'Ein Schritt kommt zuerst',
+        text: 'Schließen Sie „{step}“ ab, um mit diesem Schritt fortzufahren.',
       },
-      needsPhoto: {
-        title: 'Erstes Foto fehlt',
-        text: 'Nehmen Sie vor den Aufnahmen Ihr erstes Foto auf.',
+      done: {
+        title: 'Schritt abgeschlossen',
+        text: 'Er ist schon fertig. Fahren Sie mit dem nächsten Schritt fort.',
       },
-      capturesDone: {
-        title: 'Aufnahmen bereit',
-        text: 'Sie wurden bereits gesendet. Fahren Sie mit dem nächsten Schritt fort.',
-      },
-      needsCaptures: {
-        title: 'Aufnahmen fehlen',
-        text: 'Schließen Sie vor dem Video die Aufnahmen ab.',
+      disabled: {
+        title: 'Schritt nicht verlangt',
+        text: 'Ihr Unternehmen verlangt diesen Schritt Ihrer Registrierung nicht.',
       },
       exhausted: {
         title: 'Keine Versuche mehr',
         text: 'Wiederholen Sie das erste Foto und die Aufnahmen, um es erneut zu versuchen.',
       },
-      noVideo: {
-        title: 'Kein Video',
-        text: 'Ihr Unternehmen verlangt das Video mit Fragen nicht.',
+      unknown: {
+        title: 'Schritt nicht verfügbar',
+        text: 'Aktualisieren Sie die App, um diesen Schritt fortzusetzen.',
       },
+    },
+    /** Un 409 del servidor: el paso ya no toca (lo bloquea otro o la empresa dejó de pedirlo). */
+    stepGone: 'Dieser Schritt ist nicht mehr verfügbar',
+    /** Un paso que se cumple con un documento de identidad: cómo va. */
+    document: {
+      pending: 'Ihr Dokument fehlt noch.',
+      done: 'Dokument erhalten · {date}',
+      doneNoDate: 'Dokument erhalten.',
     },
   },
   myQr: {
@@ -169,6 +161,10 @@ export default {
     singleUse:
       'Jeder Code gilt nur einmal und läuft nach Sekunden ab: Ein Foto oder Bildschirmfoto funktioniert nicht. Er enthält weder Ihre personenbezogenen noch Ihre biometrischen Daten.',
     brightnessLarge: 'Erhöhen Sie die Helligkeit, damit er sofort gelesen wird.',
+    unavailable: {
+      qrTitle: 'QR nicht verfügbar',
+      faceTitle: 'Gesichtsregistrierung ausstehend',
+    },
   },
   pending: {
     errorTitle: 'Der Status konnte nicht aktualisiert werden',

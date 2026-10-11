@@ -19,32 +19,35 @@ const isDetail = hasKeys<FaceEnrollmentDetail>('id', 'status', 'employee_id');
 const isSubmit = hasKeys<EnrollmentSubmitResponse>('enrollment_id', 'face_status');
 const isAnswer = hasKeys<VoiceAnswerResult>('token', 'position', 'done');
 const isClip = hasKeys<VoiceClip>('content_type', 'data');
-const isProgress = hasKeys<EnrollmentProgress>('photo', 'capture', 'voice');
+const isProgress = hasKeys<EnrollmentProgress>('face_status', 'complete', 'current', 'steps');
 const isPhoto = hasKeys<EnrollmentPhotoResult>('checked_at', 'expires_at');
 const isVoiceChallenge = hasKeys<VoiceChallenge>('token', 'questions', 'total');
 
 /*
- * El registro facial del propio empleado en TRES pasos independientes (decisión del dueño, 2026-10-07): la foto inicial
- * (`photo`), las capturas con prueba de vida (`submit`) y el video con preguntas (`startVoice` + `answerVoice`); el
- * índice dibuja `progress`. El orden lo exige el servidor (409 si falta el paso anterior).
+ * El registro de identidad del propio empleado (decisión del dueño, 2026-10-08): un flujo DINÁMICO cuyos pasos y orden
+ * configura el ADMIN por empresa. `progress` entrega los pasos en su orden (el índice los dibuja tal cual) y cada
+ * endpoint atiende el paso que le toca: la foto inicial (`photo`), las capturas con prueba de vida (`submit`) y el
+ * video con preguntas (`startVoice` + `answerVoice`); los documentos de identidad son pasos y usan `/me/documents`
+ * (`employeeDocumentService`). El ORDEN lo exige el servidor (409 `ENROLLMENT_STEP_BLOCKED` con el paso que falta y
+ * `ENROLLMENT_STEP_DISABLED` si la empresa no pide ese paso).
  */
 export const enrollmentService = {
-  /** EMPLOYEE: el estado de los tres pasos de su registro (el índice). */
+  /** EMPLOYEE: los pasos de su registro, en el orden que pide su empresa, con el estado de cada uno (el índice). */
   progress(signal?: AbortSignal): Promise<EnrollmentProgress> {
     return apiRequest<EnrollmentProgress>('/enrollment/progress', { signal, validate: isProgress });
   },
 
-  /** EMPLOYEE, paso 1: la foto inicial (se valida y queda guardada, cifrada, como borrador del registro). */
+  /** EMPLOYEE, paso `INITIAL_PHOTO`: la foto inicial (se valida y queda cifrada como borrador del registro). */
   photo(captures: FaceCaptures): Promise<EnrollmentPhotoResult> {
     return postFaceCaptures('/enrollment/photo', { frontal: captures.frontal }, isPhoto);
   },
 
-  /** EMPLOYEE, paso 2: las capturas con la prueba de vida (queda en validación, o sigue el video). */
+  /** EMPLOYEE, paso `FACE_CAPTURES`: las capturas con la prueba de vida (queda en validación, o sigue el video). */
   submit(captures: FaceCaptures): Promise<EnrollmentSubmitResponse> {
     return postFaceCaptures('/enrollment/face', captures, isSubmit);
   },
 
-  /** EMPLOYEE, paso 3: una sesión de preguntas en video (las aceptadas antes se conservan: trae solo las que faltan). */
+  /** EMPLOYEE, paso `VOICE_VIDEO`: una sesión de preguntas (las aceptadas se conservan: trae solo las que faltan). */
   startVoice(): Promise<VoiceChallenge> {
     return apiRequest<VoiceChallenge>('/enrollment/voice/start', { method: 'POST', validate: isVoiceChallenge });
   },

@@ -101,7 +101,7 @@ describe('LiveFaceFlow: escaneo frontal y envío', () => {
 
   it('el motor de riesgo pide un paso más: el siguiente escaneo responde ese reto (sin pedir otro) con capturas nuevas', async () => {
     const server = serve();
-    const stepUp = { ...TWO_TURNS, challenge_id: 'ch-up', actions: ['TURN_LEFT' as const], instructions: ['Gira la cabeza hacia tu izquierda'], step_up: true };
+    const stepUp = { ...TWO_TURNS, challenge_id: 'ch-up'.padEnd(64, '0'), actions: ['TURN_LEFT' as const], instructions: ['Gira la cabeza hacia tu izquierda'], step_up: true };
     const details = { challenge: stepUp };
     const message422 = 'Por seguridad, completa un paso más: sigue las indicaciones en pantalla.';
     onSubmit.mockRejectedValueOnce(
@@ -116,7 +116,7 @@ describe('LiveFaceFlow: escaneo frontal y envío', () => {
     expect(detection.options).toMatchObject({ mode: { kind: 'action', action: 'TURN_LEFT' } });
     await stable();
     const [, frontal, turn] = camera.frames;
-    expect(onSubmit).toHaveBeenLastCalledWith({ frontal: [frontal], challenge: { id: 'ch-up', images: [turn] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
+    expect(onSubmit).toHaveBeenLastCalledWith({ frontal: [frontal], challenge: { id: 'ch-up'.padEnd(64, '0'), images: [turn] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
   });
 
   it('al salir mientras se valida o se envía, la respuesta (o su falla) ya no hace nada', async () => {
@@ -154,7 +154,7 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     renderFlow();
     const baseline = { pitch: 0.52, width: 210 };
     await stable(baseline);
-    expect(detection.options).toMatchObject({ enabled: true, mode: { kind: 'action', action: 'TURN_LEFT', minimum: 0.25, baseline }, stableFrames: 3 });
+    expect(detection.options).toMatchObject({ enabled: true, mode: { kind: 'action', action: 'TURN_LEFT', minimum: 0.25, baseline }, stableFrames: 5 });
     expect(heading()).toHaveTextContent('Prueba de vida · paso 1 de 2');
 
     see({ guidance: 'move', moveProgress: 0.1 });
@@ -165,7 +165,7 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     see({ guidance: 'too_far' });
     expect(message()).toHaveTextContent('Acércate');
     see({ guidance: 'hold_still' });
-    expect(message()).toHaveTextContent('Mantén la posición');
+    expect(message()).toHaveTextContent('Sostén así');
     expect(cue()).toBeNull();
 
     await stable(); // primer giro capturado: de vuelta al frente
@@ -188,12 +188,12 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
 
     await stable();
     const [frontal, left, right] = camera.frames;
-    expect(onSubmit).toHaveBeenCalledWith({ frontal: [frontal], challenge: { id: 'ch-1', images: [left, right] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
+    expect(onSubmit).toHaveBeenCalledWith({ frontal: [frontal], challenge: { id: 'ch-1'.padEnd(64, '0'), images: [left, right] }, camera: 'FaceTime HD Camera', telemetry: expect.any(String) });
   });
 
   it('un solo giro con la cámara trasera sin espejo (y sin mínimo del servidor: el piso)', async () => {
     camera.isMirrored = false;
-    const single = { ...TWO_TURNS, challenge_id: 'ch-2', actions: ['TURN_RIGHT' as const], instructions: ['Gira a tu derecha'], min_yaw_ratio: null };
+    const single = { ...TWO_TURNS, challenge_id: 'ch-2'.padEnd(64, '0'), actions: ['TURN_RIGHT' as const], instructions: ['Gira a tu derecha'], min_yaw_ratio: null };
     serve({ challenge: () => apiOk(single) });
     renderFlow();
     await stable();
@@ -203,12 +203,12 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     expect(message()).toHaveTextContent('Gira a tu derecha');
     expect(cue()).toHaveClass('ring-cue--left'); // sin espejo, su derecha se ve a la izquierda
     await stable();
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ challenge: { id: 'ch-2', images: [camera.frames[1]] } }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ challenge: { id: 'ch-2'.padEnd(64, '0'), images: [camera.frames[1]] } }));
   });
 
-  it('el movimiento no se detecta a tiempo: pide otro reto conservando el escaneo; al tercero reinicia todo', async () => {
+  it('el movimiento no se detecta a tiempo: pide otro reto conservando el escaneo; agotados, reinicia todo', async () => {
     let issued = 0;
-    const server = serve({ challenge: () => apiOk({ ...TWO_TURNS, challenge_id: `ch-${++issued}` }) });
+    const server = serve({ challenge: () => apiOk({ ...TWO_TURNS, challenge_id: `ch-${++issued}`.padEnd(64, '0') }) });
     renderFlow();
     await stable();
     await advance(20_000);
@@ -224,6 +224,12 @@ describe('LiveFaceFlow: prueba de vida con giros', () => {
     await advance(3_000);
     expect(heading()).toHaveTextContent('paso 1 de 2'); // el reto nuevo empieza desde su primer movimiento
     expect(server.challenges()).toBe(3);
+
+    await stable(); // tercer reto: los reintentos los fija la empresa (`liveness_max_retries`, 3 por omisión)
+    await advance(20_000);
+    expect(message()).toHaveTextContent('No se completó el movimiento a tiempo');
+    await advance(3_000);
+    expect(server.challenges()).toBe(4);
 
     await advance(20_000);
     expect(message()).toHaveTextContent('No se completó la prueba de vida. El escaneo empezará de nuevo.');
@@ -384,11 +390,12 @@ describe('LiveFaceFlow: captura manual, cámara virtual y otra forma de identifi
     expect(document.querySelector('.faceid__actions')).toBeEmptyDOMElement(); // nada que ofrecer
   });
 
-  it('otra forma de identificarse (p. ej. QR) siempre a la mano', () => {
+  it('otra forma de identificarse (p. ej. QR) siempre a la mano', async () => {
     serve();
     const onSelect = vi.fn();
     renderFlow({ alternative: { label: 'Identificarme con QR', icon: null, onSelect } });
     fireEvent.click(screen.getByRole('button', { name: 'Identificarme con QR' }));
+    await advance(0);
     expect(onSelect).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Capturar' })).toBeNull();
   });

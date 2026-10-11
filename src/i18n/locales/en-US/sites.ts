@@ -1,13 +1,13 @@
 import type { Translation } from '../../../types/i18n';
 import type es from '../es-MX/sites';
 
-/** Textos de sitios donde se checa en inglés (en-US): las mismas llaves que es-MX. */
+/** Textos de los puntos de verificación en inglés (en-US): las mismas llaves que es-MX. */
 export default {
   list: {
-    title: 'Work sites',
+    title: 'Verification sites',
     loadError: "Couldn't load the sites",
-    subtitle_one: '{count} site · where to check in person and within what radius',
-    subtitle_other: '{count} sites · where to check in person and within what radius',
+    subtitle_one: '{count} site · where identity is verified and within what radius',
+    subtitle_other: '{count} sites · where identity is verified and within what radius',
     new: 'New site',
     searchPlaceholder: 'Search by name',
     searchLabel: 'Search sites',
@@ -16,7 +16,6 @@ export default {
       site: 'Site',
       address: 'Address',
       radius: 'Radius',
-      employees: 'Employees today',
       code: 'Code',
     },
     kiosksOf_one: '{count} kiosk at {name}',
@@ -26,22 +25,22 @@ export default {
       description: 'Try another search or filter.',
     },
     empty: {
-      title: 'No work sites',
-      description: 'Create a site to set where your staff checks in.',
+      title: 'No verification sites',
+      description: 'Create a site to limit where identity is verified.',
     },
   },
   form: {
     loadError: "Couldn't load the site",
     newTitle: 'New site',
     editTitle: 'Edit site',
-    newSubtitle: 'A place where your staff checks in person: plant, branch, office…',
+    newSubtitle: 'A place where identity is verified: plant, branch, office…',
     create: 'Create site',
     createError: "Couldn't create the site",
     saveError: "Couldn't save the site",
-    rule: 'Check-in radius: {distance}.',
+    rule: 'Verification radius: {distance}.',
     created: {
       title: 'Site created',
-      text: '{name} can now be added to your shifts. {rule}',
+      text: '{name} can now be used when verifying. {rule}',
     },
     updated: {
       title: 'Site updated',
@@ -54,31 +53,31 @@ export default {
     name: 'Site name',
     nameExample: 'Hermosillo Plant',
     nameHint: 'Unique in your company: e.g., “Hermosillo Plant”',
-    radius: 'Check-in radius (meters)',
+    radius: 'Verification radius (meters)',
     radiusHint: 'Between {min} and {max} m: the size of the place plus the GPS margin.',
     suggestedRadii: 'Suggested radii',
-    onSiteNote: 'On site, people check in with their face and phone location, within this radius.',
-    locationIntro: 'Search for the place or tap the map. The circle shows the check-in radius.',
+    onSiteNote: 'On site, identity is verified with the face and phone location, within this radius.',
+    locationIntro: 'Search for the place or tap the map. The circle shows the verification radius.',
     pointRequired: "Mark the site's point on the map",
   },
   fields: {
     address: 'Address',
     references: 'Reference notes',
     point: 'Point on the map',
-    radius: 'Check-in radius',
+    radius: 'Verification radius',
   },
   confirm: {
     createTitle: 'Create site {name}?',
-    createMessage: 'It can be added to your shifts; anyone with those shifts will check in here.',
+    createMessage: 'It can be used to limit where identity is verified.',
     willCreate: 'Will be created',
     editTitle: 'Save changes to site {name}?',
   },
   status: {
     title: 'Site status',
-    activeMeaning: 'It can be added to shifts, and anyone with those shifts can check in here.',
-    inactiveMeaning: "Nobody can check in at this site, and it can't be added to a shift.",
-    deactivateWarning: "Nobody can check in here or add it to a shift until you activate it. Shifts that include it and existing records don't change.",
-    removeWarning: 'It can only be deleted if no shift uses it and nobody has checked in there. If a shift uses it, remove it from the shift; if someone checked in there, deactivate it.',
+    activeMeaning: 'It accepts identity verifications at this place.',
+    inactiveMeaning: "It doesn't accept identity verifications at this place.",
+    deactivateWarning: "It won't accept verifications here until you activate it. Existing records don't change.",
+    removeWarning: 'It can only be deleted if nobody has been verified there. If there are verifications, deactivate it.',
     activateQuestion: 'Activate site {name}?',
     deactivateQuestion: 'Deactivate site {name}?',
     removeQuestion: 'Delete site {name}?',
@@ -87,13 +86,22 @@ export default {
     removed: 'Site deleted',
     inUse: 'The site is in use: deactivate it',
   },
+  recordStatus: {
+    activateError: "Couldn't activate {name}",
+    deactivateError: "Couldn't deactivate {name}",
+    removeError: "Couldn't delete {name}",
+  },
+  validation: {
+    nameRequired: 'Enter the site name, e.g., “{example}”',
+    nameMax: 'At most {max} characters',
+  },
   trash: {
     restoreTitle: 'Restore site {name}?',
     banner: 'Site deleted',
   },
   presence: {
     label: 'Site code',
-    hint: 'Asks for the code shown by the site kiosk at check-in and check-out.',
+    hint: 'Asks for the code shown by the site kiosk when verifying.',
     on: 'Code required',
     off: 'No code',
   },

@@ -5,12 +5,12 @@ import type es from '../es-MX/devices';
 export default {
   title: 'Dispositivos',
   intro:
-    'Navegadores e celulares usados para registrar o ponto ou verificar a identidade, cada um com uma chave que não pode ser copiada. Conforme a política, um não aprovado exige uma etapa a mais ou deixa os registros em revisão.',
+    'Navegadores e celulares usados para verificar a identidade, cada um com uma chave que não pode ser copiada. Conforme a política, um não aprovado exige uma etapa a mais ou deixa os registros em revisão.',
   mineTitle: 'Meus dispositivos',
-  mineIntro: 'Os navegadores ou celulares em que você registrou sua presença ou verificou sua identidade. Sua empresa pode aprová-los ou revogá-los.',
+  mineIntro: 'Os navegadores ou celulares em que você verificou sua identidade. Sua empresa pode aprová-los ou revogá-los.',
   empty: {
     title: 'Sem dispositivos',
-    description: 'Aqui você verá os navegadores e celulares usados para registrar o ponto.',
+    description: 'Aqui você verá os navegadores e celulares usados para verificar a identidade.',
   },
   noun: {
     one: 'dispositivo',

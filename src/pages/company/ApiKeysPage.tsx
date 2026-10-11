@@ -1,5 +1,6 @@
-import { Ban, Code2, KeyRound, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Ban, Code2, KeyRound, Plus, RefreshCw, ShieldCheck, Signature } from 'lucide-react';
 import { apiKeySecretMessage } from '../../components/integrations/apiKeySecret';
+import { ExpiryBadge } from '../../components/integrations/ExpiryBadge';
 import { ApiKeyStatusBadge } from '../../components/StatusBadge';
 import { Button, ButtonLink } from '../../components/ui/Button';
 import { CopyField } from '../../components/ui/CopyField';
@@ -107,6 +108,7 @@ function ApiKeyRow({ apiKey, busy, onAction }: { apiKey: ApiKey; busy: Busy | nu
       </span>
       <span className="validator-list__badges">
         <ApiKeyStatusBadge status={apiKey.status} />
+        <ExpiryBadge expiringSoon={apiKey.expiring_soon} status={apiKey.status} days={apiKey.days_to_expire} />
         {apiKey.scopes.map((scope) => (
           <span key={scope} className="badge badge--info badge--plain">
             {nameOf('api_scopes', scope)}
@@ -202,11 +204,20 @@ export function ApiKeysPage() {
       {t('apiKeys.list.create')}
     </ButtonLink>
   );
+  // La otra mitad de las cuatro credenciales (regla 24 de la raíz): las claves con que se firma cada petición.
+  const actions = (
+    <>
+      <ButtonLink to={paths.company.signingKeys} variant="secondary" icon={<Signature size={18} />}>
+        {t('signingKeys.list.title')}
+      </ButtonLink>
+      {createButton}
+    </>
+  );
 
   return (
     <div className="page">
       <Panel>
-        <PanelHeader title={t('apiKeys.list.title')} subtitle={t('apiKeys.list.subtitle')} actions={createButton} />
+        <PanelHeader title={t('apiKeys.list.title')} subtitle={t('apiKeys.list.subtitle')} actions={actions} />
         <PanelSection>
           <PagedItems
             list={list}

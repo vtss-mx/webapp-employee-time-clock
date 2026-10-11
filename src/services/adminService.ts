@@ -20,6 +20,7 @@ import type {
   RiskPolicyCandidate,
   RiskSimulation,
 } from '../types';
+import { isRiskPolicyMetadata } from '../utils/riskReadiness';
 import { hasKeys, isPage } from '../utils/guards';
 import { apiRequest } from './apiClient';
 import { restoreRecord } from './http/restore';
@@ -30,7 +31,7 @@ const isAdmin = hasKeys<CompanyAdmin>('id', 'email', 'active');
 const isEmployee = hasKeys<CompanyEmployee>('id', 'employee_number', 'first_name', 'last_name', 'active', 'face_status');
 const isStats = hasKeys<PlatformStats>('companies', 'active_companies', 'employees', 'company_admins');
 /** La política del ADMIN: la de la empresa más el motor de riesgo y los controles antifraude. */
-const isAdminPolicy = (value: unknown): value is AdminVerificationPolicy => isPolicy(value) && hasKeys('risk_engine', 'risk_signals', 'pending_changes')(value);
+const isAdminPolicy = (value: unknown): value is AdminVerificationPolicy => isPolicy(value) && hasKeys('risk_engine', 'risk_signals', 'pending_changes')(value) && isRiskPolicyMetadata(value);
 const isUpdateResult = (value: unknown): value is PolicyUpdateResult => hasKeys<PolicyUpdateResult>('policy', 'change')(value) && isAdminPolicy(value.policy);
 const isChange = hasKeys<PolicyChange>('id', 'status', 'changes', 'requested_by');
 const isSimulation = hasKeys<RiskSimulation>('evaluated', 'current', 'candidate', 'frauds');

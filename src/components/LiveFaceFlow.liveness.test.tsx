@@ -95,7 +95,7 @@ describe('LiveFaceFlow: la prueba de vida completa del registro (decisión del d
     await stable();
     expect(flow.onSubmit).toHaveBeenCalledTimes(1);
     const [, frontalPhoto, ...moves] = camera.frames; // la inicial, la válida y una captura por movimiento, en orden
-    expect(flow.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ frontal: [frontalPhoto], challenge: { id: 'ch-enroll', images: moves } }));
+    expect(flow.onSubmit).toHaveBeenCalledWith(expect.objectContaining({ frontal: [frontalPhoto], challenge: { id: 'ch-enroll'.padEnd(64, '0'), images: moves } }));
     expect(moves).toHaveLength(4);
   });
 
@@ -112,7 +112,7 @@ describe('LiveFaceFlow: la prueba de vida completa del registro (decisión del d
 
   it('si el reto venció mientras se reunían las fotos válidas, se pide otro conservándolas, sin aviso ni reintento', async () => {
     let issued = 0;
-    const server = serve({ challenge: () => apiOk({ ...FOUR_MOVES, challenge_id: `ch-${++issued}`, expires_in: 10 }) });
+    const server = serve({ challenge: () => apiOk({ ...FOUR_MOVES, challenge_id: `ch-${++issued}`.padEnd(64, '0'), expires_in: 10 }) });
     renderFlow({ ...ENROLLMENT, frontalFrames: 2 });
     see({ guidance: 'off_center' }); // la persona tarda en colocarse
     await stable();
@@ -131,7 +131,7 @@ describe('LiveFaceFlow: la prueba de vida completa del registro (decisión del d
     let issued = 0;
     let answer: (response: Response) => void = () => undefined;
     serve({
-      challenge: () => (++issued === 1 ? apiOk({ ...FOUR_MOVES, challenge_id: 'ch-1', expires_in: 10 }) : new Promise((resolve) => (answer = resolve))),
+      challenge: () => (++issued === 1 ? apiOk({ ...FOUR_MOVES, challenge_id: 'ch-1'.padEnd(64, '0'), expires_in: 10 }) : new Promise((resolve) => (answer = resolve))),
     });
     const view = renderFlow(ENROLLMENT);
     see({ guidance: 'off_center' });

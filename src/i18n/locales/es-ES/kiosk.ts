@@ -3,7 +3,7 @@ import es from '../es-MX/kiosk';
 
 /**
  * Quioscos de los sitios en español de España (es-ES): solo lo que cambia respecto de es-MX (vocabulario; glosario §3):
- * «quiosco» (la forma preferida en España) y «fichar».
+ * «quiosco», la forma preferida en España.
  */
 export default derive(es, {
   pairing: {
@@ -14,7 +14,7 @@ export default derive(es, {
     title: 'Quioscos',
     subtitle_one: '{count} quiosco',
     subtitle_other: '{count} quioscos',
-    intro: 'La tableta de cada quiosco muestra el código que tu personal escanea o escribe al fichar en el sitio.',
+    intro: 'La tableta de cada quiosco muestra el código que tu personal escanea o escribe al verificar su identidad en el sitio.',
     new: 'Nuevo quiosco',
     newTitle: 'Nuevo quiosco',
     kiosk: 'Quiosco',
@@ -38,8 +38,8 @@ export default derive(es, {
   display: {
     pairText: 'Escribe el código de vinculación que generó tu empresa en los quioscos del sitio.',
     pairHint: 'Diez letras y números; el guion se añade solo.',
-    pairConfirmMessage: 'Mostrará el código del sitio para fichar.',
-    hint: 'Escanéalo o escribe el código al fichar tu entrada o tu salida.',
+    pairConfirmMessage: 'Mostrará el código del sitio para verificar la identidad.',
+    hint: 'Escanéalo o escribe el código al verificar tu identidad.',
     footer: 'Quiosco del sitio',
   },
 });

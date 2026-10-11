@@ -83,7 +83,7 @@ describe('Errores del sistema: bandeja', () => {
     renderWithProviders(<ErrorsPage />, { route: '/admin/errors' });
     expect(await screen.findByText('Funciones limitadas')).toBeInTheDocument();
     expect(screen.getByText('Base de datos: disponible')).toBeInTheDocument();
-    expect(screen.getByText('Motor facial: unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Motor facial: no disponible')).toBeInTheDocument();
     expect(screen.getByText('Modelo no encontrado')).toBeInTheDocument();
     expect(screen.getByText(/entre 32 y 100/)).toBeInTheDocument();
     expect(screen.getByText(/prioridad crítica · 1,500 peticiones recientes · 210.5 ms/)).toBeInTheDocument();

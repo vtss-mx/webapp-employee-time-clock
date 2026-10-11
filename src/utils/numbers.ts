@@ -98,6 +98,11 @@ export function formatDistance(meters: number, kmDigits = 1): string {
   return meters >= 1000 ? `${formatNumber(meters / 1000, kmDigits)} km` : `${formatNumber(Math.round(meters), 0)} m`;
 }
 
+/** Radio de un sitio o de un validador: "100 m" o "1.5 km" (hasta 3 decimales en km), con los separadores del idioma activo. */
+export function metersText(meters: number): string {
+  return formatDistance(meters, 3);
+}
+
 /** Nombres unidos como se dicen en el idioma activo: "Ana, Luis y Eva" / "Ana, Luis, and Eva" ("o"/"or" con `disjunction`). */
 export function formatList(items: readonly string[], type: 'conjunction' | 'disjunction' = 'conjunction'): string {
   return new Intl.ListFormat(currentLocale(), { type }).format(items);

@@ -18,7 +18,7 @@ import { useResource } from '../../hooks/useResource';
 import { useVerificationPolicy } from '../../hooks/useVerificationPolicy';
 import { useWarmLocation } from '../../hooks/useWarmLocation';
 import { t, useLocale } from '../../i18n';
-import { errorMessage } from '../../services/apiClient';
+import { verificationFailure } from '../../utils/verificationOutcome';
 import { checkpointService } from '../../services/checkpointService';
 import type { CheckpointEmployee, CheckpointEvent, VerificationMethod } from '../../types';
 import { config } from '../../utils/config';
@@ -30,7 +30,7 @@ type Finish = (outcome: VerificationOutcome) => void;
 type Locate = () => Promise<LocationTake | null>;
 
 /** El error de un intento, escrito al dibujarse (el resultado en pantalla sigue al idioma activo). */
-const failed = (finish: Finish, error: unknown) => finish({ result: null, error: () => errorMessage(error) });
+const failed = (finish: Finish, error: unknown) => finish(verificationFailure(error));
 
 /** Ícono de cada método; el título y la descripción vienen del catálogo verification_methods. */
 const METHOD_ICONS: Partial<Record<string, LucideIcon>> = { FACE: ScanFace, QR: QrCode, QR_FACE: ShieldCheck };

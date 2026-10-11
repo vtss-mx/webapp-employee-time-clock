@@ -13,12 +13,17 @@ import { RetryState } from './ui/RetryState';
 /** Color de cada estado del servidor (su texto, en `systemErrors.server.status`). */
 const STATUS_TONES: Record<ServerStatus['status'], string> = { ok: 'badge--success', degraded: 'badge--warning', unavailable: 'badge--danger' };
 /** Dependencias conocidas (código del backend → su texto); una nueva se muestra con su código. */
-const COMPONENTS: Partial<Record<string, 'database' | 'faceEngine'>> = { database: 'database', face_engine: 'faceEngine' };
+const COMPONENTS: Partial<Record<string, 'database' | 'faceEngine' | 'schema'>> = { database: 'database', face_engine: 'faceEngine', schema: 'schema' };
 const TIERS: Partial<Record<string, 'critical' | 'normal' | 'background'>> = { CRITICAL: 'critical', NORMAL: 'normal', BACKGROUND: 'background' };
 
 const componentName = (name: string) => {
   const key = COMPONENTS[name];
   return key ? t(`systemErrors.server.components.${key}`) : name;
+};
+const componentStatus = (status: string) => {
+  if (status === 'ok') return t('systemErrors.server.available');
+  if (status === 'unavailable') return t('systemErrors.server.unavailable');
+  return status;
 };
 const tierName = (tier: string) => {
   const key = TIERS[tier];
@@ -78,7 +83,7 @@ export function ServerStatusPanel() {
           {Object.entries(data.components).map(([name, component]) => (
             <li key={name}>
               <strong>
-                {t('systemErrors.server.component', { name: componentName(name), status: component.status === 'ok' ? t('systemErrors.server.available') : component.status })}
+                {t('systemErrors.server.component', { name: componentName(name), status: componentStatus(component.status) })}
               </strong>
               {component.error && <small className="muted">{component.error}</small>}
             </li>

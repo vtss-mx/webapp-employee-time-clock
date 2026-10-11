@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import type { MessageSource } from '../components/MessageDialog';
 import type { ConfirmSource } from '../types/confirm';
 import { useConfirm } from './useConfirm';
 import { useFeedback } from './useFeedback';
@@ -26,6 +27,14 @@ export interface ActionOptions<R, K> {
   onSuccess?: (result: R) => void;
   /** Al fallar, antes del popup: revertir un cambio optimista, marcar el campo, cerrar la confirmación... */
   onError?: (error: unknown) => void;
+  /**
+   * Un error que necesita su PROPIO aviso, con su propia acción, EN LUGAR del popup genérico del error: devuelve
+   * el mensaje de ese error (o null para que se explique como siempre). Es la forma de cumplir la regla 7 de la
+   * raíz cuando un rechazo no se puede reintentar (un límite con `Retry-After`, una sesión que no opera en una
+   * empresa): el aviso dice qué hacer y nunca ofrece un «Reintentar» que no podría funcionar. Como el mensaje es
+   * una función, el popup abierto sigue al idioma activo.
+   */
+  errorMessage?: (error: unknown) => MessageSource | null;
   /** Al terminar, bien o mal (p. ej. cerrar la confirmación). */
   onSettled?: () => void;
   /**
@@ -73,7 +82,10 @@ export function useAction<K = true>() {
         ok = true;
       } catch (error) {
         onError?.(error);
-        void feedback.fromError(error, { title: () => (typeof errorTitle === 'function' ? errorTitle(error) : errorTitle) });
+        // Un error con su propio aviso lo reemplaza por completo: nunca se abren dos popups por la misma falla.
+        const own = options.errorMessage?.(error);
+        if (own) void feedback.show(own);
+        else void feedback.fromError(error, { title: () => (typeof errorTitle === 'function' ? errorTitle(error) : errorTitle) });
       } finally {
         // Una pantalla que ya se cerró (navegó tras guardar) no se toca.
         if (mounted.current && !(ok && keepBusy)) setBusy(null);

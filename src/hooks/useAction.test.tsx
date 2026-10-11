@@ -108,6 +108,39 @@ describe('useAction', () => {
   });
 });
 
+describe('useAction: un error con su PROPIO aviso', () => {
+  /**
+   * Regla 7 de la raíz: un rechazo que no se puede reintentar lleva su propio aviso, con la acción que sí sirve, y
+   * NUNCA el popup genérico encima (dos avisos por la misma falla).
+   */
+  it('`errorMessage` reemplaza por completo el popup del error', async () => {
+    const { result } = renderHook(() => useAction(), { wrapper });
+    const failure = new ApiError({ statusCode: 429, code: 'EXPORT_TOO_SOON', message: 'Hace poco' });
+    await act(async () => {
+      await result.current.run(() => Promise.reject(failure), {
+        errorTitle: 'No se pudo exportar',
+        errorMessage: (error) => (error === failure ? () => ({ variant: 'info', title: 'Aún no se puede pedir de nuevo', text: 'Vuelve mañana.' }) : null),
+      });
+    });
+    const own = await screen.findByRole('dialog', { name: 'Aún no se puede pedir de nuevo' });
+    expect(own).toHaveTextContent('Vuelve mañana.');
+    expect(screen.queryByRole('alertdialog', { name: 'No se pudo exportar' })).toBeNull();
+    await userEvent.click(within(own).getByRole('button', { name: 'Entendido' }));
+  });
+
+  it('un error que no tiene aviso propio (null) se explica como siempre', async () => {
+    const { result } = renderHook(() => useAction(), { wrapper });
+    await act(async () => {
+      await result.current.run(() => Promise.reject(new ApiError({ statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: 'No disponible' })), {
+        errorTitle: 'No se pudo exportar',
+        errorMessage: () => null,
+      });
+    });
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo exportar' })).toHaveTextContent('No disponible');
+    await closePopup('No se pudo exportar');
+  });
+});
+
 describe('useAction: confirmación previa', () => {
   it('cancelar no envía nada, no marca ocupado ni avisa; confirmar sigue con la acción', async () => {
     const { result } = renderHook(() => useAction<number>(), { wrapper });

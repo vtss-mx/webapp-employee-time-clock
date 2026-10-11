@@ -15,7 +15,6 @@ export type AvailabilityField =
   | 'email'
   | 'phone'
   | 'validator_email'
-  | 'department_name'
   | 'company_tax_id'
   | 'company_admin_email'
   | 'company_phone';

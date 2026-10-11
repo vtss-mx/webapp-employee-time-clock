@@ -6,6 +6,15 @@ import type es from '../es-MX/face';
  * es-MX. Los pasos de los permisos citan literal los menús de cada sistema y navegador en alemán.
  */
 export default {
+  session: {
+    cancelTitle: 'Diese Aufnahme abbrechen?',
+    cancelMessage: 'Die aktive Aufnahme wird beendet. Eine bereits abgeschlossene Verifizierung behält ihr Ergebnis.',
+    cancelConfirm: 'Aufnahme abbrechen',
+    continue: 'Aufnahme fortsetzen',
+    capture: 'Aufnahme',
+    noLongerActive: 'Diese Aufnahme ist abgelaufen oder wurde abgebrochen. Starten Sie eine neue Aufnahme.',
+    alreadyStarted: 'Diese Aufnahme wird bereits verarbeitet oder ist abgeschlossen. Sie kann nicht erneut gesendet werden.',
+  },
   camera: {
     name: 'Kamera',
     kinds: {
@@ -163,7 +172,7 @@ export default {
     counter: 'Phase {current} von {total}',
   },
   flow: {
-    holdPosition: 'Position halten',
+    holdPose: 'Halten Sie so',
     almost: 'Noch etwas',
     photo: 'Foto {current} von {total}',
     analyzing: 'Wird analysiert…',
@@ -236,6 +245,7 @@ export default {
   speak: {
     position: 'Platzieren Sie Ihr Gesicht im Rahmen und blicken Sie geradeaus.',
     recenter: 'Blicken Sie wieder geradeaus.',
+    hold: 'Halten Sie so.',
     done: 'Fertig. Wird verarbeitet.',
     mute: 'Sprachführung stummschalten',
     unmute: 'Sprachführung aktivieren',

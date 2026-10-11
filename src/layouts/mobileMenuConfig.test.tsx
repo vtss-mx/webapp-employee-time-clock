@@ -19,7 +19,7 @@ vi.mock('./mobileMenu', () => ({
 
 function SignedIn() {
   const { login } = useAuth();
-  useEffect(() => void login('ana@empresa.com', 'Clave123'), [login]);
+  useEffect(() => void login('ana@empresa.com', 'Clave1234569'), [login]);
   return null;
 }
 

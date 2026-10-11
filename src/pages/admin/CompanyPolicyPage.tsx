@@ -43,13 +43,16 @@ import {
 import { useMemo, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { ConfidenceSlider } from '../../components/ConfidenceSlider';
+import { ReasonField } from '../../components/ReasonField';
 import { FaceLearningPanel } from '../../components/FaceLearningPanel';
+import { EnrollmentStepsSection, type EnrollmentStepsSave } from '../../components/policy/EnrollmentStepsSection';
 import { PolicyChanges } from '../../components/policy/PolicyChanges';
 import { ruledAccessories, type AccessoryRule } from '../../components/accessories';
-import { withChanges } from '../../components/policy/policyFields';
+import { appliesTo, footnote, onOff, withChanges } from '../../components/policy/policyFields';
 import { PolicyPresets, presetConfirm } from '../../components/policy/PolicyPresets';
 import { PresenceSection } from '../../components/policy/PresenceSection';
 import { RiskEngineSection } from '../../components/policy/RiskEngineSection';
+import { policyRiskConfirm } from '../../components/policy/policyRiskConfirm';
 import { RiskSimulationPanel } from '../../components/policy/RiskSimulation';
 import { VoiceGuidanceSection } from '../../components/policy/VoiceGuidanceSection';
 import { PolicyTuning, type TuningKey, type TuningSave } from '../../components/settings/PolicyTuning';
@@ -91,7 +94,6 @@ type PolicyKey =
   | 'validator_device_approval'
   | 'adaptive_learning'
   | 'detect_impossible_travel'
-  | 'qr_only_attendance'
   | 'risk_engine'
   | 'fraud_evidence'
   | 'flash_paced'
@@ -121,8 +123,6 @@ interface Option {
   security?: boolean;
   /** Advertencia de la confirmación al desactivarla (por defecto, la de suplantación de identidad). */
   warning?: WarningId;
-  /** Al revés: ENCENDERLA protege menos (un camino sin rostro, como la asistencia con el QR solo). */
-  inverse?: boolean;
 }
 
 interface Section {
@@ -132,7 +132,7 @@ interface Section {
 }
 
 /** Una regla con sus textos en `policy.options.<id>`. */
-function option(key: PolicyKey, id: OptionId, Icon: LucideIcon, extra: Pick<Option, 'security' | 'warning' | 'inverse'> = {}): Option {
+function option(key: PolicyKey, id: OptionId, Icon: LucideIcon, extra: Pick<Option, 'security' | 'warning'> = {}): Option {
   return { key, Icon, ...extra, text: () => ({ label: t(`policy.options.${id}.label`), on: t(`policy.options.${id}.on`), off: t(`policy.options.${id}.off`) }) };
 }
 
@@ -203,7 +203,7 @@ const POLICY_SECTIONS: Section[] = [
   {
     id: 'methods',
     icon: <QrCode size={20} />,
-    options: [option('qr_enabled', 'qrEnabled', QrCode), option('qr_only_attendance', 'qrOnlyAttendance', ScanLine, { inverse: true, warning: 'qrOnly' })],
+    options: [option('qr_enabled', 'qrEnabled', QrCode)],
   },
   {
     id: 'antifraud',
@@ -245,26 +245,20 @@ const VOICE_GUIDANCE = option('voice_guidance_enabled', 'voiceGuidance', Volume2
  */
 type PolicyField = TuningKey;
 
-/** Alcance de cada cambio, al pie de su confirmación. */
-const appliesTo = (company: string) => t('policy.appliesTo', { company });
-/** Al pie de lo que relaja la seguridad con la regla de dos personas: no aplica hasta que otro ADMIN lo apruebe. */
-const footnote = (company: string, relaxes: boolean, twoPerson: boolean) => (relaxes && twoPerson ? t('policy.governance.relaxNote') : appliesTo(company));
-const onOff = (value: boolean) => t(value ? 'policy.toggle.on' : 'policy.toggle.off');
-
 /**
  * Encender o apagar una regla: su estado "antes → después" y qué hará. Lo que protege más es verde; lo que
  * protege menos es rojo y, si es una protección, lleva su advertencia (suplantación, ubicación falsa,
- * dispositivos, asistencia sin rostro...) y, con la regla de dos personas, que otro ADMIN debe aprobarlo.
+ * dispositivos...) y, con la regla de dos personas, que otro ADMIN debe aprobarlo.
  */
 function switchConfirm(option: Option, value: boolean, company: string, twoPerson: boolean): ConfirmInput {
   const { label, on, off } = option.text();
-  const safer = option.inverse ? !value : value;
-  const risky = option.inverse ? value : Boolean(option.security) && !value;
+  const safer = value;
+  const risky = Boolean(option.security) && !value;
   return {
     kind: 'edit',
     tone: safer ? 'success' : 'danger',
     icon: <option.Icon size={30} />,
-    eyebrow: t(option.security || option.inverse ? 'policy.toggle.eyebrowSecurity' : 'policy.toggle.eyebrow'),
+    eyebrow: t(option.security ? 'policy.toggle.eyebrowSecurity' : 'policy.toggle.eyebrow'),
     title: t(value ? 'policy.toggle.activateTitle' : 'policy.toggle.deactivateTitle', { label }),
     message: risky ? t(`policy.warnings.${option.warning ?? 'spoofing'}`) : value ? on : off,
     changes: [{ label, before: onOff(!value), after: onOff(value) }],
@@ -384,6 +378,7 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
   const { busy: saving, run } = useAction<PolicyField>();
   /** Cambia con cada cambio pedido: el historial se vuelve a pedir. */
   const [version, setVersion] = useState(0);
+  const [riskReason, setRiskReason] = useState('');
   const twoPerson = policy.two_person_rule;
 
   /** Lo que devolvió el servidor manda: si el cambio quedó por aprobar, la política sigue como estaba. */
@@ -398,14 +393,24 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
    * como estaba si relaja la seguridad y espera a otro ADMIN (el aviso lo dice); si falla, se revierte. La
    * confirmación y el aviso se arman al dibujarse: un popup abierto sigue al idioma activo.
    */
-  const apply = (key: PolicyField, changes: AdminPolicyUpdate, notice: () => SuccessNotice, confirm?: ConfirmSource) => {
+  const apply = (key: PolicyField, changes: AdminPolicyUpdate, notice: () => SuccessNotice, confirm?: ConfirmSource, onError?: (error: unknown) => void) => {
     const previous = policy;
     void run(
       () => {
         setPolicy(withChanges(policy, changes)); // optimista, solo después de confirmar
-        return adminService.updatePolicy(companyId, changes);
+        return adminService.updatePolicy(companyId, riskReason.trim() ? { ...changes, reason: riskReason } : changes);
       },
-      { busy: key, confirm, errorTitle: saveError, success: outcome(notice), onSuccess: applied, onError: () => setPolicy(previous) },
+      {
+        busy: key,
+        confirm: policyRiskConfirm(confirm, riskReason),
+        errorTitle: saveError,
+        success: outcome(notice),
+        onSuccess: applied,
+        onError: (error) => {
+          setPolicy(previous);
+          onError?.(error); // un control con error de campo (los pasos del registro: 422 INVALID_ENROLLMENT_STEPS)
+        },
+      },
     );
   };
 
@@ -425,12 +430,16 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
   // Guía por voz (decisión del dueño, 2026-10-08): encenderla es un interruptor neutral; la voz se confirma sin la
   // regla de dos personas (cambiarla nunca relaja la seguridad).
   const onToggleVoiceGuidance = (value: boolean) => onToggle(VOICE_GUIDANCE, value);
+  // Pasos del registro de identidad (decisión del dueño, 2026-10-08): la sección arma su confirmación y su aviso y
+  // recibe el error del servidor para marcarlo en el campo (422 `INVALID_ENROLLMENT_STEPS`).
+  const saveEnrollmentSteps = ({ steps, confirm, notice, onError }: EnrollmentStepsSave) =>
+    apply('enrollment_steps', { enrollment_steps: steps }, notice, confirm, onError);
   const saveVoiceProfile = (save: TuningSave) =>
     apply('voice_profile', save.changes, () => [save.title(), save.detail()], () => voiceProfileConfirm(save, companyName));
   const applyPreset = (preset: CatalogItem) =>
-    void run(() => adminService.applyPolicyPreset(companyId, preset.code), {
+    void run(() => adminService.applyPolicyPreset(companyId, preset.code, riskReason.trim() || undefined), {
       busy: 'preset',
-      confirm: () => presetConfirm(preset, companyName, twoPerson),
+      confirm: policyRiskConfirm(() => presetConfirm(preset, companyName, twoPerson), riskReason),
       errorTitle: saveError,
       success: outcome(() => presetNotice(preset)),
       onSuccess: applied,
@@ -439,6 +448,7 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
   return (
     <>
       <PanelSection title={t('policy.presets.title')} icon={<Layers size={20} />}>
+        <ReasonField label={t('policy.risk.changeReason.label')} hint={t('policy.risk.changeReason.hint')} value={riskReason} onChange={setRiskReason} required disabled={saving !== null} />
         <p className="muted small">{t('policy.presets.hint')}</p>
         <PolicyPresets policy={policy} busy={saving === 'preset'} onApply={applyPreset} />
       </PanelSection>
@@ -479,6 +489,7 @@ function PolicyEditor({ companyId, companyName, policy, onChange: setPolicy }: P
         <p className="muted small">{t('policy.tuning.hint')}</p>
         <PolicyTuning policy={policy} saving={saving} onSave={saveTuning} />
       </PanelSection>
+      <EnrollmentStepsSection policy={policy} companyName={companyName} saving={saving} onSave={saveEnrollmentSteps} />
       <VoiceGuidanceSection policy={policy} saving={saving} onToggle={onToggleVoiceGuidance} onSaveProfile={saveVoiceProfile} />
       <PanelSection title={t('policy.risk.title')} icon={<Radar size={20} />}>
         <p className="muted small">{t('policy.risk.hint')}</p>

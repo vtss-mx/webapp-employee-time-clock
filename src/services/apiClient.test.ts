@@ -300,4 +300,29 @@ describe('apiRequest', () => {
     await expect(apiRequest('/auth/login', { method: 'POST', auth: false })).rejects.toBeInstanceOf(ApiError);
     expect(hooks.onUnauthorized).not.toHaveBeenCalled();
   });
+  it('401 con un código seguro para la sesión (sessionSafeCodes): rechaza sin cerrar la sesión', async () => {
+    mockFetch(apiFail(401, 'COMPANY_INACTIVE', 'Empresa inactiva'));
+    await expect(apiRequest('/auth/company', { method: 'POST', sessionSafeCodes: new Set(['COMPANY_INACTIVE']) })).rejects.toMatchObject({ code: 'COMPANY_INACTIVE' });
+    expect(hooks.refreshSession).not.toHaveBeenCalled();
+    expect(hooks.onUnauthorized).not.toHaveBeenCalled();
+  });
+  it('un 401 que NO está en sessionSafeCodes sí cierra la sesión', async () => {
+    mockFetch(apiFail(401, 'SESSION_REVOKED', 'Sesión revocada'));
+    await expect(apiRequest('/auth/company', { method: 'POST', sessionSafeCodes: new Set(['COMPANY_INACTIVE']) })).rejects.toMatchObject({ code: 'SESSION_REVOKED' });
+    expect(hooks.onUnauthorized).toHaveBeenCalledWith('Sesión revocada');
+  });
+  it('403 de una pantalla que dejó de estar disponible refresca al usuario (onScreenUnavailable)', async () => {
+    const onScreenUnavailable = vi.fn();
+    configureApiClient({ ...hooks, onScreenUnavailable });
+    mockFetch(apiFail(403, 'QR_DISABLED', 'QR deshabilitado'));
+    await expect(apiRequest('/x')).rejects.toMatchObject({ code: 'QR_DISABLED' });
+    expect(onScreenUnavailable).toHaveBeenCalledOnce();
+  });
+  it('un 403 corriente no refresca al usuario', async () => {
+    const onScreenUnavailable = vi.fn();
+    configureApiClient({ ...hooks, onScreenUnavailable });
+    mockFetch(apiFail(403, 'FORBIDDEN', 'Sin permiso'));
+    await expect(apiRequest('/x')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(onScreenUnavailable).not.toHaveBeenCalled();
+  });
 });

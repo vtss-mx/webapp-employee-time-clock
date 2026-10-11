@@ -39,7 +39,7 @@ function renderSelect(selectResponse: (call: MockCall) => Response, user: User =
       <SignIn />
       <Routes>
         <Route path="/" element={<CompanySelectPage />} />
-        <Route path={paths.employee.attendance} element={<p>Menú del empleado</p>} />
+        <Route path={paths.employee.dashboard} element={<p>Menú del empleado</p>} />
       </Routes>
     </>,
     { auth: true },
@@ -79,6 +79,17 @@ describe('Selección de empresa (persona en varias empresas)', () => {
     expect(popup).toHaveTextContent('La empresa está desactivada');
     await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /Panificadora del Norte/ })).toBeEnabled());
+  });
+
+  it('un 401 al elegir (empresa inactiva o acceso desactivado) NO cierra la sesión: muestra el mensaje y se queda en el selector', async () => {
+    renderSelect(() => apiFail(401, 'COMPANY_INACTIVE', 'La empresa está desactivada'));
+    await userEvent.click(await screen.findByRole('button', { name: /Panificadora del Norte/ }));
+    const popup = await screen.findByRole('alertdialog', { name: 'No se pudo entrar a Panificadora del Norte' });
+    expect(popup).toHaveTextContent('La empresa está desactivada');
+    await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
+    // La sesión sigue viva (no se fue al inicio de sesión): el selector permanece disponible.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Panificadora del Norte/ })).toBeEnabled());
+    expect(screen.getByRole('heading', { name: 'Elige tu empresa' })).toBeInTheDocument();
   });
 
   it('acceso desactivado en una empresa y un estado facial que el catálogo aún no tiene (se muestra su código)', async () => {

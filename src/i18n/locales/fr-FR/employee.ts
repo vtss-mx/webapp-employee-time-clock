@@ -73,35 +73,20 @@ export default {
     },
     before: 'Avant de commencer:',
     privacy: 'Vos photos, votre vidéo et votre voix sont conservées chiffrées et revues uniquement par votre entreprise ; elles ne sont jamais partagées.',
-    /** Los cuatro pasos del registro (decisión del dueño, 2026-10-06), en el indicador sobre el visor. */
+    /** El indicador sobre el visor: los pasos los manda el servidor y su nombre sale del catálogo; «Listo» es el final. */
     steps: {
       label: 'Étape {current} sur {total}',
-      photo: 'Photo initiale',
-      captures: 'Captures',
-      video: 'Vidéo',
       done: 'Terminé',
     },
-    /** Mientras se guarda la foto inicial (paso 1). */
+    /** Mientras se guarda la foto inicial. */
     photoSaving: 'Enregistrement de votre photo…',
-    /** El índice de los pasos independientes (decisión del dueño, 2026-10-07): estado, aviso y botón de cada uno. */
+    /** El índice del registro: estado, aviso y botón de cada paso (su nombre y descripción, del catálogo). */
     index: {
       steps_one: '{count} étape',
       steps_other: '{count} étapes',
       resume: "Suivez les étapes dans l'ordre. Vous pouvez vous arrêter après n'importe laquelle et reprendre un autre jour. Ce que vous avez fait est conservé.",
       errorTitle: 'Impossible de charger votre enregistrement',
-      label: "Étapes de l'enregistrement du visage",
-      photo: {
-        title: 'Photo initiale',
-        text: 'Une photo de votre visage de face, avec un bon éclairage.',
-      },
-      captures: {
-        title: 'Captures et détection du vivant',
-        text: '{count} captures de votre visage et quatre mouvements de la tête.',
-      },
-      video: {
-        title: 'Vidéo avec questions',
-        text: 'Répondez à voix haute à des questions sur vos données, en regardant la caméra.',
-      },
+      label: 'Étapes de votre enregistrement',
       state: {
         pending: 'En attente',
         done: 'Terminée · {date}',
@@ -112,11 +97,12 @@ export default {
         answered: '{answered} réponses sur {total}',
       },
       hint: {
+        /** `step`: el nombre del paso que falta, del catálogo. */
+        blocked: 'Terminez d’abord « {step} ».',
         validUntil: "Valable jusqu'au {date}",
         expired: 'Votre photo a expiré. Reprenez-la.',
-        needsPhoto: "Prenez d'abord votre photo initiale.",
-        needsCaptures: "Terminez d'abord les captures.",
         exhausted: 'Les tentatives sont épuisées. Reprenez la photo initiale et les captures.',
+        unknown: 'Mettez à jour l’application pour continuer cette étape.',
       },
       action: {
         photo: 'Prendre la photo',
@@ -124,35 +110,41 @@ export default {
         captures: 'Commencer les captures',
         video: 'Enregistrer la vidéo',
         resumeVideo: 'Continuer la vidéo',
+        document: 'Envoyer le document',
+        replaceDocument: 'Remplacer le document',
       },
     },
-    /** Una pantalla de un paso que se abrió fuera de orden: qué falta (su vacío). */
+    /** La pantalla de un paso que ahora no se puede abrir: qué pasa (su vacío) y de vuelta al índice. */
     blocked: {
       back: "Retour à l'enregistrement",
-      photoUsed: {
-        title: 'Photo initiale prête',
-        text: "Elle a déjà servi pour vos captures. Passez à l'étape suivante.",
+      blocked: {
+        title: 'Une étape vient avant',
+        text: 'Terminez « {step} » pour continuer cette étape.',
       },
-      needsPhoto: {
-        title: 'Photo initiale manquante',
-        text: 'Prenez votre photo initiale avant les captures.',
+      done: {
+        title: 'Étape terminée',
+        text: 'Elle est déjà faite. Continuez avec l’étape suivante.',
       },
-      capturesDone: {
-        title: 'Captures prêtes',
-        text: "Elles ont déjà été envoyées. Passez à l'étape suivante.",
-      },
-      needsCaptures: {
-        title: 'Captures manquantes',
-        text: 'Terminez les captures avant la vidéo.',
+      disabled: {
+        title: 'Étape non demandée',
+        text: 'Votre entreprise ne demande pas cette étape de votre enregistrement.',
       },
       exhausted: {
         title: 'Tentatives épuisées',
         text: 'Reprenez la photo initiale et les captures pour réessayer.',
       },
-      noVideo: {
-        title: 'Pas de vidéo',
-        text: 'Votre entreprise ne demande pas la vidéo avec questions.',
+      unknown: {
+        title: 'Étape indisponible',
+        text: 'Mettez à jour l’application pour continuer cette étape.',
       },
+    },
+    /** Un 409 del servidor: el paso ya no toca (lo bloquea otro o la empresa dejó de pedirlo). */
+    stepGone: 'Cette étape n’est plus disponible',
+    /** Un paso que se cumple con un documento de identidad: cómo va. */
+    document: {
+      pending: 'Votre document est encore manquant.',
+      done: 'Document reçu · {date}',
+      doneNoDate: 'Document reçu.',
     },
   },
   myQr: {
@@ -169,6 +161,10 @@ export default {
     singleUse:
       "Chaque code ne sert qu'une fois et expire en quelques secondes: une photo ou une capture d'écran ne fonctionne pas. Il ne contient aucune de vos données personnelles ni biométriques.",
     brightnessLarge: "Augmentez la luminosité pour qu'il soit lu instantanément.",
+    unavailable: {
+      qrTitle: 'QR indisponible',
+      faceTitle: 'Enregistrement du visage en attente',
+    },
   },
   pending: {
     errorTitle: 'Impossible de mettre à jour le statut',

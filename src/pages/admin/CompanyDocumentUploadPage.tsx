@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { DocumentUploadForm } from '../../components/documents/DocumentUploadForm';
-import { LoadFailed } from '../../components/shifts/PageStates';
+import { LoadFailed } from '../../components/ui/PageStates';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useResource } from '../../hooks/useResource';
 import { t, useT } from '../../i18n';

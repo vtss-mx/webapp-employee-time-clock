@@ -5,13 +5,13 @@ import type es from '../es-MX/devices';
 export default {
   title: 'Geräte',
   intro:
-    'Browser und Telefone, mit denen gestempelt oder die Identität verifiziert wurde, jeweils mit einem Schlüssel, der sich nicht kopieren lässt. Je nach Richtlinie verlangt ein nicht freigegebenes Gerät einen zusätzlichen Schritt oder setzt die Zeitbuchungen in Prüfung.',
+    'Browser und Telefone, mit denen die Identität verifiziert wurde, jeweils mit einem Schlüssel, der sich nicht kopieren lässt. Je nach Richtlinie verlangt ein nicht freigegebenes Gerät einen zusätzlichen Schritt oder setzt die Prüfungen in Revision.',
   mineTitle: 'Meine Geräte',
   mineIntro:
-    'Die Browser oder Telefone, mit denen Sie Ihre Anwesenheit erfasst oder Ihre Identität verifiziert haben. Ihr Unternehmen kann sie freigeben oder widerrufen.',
+    'Die Browser oder Telefone, mit denen Sie Ihre Identität verifiziert haben. Ihr Unternehmen kann sie freigeben oder widerrufen.',
   empty: {
     title: 'Keine Geräte',
-    description: 'Hier sehen Sie die Browser und Telefone, mit denen gestempelt wurde.',
+    description: 'Hier sehen Sie die Browser und Telefone, mit denen die Identität verifiziert wurde.',
   },
   noun: {
     one: 'Gerät',

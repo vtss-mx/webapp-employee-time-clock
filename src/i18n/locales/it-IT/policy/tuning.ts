@@ -31,6 +31,18 @@ export default {
     saved: 'Tempo della verifica di vivacità aggiornato',
     savedText: 'Ogni sfida scadrà dopo {time}.',
   },
+  hold: {
+    label: 'Tempo per mantenere ogni movimento',
+    description: "Per quanto ogni movimento va mantenuto prima dell'acquisizione; un po' di più evita il rifiuto alla fine.",
+    saved: 'Tempo di mantenimento aggiornato',
+    savedText: "Ogni movimento si mantiene per {time} prima dell'acquisizione.",
+  },
+  retries: {
+    label: 'Tentativi della sfida',
+    description: "Quante volte viene chiesta un'altra sfida, senza ripetere la scansione, prima di ricominciarla.",
+    saved: 'Tentativi della sfida aggiornati',
+    savedText: 'Tentativi consentiti prima di ricominciare: {count}.',
+  },
   flash: {
     label: 'Lampo di colori',
     retired: 'Disattivato per decisione di prodotto (2026-10-06): lo schermo non lampeggia più a colori. I movimenti, la raffica e la verifica vocale coprono la verifica di vivacità.',

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { currentLocale, setLocale } from '../i18n/core';
 import { ApiError } from '../services/apiClient';
+import { consentList, grantedConsent } from '../test/consents';
 import { apiOk, mockFetch, type MockCall } from '../test/http';
 import { renderWithProviders, sampleUser } from '../test/render';
 import { withScreens } from '../test/screens';
@@ -40,6 +41,8 @@ const myDevices = {
 function server() {
   return mockFetch((call: MockCall) => {
     if (call.url.includes('/auth/change-password')) return apiOk({ revoked_sessions: 2 });
+    // Datos biométricos: su sección pide el estado de los consentimientos al abrir Mi perfil.
+    if (call.url.includes('/me/consents')) return apiOk(consentList([grantedConsent]));
     return apiOk(call.url.includes('/users/me/devices') ? myDevices : deviceSessions);
   });
 }
@@ -76,7 +79,11 @@ describe('ProfilePage (Mi perfil)', () => {
     expect(await screen.findByText('Este dispositivo')).toBeInTheDocument(); // sesiones activas
     expect(screen.getByRole('heading', { name: 'Mis dispositivos' })).toBeInTheDocument();
     expect(await screen.findByText('iPhone · Safari')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Revocar/ })).toBeNull(); // los decide su empresa
+    const devices = screen.getByRole('heading', { name: 'Mis dispositivos' }).closest('section');
+    expect(within(devices as HTMLElement).queryByRole('button', { name: /Revocar/ })).toBeNull(); // los decide su empresa
+    // Datos biométricos (regla 22): su consentimiento, con el camino para leerlo y revocarlo.
+    expect(screen.getByRole('heading', { name: 'Datos biométricos' })).toBeInTheDocument();
+    expect(screen.getByText(/Otorgado el 1 oct 2026/)).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
@@ -100,6 +107,21 @@ describe('ProfilePage (Mi perfil)', () => {
     expect(screen.queryByText('Validado')).toBeNull();
     await screen.findByText('Este dispositivo');
     expect(screen.queryByRole('heading', { name: 'Mis dispositivos' })).toBeNull(); // sin empleo, sin dispositivos
+    expect(screen.queryByRole('heading', { name: 'Datos biométricos' })).toBeNull(); // ni datos biométricos
+  });
+
+  it('con una empresa en la sesión ofrece llevarse sus datos (derecho de acceso); sin ella, no', async () => {
+    session.user = { ...employeeUser, company: { id: 4, name: 'Panificadora', active: true } };
+    server();
+    const { unmount } = renderWithProviders(<ProfilePage />);
+    expect(await screen.findByRole('heading', { name: 'Mis datos' })).toBeInTheDocument();
+    unmount();
+    // Una cuenta sin empresa no tiene expediente que exportar (el servidor responde 403 COMPANY_REQUIRED).
+    session.user = employeeUser;
+    server();
+    renderWithProviders(<ProfilePage />);
+    await screen.findByText('Este dispositivo');
+    expect(screen.queryByRole('heading', { name: 'Mis datos' })).toBeNull();
   });
 
   it('si no se pudo actualizar la información, lo avisa en popup y muestra la de la sesión', async () => {
@@ -124,8 +146,8 @@ describe('ProfilePage (Mi perfil)', () => {
     await screen.findByText('Este dispositivo');
     expect(sessionLoads(calls)).toBe(1);
     await userEvent.type(screen.getByLabelText('Contraseña actual'), 'Actual1234');
-    await userEvent.type(screen.getByLabelText('Nueva contraseña'), 'Nueva12345');
-    await userEvent.type(screen.getByLabelText('Confirmar nueva contraseña'), 'Nueva12345');
+    await userEvent.type(screen.getByLabelText('Nueva contraseña'), 'Nueva1234567');
+    await userEvent.type(screen.getByLabelText('Confirmar nueva contraseña'), 'Nueva1234567');
     await userEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: '¿Cambiar tu contraseña?' })).getByRole('button', { name: 'Cambiar contraseña' }));
     expect(await screen.findByRole('dialog', { name: 'Contraseña actualizada' })).toHaveTextContent('Se cerró la sesión en 2 dispositivos más.');

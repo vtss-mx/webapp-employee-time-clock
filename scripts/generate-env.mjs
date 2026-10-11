@@ -22,8 +22,8 @@ const SECTIONS = [
   [
     'Aplicación',
     [
-      ['VITE_APP_NAME', 'Employee Time Clock', 'Nombre de la aplicación (login, encabezados y título de la pestaña).'],
-      ['VITE_APP_TAGLINE', 'Control de asistencia y jornada laboral.', 'Lema del HTML inicial en español (título y descripción de la pestaña mientras carga la app; ya cargada, se usa el lema del idioma activo).'],
+      ['VITE_APP_NAME', 'Identity Verification Platform', 'Nombre de la aplicación (login, encabezados y título de la pestaña).'],
+      ['VITE_APP_TAGLINE', 'Plataforma de verificación de identidad digital y biométrica', 'Lema del HTML inicial en español (título y descripción de la pestaña mientras carga la app; ya cargada, se usa el lema del idioma activo).'],
       [
         'VITE_VERSION_CHECK_SECONDS',
         '60',
@@ -41,6 +41,11 @@ const SECTIONS = [
         'VITE_API_UPLOAD_TIMEOUT_SECONDS',
         '60',
         `Tiempo límite al enviar imágenes (registro y verificación facial). ${range(10, 600, ' s')}`,
+      ],
+      [
+        'VITE_EXPORT_TIMEOUT_SECONDS',
+        '90',
+        `Tiempo límite de las lecturas que exportan (datos de una persona, bitácora, accesos). ${range(10, 600, ' s')}`,
       ],
       ['VITE_API_GET_RETRIES', '2', `Reintentos automáticos de lecturas (GET) ante errores transitorios. ${range(0, 5)}`],
       [
@@ -314,6 +319,61 @@ const SECTIONS = [
     ],
   ],
   [
+    'Escáner de documento (foto del documento de identidad del empleado, con OCR en el servidor)',
+    [
+      [
+        'VITE_DOC_SCAN_MIN_SHARPNESS',
+        '12',
+        'Captura con cámara del documento (DocumentScanner): nitidez mínima de un cuadro válido (varianza del ' +
+          `Laplaciano sobre la región de la guía en gris). ${range(0, 500)}`,
+      ],
+      ['VITE_DOC_SCAN_MIN_BRIGHTNESS', '50', `Brillo medio mínimo del cuadro (0-255): menos, «Más luz». ${range(0, 255)}`],
+      ['VITE_DOC_SCAN_MAX_BRIGHTNESS', '235', `Brillo medio máximo del cuadro (0-255): más, «Evita la luz directa». ${range(0, 255)}`],
+      ['VITE_DOC_SCAN_GLARE_LEVEL', '245', `Luminancia (0-255) a partir de la cual un píxel cuenta como reflejo. ${range(200, 255)}`],
+      [
+        'VITE_DOC_SCAN_GLARE_MAX',
+        '0.06',
+        `Fracción máxima de píxeles casi saturados antes de «Evita los reflejos». ${range(0, 1)}`,
+      ],
+      [
+        'VITE_DOC_SCAN_MIN_FILL',
+        '0.14',
+        'Cuánto debe llenar el contenido del documento la guía (densidad de contenido, 0-1): menos, «Coloca el ' +
+          `documento en la guía» o «Acércalo». ${range(0, 1)}`,
+      ],
+      [
+        'VITE_DOC_SCAN_MIN_COVERAGE',
+        '0.55',
+        'Cuánto del lado de la guía debe ocupar la caja de contenido (0-1): la señal de documento completo para la ' +
+          `captura automática (evita tomar la foto de un objeto pequeño o un logotipo suelto). ${range(0, 1)}`,
+      ],
+      [
+        'VITE_DOC_SCAN_CENTER_MAX',
+        '0.18',
+        `Cuánto puede descentrarse el documento dentro de la guía (parte del lado) antes de «Centra el documento». ${range(0, 1)}`,
+      ],
+      ['VITE_DOC_SCAN_STABLE_FRAMES', '12', `Cuadros válidos seguidos antes de tomar la foto sola. ${range(2, 30)}`],
+      [
+        'VITE_DOC_SCAN_MAX_SHIFT',
+        '7',
+        `Desplazamiento medio (0-255) entre cuadros que cuenta como movimiento (reinicia la cuenta). ${range(0, 64)}`,
+      ],
+      ['VITE_DOC_SCAN_GUIDE_ASPECT', '1.4', `Relación de aspecto de la guía (ancho/alto; genérica para v1). ${range(0.5, 2)}`],
+      ['VITE_DOC_SCAN_DETECT_INTERVAL_MS', '120', `Cada cuánto se analiza un cuadro de la cámara. ${range(50, 1000, ' ms')}`],
+      [
+        'VITE_DOC_SCAN_MANUAL_FALLBACK_MS',
+        '6000',
+        `Sin un cuadro válido, tras cuánto se habilita igual el obturador manual «Tomar foto». ${range(1000, 60000, ' ms')}`,
+      ],
+      [
+        'VITE_DOC_SCAN_CAPTURE_PX',
+        '1600',
+        `Lado mayor del JPEG que se sube (más resolución que un rostro: el OCR lee texto). ${range(640, 3000, ' px')}`,
+      ],
+      ['VITE_DOC_SCAN_JPEG_QUALITY', '0.85', `Calidad del JPEG que se sube. ${range(0.5, 1)}`],
+    ],
+  ],
+  [
     'Registro de asistencia (ubicación)',
     [
       [
@@ -522,9 +582,9 @@ const SECTIONS = [
       ],
       [
         'VITE_PROXY_TARGET',
-        'http://localhost:8000',
-        'Backend al que el servidor de desarrollo reenvía /api (con VITE_API_URL=/api); http://localhost:8080 = el ' +
-          'gateway de docker compose.',
+        'http://localhost:8080',
+        'Destino de /api en desarrollo: gateway de Docker Compose, que conecta con la única API. ' +
+          'Para una API ejecutada directamente fuera de Docker, ajustar a http://localhost:8000.',
       ],
       [
         'VITE_ALLOWED_HOSTS',

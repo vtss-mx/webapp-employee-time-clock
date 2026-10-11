@@ -7,6 +7,12 @@ import es from '../es-MX/policy';
  * «ordenador», «quiosco», «se aplica» (en España «aplicar» no se usa como intransitivo).
  */
 export default derive(es, {
+  risk: {
+    readiness: {
+      score: 'Puntuación máxima: {maximum}. Señales que solo se observan: {observed}. Señales obligatorias: {enforced}.',
+      cannotReject: 'La puntuación actual no alcanza el umbral de rechazo.',
+    },
+  },
   appliesTo: 'Se aplica en segundos a todo el personal de {company}.',
   sections: {
     learning: {

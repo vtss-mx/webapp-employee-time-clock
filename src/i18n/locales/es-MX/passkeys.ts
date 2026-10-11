@@ -9,6 +9,20 @@ export default {
   unsupported: 'Este navegador no admite llaves de acceso. Usa Safari, Chrome o Edge actualizados.',
   loadError: 'No se pudieron cargar tus llaves de acceso',
   add: 'Agregar llave de acceso',
+  mfa: {
+    title: 'Tu cuenta necesita una llave de acceso',
+    daysLeft_one: 'Te queda {count} día para registrarla.',
+    daysLeft_other: 'Te quedan {count} días para registrarla.',
+    expiredTitle: 'Registra tu llave de acceso para continuar',
+    expiredText: 'El plazo venció: ninguna pantalla responde hasta que la registres.',
+    action: 'Registrar llave',
+  },
+  gate: {
+    badge: 'Segundo factor',
+    title: 'Registra tu llave de acceso',
+    footnote: 'Tu sesión sigue abierta: al registrarla, todo vuelve a funcionar.',
+    action: 'Registrar llave de acceso',
+  },
   empty: {
     title: 'Sin llaves de acceso',
     description: 'Agrega una para entrar con el rostro, la huella o el PIN.',

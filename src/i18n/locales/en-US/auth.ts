@@ -27,7 +27,18 @@ export default {
   },
   password: {
     new: 'New password',
-    hint: 'At least 8 characters, with an uppercase letter, a lowercase letter, and a number',
+    hint: 'At least 12 characters, with an uppercase letter, a lowercase letter, and a number',
+  },
+  mfa: {
+    eyebrow: 'Two-factor',
+    title: 'Sign in with your passkey',
+    step: 'Use the "Sign in with passkey" button.',
+  },
+  locked: {
+    eyebrow: 'Account locked',
+    title: 'Too many attempts',
+    wait: 'Wait {value} before trying again.',
+    passkey: 'With a passkey you can sign in now.',
   },
   device: {
     eyebrow: 'Device',

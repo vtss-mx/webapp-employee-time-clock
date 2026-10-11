@@ -19,6 +19,10 @@ export default derive(es, {
   row: {
     expires: 'Caduca {date}',
     noExpiry: 'Sin caducidad',
+    expiringSoon: 'Caduca pronto',
+    expiresInDays_zero: 'Caduca hoy',
+    expiresInDays_one: 'Caduca en {count} día',
+    expiresInDays_other: 'Caduca en {count} días',
   },
   guide: {
     example: 'Ejemplo (consulta tu empresa y tu clave)',
@@ -58,9 +62,6 @@ export default derive(es, {
     error: 'No se pudo crear la clave',
     expiresIn: 'Caduca en',
     lifetimeNote: 'Al caducar deja de funcionar. Antes puedes rotarla y conservar sus permisos.',
-    lifetimes: {
-      never: 'Sin caducidad',
-    },
     confirm: {
       title: '¿Crear la clave «{name}»?',
     },

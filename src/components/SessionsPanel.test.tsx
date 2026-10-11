@@ -30,7 +30,7 @@ function renderPanel(routes: Record<string, (call: MockCall) => Response | Promi
   });
   function Profile() {
     const { login, isAuthenticated } = useAuth();
-    useEffect(() => void login('ana@empresa.com', 'Clave123'), [login]);
+    useEffect(() => void login('ana@empresa.com', 'Clave1234569'), [login]);
     return isAuthenticated ? <SessionsPanel /> : <p>Sesión cerrada</p>;
   }
   renderWithProviders(<Profile />, { auth: true });

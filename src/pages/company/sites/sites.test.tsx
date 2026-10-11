@@ -35,7 +35,6 @@ const plant: WorkSite = {
   name: 'Planta Norte',
   radius_m: 100,
   active: true,
-  employees: 12,
   presence_code: false,
   kiosks: 0,
   created_at: '2026-10-01T00:00:00Z',
@@ -69,7 +68,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('Sitios: listado', () => {
   it('muestra cada sitio (ciudad, domicilio, radio, empleados y estado), busca, filtra y abre la edición', async () => {
-    const office = { ...plant, id: 4, name: 'Oficina centro', radius_m: 1500, active: false, employees: 0, address: { ...plant.address, city: '', municipality: 'Cajeme' } };
+    const office = { ...plant, id: 4, name: 'Oficina centro', radius_m: 1500, active: false, address: { ...plant.address, city: '', municipality: 'Cajeme' } };
     const { calls } = mockFetch(apiOk(page([plant, office])));
     renderWithProviders(
       <Routes>
@@ -82,7 +81,6 @@ describe('Sitios: listado', () => {
     expect(within(row).getByText('Hermosillo')).toBeInTheDocument();
     expect(within(row).getByText('Blvd. Kino 100 Interior B, Centro, 83150 Hermosillo, Sonora')).toBeInTheDocument();
     expect(within(row).getByText('100 m')).toBeInTheDocument();
-    expect(within(row).getByText('12')).toBeInTheDocument();
     expect(within(row).getByText('Activo')).toBeInTheDocument();
     const other = screen.getByText('Oficina centro').closest('tr') as HTMLElement;
     expect(within(other).getByText('Cajeme')).toBeInTheDocument();
@@ -103,7 +101,7 @@ describe('Sitios: listado', () => {
   it('sin sitios invita a crear el primero; con búsqueda dice que nada coincide', async () => {
     mockFetch(apiOk(page([])));
     renderWithProviders(<SitesPage />, { route: '/company/sites' });
-    expect(await screen.findByText('Sin sitios de trabajo')).toBeInTheDocument();
+    expect(await screen.findByText('Sin sitios de verificación')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Nuevo sitio' })[1]).toHaveAttribute('href', '/company/sites/new');
     expect(screen.getByText(/0 sitios/)).toBeInTheDocument();
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar sitios' }), 'zzz');
@@ -128,8 +126,8 @@ describe('Sitios: alta', () => {
     await userEvent.click(screen.getByRole('button', { name: '200 m' }));
     expect(screen.getByRole('button', { name: '200 m' })).toHaveAttribute('aria-pressed', 'true');
     expect(map()).toHaveAttribute('data-radius', '200');
-    await userEvent.clear(screen.getByLabelText(/Radio para checar/));
-    await userEvent.type(screen.getByLabelText(/Radio para checar/), '5');
+    await userEvent.clear(screen.getByLabelText(/Radio para verificar/));
+    await userEvent.type(screen.getByLabelText(/Radio para verificar/), '5');
     expect(map()).toHaveAttribute('data-radius', ''); // radio inválido: sin círculo
     await userEvent.click(screen.getByRole('button', { name: '200 m' }));
 
@@ -140,19 +138,19 @@ describe('Sitios: alta', () => {
 
     // Antes de enviar se confirma lo que se creará: nombre, domicilio, punto y radio.
     const confirm = await screen.findByRole('dialog', { name: '¿Crear el sitio Planta Norte?' });
-    expect(confirm).toHaveTextContent('Se podrá agregar a tus turnos; quien los tenga checará aquí.');
+    expect(confirm).toHaveTextContent('Se podrá usar para acotar dónde se verifica la identidad.');
     expect(rows(confirm, 'Se creará')).toEqual([
       'NombrePlanta Norte',
       'DomicilioBlvd. Kino 100, Centro, 83150 Hermosillo, Sonora',
       'Punto en el mapa29.10000, -110.90000',
-      'Radio para checar200 m',
+      'Radio para verificar200 m',
       'Código de sitioSin código', // antifraude 2b: por omisión el sitio no pide el código del kiosco
     ]);
     expect(calls.filter(isWrite)).toHaveLength(0);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Crear sitio' }));
 
     expect(await screen.findByText('Lista de sitios')).toBeInTheDocument();
-    expect(await screen.findByRole('dialog', { name: 'Sitio creado' })).toHaveTextContent('Planta Norte ya se puede agregar a tus turnos. Radio para checar: 200 m.');
+    expect(await screen.findByRole('dialog', { name: 'Sitio creado' })).toHaveTextContent('Planta Norte ya se puede usar al verificar. Radio para verificar: 200 m.');
     expect(bodyOf(calls.find((c) => c.init.method === 'POST'))).toEqual({
       name: 'Planta Norte',
       radius_m: 200,
@@ -213,7 +211,7 @@ describe('Sitios: alta', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Crear sitio' }));
     const popup = await screen.findByRole('alertdialog', { name: 'Revisa los datos' });
     expect(popup).toHaveTextContent('Marca en el mapa el punto del sitio');
-    expect(popup).toHaveTextContent('Escribe un nombre');
+    expect(popup).toHaveTextContent('Escribe el nombre del sitio');
     await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
     expect(screen.getAllByText(/Marca en el mapa el punto del sitio/).length).toBeGreaterThan(0);
     expect(calls).toHaveLength(0);
@@ -254,11 +252,11 @@ describe('Sitios: edición', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     const confirm = await screen.findByRole('dialog', { name: '¿Guardar los cambios del sitio Planta Norte?' });
     expect(within(confirm).getByRole('region', { name: 'Cambios' })).toHaveTextContent('2 cambios');
-    expect(rows(confirm, 'Cambios')).toEqual(['NombreAntes: Planta NorteDespués: Planta Centro', 'Radio para checarAntes: 100 mDespués: 300 m']);
+    expect(rows(confirm, 'Cambios')).toEqual(['NombreAntes: Planta NorteDespués: Planta Centro', 'Radio para verificarAntes: 100 mDespués: 300 m']);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
     expect(calls.filter(isWrite)).toHaveLength(0);
     expect(name).toHaveValue('Planta Centro');
-    expect(screen.getByLabelText(/Radio para checar/)).toHaveValue('300');
+    expect(screen.getByLabelText(/Radio para verificar/)).toHaveValue('300');
 
     const save = async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
@@ -272,7 +270,7 @@ describe('Sitios: edición', () => {
     await userEvent.type(name, 'Planta Sur');
     await save();
     expect(await screen.findByText('Lista de sitios')).toBeInTheDocument();
-    expect(await screen.findByRole('dialog', { name: 'Sitio actualizado' })).toHaveTextContent('Planta Sur · Radio para checar');
+    expect(await screen.findByRole('dialog', { name: 'Sitio actualizado' })).toHaveTextContent('Planta Sur · Radio para verificar');
     expect(calls.filter((c) => c.init.method === 'PUT').map((c) => c.url)).toEqual(['/api/sites/3', '/api/sites/3']);
   });
 
@@ -299,12 +297,12 @@ describe('Sitios: edición', () => {
     expect(await screen.findByLabelText(/Nombre del sitio/)).toHaveValue('Planta Norte');
   });
 
-  it('desactivar y activar se confirman (cancelar no envía nada); un error se explica', async () => {
+  it('desactivar y activar se confirman (cancelar no envía nada); cada error se explica con su título', async () => {
     let patches = 0;
     const { calls } = mockFetch((call) => {
       if (call.init.method !== 'PATCH') return apiOk(plant);
       patches += 1;
-      if (patches === 2) return apiFail(500, 'INTERNAL_ERROR', 'Falla inesperada');
+      if (patches === 1 || patches === 3) return apiFail(500, 'INTERNAL_ERROR', 'Falla inesperada');
       return apiOk({ ...plant, active: (bodyOf(call) as { active: boolean }).active });
     });
     renderForm('/company/sites/3/edit');
@@ -317,11 +315,17 @@ describe('Sitios: edición', () => {
     expect(within(section).getByText('Activo')).toBeInTheDocument();
     expect(within(section).getByRole('button', { name: 'Desactivar' })).toBeEnabled();
 
-    await userEvent.click(within(section).getByRole('button', { name: 'Desactivar' }));
-    const confirm = await screen.findByRole('alertdialog', { name: '¿Desactivar el sitio Planta Norte?' });
-    expect(confirm).toHaveTextContent('Nadie podrá checar aquí');
-    expect(rows(confirm, 'Cambios')).toEqual(['EstadoAntes: ActivoDespués: Inactivo']);
-    await userEvent.click(within(confirm).getByRole('button', { name: 'Desactivar' }));
+    const deactivate = async () => {
+      await userEvent.click(within(section).getByRole('button', { name: 'Desactivar' }));
+      const dialog = await screen.findByRole('alertdialog', { name: '¿Desactivar el sitio Planta Norte?' });
+      expect(dialog).toHaveTextContent('No aceptará verificaciones aquí');
+      expect(rows(dialog, 'Cambios')).toEqual(['EstadoAntes: ActivoDespués: Inactivo']);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }));
+    };
+    // La primera falla: el título dice qué no se pudo hacer (desactivar), no un «no se pudo guardar» genérico.
+    await deactivate();
+    await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'No se pudo desactivar Planta Norte' })).getByRole('button', { name: 'Entendido' }));
+    await deactivate();
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Sitio desactivado' })).getByRole('button', { name: 'Entendido' }));
     expect(within(section).getByText('Inactivo')).toBeInTheDocument();
 
@@ -335,23 +339,23 @@ describe('Sitios: edición', () => {
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'No se pudo activar Planta Norte' })).getByRole('button', { name: 'Entendido' }));
     await activate();
     expect(await screen.findByRole('dialog', { name: 'Sitio activado' })).toBeInTheDocument();
-    expect(calls.filter((c) => c.init.method === 'PATCH').map(bodyOf)).toEqual([{ active: false }, { active: true }, { active: true }]);
+    expect(calls.filter((c) => c.init.method === 'PATCH').map(bodyOf)).toEqual([{ active: false }, { active: false }, { active: true }, { active: true }]);
   });
 
-  it('eliminar se confirma (cancelar no envía nada); si un turno lo usa o ya se checó ahí lo explica el servidor; si no, vuelve al listado', async () => {
+  it('eliminar se confirma (cancelar no envía nada); si ya hay verificaciones lo explica el servidor; si no, vuelve al listado', async () => {
     let deletes = 0;
     const { calls } = mockFetch((call) => {
       if (call.init.method !== 'DELETE') return apiOk(plant);
       deletes += 1;
-      if (deletes === 1) return apiFail(409, 'SITE_IN_USE', 'El sitio está en los turnos Matutino y Nocturno: quítalo de esos turnos o desactívalo en lugar de eliminarlo');
-      if (deletes === 2) return apiFail(409, 'SITE_HAS_RECORDS', 'Ya se checó en este sitio: desactívalo en lugar de eliminarlo para conservar su historial');
+      if (deletes === 1) return apiFail(409, 'SITE_IN_USE', 'El sitio tiene un kiosco vinculado: quítalo o desactiva el sitio en lugar de eliminarlo');
+      if (deletes === 2) return apiFail(409, 'SITE_HAS_RECORDS', 'Ya hay verificaciones en este sitio: desactívalo en lugar de eliminarlo para conservar su historial');
       if (deletes === 3) return apiFail(500, 'INTERNAL_ERROR', 'Falla inesperada');
       return apiOk(null);
     });
     renderForm('/company/sites/3/edit');
     await userEvent.click(await screen.findByRole('button', { name: 'Eliminar' }));
     const cancelled = await screen.findByRole('alertdialog', { name: '¿Eliminar el sitio Planta Norte?' });
-    expect(cancelled).toHaveTextContent('Solo se puede eliminar si ningún turno lo usa y nadie ha checado ahí.');
+    expect(cancelled).toHaveTextContent('Solo se puede eliminar si nadie se ha verificado ahí.');
     expect(cancelled.querySelector('.confirm-note')).toHaveTextContent('Pasará a «Eliminados»: podrás restaurarlo durante 1 año.');
     await userEvent.click(within(cancelled).getByRole('button', { name: 'Cancelar' }));
     expect(calls.some((c) => c.init.method === 'DELETE')).toBe(false);
@@ -363,13 +367,13 @@ describe('Sitios: edición', () => {
       await userEvent.click(within(confirm).getByRole('button', { name: 'Eliminar' }));
     };
     await remove();
-    // El popup dice qué turnos lo usan (el mensaje del servidor).
+    // El popup dice qué lo usa (el mensaje del servidor).
     const inUse = await screen.findByRole('alertdialog', { name: 'El sitio está en uso: desactívalo' });
-    expect(inUse).toHaveTextContent('El sitio está en los turnos Matutino y Nocturno: quítalo de esos turnos o desactívalo en lugar de eliminarlo');
+    expect(inUse).toHaveTextContent('El sitio tiene un kiosco vinculado: quítalo o desactiva el sitio en lugar de eliminarlo');
     await userEvent.click(within(inUse).getByRole('button', { name: 'Entendido' }));
     await remove();
     const records = await screen.findByRole('alertdialog', { name: 'El sitio está en uso: desactívalo' });
-    expect(records).toHaveTextContent('Ya se checó en este sitio');
+    expect(records).toHaveTextContent('Ya hay verificaciones en este sitio');
     await userEvent.click(within(records).getByRole('button', { name: 'Entendido' }));
     await remove();
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: 'No se pudo eliminar Planta Norte' })).getByRole('button', { name: 'Entendido' }));
@@ -380,17 +384,16 @@ describe('Sitios: edición', () => {
 });
 
 describe('Sitios en inglés (en-US)', () => {
-  it('listado: si no carga lo dice y se reintenta; radio, empleados y columnas en inglés', async () => {
+  it('listado: si no carga lo dice y se reintenta; radio y columnas en inglés', async () => {
     await setLocale('en-US');
     let attempts = 0;
-    mockFetch(() => (++attempts === 1 ? apiFail(500, 'INTERNAL_ERROR', 'Unexpected failure') : apiOk(page([plant, { ...plant, id: 4, name: 'Oficina centro', radius_m: 1500, employees: 1200 }]))));
+    mockFetch(() => (++attempts === 1 ? apiFail(500, 'INTERNAL_ERROR', 'Unexpected failure') : apiOk(page([plant, { ...plant, id: 4, name: 'Oficina centro', radius_m: 1500 }]))));
     renderWithProviders(<SitesPage />, { route: '/company/sites' });
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: "Couldn't load the sites" })).getByRole('button', { name: 'Retry' }));
     const row = (await screen.findByText('Oficina centro')).closest('tr') as HTMLElement;
     expect(within(row).getByText('1.5 km')).toBeInTheDocument();
-    expect(within(row).getByText('1,200')).toBeInTheDocument();
-    expect(screen.getByText('2 sites · where to check in person and within what radius')).toBeInTheDocument();
-    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Site', 'Address', 'Radius', 'Employees today', 'Code', 'Status']);
+    expect(screen.getByText('2 sites · where identity is verified and within what radius')).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Site', 'Address', 'Radius', 'Code', 'Status']);
   });
 
   it('alta: confirma en inglés lo que se crea; si falla lo explica y se vuelve a enviar', async () => {
@@ -399,7 +402,7 @@ describe('Sitios en inglés (en-US)', () => {
     mockFetch((call) => (call.init.method === 'POST' && ++posts === 1 ? apiFail(500, 'INTERNAL_ERROR', 'Unexpected failure') : apiOk(plant, { status: 201 })));
     renderForm('/company/sites/new');
     expect(screen.getByRole('heading', { name: 'New site' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Check-in radius/)).toHaveAccessibleDescription('Between 10 and 10,000 m: the size of the place plus the GPS margin.');
+    expect(screen.getByLabelText(/Verification radius/)).toHaveAccessibleDescription('Between 10 and 10,000 m: the size of the place plus the GPS margin.');
     expect(screen.getByRole('button', { name: '1 km' })).toBeInTheDocument(); // radio sugerido de 1000 m
     await userEvent.type(screen.getByLabelText(/Site name/), 'Planta Norte');
     await userEvent.click(screen.getByRole('button', { name: 'Tocar el mapa' }));
@@ -409,13 +412,59 @@ describe('Sitios en inglés (en-US)', () => {
       return screen.findByRole('dialog', { name: 'Create site Planta Norte?' });
     };
     const confirm = await ask();
-    expect(confirm).toHaveTextContent('It can be added to your shifts; anyone with those shifts will check in here.');
+    expect(confirm).toHaveTextContent('It can be used to limit where identity is verified.');
     const created = rows(confirm, 'Will be created');
-    expect([created[0], created[2], created[3]]).toEqual(['NamePlanta Norte', 'Point on the map29.10000, -110.90000', 'Check-in radius100 m']);
+    expect([created[0], created[2], created[3]]).toEqual(['NamePlanta Norte', 'Point on the map29.10000, -110.90000', 'Verification radius100 m']);
     expect(created[1]).toMatch(/^AddressBlvd\. Kino 100/);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Create site' }));
     await userEvent.click(within(await screen.findByRole('alertdialog', { name: "Couldn't create the site" })).getByRole('button', { name: 'Got it' }));
     await userEvent.click(within(await ask()).getByRole('button', { name: 'Create site' }));
-    expect(await screen.findByRole('dialog', { name: 'Site created' })).toHaveTextContent('Planta Norte can now be added to your shifts. Check-in radius: 100 m.');
+    expect(await screen.findByRole('dialog', { name: 'Site created' })).toHaveTextContent('Planta Norte can now be used when verifying. Verification radius: 100 m.');
+  });
+});
+
+describe('Sitios: «Eliminados»', () => {
+  const removed: WorkSite = { ...plant, active: false, deleted_at: '2026-10-07T10:00:00Z', deleted_by: 'ana@empresa.com' };
+  const RESTORED = 'Sitio restaurado.';
+
+  it('el filtro pide solo los eliminados; la fila dice cuándo y quién, no se abre y ofrece «Restaurar»', async () => {
+    const { calls } = mockFetch((call: MockCall) =>
+      call.url.endsWith('/restore') ? apiOk(plant, { code: 'SITE_RESTORED', message: RESTORED }) : apiOk(page(call.url.includes('deleted=true') ? [removed] : [plant])),
+    );
+    renderWithProviders(
+      <Routes>
+        <Route path="/company/sites" element={<SitesPage />} />
+        <Route path="/company/sites/:id/edit" element={<p>Editar sitio</p>} />
+      </Routes>,
+      { route: '/company/sites' },
+    );
+    await screen.findByText('Planta Norte');
+    await userEvent.click(screen.getByRole('button', { name: /Filtrar por estado/ }));
+    await userEvent.click(screen.getByRole('option', { name: /^Eliminados$/ }));
+    await waitFor(() => expect(calls.at(-1)?.url).toBe('/api/sites?page=1&size=10&deleted=true'));
+    expect(await screen.findByText('1 eliminado')).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Sitio', 'Domicilio', 'Eliminación', 'Acciones']);
+    const row = screen.getByText('Planta Norte').closest('tr') as HTMLElement;
+    expect(within(row).getByRole('cell', { name: /Se eliminó el .* por ana@empresa\.com/ })).toBeInTheDocument();
+
+    // Restaurar pregunta antes y dice qué sitio regresa (su domicilio y su radio).
+    await userEvent.click(within(row).getByRole('button', { name: 'Restaurar Planta Norte' }));
+    const dialog = await screen.findByRole('dialog', { name: '¿Restaurar el sitio Planta Norte?' });
+    expect(within(dialog).getByRole('region', { name: 'Detalles' })).toHaveTextContent('DomicilioBlvd. Kino 100 Interior B, Centro, 83150 Hermosillo, SonoraRadio100 m');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Restaurar' }));
+    expect(await screen.findByRole('dialog', { name: RESTORED })).toBeInTheDocument();
+    expect(calls.filter((c) => c.init.method === 'POST').map((c) => c.url)).toEqual(['/api/sites/3/restore']);
+  });
+
+  it('un sitio eliminado no se edita: el aviso con quién lo eliminó y «Restaurar» deja su edición vigente', async () => {
+    const { calls } = mockFetch((call: MockCall) => (call.url.endsWith('/restore') ? apiOk(plant, { code: 'SITE_RESTORED', message: RESTORED }) : apiOk(removed)));
+    renderForm('/company/sites/3/edit');
+    expect(await screen.findByRole('status')).toHaveTextContent('Sitio eliminado');
+    expect(screen.queryByLabelText(/Nombre del sitio/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Restaurar Planta Norte' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: '¿Restaurar el sitio Planta Norte?' })).getByRole('button', { name: 'Restaurar' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: RESTORED })).getByRole('button', { name: 'Entendido' }));
+    expect(await screen.findByLabelText(/Nombre del sitio/)).toHaveValue('Planta Norte');
+    expect(calls.filter((c) => c.init.method === 'POST')).toHaveLength(1);
   });
 });

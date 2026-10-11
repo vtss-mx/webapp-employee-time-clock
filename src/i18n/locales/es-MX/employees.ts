@@ -3,9 +3,6 @@ export default {
   noun: { one: 'empleado', other: 'empleados' },
   /** El número del empleado en una línea secundaria ("No. EMP-7"). */
   number: 'No. {number}',
-  /** Cuántos empleados ("12 empleados"). */
-  count_one: '{count} empleado',
-  count_other: '{count} empleados',
   email: 'Correo',
   loadError: 'No se pudo cargar el empleado',
   back: 'Empleados',
@@ -44,7 +41,7 @@ export default {
     phoneHint: 'Elige el país y escribe el número',
     password: 'Contraseña',
     newPassword: 'Nueva contraseña',
-    passwordHint: 'Mínimo 8 caracteres, con mayúscula, minúscula y número',
+    passwordHint: 'Mínimo 12 caracteres, con mayúscula, minúscula y número',
     keepPassword: 'Déjala vacía para no cambiarla',
     sharedAccount: 'Cuenta compartida con otra empresa: solo la persona puede cambiarlo',
     headwear: 'Excepción de prenda de cabeza',
@@ -94,9 +91,7 @@ export default {
     title: 'Empleado',
     sharedAccount: 'Cuenta compartida',
     sharedAccountHint: 'Trabaja también en otra empresa con la misma cuenta',
-    shifts: 'Turnos',
     info: 'Información',
-    managerOf: 'Responsable de',
     registered: 'Registrado',
     history: 'Bitácora de verificaciones',
     activate: 'Activar empleado',
@@ -186,31 +181,6 @@ export default {
         confirm: 'Sí, solicitar a todos',
       },
     },
-  },
-  /** Elegir uno o varios empleados (asignar un turno, registrar una ausencia). */
-  picker: {
-    label: 'Empleados',
-    searchPlaceholder: 'Buscar por nombre, número o correo',
-    allDepartments: 'Todos los departamentos',
-    departmentFilter: 'Filtrar por departamento',
-    chosen_one: '{count} empleado elegido',
-    chosen_other: '{count} empleados elegidos',
-    nobody: 'Nadie elegido',
-    selectFiltered_one: 'Seleccionar el único de este filtro',
-    selectFiltered_other: 'Seleccionar los {count} de este filtro',
-    selectAll_one: 'Seleccionar al único empleado',
-    selectAll_other: 'Seleccionar a los {count}',
-    clear: 'Quitar selección',
-    selectError: 'No se pudieron seleccionar los empleados',
-    limit: {
-      title: 'Se alcanzó el límite',
-      text: 'El filtro tiene {total} empleados y el máximo por operación es {limit}: se eligieron los primeros {chosen} de la lista.',
-    },
-    noMatch: 'Prueba con otra búsqueda o filtro.',
-    empty: 'Registra a tu personal en Empleados para elegirlo.',
-    /** A quiénes afecta una acción, en su confirmación. */
-    affected_one: 'Empleado',
-    affected_other: 'Empleados ({count})',
   },
   /** «Eliminados»: restaurar y el aviso del expediente de un empleado eliminado. */
   trash: {

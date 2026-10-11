@@ -1,5 +1,5 @@
 // Kioscos de los sitios (antifraude 2b): la tableta de un sitio muestra un código que cambia solo; el empleado lo
-// escanea o lo escribe al checar su entrada y su salida. La empresa los administra desde sus sitios
+// escanea o lo escribe al verificar su identidad. La empresa los administra desde sus sitios
 // (`/company/sites/:id/kiosks`); la tableta usa la ruta pública `/kiosk` (sin sesión, con la llave del dispositivo).
 import type { Page } from './index';
 import type { SoftDeleted } from './trash';

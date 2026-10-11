@@ -161,6 +161,17 @@ describe('PaymentFormPage (registrar un pago)', () => {
     expect(screen.getByLabelText('Monto')).toHaveAccessibleDescription('Monto inválido');
   });
 
+  it('un 413 del gateway por el archivo (PAYLOAD_TOO_LARGE) también cae en el campo del comprobante', async () => {
+    renderPayment({ register: () => fail422('PAYLOAD_TOO_LARGE', 'El archivo es demasiado grande', null, 413) });
+    await screen.findByLabelText('Monto');
+    await retype('Monto', '100');
+    await userEvent.upload(screen.getByLabelText('Comprobante del pago'), new File(['%PDF'], 'ok.pdf', { type: 'application/pdf' }));
+    await userEvent.click(submit());
+    await userEvent.click(within(await screen.findByRole('dialog', { name: /^¿Registrar el pago de \$100\.00\sMXN\?$/ })).getByRole('button', { name: 'Registrar pago' }));
+    await screen.findByRole('alertdialog', { name: 'No se pudo registrar el pago' });
+    expect(screen.getByLabelText('Comprobante del pago')).toHaveAccessibleDescription('El archivo es demasiado grande');
+  });
+
   it('una moneda que ya no se ofrece se sigue mostrando si es la de la empresa (sin aclaración si el catálogo no la tiene)', async () => {
     mockFetch(apiOk(usdAccount));
     const currencies = catalogsWith({}).currencies.map((item) => (item.code === 'USD' ? { ...item, active: false, description: null } : item));

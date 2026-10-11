@@ -7,14 +7,13 @@ import type { CatalogApi } from '../../utils/catalogs';
 import { formatConfidence } from '../../utils/format';
 import { formatCount, formatNumber } from '../../utils/numbers';
 import { catalogOptions, numbered, saveOf, TuningRow, withCurrent, type Tuning, type TuningSave } from '../settings/PolicyTuning';
+import { RiskReadinessNotice } from './RiskReadinessNotice';
 import { Select } from '../ui/Select';
 
 /** Cortes del puntaje (0-100) que se ofrecen; el vigente se agrega si no está. */
 const SCORES = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95];
 /** Puntos de una señal (el backend acepta de 0 a 100). */
 const POINTS = [0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100];
-/** Si el motor falla solo se puede permitir, avisar o pedir un paso más (nunca negar a ciegas). */
-const FALLBACKS = new Set(['ALLOW', 'ALERT', 'STEP_UP']);
 
 type Tier = 'medium' | 'high' | 'critical';
 const TIERS: Tier[] = ['medium', 'high', 'critical'];
@@ -78,21 +77,36 @@ function actionTuning(policy: AdminVerificationPolicy, tier: Tier, { active, byC
 function riskTunings(policy: AdminVerificationPolicy, catalogs: CatalogApi): Tuning[] {
   const { active, byCode, nameOf } = catalogs;
   return [
+    {
+      key: 'risk_family_max_points',
+      icon: <Gauge size={20} />,
+      label: () => t('policy.risk.fields.familyCap'),
+      description: t('policy.risk.familyCap.description'),
+      enabled: policy.risk_engine && policy.risk_family_max_points !== undefined && policy.risk_family_max_points_options !== undefined,
+      value: String(policy.risk_family_max_points ?? ''),
+      options: () => numbered(policy.risk_family_max_points_options ?? [], pointsLabel),
+      stricter: 'higher',
+      pick: (picked) => ({
+        changes: { risk_family_max_points: Number(picked) },
+        title: () => t('policy.risk.familyCap.saved'),
+        detail: () => t('policy.risk.familyCap.savedText', { points: pointsLabel(Number(picked)) }),
+      }),
+    },
     ...TIERS.map((tier) => scoreTuning(policy, tier)),
     ...TIERS.map((tier) => actionTuning(policy, tier, catalogs)),
     {
-      key: 'risk_fallback_action',
+      key: 'risk_failure_policy',
       icon: <LifeBuoy size={20} />,
       label: () => t('policy.risk.fields.fallbackAction'),
       description: t('policy.risk.fallback.description'),
-      enabled: policy.risk_engine,
-      value: policy.risk_fallback_action,
-      options: catalogOptions(active('risk_actions').filter((action) => FALLBACKS.has(action.code))),
+      enabled: policy.risk_engine && policy.risk_failure_policy !== undefined,
+      value: policy.risk_failure_policy ?? '',
+      options: catalogOptions(active('risk_fallback_actions')),
       stricter: 'higher',
       pick: (code) => ({
-        changes: { risk_fallback_action: code },
+        changes: { risk_failure_policy: code },
         title: () => t('policy.risk.fallback.saved'),
-        detail: () => t('policy.risk.fallback.savedText', { action: nameOf('risk_actions', code) }),
+        detail: () => t('policy.risk.fallback.savedText', { action: nameOf('risk_fallback_actions', code) }),
       }),
     },
     {
@@ -172,12 +186,14 @@ function SignalRow({ signal, enabled, saving, onSave }: { signal: RiskSignalSett
   const t = useT();
   const catalogs = useCatalogs();
   const labelId = useId();
-  const [mode, points] = signalTunings(signal, enabled, catalogs);
+  const [mode, points] = signalTunings(signal, enabled && !signal.critical_action, catalogs);
   const platform = t('policy.risk.signals.platform', { mode: catalogs.nameOf('signal_modes', signal.default_mode), points: pointsLabel(signal.default_points) });
   return (
     <li className="signal-row">
       <span className="signal-row__text">
         <strong id={labelId}>{signal.name}</strong>
+        {signal.critical_action && <span className="small">{t('policy.risk.readiness.critical', { action: catalogs.nameOf('verification_statuses', signal.critical_action === 'BLOCK' ? 'BLOCKED' : signal.critical_action) })}</span>}
+        {signal.calibration_required && <span className="small muted">{t('policy.risk.readiness.calibration')}</span>}
         {signal.description && <span className="small muted">{signal.description}</span>}
         <span className="signal-row__tags">
           <span className="badge badge--muted">{catalogs.nameOf('fraud_kinds', signal.kind)}</span>
@@ -196,7 +212,7 @@ function SignalRow({ signal, enabled, saving, onSave }: { signal: RiskSignalSett
             aria-label={tuning.label()}
             size="sm"
             value={tuning.value}
-            disabled={!enabled || saving === tuning.key}
+            disabled={!tuning.enabled || saving === tuning.key}
             options={tuning.options()}
             onChange={(value) => onSave(saveOf(tuning, value))}
           />
@@ -217,6 +233,7 @@ export function RiskEngineSection({ policy, saving, onSave }: RiskEngineSectionP
   const catalogs = useCatalogs();
   return (
     <div className="stack">
+      <RiskReadinessNotice policy={policy} />
       {riskTunings(policy, catalogs).map((tuning) => (
         <TuningRow key={tuning.key} tuning={tuning} saving={saving} onSave={onSave} />
       ))}

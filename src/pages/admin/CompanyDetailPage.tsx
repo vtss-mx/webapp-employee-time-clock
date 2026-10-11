@@ -1,7 +1,7 @@
 import { Blocks, IdCard, KeyRound, Pencil, Power, PowerOff, ShieldCheck, Trash2, Unplug, UserCheck, UserCog, UserPlus, UserX } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CompanyBillingSection } from '../../components/billing/CompanyBillingSection';
-import { LoadFailed } from '../../components/shifts/PageStates';
+import { LoadFailed } from '../../components/ui/PageStates';
 import { deleteNote } from '../../components/trash/TrashParts';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Avatar } from '../../components/ui/Avatar';
@@ -16,6 +16,7 @@ import { usePagedList, type PagedList } from '../../hooks/usePagedList';
 import { useResource } from '../../hooks/useResource';
 import { t, useT } from '../../i18n';
 import { paths } from '../../routes/paths';
+import { ApiError } from '../../services/apiClient';
 import { adminService } from '../../services/adminService';
 import type { CompanyAdmin, CompanyDetail } from '../../types';
 import type { ConfirmInput, ConfirmSource } from '../../types/confirm';
@@ -147,7 +148,13 @@ function adminConfirm(admin: CompanyAdmin, company: CompanyDetail): ConfirmInput
 const loadError = () => t('admin.shared.loadCompanyError');
 const adminsError = () => t('admin.detail.adminsError');
 const actionError = () => t('admin.detail.actionError');
-const deleteError = () => t('admin.detail.deleteError');
+/**
+ * Códigos con los que el backend impide eliminar una empresa porque sigue en uso: tiene cobranza (cargos, pagos o
+ * saldo) o empleados. El popup sugiere desactivarla en su lugar (el motivo exacto lo da el mensaje del servidor);
+ * cualquier otra falla usa el título genérico.
+ */
+const COMPANY_IN_USE_CODES: ReadonlySet<string> = new Set(['COMPANY_HAS_BILLING', 'COMPANY_HAS_EMPLOYEES']);
+const deleteError = (error: unknown) => (error instanceof ApiError && COMPANY_IN_USE_CODES.has(error.code) ? t('admin.detail.remove.inUse') : t('admin.detail.deleteError'));
 const statusNotice = (wasActive: boolean) => (): SuccessNotice =>
   wasActive
     ? [t('admin.detail.done.deactivated'), t('admin.detail.done.deactivatedText')]

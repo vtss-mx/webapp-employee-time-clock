@@ -29,15 +29,27 @@ describe('AuthProvider', () => {
   it('login guarda el token SOLO en memoria y marca la sesión', async () => {
     const { calls } = mockFetch(route({ '/auth/login': () => apiOk(tokenResponse()), '/users/me': () => apiOk(sampleUser) }));
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => result.current.login('ANA@empresa.com ', 'Clave123'));
+    await act(() => result.current.login('ANA@empresa.com ', 'Clave1234569'));
     expect(result.current.isAuthenticated).toBe(true);
     expect(result.current.user?.email).toBe('ana@empresa.com');
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ email: 'ana@empresa.com', password: 'Clave123', remember: false });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ email: 'ana@empresa.com', password: 'Clave1234569', remember: false });
     expect(localStorage.length + sessionStorage.length).toBe(0); // nada en el navegador: ni token ni indicador
 
     // El token se inyecta en las peticiones autenticadas.
     await act(() => apiRequest('/users/me'));
     expect((calls[1].init.headers as Record<string, string>).Authorization).toMatch(/^Bearer token-/);
+  });
+
+  it('un 403 de una pantalla que dejó de estar disponible refresca al usuario UNA sola vez (el menú se recalcula, sin bucles)', async () => {
+    const { calls } = mockFetch(route({ '/auth/login': () => apiOk(tokenResponse()), '/users/me': () => apiOk(sampleUser), '/x': () => apiFail(403, 'QR_DISABLED', 'QR deshabilitado') }));
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await act(() => result.current.login('ana@empresa.com', 'x'));
+    // Dos peticiones que responden lo mismo no encadenan dos refrescos (defensa contra bucles).
+    await act(async () => {
+      await apiRequest('/x').catch(() => undefined);
+      await apiRequest('/x').catch(() => undefined);
+    });
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith('/users/me')).length).toBe(1));
   });
 
   it('restaura la sesión al recargar usando la cookie (refresh)', async () => {

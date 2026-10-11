@@ -6,7 +6,7 @@ import type { StorageSummary, UsageCounters, UsageDay } from '../../types';
 import { businessToday, formatDate } from '../../utils/format';
 import { formatAxisCount, formatBytes, formatCount, formatDuration } from '../../utils/numbers';
 import { dayLabel } from '../../utils/usage';
-import { QuickChoices } from '../shifts/formFields';
+import { QuickChoices } from '../ui/formFields';
 import { BarList } from '../ui/BarList';
 import { ColumnChart } from '../ui/ColumnChart';
 import { DateField, parseIso } from '../ui/DateField';

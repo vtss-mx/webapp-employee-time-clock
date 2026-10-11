@@ -71,6 +71,32 @@ describe('useDynamicQr', () => {
     expect(result.current.qr?.id).toBe(2);
   });
 
+  it('el código que se mostraba ya no existe (404 QR_NOT_FOUND al consultar su estado): lo trata como reemplazado', async () => {
+    const { calls } = mockFetch((call) => (call.init.method === 'POST' ? apiOk(qr(1)) : apiFail(404, 'QR_NOT_FOUND', 'El código ya no existe')));
+    const { result } = renderHook(() => useDynamicQr());
+    await tick(0);
+    expect(result.current.phase).toBe('ready');
+    await tick(3_000); // la consulta de estado responde 404: no se traga en silencio
+    expect(result.current.phase).toBe('replaced');
+    await tick(60_000);
+    expect(issued(calls)).toBe(1); // no pide otro solo (como un reemplazo)
+  });
+
+  it('una falla al consultar el estado (servidor, red, otra ruta que no existe) no cambia el código: sigue vigente y reintenta', async () => {
+    let status = 0;
+    const answers = [apiFail(500, 'INTERNAL_ERROR', 'Falla del servidor'), apiFail(404, 'ROUTE_NOT_FOUND', 'No existe la ruta'), apiOk({ id: 1, status: 'USED', expires_at: null, used_at: null })];
+    mockFetch((call) => (call.init.method === 'POST' ? apiOk(qr(1, 600)) : (answers[status++] ?? answers[2])));
+    const { result } = renderHook(() => useDynamicQr());
+    await tick(0);
+    await tick(3_000); // 500: el sondeo lo ignora
+    expect(result.current.phase).toBe('ready');
+    await tick(10_000); // 404 de otra cosa que no es QR_NOT_FOUND: tampoco es un reemplazo
+    expect(result.current.phase).toBe('ready');
+    expect(result.current.qr?.id).toBe(1);
+    await tick(60_000); // la siguiente consulta sí responde: el código se usó
+    expect(result.current.phase).toBe('used');
+  });
+
   it('con la pantalla oculta se pausa al vencer y se renueva al volver', async () => {
     const { calls } = server();
     const { result } = renderHook(() => useDynamicQr());
@@ -131,15 +157,15 @@ describe('useDynamicQr', () => {
     expect(failing.result.current).toMatchObject({ phase: 'loading', error: null });
   });
 
-  /** Servidor cuya respuesta de estado ("ya lo usaron") llega cuando la prueba la libera. */
-  function slowStatusServer(lifetime = 30) {
+  /** Servidor cuya respuesta de estado ("ya lo usaron" o la que se indique) llega cuando la prueba la libera. */
+  function slowStatusServer(lifetime = 30, answer: (id: number) => Response = (id) => apiOk({ id, status: 'USED', expires_at: null, used_at: null })) {
     let next = 0;
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => (release = resolve));
     const { calls } = mockFetch(async (call) => {
       if (call.init.method === 'POST') return apiOk(qr(++next, lifetime));
       await gate;
-      return apiOk({ id: Number(call.url.split('/').pop()), status: 'USED', expires_at: null, used_at: null });
+      return answer(Number(call.url.split('/').pop()));
     });
     return { calls, release: () => act(() => Promise.resolve().then(() => release())) };
   }
@@ -154,6 +180,27 @@ describe('useDynamicQr', () => {
     await release(); // "el 1 ya se usó": llega tarde
     expect(result.current.phase).toBe('ready');
     expect(result.current.qr?.id).toBe(2);
+  });
+
+  it('un 404 QR_NOT_FOUND que llega tarde (el código ya se renovó, se pausó o se salió) no marca el nuevo como reemplazado', async () => {
+    const gone = () => apiFail(404, 'QR_NOT_FOUND', 'El código ya no existe');
+    const renewed = slowStatusServer(30, gone);
+    const view = renderHook(() => useDynamicQr());
+    await tick(0);
+    await tick(3_000); // consulta el código 1 (lenta)
+    await act(() => view.result.current.renew());
+    expect(view.result.current.qr?.id).toBe(2);
+    await renewed.release(); // "el 1 no existe": llega tarde
+    expect(view.result.current).toMatchObject({ phase: 'ready' });
+    expect(view.result.current.qr?.id).toBe(2);
+
+    const left = slowStatusServer(30, gone);
+    const other = renderHook(() => useDynamicQr());
+    await tick(0);
+    await tick(3_000);
+    other.unmount();
+    await left.release();
+    expect(other.result.current.phase).toBe('ready');
   });
 
   it('si mientras se consultaba el código se pausó (pantalla oculta) o se salió, la respuesta se ignora', async () => {

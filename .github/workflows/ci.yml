@@ -1,0 +1,270 @@
+# Integración continua de la aplicación web (brecha B2 de
+# `../backend-employee-time-clock/docs/rd/certificaciones-seguridad-2026-10-08.md`: hoy las compuertas
+# se ejecutan a mano y nadie puede demostrar que se ejecutaron antes de un despliegue concreto).
+# Bloqueante para SOC 2 CC8.1 y para ISO/IEC 27001 A.8.25-A.8.29, A.8.31 y A.8.32.
+#
+# Ejecuta EXACTAMENTE los comandos de cierre de `AGENTS.md` §2.1 de la raíz para este proyecto
+# (`npm run typecheck && npm run lint && npm run coverage && npm run duplication`), más la cadena de
+# suministro (`npm run supply-chain`: SBOM CycloneDX y `npm audit` estricto), y conserva la cobertura
+# y el SBOM como evidencia fechada por commit.
+name: CI · aplicación web
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      commercial_release:
+        description: Comprobar autorización comercial antes de publicar
+        type: boolean
+        default: false
+
+# Mínimo privilegio (ISO A.8.2): el flujo solo LEE el repositorio.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-webapp-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # La misma versión mayor que la imagen (`Dockerfile`: node:24-alpine) y que `@types/node` (regla 11).
+  NODE_VERSION: '24'
+  GITLEAKS_VERSION: 8.18.4
+
+jobs:
+  gate:
+    name: Tipos, lint, cobertura 100 % y duplicación
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # `npm ci` respeta `package-lock.json` al pie de la letra: la instalación es reproducible y una
+      # versión no se puede sustituir (el equivalente de `--require-hashes` del backend, porque el
+      # candado de npm ya guarda el `integrity` SHA-512 de cada paquete).
+      - name: Instalar dependencias exactas del candado
+        run: npm ci
+
+      # El `.env` no va al repositorio (lleva las claves de Google y Firebase), pero la aplicación y
+      # su guardián lo necesitan: `src/utils/envFile.test.ts` compara el `.env` local con lo que
+      # genera el generador. Aquí se genera con los valores por omisión y las claves vacías, que es
+      # exactamente lo que ese guardián espera (regla 19).
+      - name: Generar el .env con los valores por omisión
+        run: node scripts/generate-env.mjs > .env
+
+      - name: Tipos (tsc -b)
+        run: npm run typecheck
+
+      # Incluye los textos sin traducir y la ortografía de los siete idiomas (regla 16).
+      - name: Lint y ortografía
+        run: npm run lint
+
+      # El aviso conserva las licencias y atribuciones originales de cada instalación física.
+      # Una versión anidada o una evidencia ausente debe detener la compuerta antes del build.
+      - name: Avisos de terceros · pruebas y cobertura 100 %
+        run: |
+          node --test --experimental-test-coverage \
+            --test-coverage-include='scripts/generate-third-party-notices.mjs' \
+            --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=100 \
+            scripts/generate-third-party-notices.test.mjs
+          npm run notices
+          node scripts/generate-third-party-notices.mjs --check
+
+      - name: Cobertura 100 % (líneas, ramas, funciones y sentencias)
+        run: npm run coverage
+
+      - name: Duplicación (jscpd)
+        run: npm run duplication
+
+      - name: Evidencia · cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-webapp-${{ github.sha }}
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  supply-chain:
+    name: SBOM y vulnerabilidades
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      # SBOM CycloneDX de lo que se envía al navegador + `npm audit` en dos alcances (lo que viaja al
+      # navegador y la cadena de construcción). Cualquier vulnerabilidad termina en 1.
+      - name: SBOM (CycloneDX) y npm audit
+        run: npm run supply-chain
+
+      - name: Evidencia · SBOM del frontend
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-webapp-${{ github.sha }}
+          path: reports/sbom/
+          if-no-files-found: error
+          retention-days: 90
+
+  secrets:
+    name: Secretos (gitleaks, historial completo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # El historial COMPLETO: un secreto que se subió y luego se borró sigue aquí y se considera
+          # comprometido (hay que rotarlo). Es lo que el escaneo propio de la compuerta local no hace.
+          fetch-depth: 0
+
+      # Binario con su versión FIJADA, verificado contra el archivo de sumas que publica el propio
+      # proyecto (el mismo patrón que pgBackRest en el Dockerfile del backend). No se usa
+      # `gitleaks-action` porque su versión 2 exige licencia para organizaciones.
+      - name: Instalar gitleaks ${{ env.GITLEAKS_VERSION }}
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$archive" "$base/$archive"
+          curl -sSfL -o checksums.txt "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " $archive\$" checksums.txt | sha256sum -c -
+          tar -xzf "$archive" gitleaks
+          ./gitleaks version
+
+      # `--redact`: el reporte es evidencia y jamás debe llevar el secreto en claro.
+      - name: Buscar secretos
+        run: |
+          ./gitleaks detect --source . --redact --no-banner --exit-code 1 \
+            --report-format sarif --report-path gitleaks.sarif
+
+      - name: Evidencia · reporte de secretos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: secretos-webapp-${{ github.sha }}
+          path: gitleaks.sarif
+          if-no-files-found: warn
+          retention-days: 90
+
+  image:
+    needs: license-review
+    name: Imagen de contenedor (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # La imagen que se despliega: Nginx sirviendo la aplicación construida (también es el gateway).
+      - name: Construir la imagen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          tags: time-clock-webapp:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: SBOM de la imagen (CycloneDX)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: time-clock-webapp:ci
+          format: cyclonedx
+          output: sbom-imagen.cdx.json
+
+      # Mismo umbral que el backend (decisión documentada en `scripts/README.md` de la raíz): falla
+      # con CRITICAL o HIGH que TENGA corrección; lo que no tiene parche queda en el reporte completo.
+      - name: Vulnerabilidades de la imagen
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: time-clock-webapp:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+          output: trivy-bloqueantes.txt
+
+      - name: Reporte completo (también lo que no bloquea)
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: time-clock-webapp:ci
+          severity: CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN
+          exit-code: '0'
+          format: table
+          output: trivy-completo.txt
+
+      - name: Evidencia · SBOM y vulnerabilidades de la imagen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagen-webapp-${{ github.sha }}
+          path: |
+            sbom-imagen.cdx.json
+            trivy-bloqueantes.txt
+            trivy-completo.txt
+          if-no-files-found: warn
+          retention-days: 90
+
+  license-review:
+    name: Integridad de licencias y aprobación comercial
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # No instala dependencias ni ejecuta modelos. Las huellas son evidencia revisada;
+      # actualizarlas exige volver a auditar, nunca aprobar automáticamente un componente.
+      - name: Verificar entradas auditadas
+        run: sha256sum --check docs/compliance/release-inputs.sha256
+      - name: Comprobar modelos y dependencias nuevos
+        shell: bash
+        run: |
+          git ls-files -- '*.onnx' '*.pth' '*.pt' '*.tflite' '*.traineddata' '*.safetensors' '*.ttf' '*.otf' '*.woff' '*.woff2' '*package.json' '*package-lock.json' '*requirements*.txt' '*pyproject.toml' '*Dockerfile*' '*.gradle' '*.gradle.kts' '*.csproj' '*pubspec.yaml' '*pubspec.lock' '*Package.swift' '*Package.resolved' '*Podfile.lock' '*go.mod' '*go.sum' | sort > /tmp/licensing-current.txt
+          sed -n 's/^[a-f0-9]*  //p' docs/compliance/release-inputs.sha256 | sort > /tmp/licensing-reviewed.txt
+          comm -23 /tmp/licensing-current.txt /tmp/licensing-reviewed.txt > /tmp/licensing-new.txt
+          if test -s /tmp/licensing-new.txt; then
+            cat /tmp/licensing-new.txt
+            echo 'Componentes nuevos sin revisión de licencias' >&2
+            exit 1
+          fi
+      - name: Estado comercial (informativo en PR)
+        run: jq '{status, approved, blockers}' docs/compliance/commercial-release.json
+      # La herramienta es una copia generada de scripts/ en la raíz del espacio de trabajo.
+      # La plantilla commercial-preflight.yml también se copia de la raíz, sin bifurcarla:
+      # una publicación futura debe depender de ese preflight y consumir el mismo artefacto.
+      - name: Bloquear release sin aprobación acreditada
+        if: github.event_name == 'release' || inputs.commercial_release == true
+        run: |
+          sha256sum --check docs/compliance/tooling/commercial-controls.sha256
+          mkdir -p /tmp/ivp-commercial-tools
+          tar -xzf docs/compliance/tooling/commercial-controls.tar.gz -C /tmp/ivp-commercial-tools
+          python3 /tmp/ivp-commercial-tools/commercial_gate.py --root "$PWD"
+      - name: Evidencia de licencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: licencia-comercial-${{ github.sha }}
+          path: docs/compliance/
+          if-no-files-found: error
+          retention-days: 90

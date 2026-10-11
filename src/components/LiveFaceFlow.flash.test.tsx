@@ -1,3 +1,4 @@
+import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { advance, flow, renderFlow, resetFaceFlow, serve, stable, TWO_TURNS } from '../test/faceFlow';
 import { apiOk } from '../test/http';
@@ -18,6 +19,10 @@ vi.mock('../hooks/useFaceBurst', () => ({
 
 const pace = vi.hoisted(() => ({ available: true, step: vi.fn(), fallbackColors: vi.fn() }));
 vi.mock('../services/flashPacingService', () => ({ flashPacingService: pace }));
+const digest = vi.hoisted(() => ({ sha256Hex: vi.fn() }));
+// WebCrypto tiene su propia cola: avanzar el reloj simulado no espera su digest. La utilidad
+// criptográfica tiene pruebas reales propias; aquí se controla su promesa, igual que cámara y canal.
+vi.mock('../utils/digest', () => digest);
 
 const HOLD = config.faceFlashHoldMs;
 const DICTATED: FaceChallenge = { ...TWO_TURNS, flash: [], flash_pace: { token: 't0', total: 2, window_ms: 2000 } };
@@ -38,6 +43,7 @@ beforeEach(() => {
   pace.available = true;
   pace.step.mockReset();
   pace.fallbackColors.mockReset();
+  digest.sha256Hex.mockReset().mockResolvedValue('a'.repeat(64));
 });
 afterEach(() => vi.useRealTimers());
 
@@ -57,6 +63,29 @@ describe('LiveFaceFlow: destello dictado por el servidor', () => {
     expect(captured.flashReceipt).toBe('rcpt-9');
     expect(pace.step).toHaveBeenNthCalledWith(1, 't0'); // el primer color sin huella
     expect(pace.step.mock.calls[1][0]).toBe('t1');
+    expect(pace.step).toHaveBeenNthCalledWith(2, 't1', 'a'.repeat(64));
+    expect(pace.step).toHaveBeenNthCalledWith(3, 't2', 'a'.repeat(64));
+  });
+
+  it('espera la huella pendiente antes de pedir otro color y enviar el intento', async () => {
+    let finishDigest!: (hex: string) => void;
+    digest.sha256Hex.mockImplementationOnce(() => new Promise<string>((resolve) => { finishDigest = resolve; }));
+    pace.step.mockResolvedValueOnce(color('#FF0000', 't1')).mockResolvedValueOnce(color('#00FF00', 't2')).mockResolvedValueOnce({ done: true, receipt: 'rcpt-delayed' });
+    serve({ challenge: () => apiOk(DICTATED) });
+    renderFlow();
+    await throughChallenge();
+    await advance(HOLD);
+    // Reproduce la carrera anterior sin depender de carga de CPU ni agregar tiempo al test:
+    // el reloj del color venció, pero el trabajo criptográfico todavía no terminó.
+    expect(overlay()).not.toBeNull();
+    expect(pace.step).toHaveBeenCalledTimes(1);
+    expect(flow.onSubmit).not.toHaveBeenCalled();
+    await act(() => { finishDigest('b'.repeat(64)); return Promise.resolve(); });
+    expect(pace.step).toHaveBeenNthCalledWith(2, 't1', 'b'.repeat(64));
+    await advance(HOLD);
+    expect(overlay()).toBeNull();
+    expect(flow.onSubmit).toHaveBeenCalledTimes(1);
+    expect(flow.onSubmit.mock.calls[0][0].flashReceipt).toBe('rcpt-delayed');
   });
 
   it('modo de respaldo en claro (el reto trae `flash`): pinta cada color y envía SIN comprobante', async () => {

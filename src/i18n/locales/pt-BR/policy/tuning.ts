@@ -31,6 +31,18 @@ export default {
     saved: 'Tempo da prova de vida atualizado',
     savedText: 'Cada desafio vencerá após {time}.',
   },
+  hold: {
+    label: 'Tempo para manter cada movimento',
+    description: 'Quanto cada movimento deve ser mantido antes de capturar; um pouco mais evita a recusa no final.',
+    saved: 'Tempo para manter atualizado',
+    savedText: 'Cada movimento é mantido por {time} antes de capturar.',
+  },
+  retries: {
+    label: 'Tentativas do desafio',
+    description: 'Quantas vezes é pedido outro desafio, sem repetir a leitura, antes de reiniciá-la.',
+    saved: 'Tentativas do desafio atualizadas',
+    savedText: 'Tentativas permitidas antes de reiniciar: {count}.',
+  },
   flash: {
     label: 'Flash de cores',
     retired: 'Desativado por decisão do produto (2026-10-06): a tela não pisca mais cores. Os movimentos, a sequência e a verificação por voz cobrem a prova de vida.',

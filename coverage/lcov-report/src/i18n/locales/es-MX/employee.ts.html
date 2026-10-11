@@ -258,7 +258,15 @@
 <a name='L193'></a><a href='#L193'>193</a>
 <a name='L194'></a><a href='#L194'>194</a>
 <a name='L195'></a><a href='#L195'>195</a>
-<a name='L196'></a><a href='#L196'>196</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -529,35 +537,27 @@ export default {
     },
     before: 'Antes de comenzar:',
     privacy: 'Tus fotos, tu video y tu voz se guardan cifrados y solo los revisa tu empresa; nunca se comparten.',
-    /** Los cuatro pasos del registro (decisión del dueño, 2026-10-06), en el indicador sobre el visor. */
+    /**
+     * El indicador sobre el visor. Los pasos los pide el servidor y su NOMBRE sale del catálogo `enrollment_steps`
+     * (decisión del dueño, 2026-10-08: el flujo es dinámico); «Listo» es el final del proceso, no un paso, así que su
+     * texto sí es de la aplicación.
+     */
     steps: {
       label: 'Paso {current} de {total}',
-      photo: 'Foto inicial',
-      captures: 'Capturas',
-      video: 'Video',
       done: 'Listo',
     },
-    /** Mientras se guarda la foto inicial (paso 1). */
+    /** Mientras se guarda la foto inicial. */
     photoSaving: 'Guardando tu foto…',
-    /** El índice de los pasos independientes (decisión del dueño, 2026-10-07): estado, aviso y botón de cada uno. */
+    /**
+     * El índice del registro: estado, aviso y botón de cada paso. El NOMBRE y la descripción de cada paso salen del
+     * catálogo `enrollment_steps` (decisión del dueño, 2026-10-08: el ADMIN decide cuáles pasos y en qué orden).
+     */
     index: {
       steps_one: '{count} paso',
       steps_other: '{count} pasos',
       resume: 'Hazlos en orden. Puedes salir después de cualquiera y continuar otro día: lo que hiciste se guarda.',
       errorTitle: 'No se pudo cargar tu registro',
-      label: 'Pasos del registro facial',
-      photo: {
-        title: 'Foto inicial',
-        text: 'Una foto de tu rostro de frente, con buena luz.',
-      },
-      captures: {
-        title: 'Capturas y prueba de vida',
-        text: '{count} capturas de tu rostro y cuatro movimientos de la cabeza.',
-      },
-      video: {
-        title: 'Video con preguntas',
-        text: 'Responde en voz alta preguntas sobre tus datos, mirando a la cámara.',
-      },
+      label: 'Pasos de tu registro',
       state: {
         pending: 'Pendiente',
         done: 'Completado · {date}',
@@ -570,9 +570,10 @@ export default {
       hint: {
         validUntil: 'Sirve hasta el {date}',
         expired: 'Tu foto venció. Tómala de nuevo.',
-        needsPhoto: 'Primero toma tu foto inicial.',
-        needsCaptures: 'Primero completa las capturas.',
+        /** `step`: el nombre del paso que falta, del catálogo. */
+        blocked: 'Primero completa «{step}».',
         exhausted: 'Se agotaron los intentos. Repite la foto inicial y las capturas.',
+        unknown: 'Actualiza la aplicación para continuar con este paso.',
       },
       action: {
         photo: 'Tomar foto',
@@ -580,35 +581,41 @@ export default {
         captures: 'Iniciar capturas',
         video: 'Grabar video',
         resumeVideo: 'Continuar video',
+        document: 'Subir documento',
+        replaceDocument: 'Reemplazar documento',
       },
     },
-    /** Una pantalla de un paso que se abrió fuera de orden: qué falta (su vacío). */
+    /** La pantalla de un paso que ahora no se puede abrir: qué pasa (su vacío) y de vuelta al índice. */
     blocked: {
       back: 'Volver al registro',
-      photoUsed: {
-        title: 'Foto inicial lista',
-        text: 'Ya se usó en tus capturas. Continúa con el siguiente paso.',
+      blocked: {
+        title: 'Falta un paso antes',
+        text: 'Completa «{step}» para continuar con este paso.',
       },
-      needsPhoto: {
-        title: 'Falta tu foto inicial',
-        text: 'Toma tu foto inicial antes de las capturas.',
+      done: {
+        title: 'Paso completado',
+        text: 'Ya quedó listo. Continúa con el siguiente paso.',
       },
-      capturesDone: {
-        title: 'Capturas listas',
-        text: 'Ya se enviaron. Continúa con el siguiente paso.',
-      },
-      needsCaptures: {
-        title: 'Faltan tus capturas',
-        text: 'Completa las capturas antes del video.',
+      disabled: {
+        title: 'Paso no solicitado',
+        text: 'Tu empresa no pide este paso de tu registro.',
       },
       exhausted: {
         title: 'Intentos agotados',
         text: 'Repite la foto inicial y las capturas para volver a intentarlo.',
       },
-      noVideo: {
-        title: 'Sin video',
-        text: 'Tu empresa no pide el video con preguntas.',
+      unknown: {
+        title: 'Paso no disponible',
+        text: 'Actualiza la aplicación para continuar con este paso.',
       },
+    },
+    /** Un 409 del servidor: el paso ya no toca (lo bloquea otro o tu empresa dejó de pedirlo). */
+    stepGone: 'Este paso ya no está disponible',
+    /** Un paso que se cumple con un documento de identidad: cómo va y la pantalla para subirlo. */
+    document: {
+      pending: 'Falta subir tu documento.',
+      done: 'Documento recibido · {date}',
+      doneNoDate: 'Documento recibido.',
     },
   },
   /** Credencial digital: QR dinámico del empleado (MyQrPage). */
@@ -625,6 +632,11 @@ export default {
     brightness: 'Sube el brillo de tu pantalla para que se lea más rápido.',
     singleUse: 'Cada código sirve una sola vez y vence en segundos: una foto o captura de pantalla no sirve. No contiene tus datos personales ni biométricos.',
     brightnessLarge: 'Sube el brillo para que se lea al instante.',
+    /** El QR no puede generarse por una regla de la empresa (no un fallo pasajero): estado que lo explica. */
+    unavailable: {
+      qrTitle: 'QR no disponible',
+      faceTitle: 'Registro facial pendiente',
+    },
   },
   /** En espera de que la empresa valide el registro facial (PendingValidationPage). */
   pending: {
@@ -655,7 +667,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-10-08T15:45:41.852Z
+                at 2026-10-11T02:30:57.323Z
             </div>
         <script src="../../../../prettify.js"></script>
         <script>

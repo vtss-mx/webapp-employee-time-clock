@@ -15,12 +15,12 @@ const wantedPageSize = envNumber(env, 'VITE_PAGE_SIZE', 10, 1, 50);
 const defaultPageSize = pageSizes.includes(wantedPageSize) ? wantedPageSize : pageSizes[0];
 
 export const config = {
-  appName: envString(env, 'VITE_APP_NAME', 'Employee Time Clock'),
+  appName: envString(env, 'VITE_APP_NAME', 'Identity Verification Platform'),
   /**
    * Lema del HTML inicial (`index.html`, antes de que cargue la app). La interfaz usa el del idioma activo
-   * (`app.tagline` en los diccionarios es-MX y en-US), que también reemplaza el título de la pestaña.
+   * (`app.tagline` en los diccionarios de los siete idiomas), que también reemplaza el título de la pestaña.
    */
-  appTagline: envString(env, 'VITE_APP_TAGLINE', 'Control de asistencia y jornada laboral.'),
+  appTagline: envString(env, 'VITE_APP_TAGLINE', 'Plataforma de verificación de identidad digital y biométrica'),
   /** Compilación en ejecución y dónde consultar la publicada (detección de versiones nuevas). */
   buildId: __APP_BUILD_ID__,
   versionUrl: `${base}version.json`,
@@ -31,6 +31,12 @@ export const config = {
   apiTimeoutMs: seconds('VITE_API_TIMEOUT_SECONDS', 30, 5, 300),
   /** Envío de imágenes (registro y verificación facial). */
   apiUploadTimeoutMs: seconds('VITE_API_UPLOAD_TIMEOUT_SECONDS', 60, 10, 600),
+  /**
+   * Lecturas pesadas que el servidor arma de una vez: la exportación de los datos de una persona (RGPD arts. 15 y
+   * 20) y la de la bitácora de auditoría o del informe de accesos para el auditor. Recorren varias tablas acotadas
+   * y tardan más que una pantalla, así que no comparten el tiempo límite de una lectura normal.
+   */
+  exportTimeoutMs: seconds('VITE_EXPORT_TIMEOUT_SECONDS', 90, 10, 600),
   /** Reintentos automáticos de lecturas (GET) ante errores transitorios. */
   apiGetRetries: envNumber(env, 'VITE_API_GET_RETRIES', 2, 0, 5),
   apiMaxRetryAfterMs: seconds('VITE_API_MAX_RETRY_AFTER_SECONDS', 10, 1, 60),
@@ -194,6 +200,42 @@ export const config = {
   faceBurstStagingMargin: envNumber(env, 'VITE_FACE_BURST_STAGING_MARGIN', 2, 1.2, 3),
   faceBurstMaxFrames: envNumber(env, 'VITE_FACE_BURST_MAX_FRAMES', 96, 10, 120),
   faceBurstHoldWaitMs: envNumber(env, 'VITE_FACE_BURST_HOLD_WAIT_MS', 1200, 0, 5000),
+
+  // --- Escáner de documento (foto del documento de identidad del empleado, con OCR en el servidor) ---
+  /**
+   * Captura con cámara del documento de identidad (`DocumentScanner`, «Mis documentos» → «Subir documento»): un escáner
+   * en vivo que mide CADA cuadro dentro de la guía (sin volver a dibujar en React por cuadro, como el escaneo facial) y
+   * toma la foto SOLA cuando el documento llena la guía, está enfocado, con luz, sin reflejos, derecho y quieto; también
+   * hay un obturador manual «Tomar foto». Igual que la calidad del cuadro facial, son límites de captura del DISPOSITIVO
+   * (globales, no por empresa): el servidor vuelve a revisar la imagen y la lee con OCR. Qué se mide: nitidez (varianza
+   * del Laplaciano sobre la región en gris), brillo medio (0-255), reflejos (fracción de píxeles casi saturados), llenado
+   * (densidad del contenido del documento dentro de la guía), cobertura (cuánto del lado de la guía ocupa la caja de
+   * contenido) y centrado. Para no tomar fotos «a lo pendejo», la captura automática exige una señal CLARAMENTE de
+   * documento (llenado + cobertura), no solo nitidez y luz. La guía es solo visual: la foto es el cuadro completo (sin
+   * recorte; el recorte y el enderezado automáticos quedan para una v2).
+   */
+  docScanMinSharpness: envNumber(env, 'VITE_DOC_SCAN_MIN_SHARPNESS', 12, 0, 500),
+  docScanMinBrightness: envNumber(env, 'VITE_DOC_SCAN_MIN_BRIGHTNESS', 50, 0, 255),
+  docScanMaxBrightness: envNumber(env, 'VITE_DOC_SCAN_MAX_BRIGHTNESS', 235, 0, 255),
+  /** Luminancia (0-255) a partir de la cual un píxel es «reflejo» y la fracción máxima de ellos antes de avisar. */
+  docScanGlareLevel: envNumber(env, 'VITE_DOC_SCAN_GLARE_LEVEL', 245, 200, 255),
+  docScanGlareMax: envNumber(env, 'VITE_DOC_SCAN_GLARE_MAX', 0.06, 0, 1),
+  /** Cuánto debe llenar el contenido del documento la guía (0-1) y cuánto puede descentrarse (parte del lado de la guía). */
+  docScanMinFill: envNumber(env, 'VITE_DOC_SCAN_MIN_FILL', 0.14, 0, 1),
+  /** Cuánto del lado de la guía debe ocupar la caja de contenido (0-1): la señal de documento completo para la captura automática. */
+  docScanMinCoverage: envNumber(env, 'VITE_DOC_SCAN_MIN_COVERAGE', 0.55, 0, 1),
+  docScanCenterMax: envNumber(env, 'VITE_DOC_SCAN_CENTER_MAX', 0.18, 0, 1),
+  /** Cuadros válidos seguidos antes de tomar la foto sola y desplazamiento medio (0-255) entre cuadros que cuenta como movimiento. */
+  docScanStableFrames: envNumber(env, 'VITE_DOC_SCAN_STABLE_FRAMES', 12, 2, 30),
+  docScanMaxShift: envNumber(env, 'VITE_DOC_SCAN_MAX_SHIFT', 7, 0, 64),
+  /** Relación de aspecto de la guía (ancho/alto; genérica para v1). */
+  docScanGuideAspect: envNumber(env, 'VITE_DOC_SCAN_GUIDE_ASPECT', 1.4, 0.5, 2),
+  /** Cada cuánto se analiza un cuadro (ms) y, sin un cuadro válido, tras cuánto se habilita igual el obturador manual (ms). */
+  docScanDetectIntervalMs: envNumber(env, 'VITE_DOC_SCAN_DETECT_INTERVAL_MS', 120, 50, 1000),
+  docScanManualFallbackMs: envNumber(env, 'VITE_DOC_SCAN_MANUAL_FALLBACK_MS', 6000, 1000, 60000),
+  /** Lado mayor (px) y calidad (0-1) del JPEG que se sube (más resolución que un rostro: el OCR lee texto). */
+  docScanCapturePx: envNumber(env, 'VITE_DOC_SCAN_CAPTURE_PX', 1600, 640, 3000),
+  docScanJpegQuality: envNumber(env, 'VITE_DOC_SCAN_JPEG_QUALITY', 0.85, 0.5, 1),
 
   // --- Registro de asistencia (ubicación) ---
   /**

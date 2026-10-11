@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { setLocale } from '../../../i18n/core';
-import { plant } from '../../../test/shifts';
+import { plant } from '../../../test/sites';
 import { apiFail, apiOk, jsonResponse, envelope, mockFetch, type MockCall } from '../../../test/http';
 import { renderWithProviders } from '../../../test/render';
 import type { Kiosk, KioskCreated, WorkSite } from '../../../types';
@@ -82,7 +82,7 @@ describe('Sitios: código de sitio y kioscos (antifraude 2b)', () => {
     const { calls } = serve({ current: plant, write: () => apiOk({ ...plant, presence_code: true }) });
     renderAt('/company/sites/3/edit');
     const toggle = await screen.findByRole('switch', { name: 'Código de sitio' });
-    expect(screen.getByText('Pide en la entrada y la salida el código que muestra el kiosco del sitio.')).toBeInTheDocument();
+    expect(screen.getByText('Pide al verificar el código que muestra el kiosco del sitio.')).toBeInTheDocument();
     await userEvent.click(toggle);
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     const confirm = await screen.findByRole('dialog', { name: '¿Guardar los cambios del sitio Planta Norte?' });
@@ -96,7 +96,7 @@ describe('Sitios: código de sitio y kioscos (antifraude 2b)', () => {
     serve();
     renderAt('/company/sites/3/kiosks');
     expect(await screen.findByText('Planta Norte · 2 kioscos')).toBeInTheDocument();
-    expect(screen.getByText('La tableta de cada kiosco muestra el código que tu personal escanea o escribe al checar en el sitio.')).toBeInTheDocument();
+    expect(screen.getByText('La tableta de cada kiosco muestra el código que tu personal escanea o escribe al verificar su identidad en el sitio.')).toBeInTheDocument();
     const paired = (await screen.findByText('Entrada principal')).closest('tr') as HTMLElement;
     expect(within(paired).getByText('Safari · iPadOS')).toBeInTheDocument();
     expect(within(paired).getByText('Vinculado')).toBeInTheDocument();

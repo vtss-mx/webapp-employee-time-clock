@@ -1,0 +1,73 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/continuity';
+
+/** Continuité du service (section « Continuité » de l'écran Performances de l'ADMIN ; migration 0097), fr-FR. */
+export default {
+  loadError: 'Impossible de charger la continuité',
+  drillsError: "Impossible de charger l'historique des exercices",
+  commitment: 'Engagement de reprise',
+  commitmentIntro: "Ce à quoi la plateforme s'engage et ce qui est activé aujourd'hui.",
+  rto: 'Temps maximal pour revenir (RTO)',
+  rpo: 'Perte maximale de données (RPO)',
+  interval: 'Fréquence des exercices',
+  backupUpload: 'Copie de la sauvegarde vers le stockage',
+  pitr: 'Restauration à un instant donné',
+  backupInterval: 'Fréquence des sauvegardes',
+  backupRetention: 'Sauvegardes conservées',
+  pitrArchive: "Fréquence d'archivage du journal",
+  pitrRetention: 'Archive conservée',
+  enabled: 'Activée',
+  disabled: 'Désactivée',
+  days_one: '{count} jour',
+  days_other: '{count} jours',
+  rpoUnreachable: "Le RPO promis est plus court que l'intervalle d'archivage du journal : il ne peut pas être tenu.",
+  drills: 'Exercices de restauration',
+  drillsIntro: 'Un mécanisme par façon de restaurer. Jamais testé compte comme en retard.',
+  kinds: {
+    PITR: 'Instant donné',
+    BUCKET_DUMP: 'Copie chiffrée dans le stockage',
+  },
+  states: {
+    never: 'Jamais testé',
+    overdue: 'En retard',
+    failed: 'Le dernier a échoué',
+    ok: 'À jour',
+  },
+  neverDrilled: "Jamais testé : c'est à faire maintenant.",
+  lastSuccess: 'Dernier exercice réussi : {date}',
+  dueOn: 'prochain le {date}',
+  dueNow: 'à faire maintenant',
+  lastFailed: 'La tentative du {date} a échoué.',
+  rtoMeasured: 'Revenu en {value}',
+  rpoMeasured: 'Perte de {value}',
+  dataset: 'Avec {value}',
+  targetsAt: 'Engagement alors : {rto} et {rpo}',
+  notMeasured: 'Non mesuré',
+  overdue_one: "{count} mécanisme est en retard ou n'a jamais été testé.",
+  overdue_other: "{count} mécanismes sont en retard ou n'ont jamais été testés.",
+  history: 'Historique des exercices',
+  historyIntro: 'Chaque exercice avec son résultat et ses mesures. Les échecs aussi.',
+  columns: {
+    kind: 'Mécanisme',
+    when: 'Quand',
+    result: 'Résultat',
+    measures: 'Mesures',
+  },
+  results: {
+    met: 'Tenu',
+    missed: 'Restauré, hors objectif',
+    failed: 'Échec',
+  },
+  noun: {
+    one: 'exercice',
+    other: 'exercices',
+  },
+  empty: {
+    title: 'Aucun exercice',
+    description: 'Chaque restauration et ses mesures apparaîtront ici.',
+  },
+  noKinds: {
+    title: 'Aucun mécanisme',
+    description: "L'état de chaque façon de restaurer apparaîtra ici.",
+  },
+} satisfies Translation<typeof es>;

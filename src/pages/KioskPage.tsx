@@ -1,3 +1,4 @@
+import { LegalNoticesLink } from '../components/LegalNoticesLink';
 import { CloudOff, KeyRound, Link2, PauseCircle, Tablet } from 'lucide-react';
 import { useState, type ReactNode, type SubmitEvent } from 'react';
 import { QrCountdown, QrRing } from '../components/DynamicQrCode';
@@ -147,6 +148,7 @@ export function KioskPage() {
       )}
       <footer className="kiosk__footer">
         <Tablet size={16} aria-hidden /> {t('kiosk.display.footer')}
+        <LegalNoticesLink />
       </footer>
     </main>
   );

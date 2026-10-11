@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setLocale } from '../i18n/core';
-import { businessTimeZone, formatConfidence, formatDate, formatDateTime, formatMinutes, formatTime, localeDateFormat, setBusinessTimeZone, timeAgo, timeStyle } from './format';
+import { businessTimeZone, formatConfidence, formatDate, formatDateTime, formatMinutes, localeDateFormat, setBusinessTimeZone, timeAgo, timeStyle } from './format';
 import { formatCount, formatDistance, formatList, formatMoney, formatNumber, formatRate, localeNumberFormat } from './numbers';
 
 /**
@@ -11,17 +11,16 @@ const INSTANT = '2026-05-10T19:55:00Z'; // 13:55 en la Ciudad de México
 
 describe('fechas y horas por idioma', () => {
   it('es-MX: 24 h para los registros y el formato de siempre', () => {
-    expect(formatTime(INSTANT)).toBe('13:55');
     expect(formatDate('1990-05-10')).toBe('10 may 1990');
     expect(formatDate(INSTANT)).toBe('10 may 2026');
     expect(formatDateTime(INSTANT)).toMatch(/^10 may 2026, 1:55\sp\.\s?m\.$/);
     expect(timeStyle()).toMatchObject({ hourCycle: 'h23' });
     expect(formatMinutes(440)).toBe('7 h 20 min');
+    expect(formatMinutes(null)).toBe('—'); // sin dato: el guion, no «0 min»
   });
 
   it('en-US: reloj de 12 horas, orden y nombres en inglés, en la misma zona del negocio', async () => {
     await setLocale('en-US');
-    expect(formatTime(INSTANT)).toBe('1:55 PM');
     expect(formatDate('1990-05-10')).toBe('May 10, 1990');
     expect(formatDateTime(INSTANT)).toMatch(/^May 10, 2026, 1:55\sPM$/);
     expect(timeAgo(new Date().toISOString())).toBe('just now');
@@ -36,9 +35,7 @@ describe('fechas y horas por idioma', () => {
     setBusinessTimeZone('America/Hermosillo');
     setBusinessTimeZone('Zona/Inexistente');
     expect(businessTimeZone()).toBe('America/Hermosillo');
-    expect(formatTime(INSTANT)).toBe('12:55');
     await setLocale('en-US');
-    expect(formatTime(INSTANT)).toBe('12:55 PM');
     setBusinessTimeZone('America/Mexico_City');
   });
 });

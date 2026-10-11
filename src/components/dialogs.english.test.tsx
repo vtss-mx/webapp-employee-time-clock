@@ -4,12 +4,9 @@ import { Save } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { currentLocale, setLocale } from '../i18n/core';
 import { renderWithProviders } from '../test/render';
-import type { BulkResult } from '../types';
-import { bulkResultMessage, BulkResultSummary } from './BulkResultSummary';
 import { ConfirmDialog, Modal } from './Modal';
 import { DialogHero } from './ui/DialogHero';
 import { ReasonFormPanel } from './ReasonFormPanel';
-import { RejectRequestPanel, validateRejectNote } from './RejectRequestPanel';
 
 /**
  * Popups, confirmaciones y formularios con motivo en inglés (en-US) y el cambio de idioma en
@@ -102,57 +99,7 @@ describe('encabezado con la posición en la cola', () => {
   });
 });
 
-describe('resultado de una operación masiva en inglés', () => {
-  const outcome = (id: number, result: 'DONE' | 'SKIPPED', message: string | null = null) => ({ employee: { id, full_name: `Person ${id}`, employee_number: `EMP-${id}` }, result, code: null, message });
-  const copy = { title: 'Shift assigned', done: 'Assigned', unchanged: 'Already had it', skipped: 'Not assigned' };
-
-  it('con omisiones: título, número de empleado y "and N more"', async () => {
-    await english();
-    const result: BulkResult = { done: 9, unchanged: 0, skipped: 1, results: [...Array.from({ length: 9 }, (_, i) => outcome(i + 1, 'DONE')), outcome(20, 'SKIPPED', 'Inactive')] };
-    expect(bulkResultMessage(result, copy)).toMatchObject({ variant: 'warning', title: 'Shift assigned (some skipped)' });
-    render(<BulkResultSummary result={result} copy={copy} />);
-    expect(screen.getByText('No. EMP-20')).toBeInTheDocument();
-    expect(screen.getByText('and 1 more')).toBeInTheDocument();
-  });
-});
-
-const question = () =>
-  currentLocale() === 'en-US'
-    ? { title: 'Reject the request?', eyebrow: 'Shift change', message: 'Ana keeps her shift.', facts: [{ label: 'Shift', value: 'Morning' }] }
-    : { title: '¿Rechazar la solicitud?', eyebrow: 'Cambio de turno', message: 'Ana conserva su turno.', facts: [{ label: 'Turno', value: 'Matutino' }] };
-
-describe('rechazar una solicitud en inglés y con cambio de idioma', () => {
-  it('nota obligatoria, confirmación y error en el idioma activo (también con el popup abierto)', async () => {
-    await english();
-    const onSend = vi.fn().mockRejectedValue(new Error('down'));
-    renderWithProviders(<RejectRequestPanel title="Reject request" subtitle="Ana Ruiz · EMP-7" backTo="/requests" intro="Ana asked to change shifts." placeholder="Why?" question={question} onSend={onSend} onCancel={noop} />);
-    expect(screen.getByRole('link', { name: 'Requests' })).toHaveAttribute('href', '/requests');
-    expect(screen.getByRole('heading', { name: 'Reason' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Explain why (at least 5 characters). The employee will see it.');
-
-    await userEvent.type(screen.getByLabelText('Note for the employee'), '  Not enough staff ');
-    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Reject the request?' });
-    expect(dialog).toHaveTextContent('Note they will see');
-    expect(dialog).toHaveTextContent('Not enough staff');
-
-    await act(() => setLocale('es-MX'));
-    const spanish = screen.getByRole('alertdialog', { name: '¿Rechazar la solicitud?' });
-    expect(spanish).toHaveTextContent('Nota que verá');
-    expect(spanish).toHaveTextContent('Matutino');
-    await userEvent.click(within(spanish).getByRole('button', { name: 'Rechazar' }));
-    expect(onSend).toHaveBeenCalledWith('Not enough staff');
-    expect(await screen.findByRole('alertdialog', { name: 'No se pudo rechazar la solicitud' })).toBeInTheDocument();
-    await act(() => english());
-    expect(screen.getByRole('alertdialog', { name: "Couldn't reject the request" })).toBeInTheDocument();
-  });
-
-  it('la regla de la nota en español', () => {
-    expect(validateRejectNote(' no ')).toBe('Explica el motivo (al menos 5 caracteres). El empleado lo verá.');
-    expect(validateRejectNote('Falta personal')).toBeUndefined();
-  });
-
+describe('formulario con motivo en inglés y con cambio de idioma', () => {
   it('ReasonFormPanel acepta una confirmación que se arma al dibujarse y un título de error fijo', async () => {
     const onSend = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(

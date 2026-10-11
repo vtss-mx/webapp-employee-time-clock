@@ -80,7 +80,8 @@ const wholeValue = (value: string) => new RegExp(`(?<![\\p{L}\\p{N}])${escapeReg
 
 /** Primero la marca, luego los datos (del más largo al más corto: «Operaciones Acme» antes que «Acme») y al final lo que no es lenguaje. */
 function neutralize(text: string, data: readonly RegExp[]): string {
-  let result = text.replaceAll(BRAND, ' '.repeat(BRAND.length));
+  let result = text;
+  for (const brand of [BRAND, 'Identity Verification Platform', 'VT Software Solutions']) result = result.replaceAll(brand, ' '.repeat(brand.length));
   for (const value of data) result = result.replace(value, (match) => ' '.repeat(match.length));
   for (const pattern of NEUTRAL) result = result.replace(pattern, (match) => ' '.repeat(match.length));
   return result;

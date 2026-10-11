@@ -1,8 +1,8 @@
 import { MapPin, MapPinPlus, Tablet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../../../i18n';
-import { siteRestore } from '../../../components/shifts/RecordTrash';
-import { metersText, sitesLoadError } from '../../../components/shifts/shiftRules';
+import { siteRestore } from '../../../components/sites/SiteTrash';
+import { sitesLoadError } from '../../../components/sites/siteRules';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { listEmpty, listSubtitle, noMatchEmpty, TrashCells, trashColumns } from '../../../components/trash/TrashParts';
 import { ButtonLink } from '../../../components/ui/Button';
@@ -15,12 +15,12 @@ import { paths } from '../../../routes/paths';
 import { siteService } from '../../../services/siteService';
 import type { WorkSite } from '../../../types';
 import { addressLine } from '../../../utils/address';
-import { formatCount } from '../../../utils/numbers';
+import { formatCount, metersText } from '../../../utils/numbers';
 
 /**
- * Sitios de trabajo: los lugares (con su punto y su radio) donde el personal checa en persona.
+ * Puntos de verificación: los lugares (con su punto y su radio) donde se verifica la identidad del personal.
  * La fila abre la edición; el estado se cambia ahí mismo. En «Eliminados», cuándo y quién y «Restaurar».
- * Cada sitio dice si pide el código del kiosco al checar (antifraude 2b) y lleva a sus kioscos.
+ * Cada sitio dice si pide el código del kiosco al verificar (antifraude 2b) y lleva a sus kioscos.
  */
 export function SitesPage() {
   const t = useT();
@@ -37,7 +37,6 @@ export function SitesPage() {
   const columns = {
     address: t('sites.list.columns.address'),
     radius: t('sites.list.columns.radius'),
-    employees: t('sites.list.columns.employees'),
     code: t('sites.list.columns.code'),
     status: t('common.fields.status'),
   };
@@ -51,7 +50,7 @@ export function SitesPage() {
           <ListResults
             list={list}
             pager={{ noun: { one: t('sites.list.noun.one'), other: t('sites.list.noun.other') } }}
-            columns={trash ? [t('sites.list.columns.site'), columns.address, ...trashColumns()] : [t('sites.list.columns.site'), columns.address, columns.radius, columns.employees, columns.code, columns.status]}
+            columns={trash ? [t('sites.list.columns.site'), columns.address, ...trashColumns()] : [t('sites.list.columns.site'), columns.address, columns.radius, columns.code, columns.status]}
             onOpen={trash ? undefined : (site) => void navigate(paths.company.editSite(site.id))}
             empty={listEmpty(list, {
               noMatch: noMatchEmpty(t('sites.list.noMatch.title'), t('sites.list.noMatch.description')),
@@ -78,9 +77,6 @@ export function SitesPage() {
                 ) : (
                   <>
                     <td data-label={columns.radius}>{metersText(site.radius_m)}</td>
-                    <td data-label={columns.employees}>
-                      <span className="badge badge--info badge--plain">{formatCount(site.employees)}</span>
-                    </td>
                     <td data-label={columns.code}>
                       <span className="site-code">
                         <span className={`badge ${site.presence_code ? 'badge--success' : 'badge--muted'}`}>{t(site.presence_code ? 'sites.presence.on' : 'sites.presence.off')}</span>

@@ -176,3 +176,21 @@ Rica
 Sint
 Tokelau
 Tomé
+
+# Siglas de la continuidad del servicio y de la revisión de accesos, iguales en los siete idiomas (RTO: tiempo
+# máximo para volver; RPO: pérdida máxima de datos; CSV: el formato de la exportación del informe; Argon2id: el
+# algoritmo con que se guardan las contraseñas, un nombre propio)
+RTO
+RPO
+CSV
+Argon
+# «dell'API» (it-IT): el artículo elidido ante una sigla. Va en la lista COMÚN y no en la del italiano porque el
+# revisor parte la palabra en la sigla («API», que el inglés conoce) y la señalaría como un préstamo.
+dell'API
+dell’API
+
+# Sigla oficial de Identity Verification Platform; nombre propio de la plataforma.
+IVP
+
+# Sigla de Machine Readable Zone, formato de lectura ICAO 9303 (compartida por los siete idiomas).
+MRZ

@@ -5,13 +5,13 @@ import type es from '../es-MX/devices';
 export default {
   title: 'Appareils',
   intro:
-    "Navigateurs et téléphones depuis lesquels cette personne a pointé ou vérifié son identité, chacun avec une clé impossible à copier. Selon la politique, un appareil non approuvé exige une étape supplémentaire ou soumet ses pointages à examen.",
+    "Navigateurs et téléphones depuis lesquels cette personne a vérifié son identité, chacun avec une clé impossible à copier. Selon la politique, un appareil non approuvé exige une étape supplémentaire ou soumet ses vérifications à examen.",
   mineTitle: 'Mes appareils',
   mineIntro:
-    'Les navigateurs ou téléphones depuis lesquels vous avez pointé ou vérifié votre identité. Votre entreprise peut les approuver ou les révoquer.',
+    'Les navigateurs ou téléphones depuis lesquels vous avez vérifié votre identité. Votre entreprise peut les approuver ou les révoquer.',
   empty: {
     title: 'Aucun appareil',
-    description: 'Les navigateurs et téléphones utilisés pour pointer apparaîtront ici.',
+    description: 'Les navigateurs et téléphones utilisés pour vérifier une identité apparaîtront ici.',
   },
   noun: {
     one: 'appareil',

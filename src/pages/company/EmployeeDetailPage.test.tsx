@@ -45,7 +45,7 @@ function serve(current: () => Employee, handle?: (call: MockCall) => Response | 
   });
 }
 
-/** Usuario de la empresa con las pantallas que le da el backend (incluye Turnos). */
+/** Usuario de la empresa con las pantallas que le da el backend. */
 const companyUser = withScreens({ ...sampleUser, role: 'COMPANY', employee: null });
 
 /** Sesión ya iniciada con ese usuario (las pantallas que puede ver vienen del backend). */
@@ -59,6 +59,8 @@ function session(user: User | null): AuthContextValue {
     dismissDeviceBlock: vi.fn(),
     suspension: null,
     dismissSuspension: vi.fn(),
+    mfaEnrollment: null,
+    dismissMfaEnrollment: vi.fn(),
     login: vi.fn(),
     loginWithPasskey: vi.fn(),
     logout: vi.fn(),
@@ -111,23 +113,18 @@ describe('EmployeeDetailPage: sin aprendizaje automático', () => {
 });
 
 describe('EmployeeDetailPage: expediente', () => {
-  it('muestra departamento, áreas a su cargo, teléfono, cuenta compartida y el rechazo con su motivo', async () => {
+  it('muestra teléfono, cuenta compartida y el rechazo con su motivo', async () => {
     serve(() => ({
       ...employee,
       phone: '+526621234567',
       shared_account: true,
       headwear_exempt: true,
-      department_id: 3,
-      department_name: 'Producción',
-      managed_departments: [{ id: 3, name: 'Producción' }, { id: 4, name: 'Almacén' }],
       face_status: 'REJECTED',
       face_rejection_reason: 'La foto está borrosa',
     }));
     renderDetail();
     expect(await screen.findByText('Cuenta compartida')).toHaveAttribute('title', 'Trabaja también en otra empresa con la misma cuenta');
     expect(screen.getByText('+52 662 123 4567')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'Producción' }).map((link) => link.getAttribute('href'))).toEqual(['/company/departments/3', '/company/departments/3']);
-    expect(screen.getByRole('link', { name: 'Almacén' })).toHaveAttribute('href', '/company/departments/4');
     expect(screen.getByText('Motivo: “La foto está borrosa”')).toBeInTheDocument();
     expect(screen.getByText(/Exento de retirar prenda de cabeza/)).toBeInTheDocument();
     // Rechazado: se registra en persona (acción principal), se consulta su validación y se puede pedir otra.
@@ -137,12 +134,10 @@ describe('EmployeeDetailPage: expediente', () => {
     expect(screen.getByRole('link', { name: 'Solicitar nueva verificación' })).toHaveAttribute('href', '/company/employees/7/reverify');
   });
 
-  it('sin registro facial ni departamento: solo ofrece registrarlo en persona', async () => {
-    serve(() => ({ ...employee, face_status: 'NOT_ENROLLED', latest_enrollment_id: null, rfc: null, department_id: null, department_name: null, managed_departments: [] }));
+  it('sin registro facial: solo ofrece registrarlo en persona', async () => {
+    serve(() => ({ ...employee, face_status: 'NOT_ENROLLED', latest_enrollment_id: null, rfc: null }));
     renderDetail();
     expect(await screen.findByRole('button', { name: 'Registrar rostro en persona' })).toBeInTheDocument();
-    expect(screen.getByText('Sin departamento')).toBeInTheDocument();
-    expect(screen.queryByText('Responsable de')).toBeNull();
     expect(screen.getAllByText('Sin capturar')).toHaveLength(4); // RFC, CURP, NSS y teléfono
     expect(screen.queryByRole('link', { name: /validación/ })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Solicitar nueva verificación' })).toBeNull();
@@ -288,28 +283,17 @@ describe('EmployeeDetailPage: registro en persona', () => {
   });
 });
 
-describe('EmployeeDetailPage: turnos', () => {
-  it('con la pantalla de Turnos lleva a los turnos del empleado', async () => {
-    serve(() => employee);
-    renderDetail();
-    expect(await screen.findByRole('link', { name: 'Turnos' })).toHaveAttribute('href', '/company/shifts/employees/7');
-  });
-
+describe('EmployeeDetailPage: acción principal según su registro', () => {
   it('con su registro por validar, la acción principal es validarlo', async () => {
     serve(() => ({ ...employee, face_status: 'PENDING_REVIEW' }));
     renderDetail();
     expect(await screen.findByRole('link', { name: 'Validar identidad' })).toHaveClass('btn--primary');
   });
 
-  it('sin esa pantalla (o sin sesión) no muestra el enlace: lo decide el backend', async () => {
+  it('sin sesión el expediente se dibuja igual (lo que se ofrece lo decide el backend)', async () => {
     serve(() => employee);
-    const { unmount } = renderDetail({ ...companyUser, screens: companyUser.screens.filter((s) => s.code !== 'COMPANY_SHIFTS') });
-    expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Turnos' })).toBeNull();
-    unmount();
     renderDetail(null);
     expect(await screen.findByRole('heading', { name: 'Ana Ruiz' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Turnos' })).toBeNull();
   });
 });
 

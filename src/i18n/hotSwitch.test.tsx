@@ -46,9 +46,9 @@ describe('cambio de idioma en caliente', () => {
     const current = screen.getByLabelText('Contraseña actual');
     const next = screen.getByLabelText('Nueva contraseña');
     const confirm = screen.getByLabelText('Confirmar nueva contraseña');
-    await userEvent.type(current, 'Anterior123');
-    await userEvent.type(next, 'Nueva12345');
-    await userEvent.type(confirm, 'Nueva12345');
+    await userEvent.type(current, 'Anterior12345');
+    await userEvent.type(next, 'Nueva1234567');
+    await userEvent.type(confirm, 'Nueva1234567');
 
     // 2) Cambia el idioma con el selector de la pantalla.
     const language = screen.getByRole('heading', { name: 'Idioma' }).closest('section') as HTMLElement;
@@ -59,9 +59,9 @@ describe('cambio de idioma en caliente', () => {
     expect(session.updatePreferences).toHaveBeenCalledWith({ locale: 'en-US' });
     // Los mismos campos (no se volvieron a montar), con su etiqueta nueva y lo escrito intacto.
     expect(screen.getByLabelText('Current password')).toBe(current);
-    expect(current).toHaveValue('Anterior123');
-    expect(next).toHaveValue('Nueva12345');
-    expect(confirm).toHaveValue('Nueva12345');
+    expect(current).toHaveValue('Anterior12345');
+    expect(next).toHaveValue('Nueva1234567');
+    expect(confirm).toHaveValue('Nueva1234567');
 
     // 3) Confirmación abierta: cambia de idioma sin cerrarse y sin enviar nada.
     await userEvent.click(screen.getByRole('button', { name: 'Update password' }));
@@ -71,7 +71,7 @@ describe('cambio de idioma en caliente', () => {
     expect(screen.getByRole('alertdialog')).toBe(dialog);
     expect(dialog).toHaveTextContent('¿Cambiar tu contraseña?');
     expect(screen.getByRole('heading', { name: 'Mi perfil' })).toBeInTheDocument();
-    expect(current).toHaveValue('Anterior123'); // detrás del popup, el formulario sigue lleno
+    expect(current).toHaveValue('Anterior12345'); // detrás del popup, el formulario sigue lleno
     expect(passwordChanges(calls)).toHaveLength(0);
 
     // 4) Se confirma: se envía una sola vez; el aviso de éxito abierto también sigue al idioma.

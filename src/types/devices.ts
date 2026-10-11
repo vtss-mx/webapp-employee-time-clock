@@ -1,7 +1,7 @@
 import type { DeviceStatus, Page } from './index';
 
 /**
- * Dispositivo (navegador de un teléfono o computadora) desde el que un empleado checa o verifica su identidad: el
+ * Dispositivo (navegador de un teléfono o computadora) desde el que un empleado verifica su identidad: el
  * backend guarda solo el hash de su llave (decisión D2). Lo ven la empresa (ficha del empleado) y el empleado (Mi
  * perfil). `status`: catálogo `device_statuses` (por decidir, aprobado o revocado).
  */

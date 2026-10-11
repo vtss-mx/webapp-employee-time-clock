@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useT } from '../../i18n';
 import { config } from '../../utils/config';
+import { LegalNoticesLink } from '../LegalNoticesLink';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { BrandLogo } from '../ui/BrandLogo';
 
@@ -54,7 +55,8 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="auth__footer">
-        {t('auth.layout.copyright', { year: new Date().getFullYear(), app: config.appName })}
+        <span>{t('auth.layout.copyright', { year: new Date().getFullYear(), app: config.appName })}</span>
+        <LegalNoticesLink />
       </footer>
     </div>
   );

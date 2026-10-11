@@ -83,7 +83,7 @@ export default defineConfig(({ mode }) => {
       ],
       proxy: {
         // ws: true → también reenvía el canal WebSocket de validación (/api/ws/...).
-        '/api': { target: env.VITE_PROXY_TARGET || 'http://localhost:8000', changeOrigin: true, ws: true },
+        '/api': { target: env.VITE_PROXY_TARGET || 'http://localhost:8080', changeOrigin: true, ws: true },
       },
     },
     preview: { host: true, port: 4173, allowedHosts: NGROK_HOSTS },

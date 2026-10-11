@@ -28,6 +28,7 @@ configúrala
 configurarlo
 descartarlo
 confírmalo
+cópiala
 cópialo
 desactívala
 desactívalo
@@ -36,6 +37,7 @@ escanéalo
 escríbelo
 márcalo
 muéstralo
+otórgalo
 pégalo
 quítalo
 quítalos
@@ -50,6 +52,7 @@ rótala
 monto
 montos
 autocalibración
+biométrica
 biométrico
 telemetría
 biométricos
@@ -91,3 +94,5 @@ regístralo
 suspéndela
 confírmalos
 enciéndelo
+verificarte
+trátala

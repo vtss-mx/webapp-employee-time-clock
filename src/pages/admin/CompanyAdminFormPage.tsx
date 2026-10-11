@@ -122,7 +122,11 @@ function CompanyAdminForm({ company, admin }: { company: CompanyDetail; admin: C
       saveError(mode.key),
       {
         confirm: admin ? () => resetConfirm(company, admin) : () => addConfirm(company, email.trim().toLowerCase()),
-        onError: (err) => err instanceof ApiError && err.code === 'EMAIL_TAKEN' && setServerError(err.message),
+        onError: (err) => {
+          if (err instanceof ApiError && err.code === 'EMAIL_TAKEN') setServerError(err.message);
+          // Lo que el servidor rechace de la contraseña (largo, filtrada, reciclada) se marca en su campo.
+          password.showServerError(err);
+        },
       },
     );
   };

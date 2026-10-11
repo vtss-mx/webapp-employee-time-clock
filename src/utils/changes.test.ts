@@ -52,7 +52,7 @@ describe('describeChanges', () => {
 
 describe('describeValues', () => {
   it('"Etiqueta: valor" de los campos con valor (los vacíos se omiten y el secreto se oculta)', () => {
-    expect(describeValues({ ...before, password: 'Secreta123' }, labels)).toEqual([
+    expect(describeValues({ ...before, password: 'Secreta123456' }, labels)).toEqual([
       { label: 'Nombre', value: 'Ana Ruiz' },
       { label: 'Departamento', value: 'Depto. 3' },
       { label: 'Activo', value: 'Sí' },

@@ -1,7 +1,7 @@
 {
-  "name": "Employee Time Clock",
-  "short_name": "ETC",
-  "description": "Control de asistencia y jornada laboral.",
+  "name": "Identity Verification Platform",
+  "short_name": "IVP",
+  "description": "Plataforma de verificación de identidad digital y biométrica",
   "lang": "es-MX",
   "start_url": "/",
   "scope": "/",

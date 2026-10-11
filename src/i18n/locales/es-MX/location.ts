@@ -36,10 +36,6 @@ export default {
       text: 'Este validador solo puede iniciar sesión en su lugar de operación y el permiso de ubicación está bloqueado.',
       next: 'Vuelve a la aplicación e inicia sesión de nuevo.',
     },
-    attendance: {
-      text: 'Tu registro de asistencia necesita tu ubicación y el permiso está bloqueado en este navegador.',
-      next: 'Regresa aquí y toca «Reintentar».',
-    },
     map: {
       text: 'Para ubicarte en el mapa hace falta el permiso de ubicación y está bloqueado en este navegador.',
       next: 'Vuelve a tocar «Mi ubicación» (o marca el punto en el mapa).',

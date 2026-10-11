@@ -73,35 +73,20 @@ export default {
     },
     before: 'Antes de começar:',
     privacy: 'Suas fotos, seu vídeo e sua voz são guardados criptografados e só sua empresa os revisa; nunca são compartilhados.',
-    /** Los cuatro pasos del registro (decisión del dueño, 2026-10-06), en el indicador sobre el visor. */
+    /** El indicador sobre el visor: los pasos los manda el servidor y su nombre sale del catálogo; «Listo» es el final. */
     steps: {
       label: 'Passo {current} de {total}',
-      photo: 'Foto inicial',
-      captures: 'Capturas',
-      video: 'Vídeo',
       done: 'Pronto',
     },
-    /** Mientras se guarda la foto inicial (paso 1). */
+    /** Mientras se guarda la foto inicial. */
     photoSaving: 'Salvando sua foto…',
-    /** El índice de los pasos independientes (decisión del dueño, 2026-10-07): estado, aviso y botón de cada uno. */
+    /** El índice del registro: estado, aviso y botón de cada paso (su nombre y descripción, del catálogo). */
     index: {
       steps_one: '{count} etapa',
       steps_other: '{count} etapas',
       resume: 'Faça as etapas em ordem. Você pode sair depois de qualquer uma e continuar outro dia: o que você fez fica salvo.',
       errorTitle: 'Não foi possível carregar seu cadastro',
-      label: 'Etapas do cadastro facial',
-      photo: {
-        title: 'Foto inicial',
-        text: 'Uma foto do seu rosto de frente, com boa luz.',
-      },
-      captures: {
-        title: 'Capturas e prova de vida',
-        text: '{count} capturas do seu rosto e quatro movimentos da cabeça.',
-      },
-      video: {
-        title: 'Vídeo com perguntas',
-        text: 'Responda em voz alta a perguntas sobre seus dados, olhando para a câmera.',
-      },
+      label: 'Etapas do seu cadastro',
       state: {
         pending: 'Pendente',
         done: 'Concluída · {date}',
@@ -112,11 +97,12 @@ export default {
         answered: '{answered} de {total} respondidas',
       },
       hint: {
+        /** `step`: el nombre del paso que falta, del catálogo. */
+        blocked: 'Primeiro conclua “{step}”.',
         validUntil: 'Válida até {date}',
         expired: 'Sua foto venceu. Tire outra.',
-        needsPhoto: 'Primeiro tire sua foto inicial.',
-        needsCaptures: 'Primeiro conclua as capturas.',
         exhausted: 'As tentativas se esgotaram. Repita a foto inicial e as capturas.',
+        unknown: 'Atualize o aplicativo para continuar esta etapa.',
       },
       action: {
         photo: 'Tirar foto',
@@ -124,35 +110,41 @@ export default {
         captures: 'Iniciar capturas',
         video: 'Gravar vídeo',
         resumeVideo: 'Continuar vídeo',
+        document: 'Enviar documento',
+        replaceDocument: 'Substituir documento',
       },
     },
-    /** Una pantalla de un paso que se abrió fuera de orden: qué falta (su vacío). */
+    /** La pantalla de un paso que ahora no se puede abrir: qué pasa (su vacío) y de vuelta al índice. */
     blocked: {
       back: 'Voltar ao cadastro',
-      photoUsed: {
-        title: 'Foto inicial pronta',
-        text: 'Ela já foi usada nas suas capturas. Continue com a próxima etapa.',
+      blocked: {
+        title: 'Falta uma etapa antes',
+        text: 'Conclua “{step}” para continuar esta etapa.',
       },
-      needsPhoto: {
-        title: 'Falta sua foto inicial',
-        text: 'Tire sua foto inicial antes das capturas.',
+      done: {
+        title: 'Etapa concluída',
+        text: 'Já está pronta. Continue com a próxima etapa.',
       },
-      capturesDone: {
-        title: 'Capturas prontas',
-        text: 'Elas já foram enviadas. Continue com a próxima etapa.',
-      },
-      needsCaptures: {
-        title: 'Faltam suas capturas',
-        text: 'Conclua as capturas antes do vídeo.',
+      disabled: {
+        title: 'Etapa não solicitada',
+        text: 'Sua empresa não pede esta etapa do seu cadastro.',
       },
       exhausted: {
         title: 'Tentativas esgotadas',
         text: 'Repita a foto inicial e as capturas para tentar de novo.',
       },
-      noVideo: {
-        title: 'Sem vídeo',
-        text: 'Sua empresa não pede o vídeo com perguntas.',
+      unknown: {
+        title: 'Etapa indisponível',
+        text: 'Atualize o aplicativo para continuar esta etapa.',
       },
+    },
+    /** Un 409 del servidor: el paso ya no toca (lo bloquea otro o la empresa dejó de pedirlo). */
+    stepGone: 'Esta etapa não está mais disponível',
+    /** Un paso que se cumple con un documento de identidad: cómo va. */
+    document: {
+      pending: 'Falta enviar seu documento.',
+      done: 'Documento recebido · {date}',
+      doneNoDate: 'Documento recebido.',
     },
   },
   myQr: {
@@ -168,6 +160,10 @@ export default {
     brightness: 'Aumente o brilho da tela para que a leitura seja mais rápida.',
     singleUse: 'Cada código vale uma única vez e vence em segundos: uma foto ou captura de tela não funciona. Não contém seus dados pessoais nem biométricos.',
     brightnessLarge: 'Aumente o brilho para que a leitura seja instantânea.',
+    unavailable: {
+      qrTitle: 'QR indisponível',
+      faceTitle: 'Cadastro facial pendente',
+    },
   },
   pending: {
     errorTitle: 'Não foi possível atualizar a situação',

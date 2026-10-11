@@ -4,21 +4,11 @@ import type es from '../es-MX/employeeDocuments';
 /** Ausweisdokumente des Mitarbeiters (de-DE): dieselben Schlüssel und Variablen wie es-MX. */
 export default {
   title: 'Meine Dokumente',
-  subtitle: 'Laden Sie Ihren Adressnachweis und einen amtlichen Ausweis hoch.',
   add: 'Dokument hochladen',
   loadError: 'Ihre Dokumente konnten nicht geladen werden',
   noun: {
     one: 'Dokument',
     other: 'Dokumente',
-  },
-  requirements: {
-    title: 'Von Ihrem Unternehmen verlangte Dokumente',
-    officialId: 'Ein amtlicher Ausweis',
-    proofOfAddress: 'Adressnachweis',
-    done: 'Fertig',
-    missing: 'Ausstehend',
-    allDone: 'Sie haben hochgeladen, was Ihr Unternehmen verlangt.',
-    notRequired: 'Ihr Unternehmen verlangt derzeit keine Dokumente.',
   },
   columns: {
     file: 'Dokument',
@@ -57,7 +47,7 @@ export default {
     dataSection: 'Dokumenttyp',
     typeLabel: 'Dokumenttyp',
     typePlaceholder: 'Typ wählen',
-    uploading: 'Dokument wird hochgeladen…',
+    validating: 'Dokument wird geprüft…',
     error: 'Das Dokument konnte nicht hochgeladen werden',
     confirm: {
       title: '{name} hochladen?',
@@ -72,6 +62,11 @@ export default {
       size: 'Die Datei ist {size} groß, das Maximum ist {max}.',
       typeMissing: 'Wählen Sie den Dokumenttyp.',
     },
+    notRecognized: {
+      title: 'Dokument nicht erkannt',
+      retake: 'Foto erneut aufnehmen',
+      choose: 'Andere Datei wählen',
+    },
   },
   review: {
     title: 'Dokumente des Mitarbeiters',
@@ -85,7 +80,8 @@ export default {
     confirmedBy: 'Bestätigt von {by}',
     pending: 'Zu prüfen',
     read: 'Erkennung {value}',
-    mrz: 'Maschinenlesbare Zone geprüft',
+    mrz: 'MRZ-Prüfziffern stimmen',
+    mrzHelp: 'Die Lesekontrollen stimmen überein; sie beweisen nicht die Echtheit des Dokuments.',
     notRead: 'Keine automatische Erkennung',
     download: 'Herunterladen',
     downloadError: 'Das Dokument konnte nicht heruntergeladen werden',

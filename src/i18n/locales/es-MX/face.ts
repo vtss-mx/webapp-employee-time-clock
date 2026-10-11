@@ -1,5 +1,14 @@
 /** Textos de cámara, registro y verificación facial, prueba de vida y destello (es-MX). */
 export default {
+  session: {
+    cancelTitle: '¿Cancelar esta captura?',
+    cancelMessage: 'La captura activa se detendrá. Una verificación ya terminada conservará su resultado.',
+    cancelConfirm: 'Cancelar captura',
+    continue: 'Continuar captura',
+    capture: 'Captura',
+    noLongerActive: 'Esta captura ya venció o fue cancelada. Inicia una nueva captura.',
+    alreadyStarted: 'Esta captura ya está en proceso o terminó. No puede enviarse otra vez.',
+  },
   /** Visor de la cámara (CameraCapture, useCamera). */
   camera: {
     name: 'Cámara',
@@ -171,7 +180,8 @@ export default {
   },
   /** Mensajes del flujo facial guiado (LiveFaceFlow, liveFaceView). */
   flow: {
-    holdPosition: 'Mantén la posición',
+    /** Al llegar (y sostener) un movimiento de la prueba de vida: ánimo para no regresar al frente mientras se captura. */
+    holdPose: 'Sostén así',
     almost: 'Un poco más',
     /** La cuenta bajo la indicación mientras se toman las fotos de frente. */
     photo: 'Foto {current} de {total}',
@@ -203,6 +213,8 @@ export default {
   speak: {
     position: 'Coloca tu rostro dentro de la guía y mira al frente.',
     recenter: 'Vuelve a mirar al frente.',
+    /** Al llegar el movimiento del reto: que lo sostenga mientras se captura. */
+    hold: 'Sostén así.',
     done: 'Listo. Procesando.',
     /** Aviso del botón de silencio del encabezado (lectores de pantalla). */
     mute: 'Silenciar la guía por voz',

@@ -32,12 +32,14 @@ export const NO_LIVENESS: FaceChallenge = {
   flash: [],
   flash_required: false,
   expires_in: null,
+  liveness_hold_ms: null,
+  liveness_max_retries: null,
 };
 
 export const TWO_TURNS: FaceChallenge = {
   ...NO_LIVENESS,
   liveness_required: true,
-  challenge_id: 'ch-1',
+  challenge_id: 'ch-1'.padEnd(64, '0'),
   action: 'TURN_LEFT',
   instruction: 'Gira la cabeza hacia tu izquierda',
   actions: ['TURN_LEFT', 'TURN_RIGHT'],
@@ -52,7 +54,16 @@ type Responder = (call: MockCall) => Response | Promise<Response>;
 
 /** Backend del flujo: validación previa (/face/check) y reto (/face/challenge). */
 export function serve({ check = () => apiOk(CHECK_OK), challenge = () => apiOk(NO_LIVENESS) }: { check?: Responder; challenge?: Responder } = {}) {
-  const { calls } = mockFetch((call) => (call.url.includes('/face/check') ? check(call) : call.url.includes('/face/challenge') ? challenge(call) : apiFail(404, 'NOT_FOUND')));
+  const { calls } = mockFetch((call) => {
+    if (call.url.includes('/face/check')) return check(call);
+    if (call.url.includes('/face/challenge')) return challenge(call);
+    if (call.url.includes('/verification/sessions/')) return apiOk({
+      id: call.url.split('/').at(-1), execution_status: 'READY', decision_status: null,
+      created_at: '2026-10-10T22:00:00Z', expires_at: '2026-10-10T22:01:00Z',
+      flow_version: 'synthetic-test-protocol', policy_version: '0'.repeat(64), attempt_id: null, device_nonce: null,
+    });
+    return apiFail(404, 'NOT_FOUND');
+  });
   return { checks: () => calls.filter((c) => c.url.includes('/face/check')).length, challenges: () => calls.filter((c) => c.url.includes('/face/challenge')).length, calls };
 }
 
@@ -74,7 +85,7 @@ export const accessoriesFound = (accessories: string[]) =>
 /** El reto del REGISTRO (decisión del dueño, 2026-10-07): siempre los cuatro movimientos de la cabeza, en orden al azar. */
 export const FOUR_MOVES: FaceChallenge = {
   ...TWO_TURNS,
-  challenge_id: 'ch-enroll',
+  challenge_id: 'ch-enroll'.padEnd(64, '0'),
   action: 'LOOK_UP',
   instruction: 'Levanta un poco la barbilla y mira hacia arriba',
   actions: ['LOOK_UP', 'TURN_RIGHT', 'LOOK_DOWN', 'TURN_LEFT'],

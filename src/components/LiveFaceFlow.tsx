@@ -8,6 +8,7 @@ import { useFaceAutoCapture, useFaceDetector, type FaceGuidance } from '../hooks
 import { useFaceBurst } from '../hooks/useFaceBurst';
 import { isSteadyGuidance, useEnrollmentPhotoPlan, useFrontalCapture, type FrontalPhoto } from '../hooks/useFrontalCapture';
 import { useMountedRef } from '../hooks/useMountedRef';
+import { useVerificationSession } from '../hooks/useVerificationSession';
 import { useScreenFlash } from '../hooks/useScreenFlash';
 import { t, useLocale } from '../i18n';
 import { resolveLazy, type LazyText } from '../i18n/lazy';
@@ -18,6 +19,7 @@ import type { ChallengePurpose, FaceChallenge, VerificationRules } from '../type
 import { isVirtualCamera } from '../utils/cameraDevices';
 import { config } from '../utils/config';
 import type { FaceBaseline } from '../utils/facePose';
+import { stableHandler, type ActiveChallenge } from '../utils/faceStableHandler';
 import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, reportedAccessories, stepUpChallenge } from '../utils/faceErrors';
 import { faceFrameSharpness } from '../utils/frameQuality';
 import { sleep, whenOnline } from '../utils/waits';
@@ -25,7 +27,7 @@ import { CameraCapture } from './CameraCapture';
 import { AccessoryBadges, FaceGuide } from './FaceGuide';
 import { FlashOverlay } from './FlashOverlay';
 import { ScanCard, scanStages, stageFill, type Phase } from './FaceScan';
-import { accessoryWatchEnabled, autoCaptureFlags, challengeActions, detectionMode, detectorActive, manualCaptureDisabled, SCANNING_PHASES, scannerView, scanProgress, shutterEnabled, type ScannerViewInput } from './liveFaceView';
+import { accessoryWatchEnabled, autoCaptureFlags, challengeActions, detectionMode, detectorActive, manualCaptureDisabled, moveStableFrames, SCANNING_PHASES, scannerView, scanProgress, shutterEnabled, type ScannerViewInput } from './liveFaceView';
 import { FlowActions, VoiceMuteButton, type FlowAlternative } from './LiveFaceParts';
 import { ScannerHints } from './LivenessCues';
 
@@ -102,9 +104,6 @@ interface LiveFaceFlowProps {
  * reporte. Es el único aviso: la indicación grande nunca pide retirar nada; un accesorio bloqueado reanuda el escaneo.
  */
 
-/** Reto vigente (con prueba de vida): siempre trae su id. */
-type ActiveChallenge = FaceChallenge & { challenge_id: string };
-
 interface Blocked {
   /**
    * Por qué se detuvo: se escribe al dibujarse (el estado no guarda el texto ya traducido), así un
@@ -114,8 +113,12 @@ interface Blocked {
   reason: LazyText | null;
 }
 
-/** Retos pedidos de nuevo (conservando el escaneo) antes de reiniciar todo el flujo. */
-const CHALLENGE_RETRIES = 2;
+/**
+ * Cuántos retos más se piden conservando el escaneo antes de reiniciar todo el flujo: lo calibra el ADMIN por empresa y
+ * viaja en el reto (`liveness_max_retries`; el backend es la fuente de verdad). Sin valor (backend anterior), 3: un
+ * registro lento y cuidadoso recibe otro reto en lugar de un «todo mal».
+ */
+const CHALLENGE_RETRIES_FALLBACK = 3;
 const timeoutReason = () => t('face.flow.timeout');
 
 /**
@@ -149,19 +152,6 @@ function challengeExpired(challenge: FaceChallenge, arrivedAt: number): boolean 
   return challenge.liveness_required && Date.now() >= challengeDeadline(challenge, arrivedAt);
 }
 
-interface StableHandlers {
-  frontal: (sample?: FaceBaseline) => Promise<void>;
-  step: (active: ActiveChallenge) => Promise<void>;
-  recenter: (active: ActiveChallenge) => Promise<void>;
-}
-
-/** Lo que dispara el rostro estable en cada fase (en un movimiento y en la vuelta al frente siempre hay un reto vigente). */
-function stableHandler(phase: Phase, challenge: ActiveChallenge | null, handlers: StableHandlers): (sample?: FaceBaseline) => void | Promise<void> {
-  if (phase === 'recenter' && challenge) return () => handlers.recenter(challenge);
-  if (phase === 'challenge' && challenge) return () => handlers.step(challenge);
-  return handlers.frontal;
-}
-
 export function LiveFaceFlow({
   title,
   facing = 'user',
@@ -180,6 +170,7 @@ export function LiveFaceFlow({
   // Los textos del visor se escriben en cada dibujo a partir de la fase, la guía y el paso: un cambio
   // de idioma los traduce al instante sin tocar la cámara ni el avance del escaneo.
   useLocale();
+  const { bind: bindSession, track: trackSession, ready: sessionReady, close: closeSession } = useVerificationSession(title);
   const camera = useCamera({ facing });
   // Antifraude: lo que el navegador dice de sí mismo y de su cámara viaja con las capturas (solo números).
   const telemetry = useCaptureTelemetry(camera, policy.blocked_cameras);
@@ -281,6 +272,7 @@ export function LiveFaceFlow({
       burst.pause();
       setPhase('submitting');
       try {
+        await sessionReady();
         const device = deviceNonceRef.current ? { deviceNonce: deviceNonceRef.current } : {};
         await onSubmit({ ...captured, ...device, camera: camera.trackLabel || undefined, telemetry: telemetry() });
         transientStreak.current = 0;
@@ -289,17 +281,18 @@ export function LiveFaceFlow({
         await block(error);
       }
     },
-    [block, burst, camera.trackLabel, onSubmit, telemetry],
+    [block, burst, camera.trackLabel, onSubmit, sessionReady, telemetry],
   );
 
   /** Un reto recibido: cuándo llegó (su vida corre desde ahí) y, para el anillo, cuántas fotos pide. */
   const arrived = useCallback(
     (next: FaceChallenge) => {
+      bindSession(next.challenge_id);
       arrivedRef.current = Date.now();
       if (mounted.current) setUpcoming(next);
       return next;
     },
-    [mounted],
+    [bindSession, mounted],
   );
 
   /**
@@ -313,9 +306,10 @@ export function LiveFaceFlow({
       scan === scanRef.current ? arrived(next) : next,
     );
     stepUpRef.current = null;
+    trackSession(pending);
     pending.catch(() => undefined); // se atiende al esperarlo (onFrontalStable)
     return pending;
-  }, [arrived, purpose]);
+  }, [arrived, purpose, trackSession]);
 
   // Validación previa en el servidor (nitidez, luz, rostro completo y los accesorios que la empresa bloquea). Los
   // accesorios que informa, bloqueados o no, son las insignias; una validación sin ellos las retira.
@@ -367,10 +361,11 @@ export function LiveFaceFlow({
     [beginChallenge, submit],
   );
 
-  // Otro reto conservando el escaneo (hasta CHALLENGE_RETRIES); después se reinicia todo el flujo.
+  // Otro reto conservando el escaneo (hasta el tope que calibra el ADMIN, `liveness_max_retries`; sin él, 3); después se
+  // reinicia todo el flujo.
   const retryChallenge = useCallback(
     async (reason: LazyText) => {
-      if (challengeRetries.current >= CHALLENGE_RETRIES) {
+      if (challengeRetries.current >= (challenge?.liveness_max_retries ?? CHALLENGE_RETRIES_FALLBACK)) {
         await block(challengeExhausted());
         return;
       }
@@ -389,7 +384,7 @@ export function LiveFaceFlow({
         await block(error);
       }
     },
-    [arrived, block, clearChallenge, mounted, proceed, purpose],
+    [arrived, block, challenge, clearChallenge, mounted, proceed, purpose],
   );
 
   // Fase 1: rostro frontal estable → reto (pedido ya) + fotos → validación previa → reto (si aplica). Si el reto venció
@@ -522,7 +517,7 @@ export function LiveFaceFlow({
   // Mientras se toman las fotos del registro el detector sigue leyendo (sin disparar nada): cada foto cuenta solo si en
   // ese instante el rostro sigue dentro de la guía, centrado, de frente, quieto y ENFOCADO. La foto inicial manual no se
   // auto-dispara: el obturador la toma (abajo).
-  const auto = autoCaptureFlags(phase, enrollment, cameraReady, detecting, virtualCamera);
+  const auto = autoCaptureFlags(phase, enrollment, cameraReady, detecting, virtualCamera, moveStableFrames(challenge));
   const { guidance, progress, moveProgress } = useFaceAutoCapture({
     detector,
     videoRef: camera.videoRef,
@@ -582,8 +577,9 @@ export function LiveFaceFlow({
 
   // Guía por voz (decisión del dueño, 2026-10-08): lee las indicaciones en voz alta si la empresa la encendió. Se
   // dispara con el CÓDIGO del paso (fase, movimiento y la instrucción del servidor, derivada igual que el visor), nunca
-  // con el texto ya traducido: un cambio de idioma en caliente no la repite ni redibuja el visor por cuadro.
-  const voice = useFaceSpeech({ enabled: policy.voice_guidance_enabled, profile: policy.voice_profile, phase, step, challenge });
+  // con el texto ya traducido: un cambio de idioma en caliente no la repite ni redibuja el visor por cuadro. Al llegar el
+  // movimiento (`holding`) dice un «sostén» corto para que la persona no regrese al frente mientras se captura.
+  const voice = useFaceSpeech({ enabled: policy.voice_guidance_enabled, profile: policy.voice_profile, phase, step, challenge, holding: phase === 'challenge' && isSteadyGuidance(guidance) });
 
   // La indicación se entrega como función (se escribe al dibujarse, también la que se desvanece en el fundido cruzado).
   const message = () => scannerView(viewInput).message;
@@ -602,7 +598,7 @@ export function LiveFaceFlow({
       stage={stage}
       fill={stageFill(stage, { progress, moveProgress, capture: frontal.capture })}
       intro={intro}
-      onCancel={onCancel}
+      onCancel={() => closeSession(onCancel, onFatal)}
       viewport={
         <CameraCapture camera={camera} className="camera--fill">
           <span className="faceid__label">{camera.activeLabel}</span>
@@ -621,7 +617,7 @@ export function LiveFaceFlow({
               ? { disabled: manualCaptureDisabled(cameraReady, scanning, virtualCamera), onCapture: () => void onStable() }
               : null
           }
-          alternative={alternative}
+          alternative={alternative && { ...alternative, onSelect: () => closeSession(alternative.onSelect, onFatal) }}
         />
       }
     />

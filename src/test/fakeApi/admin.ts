@@ -16,12 +16,15 @@ import type {
   PolicyChange,
   ServerStatus,
 } from '../../types';
+import type { AccessReviewAccount, AccessReviewSummary } from '../../types/accessReview';
+import type { AuditEvent, AuditSummary } from '../../types/audit';
+import type { Continuity, RestoreDrill } from '../../types/continuity';
 import type { CompanyDriftRow, DriftRow, DriftSummary } from '../../types/drift';
 import type { FaceSecurityOverview } from '../../types/faceSecurity';
 import { account, charge, chargeDetail, companyRow, companyUsage, estimate, overview as billingOverview, payment, preview, routeUsage, statementEntries, usageOverview, usageRow, userUsage } from '../billing';
 import { company } from '../companyPages';
 import { taxCertificate } from '../documents';
-import { riskSignal, sampleAdminPolicy } from '../fixtures';
+import { riskSignal, sampleAdminPolicy, sampleVerificationDetail, sampleVerificationSummary } from '../fixtures';
 import { alertDetail, functionRow, overview as performanceOverview, routeRow, series, slowAlert, statement, vitals } from '../performance';
 import { get, pageOf, route, say, tx, type Ctx, type Route } from './core';
 
@@ -30,7 +33,6 @@ const companyEmployee: CompanyEmployee = {
   employee_number: 'EMP-7',
   first_name: 'Ana',
   last_name: 'Ruiz',
-  department_name: 'Operaciones Acme',
   email: 'ana@acme.mx',
   phone: '+526621234567',
   active: true,
@@ -233,6 +235,125 @@ const policyChange: PolicyChange = {
 
 const learning: FaceLearningSummary = { enabled: true, approved_employees: 40, employees_learning: 12, learned_samples: 30, identifications: 400, learned_identifications: 90, last_learned_at: '2026-10-01T10:00:00Z' };
 
+/**
+ * Bitácora de auditoría (migración 0095): un evento con su «antes → después». Nada de aquí cambia con el idioma
+ * (la acción y el resultado son CÓDIGOS que la app nombra con sus catálogos).
+ */
+const auditEvent: AuditEvent = {
+  id: 1,
+  occurred_at: '2026-10-05T10:00:00Z',
+  action: 'VERIFICATION_POLICY_CHANGED',
+  outcome: 'OK',
+  actor_email: 'support@vtss.mx',
+  actor_role: 'ADMIN',
+  actor_id: 1,
+  company_id: 1,
+  company_name: 'Acme',
+  entity_type: 'verification_policy',
+  entity_id: '1',
+  ip: '187.188.1.10',
+  user_agent: 'Mozilla/5.0',
+  trace_id: 'abc12345trace',
+  details: { site_codes: { before: 'OBSERVE', after: 'ENFORCE' }, liveness_steps: 2 },
+};
+
+const auditSummary: AuditSummary = {
+  since: '2026-09-28T00:00:00Z',
+  until: '2026-10-05T23:59:59Z',
+  total: 128,
+  by_action: [
+    { action: 'VERIFICATION_POLICY_CHANGED', outcome: 'OK', total: 120 },
+    { action: 'LOGIN_FAILED', outcome: 'DENIED', total: 8 },
+  ],
+  dropped: 0,
+  pending: 2,
+  retention_days: 730,
+};
+
+/** Revisión de accesos (migración 0096): una cuenta y el resumen con sus controles declarados. */
+const reviewAccount: AccessReviewAccount = {
+  id: 2,
+  email: 'admin@acme.mx',
+  role: 'COMPANY',
+  active: true,
+  created_at: '2026-01-01T00:00:00Z',
+  company: { id: 1, name: 'Acme', active: true },
+  last_login_at: '2026-10-05T15:00:00Z',
+  days_since_login: 0,
+  stale: false,
+  locked: false,
+  locked_until: null,
+  mfa_required: true,
+  mfa_satisfied: false,
+  passkeys: 0,
+  mfa_grace_until: '2026-10-20T00:00:00Z',
+  open_sessions: 1,
+  employments: 0,
+};
+
+const reviewSummary: AccessReviewSummary = {
+  generated_at: '2026-10-05T16:00:00Z',
+  accounts: 12,
+  by_role: { ADMIN: 1, COMPANY: 3, VALIDATOR: 2, EMPLOYEE: 6 },
+  inactive: 1,
+  never_signed_in: 2,
+  stale: 1,
+  locked: 0,
+  privileged: 4,
+  privileged_without_mfa: 1,
+  active_api_keys: 3,
+  api_keys_expiring_soon: 1,
+  controls: {
+    mfa_required_for: ['ADMIN', 'COMPANY'],
+    mfa_grace_days: 14,
+    password_min_length: 12,
+    password_history_size: 5,
+    breached_password_check: true,
+    argon2: { time_cost: 3, memory_mb: 64, parallelism: 4 },
+    lockout_max_failures: 5,
+    lockout_minutes: 15,
+    session_absolute_minutes: 720,
+    session_idle_minutes: 60,
+    privileged_session_idle_minutes: 15,
+    stale_days: 90,
+  },
+};
+
+/** Continuidad (migración 0097): el compromiso, un ensayo correcto y otro que nunca se ha hecho. */
+const pitrDrill: RestoreDrill = {
+  id: 1,
+  kind: 'PITR',
+  started_at: '2026-10-01T02:00:00Z',
+  finished_at: '2026-10-01T02:12:00Z',
+  success: true,
+  rto_seconds: 720,
+  rpo_seconds: 45,
+  dataset_mb: 2048,
+  target_rto_minutes: 30,
+  target_rpo_seconds: 60,
+  met_targets: true,
+  actor: 'scripts/db_pitr_check.sh',
+  notes: null,
+  recorded_at: '2026-10-01T02:12:30Z',
+};
+
+const continuity: Continuity = {
+  rto_minutes: 30,
+  rpo_seconds: 60,
+  drill_interval_days: 90,
+  backup_upload_enabled: true,
+  pitr_enabled: true,
+  backup_interval_hours: 24,
+  backup_retention_days: 30,
+  pitr_archive_timeout_seconds: 60,
+  pitr_retention_days: 14,
+  drills: [
+    { kind: 'PITR', last_attempt: pitrDrill, last_success: pitrDrill, days_since_success: 4, overdue: false, due_on: '2026-12-30T02:00:00Z' },
+    { kind: 'BUCKET_DUMP', last_attempt: null, last_success: null, days_since_success: null, overdue: true, due_on: null },
+  ],
+  overdue_count: 1,
+};
+
 /** La cuenta de cobranza con la nota de una suspensión automática (texto del sistema, en el idioma de quien lee). */
 const billingAccount = (ctx: Ctx) => ({
   ...account,
@@ -261,6 +382,25 @@ export function adminRoutes(): Route[] {
     get('/admin/drift/summary', () => driftSummary),
     get('/admin/drift', (ctx) => pageOf([driftRow(ctx)], { week_start: '2026-09-28' })),
     get('/admin/drift/companies', () => pageOf([companyDrift], { week_start: '2026-09-28' })),
+    // Bitácora de auditoría, revisión de accesos y continuidad (migraciones 0095, 0096 y 0097).
+    get('/admin/audit/summary', () => auditSummary),
+    get('/admin/audit/export', () => ({ items: [auditEvent], next_cursor: null, since: auditSummary.since, until: auditSummary.until })),
+    get('/admin/audit', () => pageOf([auditEvent], { since: auditSummary.since, until: auditSummary.until })),
+    get('/admin/access-review/summary', () => reviewSummary),
+    get('/admin/access-review/export', () => ({ filename: 'accesos-2026-10-05.csv', content_type: 'text/csv', data: 'ZQ==', rows: 12, limit: 5000, generated_at: reviewSummary.generated_at })),
+    get('/admin/access-review', () => pageOf([reviewAccount])),
+    // Historial de verificaciones de TODAS las empresas (migración 0106): el resumen, la página y el detalle.
+    get('/admin/verifications/summary', () => sampleVerificationSummary),
+    get('/admin/verifications/:id', () => sampleVerificationDetail),
+    get('/admin/verifications', () =>
+      pageOf([{ ...sampleVerificationDetail, company_id: 1, company_name: 'Acme', employee_id: 7, employee_number: 'EMP-7', employee_name: 'Ana Ruiz', avatar: null, latitude: 29.1, longitude: -110.9, location_accuracy_m: 12 }], {
+        since: sampleVerificationSummary.since,
+        until: sampleVerificationSummary.until,
+        count_cap: 10000,
+      }),
+    ),
+    get('/admin/continuity/drills', () => pageOf([pitrDrill])),
+    get('/admin/continuity', () => continuity),
     get('/admin/fraud-cases/count', () => ({ active: 1 })),
     get('/admin/fraud-cases', (ctx) => pageOf([fraudCase(ctx)])),
     get('/admin/fraud-cases/:id', (ctx) => fraudDetail(ctx)),

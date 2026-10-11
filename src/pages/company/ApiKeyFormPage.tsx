@@ -1,4 +1,4 @@
-import { CalendarClock, History, KeyRound, ScanFace, ScanLine, ShieldCheck, TriangleAlert, Users, type LucideIcon } from 'lucide-react';
+import { CalendarClock, FileText, History, KeyRound, MapPin, ScanFace, ScanLine, ShieldCheck, SlidersHorizontal, TriangleAlert, Users, type LucideIcon } from 'lucide-react';
 import { useId, useState, type SubmitEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FieldLabel, FormField } from '../../components/FormField';
@@ -13,15 +13,23 @@ import { useFeedback } from '../../hooks/useFeedback';
 import { t, useT, type MessageKey } from '../../i18n';
 import { paths } from '../../routes/paths';
 import { apiKeyService } from '../../services/apiKeyService';
-import { ApiError } from '../../services/apiClient';
+import { ApiError, fieldErrorsFrom } from '../../services/apiClient';
 import type { ApiScope } from '../../types';
 import type { ConfirmInput } from '../../types/confirm';
 
 /** Ícono de cada permiso; los permisos (código, nombre y qué permiten) vienen del catálogo api_scopes. */
 const SCOPE_ICONS: Partial<Record<string, LucideIcon>> = {
   EMPLOYEES_READ: Users,
-  ATTENDANCE_READ: History,
+  EMPLOYEES_WRITE: Users,
+  VERIFICATIONS_READ: History,
   VALIDATORS_READ: ScanLine,
+  VALIDATORS_WRITE: ScanLine,
+  SITES_READ: MapPin,
+  SITES_WRITE: MapPin,
+  DOCUMENTS_READ: FileText,
+  DOCUMENTS_WRITE: FileText,
+  CONSENTS_READ: ShieldCheck,
+  SETTINGS_READ: SlidersHorizontal,
   VERIFICATION: ScanFace,
 };
 
@@ -47,23 +55,24 @@ function VerificationWarning({ mixed }: { mixed: boolean }) {
   );
 }
 
-/** Vigencias que se ofrecen (el backend acepta de 1 a 730 días o sin vencimiento) y el texto de cada una. */
+/**
+ * Vigencias que se ofrecen. **Ya no existe «sin vencimiento»** (migración 0096 del backend): toda llave caduca,
+ * y un valor por encima del tope del servidor responde 422 `API_KEY_EXPIRY_TOO_LONG` en el campo. El tope lo pone
+ * el servidor, así que aquí solo se ofrecen vigencias que siempre caben.
+ */
 const LIFETIMES = {
   '30': 'apiKeys.form.lifetimes.days30',
   '90': 'apiKeys.form.lifetimes.days90',
   '180': 'apiKeys.form.lifetimes.months6',
   '365': 'apiKeys.form.lifetimes.year1',
-  never: 'apiKeys.form.lifetimes.never',
 } as const satisfies Record<string, MessageKey>;
 type Lifetime = keyof typeof LIFETIMES;
 
 /** Opciones de la vigencia en el idioma activo. */
-const lifetimeOptions = () =>
-  (Object.keys(LIFETIMES) as Lifetime[]).map((value) => ({
-    value,
-    label: t(LIFETIMES[value]),
-    ...(value === 'never' ? { description: t('apiKeys.form.lifetimes.neverHint') } : {}),
-  }));
+const lifetimeOptions = () => (Object.keys(LIFETIMES) as Lifetime[]).map((value) => ({ value, label: t(LIFETIMES[value]) }));
+
+/** El 422 del tope de vigencia va al campo de la vigencia (llegue por su código o por el nombre del campo). */
+const EXPIRY_FIELD: Partial<Record<string, 'expires_in_days'>> = { API_KEY_EXPIRY_TOO_LONG: 'expires_in_days', expires_in_days: 'expires_in_days' };
 
 /** Título del popup si no se pudo crear: el tope de llaves se explica aparte. */
 const createError = (error: unknown) => t(error instanceof ApiError && error.code === 'API_KEY_LIMIT' ? 'apiKeys.form.limitError' : 'apiKeys.form.error');
@@ -101,6 +110,8 @@ export function ApiKeyFormPage() {
   const [scopes, setScopes] = useState<ApiScope[]>([]);
   const [lifetime, setLifetime] = useState<Lifetime>('365');
   const [touched, setTouched] = useState(false);
+  // El 422 del tope de vigencia (`API_KEY_EXPIRY_TOO_LONG`) se marca en el campo de la vigencia, no solo en el popup.
+  const [lifetimeError, setLifetimeError] = useState<string>();
   const { saving, submit: send } = useSubmit();
 
   const nameError = touched && !name.trim() ? t('apiKeys.form.nameRequired') : undefined;
@@ -114,7 +125,7 @@ export function ApiKeyFormPage() {
     if (!ready || saving) return;
     await send(
       async () => {
-        const created = await apiKeyService.create({ name, scopes, expires_in_days: lifetime === 'never' ? null : Number(lifetime) });
+        const created = await apiKeyService.create({ name, scopes, expires_in_days: Number(lifetime) });
         back();
         void feedback.show(() => apiKeySecretMessage(created));
       },
@@ -122,6 +133,7 @@ export function ApiKeyFormPage() {
       {
         // Pregunta antes de crearla; cancelar deja el formulario como estaba.
         confirm: () => createConfirm(name.trim(), active('api_scopes').filter((scope) => scopes.includes(scope.code)).map((scope) => scope.name), lifetime),
+        onError: (err) => setLifetimeError(fieldErrorsFrom<{ expires_in_days: string }>(err, EXPIRY_FIELD).expires_in_days),
       },
     );
   };
@@ -169,7 +181,21 @@ export function ApiKeyFormPage() {
         <PanelSection title={t('apiKeys.form.lifetime')} icon={<CalendarClock size={20} />}>
           <div className="field">
             <FieldLabel htmlFor={lifetimeId} label={t('apiKeys.form.expiresIn')} />
-            <Select id={lifetimeId} value={lifetime} options={lifetimeOptions()} onChange={setLifetime} />
+            <Select
+              id={lifetimeId}
+              value={lifetime}
+              options={lifetimeOptions()}
+              aria-describedby={lifetimeError ? `${lifetimeId}-error` : undefined}
+              onChange={(value) => {
+                setLifetimeError(undefined);
+                setLifetime(value);
+              }}
+            />
+            {lifetimeError && (
+              <p id={`${lifetimeId}-error`} className="field__error">
+                {lifetimeError}
+              </p>
+            )}
           </div>
           <p className="muted small">{t('apiKeys.form.lifetimeNote')}</p>
         </PanelSection>

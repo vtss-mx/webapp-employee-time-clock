@@ -23,10 +23,19 @@ export default {
     applied: 'Livello {name} applicato',
   },
   risk: {
+    readiness: {
+      title: 'Stato del motore di rischio',
+      score: 'Limite superiore del punteggio: {maximum}. Segnali solo osservati: {observed}. Segnali obbligatori: {enforced}.',
+      cannotReject: 'Il punteggio non consente il rifiuto con questa configurazione.',
+      calibration: 'La calibrazione è ancora in sospeso; questo conteggio non dimostra la precisione.',
+      independent: 'I controlli critici si applicano anche con il segnale o il motore disattivato.',
+      critical: 'Controllo indipendente: {action}',
+    },
     title: 'Motore di rischio',
     hint: "Somma i punti dei segnali di ogni tentativo e applica l'azione del suo livello di rischio. Ogni famiglia di segnali ha un limite: un singolo segnale non nega mai da solo.",
     points: '{points} punti',
     fields: {
+      familyCap: 'Limite per famiglia',
       mediumScore: 'Rischio medio da',
       highScore: 'Rischio alto da',
       criticalScore: 'Rischio critico da',
@@ -38,6 +47,15 @@ export default {
       deviceMode: 'Dispositivo del dipendente',
       minConfidence: 'Livello di affidabilità',
       identifyConfidence: 'Livello di affidabilità per identificare tra tutti',
+    },
+    familyCap: {
+      description: 'Limita la somma dei segnali della stessa famiglia.',
+      saved: 'Limite di rischio aggiornato',
+      savedText: 'Limite per famiglia: {points}.',
+    },
+    changeReason: {
+      label: 'Motivo della modifica del rischio',
+      hint: 'Spiega la modifica; viene registrata nella cronologia aziendale.',
     },
     scores: {
       medium: 'Più basso è, più tentativi richiedono un passaggio in più.',
@@ -52,7 +70,7 @@ export default {
       savedText: '{tier}: {action}.',
     },
     fallback: {
-      description: 'Può solo consentire, avvisare o chiedere un passaggio in più: non nega mai alla cieca.',
+      description: 'Un errore del motore non approva mai l’identità. Il server definisce le opzioni sicure.',
       saved: 'Ripiego del motore aggiornato',
       savedText: 'Se il motore non funziona: {action}.',
     },
@@ -170,7 +188,7 @@ export default {
     },
     siteCodes: {
       label: 'Codice della sede',
-      hint: "Nelle sedi che lo attivano, l'entrata e l'uscita includono il codice del chiosco.",
+      hint: "Nelle sedi che lo attivano, ogni verifica include il codice del chiosco.",
       enforceWarning: 'Prima, installa un chiosco in ogni sede che lo attiva: senza il codice non si registra.',
     },
   },

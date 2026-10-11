@@ -5,12 +5,12 @@ import type es from '../es-MX/devices';
 export default {
   title: 'Dispositivi',
   intro:
-    'Browser e telefoni da cui ha timbrato o verificato la propria identità, ciascuno con una chiave che non si può copiare. In base ai criteri, uno non approvato richiede un passaggio in più o manda le sue registrazioni in revisione.',
+    'Browser e telefoni da cui ha verificato la propria identità, ciascuno con una chiave che non si può copiare. In base ai criteri, uno non approvato richiede un passaggio in più o manda le sue registrazioni in revisione.',
   mineTitle: 'I miei dispositivi',
-  mineIntro: 'I browser o i telefoni da cui hai registrato la presenza o verificato la tua identità. La tua azienda può approvarli o revocarli.',
+  mineIntro: 'I browser o i telefoni da cui hai verificato la tua identità. La tua azienda può approvarli o revocarli.',
   empty: {
     title: 'Nessun dispositivo',
-    description: 'Qui vedrai i browser e i telefoni usati per timbrare.',
+    description: "Qui vedrai i browser e i telefoni usati per verificare l'identità.",
   },
   noun: {
     one: 'dispositivo',

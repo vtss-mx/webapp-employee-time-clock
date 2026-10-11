@@ -43,8 +43,8 @@ export default {
       hint: 'Jede sichere Identifizierung zeigt, wie jeder Mitarbeiter heute aussieht. Die vom Unternehmen validierten Aufnahmen werden nie ersetzt.',
     },
     location: {
-      title: 'Position bei der Anwesenheit',
-      hint: 'Jede Zeitbuchung enthält die Position des Telefons und die Uhrzeit des Servers; passen Sie unten Genauigkeit und Geschwindigkeit an.',
+      title: 'Position bei der Prüfung',
+      hint: 'Jede Prüfung enthält die Position des Telefons und die Uhrzeit des Servers; passen Sie unten Genauigkeit und Geschwindigkeit an.',
     },
     methods: {
       title: 'Methoden der Identifizierung',
@@ -53,7 +53,7 @@ export default {
     antifraud: {
       title: 'Betrugsschutz',
       hint:
-        'Im Zweifel verlangt die Risikobewertung einen zusätzlichen Schritt oder legt die Zeitbuchung dem Unternehmen zur Prüfung vor. Nachweise zu verdächtigen Versuchen sieht nur der Administrator unter „Betrugsfälle“.',
+        'Im Zweifel verlangt die Risikobewertung einen zusätzlichen Schritt oder legt die Prüfung dem Unternehmen zur Revision vor. Nachweise zu verdächtigen Versuchen sieht nur der Administrator unter „Betrugsfälle“.',
     },
     capture: {
       title: 'Aufnahmeprotokoll',
@@ -158,8 +158,8 @@ export default {
     },
     detectImpossibleTravel: {
       label: 'Unmögliche Reisen erkennen',
-      on: 'Eine Zeitbuchung, die für die vergangene Zeit zu weit von der vorherigen entfernt ist, wird abgelehnt (gefälschte Position oder geteiltes Konto).',
-      off: 'Die Position einer Zeitbuchung wird nicht mit der vorherigen verglichen.',
+      on: 'Eine Prüfung, die für die vergangene Zeit zu weit von der vorherigen entfernt ist, wird abgelehnt (gefälschte Position oder geteiltes Konto).',
+      off: 'Die Position einer Prüfung wird nicht mit der vorherigen verglichen.',
     },
     qrEnabled: {
       label: 'Verifizierung per QR-Code',
@@ -170,11 +170,6 @@ export default {
       label: 'Geräte von Prüfgeräten freigeben',
       on: 'Jeder Tabletcomputer und jedes Telefon eines Prüfgeräts muss unter Prüfgeräte › Geräte freigegeben werden.',
       off: 'Prüfgeräte können sich mit E-Mail-Adresse und Passwort auf jedem Gerät anmelden.',
-    },
-    qrOnlyAttendance: {
-      label: 'Anwesenheit nur mit QR-Code',
-      on: 'Ein Prüfgerät im QR-Modus erfasst Kommen und Gehen mit dem Code, ohne Gesicht.',
-      off: 'Der QR-Code allein dient nur zur Identifizierung; für die Zeitbuchung ist das Gesicht nötig.',
     },
     riskEngine: {
       label: 'Risikobewertung',
@@ -215,10 +210,9 @@ export default {
   },
   warnings: {
     spoofing: 'Dies verringert den Schutz vor Identitätstäuschung (Fotos, Bildschirme oder Videos).',
-    impossibleTravel: 'Eine Zeitbuchung mit gefälschter Position oder von einem anderen Ort wird nicht anhand der Entfernung erkannt.',
+    impossibleTravel: 'Eine Prüfung mit gefälschter Position oder von einem anderen Ort wird nicht anhand der Entfernung erkannt.',
     deviceApproval: 'Wer E-Mail-Adresse und Passwort eines Prüfgeräts kennt, kann es von jedem Gerät aus bedienen.',
     mobileOnly: 'Prüfgeräte können dann über Computer arbeiten, deren Kamera sich meist leichter mit Fotos oder Bildschirmen täuschen lässt.',
-    qrOnly: 'Wer das Telefon eines anderen Mitarbeiters hat, kann dessen Anwesenheit erfassen, ohne das Gesicht zu zeigen.',
     riskEngine:
       'Die Signale werden nicht mehr addiert: Ein Versuch mit mehreren Hinweisen auf Täuschung kommt durch, wenn ihn kein einzelner Schutzmechanismus stoppt.',
     captureProtocol: 'Ein im Voraus vorbereitetes Video ist schwerer zu erkennen.',
@@ -248,6 +242,35 @@ export default {
       confirmLabel: 'Stimme speichern',
     },
     preview: 'Stimme testen',
+  },
+  /** Schritte der Identitätsregistrierung und ihre Reihenfolge: der ADMIN entscheidet je Unternehmen. */
+  enrollment: {
+    title: 'Schritte der Identitätsregistrierung',
+    hint: 'Wählen Sie, was von jedem Mitarbeiter verlangt wird und in welcher Reihenfolge. Der Mitarbeiter geht die Schritte in dieser Reihenfolge durch.',
+    label: 'Schritte der Registrierung, in Reihenfolge',
+    required: 'Pflicht',
+    locked: 'Wird immer verlangt: Es ist die Registrierung, die das Unternehmen prüft.',
+    position: 'Schritt {position} von {total}',
+    notAsked: 'Wird nicht verlangt',
+    moveUp: '„{name}“ nach oben',
+    moveDown: '„{name}“ nach unten',
+    note: 'Der Schritt „{step}“ wird immer verlangt und bleibt am Ende des Ablaufs.',
+    warning: 'Weniger Schritte zu verlangen verringert die Nachweise, dass die Person die ist, die sie zu sein behauptet.',
+    confirm: {
+      enableTitle: '„{name}“ verlangen?',
+      enableText: 'Jeder Mitarbeiter muss „{name}“ in seiner Registrierung abschließen.',
+      disableTitle: '„{name}“ nicht mehr verlangen?',
+      moveTitle: '„{name}“ auf Schritt {position} verschieben?',
+      moveText: 'Es werden die gleichen Schritte verlangt, in anderer Reihenfolge.',
+      order: 'Reihenfolge der Registrierung',
+      save: 'Reihenfolge speichern',
+    },
+    notice: {
+      enabled: '{name}: wird jetzt verlangt',
+      disabled: '{name}: wird nicht mehr verlangt',
+      moved: '{name}: verschoben',
+      text: 'Gilt für die Registrierung aller, die sie noch nicht beendet haben.',
+    },
   },
   tuning,
   ...antifraud,

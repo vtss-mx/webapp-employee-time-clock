@@ -7,7 +7,6 @@ import { detectedAccessories, faceErrorOutcome, faceResumeDelayMs, isRetryableFa
 import { ApiError } from './apiClient';
 import { authService } from './authService';
 import { catalogService } from './catalogService';
-import { departmentService } from './departmentService';
 import { employeeService } from './employeeService';
 import { enrollmentService } from './enrollmentService';
 import { errorReportService } from './errorReportService';
@@ -16,8 +15,6 @@ import { apiKeyService } from './apiKeyService';
 import { meService } from './meService';
 import { settingsService } from './settingsService';
 import { faceService, verificationService } from './verificationService';
-import { attendanceService } from './attendanceService';
-import { shiftService } from './shiftService';
 import { siteService } from './siteService';
 
 const employee = { id: 1, employee_number: 'EMP-1', first_name: 'Ana', last_name: 'Ruiz' };
@@ -25,10 +22,11 @@ const qr = { id: 1, content: 'TCQR2:abc', employee_number: 'EMP-1', expires_at: 
 const apiKey = { id: 3, name: 'ERP', prefix: 'tck_Ab3dE9fG', scopes: ['EMPLOYEES_READ'], status: 'ACTIVE' };
 const qrSummary = { live: true, live_until: null, last_issued_at: null, last_used_at: null };
 const detail = { id: 3, status: 'PENDING', employee_id: 1 };
-const department = { id: 3, name: 'Producción', employee_count: 0, managers: [] };
 const errorReport = { id: 9, code: 'INTERNAL_ERROR', status: 'PENDING', severity: 'CRITICAL', occurrences: 2 };
 const result = { verified: true, method: 'FACE', message: 'ok' };
 const policy = { block_glasses: true, block_headwear: true, block_mask: false, liveness_challenge: true, anti_spoofing: true, qr_enabled: true, voice_guidance_enabled: false };
+/** La que llega del servidor con su lista de cámaras bloqueadas (arreglo presente). */
+const settingsPolicy = { ...policy, blocked_cameras: ['OBS Virtual Camera'] };
 /** La del ADMIN: la de la empresa más el motor de riesgo (lo mínimo que la app revisa). */
 const adminPolicy = { ...policy, risk_engine: true, risk_signals: [], pending_changes: 0 };
 const site = { id: 2, name: 'Planta Norte', address: {}, radius_m: 100, active: true };
@@ -38,25 +36,6 @@ const sitePayload = {
   radius_m: 100,
   presence_code: false,
 };
-const shift = { id: 5, name: 'Matutino', start_time: '08:00:00', end_time: '16:00:00', weekdays: [0], remote_weekdays: [], sites: [], active: true };
-const shiftPayload = {
-  name: 'Matutino',
-  start_time: '08:00',
-  end_time: '16:00',
-  weekdays: [0, 1] as const,
-  breaks_count: 1,
-  break_minutes: 30,
-  early_check_in_minutes: 15,
-  late_tolerance_minutes: 10,
-  early_check_out_minutes: 0,
-  late_check_out_minutes: 60,
-  site_ids: [2],
-  remote_weekdays: [],
-};
-const assignment = { id: 8, shift, valid_from: '2026-10-05', state: 'SCHEDULED' };
-const shiftRequest = { id: 4, employee: { id: 1 }, shift, valid_from: '2026-10-06', status: 'PENDING' };
-const session = { id: 6, work_date: '2026-10-05', status: 'OPEN', check_in_at: 'x', breaks: [] };
-const board = { items: [{ employee: { id: 1 }, state: 'WORKING', shift_name: 'Matutino' }], total: 1, page: 1, size: 10, work_date: '2026-10-05', working: 1 };
 
 /** Cada servicio llama al endpoint y método correctos y valida la forma de la respuesta. */
 describe('servicios', () => {
@@ -72,15 +51,6 @@ describe('servicios', () => {
     ['employees.qrSummary', () => employeeService.qrSummary(1), qrSummary, 'GET', '/api/employees/1/qr'],
     ['employees.revokeQr', () => employeeService.revokeQr(1), qrSummary, 'DELETE', '/api/employees/1/qr'],
     ['employees.history', () => employeeService.history(1, { page: 1, size: 10 }), { items: [{ id: 1, method: 'QR', success: true }], total: 1, page: 1, size: 10 }, 'GET', '/api/employees/1/verifications?page=1&size=10'],
-    ['departments.list', () => departmentService.list({ page: 1, size: 10, search: 'pro' }), { items: [department], total: 1 }, 'GET', '/api/departments?page=1&size=10&search=pro'],
-    ['departments.get', () => departmentService.get(3), department, 'GET', '/api/departments/3'],
-    ['departments.create', () => departmentService.create({ name: 'Producción', description: null }), department, 'POST', '/api/departments'],
-    ['departments.update', () => departmentService.update(3, { name: 'Producción', description: 'x' }), department, 'PUT', '/api/departments/3'],
-    ['departments.remove', () => departmentService.remove(3), null, 'DELETE', '/api/departments/3'],
-    ['departments.assign', () => departmentService.assign(3, 7), department, 'POST', '/api/departments/3/employees'],
-    ['departments.unassign', () => departmentService.unassign(3, 7), department, 'DELETE', '/api/departments/3/employees/7'],
-    ['departments.addManager', () => departmentService.addManager(3, 7), department, 'POST', '/api/departments/3/managers'],
-    ['departments.removeManager', () => departmentService.removeManager(3, 7), department, 'DELETE', '/api/departments/3/managers/7'],
     ['errors.list', () => errorReportService.list({ page: 1, size: 10, status: 'PENDING' }), { items: [errorReport], total: 1 }, 'GET', '/api/admin/errors?page=1&size=10&status=PENDING'],
     ['errors.summary', () => errorReportService.summary(), { by_status: {}, pending: 0 }, 'GET', '/api/admin/errors/summary'],
     ['errors.get', () => errorReportService.get(9), errorReport, 'GET', '/api/admin/errors/9'],
@@ -89,7 +59,7 @@ describe('servicios', () => {
     ['errors.resolveMatching', () => errorReportService.resolveMatching({ severity: 'WARNING' }, '2026-10-03T10:00:00Z'), { resolved: 4 }, 'POST', '/api/admin/errors/resolve'],
     ['enrollments.submit', () => enrollmentService.submit({ frontal: [new Blob(['a'])] }), { enrollment_id: 1, face_status: 'PENDING_REVIEW' }, 'POST', '/api/enrollment/face'],
     ['enrollments.list', () => enrollmentService.list('PENDING', { page: 1, size: 10 }), { items: [detail], total: 1 }, 'GET', '/api/enrollments?status=PENDING&page=1&size=10'],
-    ['enrollments.progress', () => enrollmentService.progress(), { photo: { status: 'pending' }, capture: { status: 'locked' }, voice: { status: 'locked' } }, 'GET', '/api/enrollment/progress'],
+    ['enrollments.progress', () => enrollmentService.progress(), { face_status: 'NOT_ENROLLED', complete: false, current: 'INITIAL_PHOTO', steps: [] }, 'GET', '/api/enrollment/progress'],
     ['enrollments.photo', () => enrollmentService.photo({ frontal: [new Blob(['a'])], camera: 'Cámara' }), { ok: true, checked_at: 'x', expires_at: 'y' }, 'POST', '/api/enrollment/photo'],
     ['enrollments.startVoice', () => enrollmentService.startVoice(), { token: 't', questions: [], total: 3, answered: 3 }, 'POST', '/api/enrollment/voice/start'],
     ['enrollments.get', () => enrollmentService.get(3), detail, 'GET', '/api/enrollments/3'],
@@ -105,7 +75,7 @@ describe('servicios', () => {
     ['apiKeys.rotate', () => apiKeyService.rotate(3), { ...apiKey, secret: 'tck_y' }, 'POST', '/api/api-keys/3/rotate'],
     ['apiKeys.revoke', () => apiKeyService.revoke(3), apiKey, 'DELETE', '/api/api-keys/3'],
     ['me.qrStatus', () => meService.qrStatus(7), { id: 7, status: 'USED' }, 'GET', '/api/users/me/qr/7'],
-    ['settings.get', () => settingsService.getVerificationPolicy(), policy, 'GET', '/api/settings/verification'],
+    ['settings.get', () => settingsService.getVerificationPolicy(), settingsPolicy, 'GET', '/api/settings/verification'],
     ['admin.policy', () => adminService.policy(4), adminPolicy, 'GET', '/api/admin/companies/4/verification-policy'],
     ['admin.updatePolicy', () => adminService.updatePolicy(4, { block_mask: false }), { policy: adminPolicy, change: null }, 'PUT', '/api/admin/companies/4/verification-policy'],
     ['admin.faceLearning', () => adminService.faceLearning(4), { enabled: true, employees_learning: 1, learned_samples: 2 }, 'GET', '/api/admin/companies/4/face-learning'],
@@ -125,29 +95,6 @@ describe('servicios', () => {
     ['sites.update', () => siteService.update(2, sitePayload), site, 'PUT', '/api/sites/2'],
     ['sites.setStatus', () => siteService.setStatus(2, false), site, 'PATCH', '/api/sites/2/status'],
     ['sites.remove', () => siteService.remove(2), null, 'DELETE', '/api/sites/2'],
-    ['shifts.list', () => shiftService.list({ page: 1, size: 10, active: true }), { items: [shift], total: 1 }, 'GET', '/api/shifts?page=1&size=10&active=true'],
-    ['shifts.get', () => shiftService.get(5), shift, 'GET', '/api/shifts/5'],
-    ['shifts.create', () => shiftService.create({ ...shiftPayload, weekdays: [0, 1] }), shift, 'POST', '/api/shifts'],
-    ['shifts.update', () => shiftService.update(5, { ...shiftPayload, weekdays: [0, 1] }), shift, 'PUT', '/api/shifts/5'],
-    ['shifts.setStatus', () => shiftService.setStatus(5, false), shift, 'PATCH', '/api/shifts/5/status'],
-    ['shifts.remove', () => shiftService.remove(5), null, 'DELETE', '/api/shifts/5'],
-    ['shifts.assignments', () => shiftService.assignments(1, { page: 1, size: 10 }), { items: [assignment], total: 1 }, 'GET', '/api/employees/1/shift-assignments?page=1&size=10'],
-    ['shifts.assign', () => shiftService.assign(1, { shift_id: 5, valid_from: '2026-10-05' }), assignment, 'POST', '/api/employees/1/shift-assignments'],
-    ['shifts.cancelAssignment', () => shiftService.cancelAssignment(8), null, 'DELETE', '/api/shift-assignments/8'],
-    ['shifts.requests', () => shiftService.requests({ page: 1, size: 10, status: 'PENDING' }), { items: [shiftRequest], total: 1 }, 'GET', '/api/shift-requests?page=1&size=10&status=PENDING'],
-    ['shifts.pendingRequests', () => shiftService.pendingRequests(), { pending: 2 }, 'GET', '/api/shift-requests/summary'],
-    ['shifts.approve', () => shiftService.approve(4), shiftRequest, 'POST', '/api/shift-requests/4/approve'],
-    ['shifts.reject', () => shiftService.reject(4, ' Sin cupo '), shiftRequest, 'POST', '/api/shift-requests/4/reject'],
-    ['attendance.board', () => attendanceService.board({ page: 1, size: 10, date: '2026-10-05' }), board, 'GET', '/api/attendance/board?page=1&size=10&date=2026-10-05'],
-    ['attendance.sessions', () => attendanceService.sessions({ page: 1, size: 10, status: 'CLOSED' }), { items: [{ ...session, employee: { id: 1 } }], total: 1 }, 'GET', '/api/attendance/sessions?page=1&size=10&status=CLOSED'],
-    ['attendance.session', () => attendanceService.session(6), { ...session, employee: { id: 1 }, events: [] }, 'GET', '/api/attendance/sessions/6'],
-    ['attendance.today', () => attendanceService.today(), { now: 'x', actions: [], message: 'm', sites: [] }, 'GET', '/api/me/attendance/today'],
-    ['attendance.record', () => attendanceService.record('BREAK_START', { frontal: [new Blob(['a'])] }, { latitude: 29, longitude: -110, accuracy: 12 }), { verified: true, message: 'm', action: 'BREAK_START', verification: result }, 'POST', '/api/me/attendance/break-start'],
-    ['attendance.history', () => attendanceService.history({ page: 1, size: 10 }), { items: [session], total: 1 }, 'GET', '/api/me/attendance/history?page=1&size=10'],
-    ['attendance.availableShifts', () => attendanceService.availableShifts({ page: 1, size: 50 }), { items: [shift], total: 1 }, 'GET', '/api/me/shifts?page=1&size=50'],
-    ['attendance.myRequests', () => attendanceService.myRequests({ page: 1, size: 10 }), { items: [shiftRequest], total: 1 }, 'GET', '/api/me/shift-requests?page=1&size=10'],
-    ['attendance.requestChange', () => attendanceService.requestChange({ shift_id: 5, valid_from: '2026-10-06', reason: ' Estudio ' }), shiftRequest, 'POST', '/api/me/shift-requests'],
-    ['attendance.cancelRequest', () => attendanceService.cancelRequest(4), shiftRequest, 'POST', '/api/me/shift-requests/4/cancel'],
   ])('%s', async (_name, call, data, method, url) => {
     const { calls } = mockFetch(apiOk(data));
     await call();
@@ -155,33 +102,13 @@ describe('servicios', () => {
     expect(calls[0].url).toBe(url);
   });
 
-  it('asistencia: el registro envía la ubicación con la precisión acotada; un tablero sin conteos no es válido', async () => {
-    const { calls } = mockFetch(apiOk({ verified: true, message: 'm', action: 'CHECK_IN', verification: result }), apiOk({ items: [], total: 0 }));
-    await attendanceService.record('CHECK_IN', { frontal: [new Blob(['a'])] }, { latitude: 29.1, longitude: -110.9, accuracy: 250_000 });
-    const form = calls[0].init.body as FormData;
-    expect([form.get('latitude'), form.get('longitude'), form.get('accuracy')]).toEqual(['29.1', '-110.9', '100000']);
-    expect(form.get('location_samples')).toBeNull(); // sin la toma de varias lecturas
-    expect(calls[0].url).toBe('/api/me/attendance/check-in');
-    await expect(attendanceService.board({ page: 1, size: 10 })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  it('la política de verificación siempre trae `blocked_cameras` como arreglo (un backend anterior que no lo manda → [])', async () => {
+    mockFetch(apiOk(policy)); // `policy` no incluye blocked_cameras: el servicio lo normaliza para los consumidores
+    await expect(settingsService.getVerificationPolicy()).resolves.toEqual({ ...policy, blocked_cameras: [], enrollment_steps: ['INITIAL_PHOTO', 'FACE_CAPTURES', 'VOICE_VIDEO'] });
   });
 
-  it('asistencia: todas las lecturas de la toma viajan para que el servidor detecte una ubicación simulada', async () => {
-    const { calls } = mockFetch(apiOk({ verified: true, message: 'm', action: 'CHECK_IN', verification: result }));
-    const samples = [
-      { latitude: 29.1, longitude: -110.9, accuracy: 12 },
-      { latitude: 29.10001, longitude: -110.9, accuracy: 250_000 },
-    ];
-    await attendanceService.record('CHECK_IN', { frontal: [new Blob(['a'])] }, { ...samples[0], samples });
-    expect(JSON.parse((calls[0].init.body as FormData).get('location_samples') as string)).toEqual([samples[0], { ...samples[1], accuracy: 100_000 }]);
-  });
 
-  it('las solicitudes y el motivo del rechazo viajan sin espacios sobrantes', async () => {
-    const { calls } = mockFetch(apiOk(shiftRequest));
-    await shiftService.reject(4, '  Sin cupo  ');
-    await attendanceService.requestChange({ shift_id: 5, valid_from: '2026-10-06', reason: '  Estudio  ' });
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ note: 'Sin cupo' });
-    expect(JSON.parse(calls[1].init.body as string)).toEqual({ shift_id: 5, valid_from: '2026-10-06', reason: 'Estudio' });
-  });
+
 
   it('rechaza respuestas con forma inesperada', async () => {
     mockFetch(apiOk({ id: 'sin-campos' }), apiOk({ liveness_required: true, actions: ['TURN_LEFT'] }));
@@ -294,20 +221,12 @@ describe('stepUpChallenge: el reto de "un paso más" del motor de riesgo', () =>
 });
 
 describe('servicios del antifraude', () => {
-  it('nivel predefinido con motivo, contador de revisiones y la decisión de una jornada (sin nota)', async () => {
+  it('aplicar un nivel predefinido manda el motivo sin espacios sobrantes', async () => {
     const adminPolicy = { ...policy, risk_engine: true, risk_signals: [], pending_changes: 0 };
-    const { calls } = mockFetch((call) => {
-      if (call.url.endsWith('/preset')) return apiOk({ policy: adminPolicy, change: null });
-      if (call.url.endsWith('/reviews/count')) return apiOk({ pending: 3 });
-      return apiOk({ id: 5, employee: { id: 1 }, events: [], status: 'CLOSED' });
-    });
+    const { calls } = mockFetch(apiOk({ policy: adminPolicy, change: null }));
     await adminService.applyPolicyPreset(4, 'HIGH', '  Fraude en planta ');
-    expect(await attendanceService.reviewCount()).toBe(3);
-    await attendanceService.review(5, 'CONFIRMED', '   ');
     expect(calls.map((c): [string, unknown] => [c.url, c.init.body ? (JSON.parse(c.init.body as string) as unknown) : undefined])).toEqual([
       ['/api/admin/companies/4/verification-policy/preset', { preset: 'HIGH', reason: 'Fraude en planta' }],
-      ['/api/attendance/reviews/count', undefined],
-      ['/api/attendance/sessions/5/review', { decision: 'CONFIRMED', note: null }],
     ]);
   });
 });

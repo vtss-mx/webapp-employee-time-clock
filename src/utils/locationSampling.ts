@@ -1,6 +1,6 @@
 /**
  * Varias lecturas de la ubicación en una ventana corta (antifraude 1b, `docs/rd/antifraude-identidad.md` §2.7): un GPS
- * real tiembla y su precisión cambia; un simulador repite la misma lectura. Las viaja el registro de asistencia para que
+ * real tiembla y su precisión cambia; un simulador repite la misma lectura. Las viaja cada verificación para que
  * el SERVIDOR lo mida (la que decide la geocerca es la más precisa).
  */
 import { config } from './config';

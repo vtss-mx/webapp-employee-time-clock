@@ -1,7 +1,7 @@
 import { useCatalogs } from '../hooks/useCatalogs';
 
-/** Catálogos de motivos sugeridos (rechazar un registro, pedir nueva verificación, registrar o corregir asistencia). */
-export type ReasonCatalog = 'enrollment_rejection_reasons' | 'reverification_reasons' | 'attendance_edit_reasons';
+/** Catálogos de motivos sugeridos (rechazar un registro de identidad, pedir una nueva verificación). */
+export type ReasonCatalog = 'enrollment_rejection_reasons' | 'reverification_reasons';
 
 interface ReasonChipsProps {
   /** Catálogo de motivos sugeridos (solo se ofrecen los activos, en su orden). */

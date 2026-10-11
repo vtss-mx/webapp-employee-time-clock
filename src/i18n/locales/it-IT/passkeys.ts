@@ -8,6 +8,20 @@ export default {
   unsupported: 'Questo browser non supporta le chiavi di accesso. Usa Safari, Chrome o Edge aggiornati.',
   loadError: 'Impossibile caricare le tue chiavi di accesso',
   add: 'Aggiungi chiave di accesso',
+  mfa: {
+    title: 'Il tuo account ha bisogno di una chiave di accesso',
+    daysLeft_one: 'Ti resta {count} giorno per registrarla.',
+    daysLeft_other: 'Ti restano {count} giorni per registrarla.',
+    expiredTitle: 'Registra la tua chiave di accesso per continuare',
+    expiredText: 'Il termine è scaduto: nessuna schermata funziona fino alla registrazione.',
+    action: 'Registra la chiave',
+  },
+  gate: {
+    badge: 'Secondo fattore',
+    title: 'Registra la tua chiave di accesso',
+    footnote: 'La tua sessione resta aperta: dopo la registrazione tutto torna a funzionare.',
+    action: 'Registra la chiave di accesso',
+  },
   empty: {
     title: 'Nessuna chiave di accesso',
     description: "Aggiungine una per accedere con il volto, l'impronta o il PIN.",

@@ -81,7 +81,7 @@ export default {
     adminEmail: 'E-mail do administrador',
     adminEmailHint: 'Com este e-mail ele entrará; é também o e-mail da empresa',
     adminPassword: 'Senha inicial',
-    adminPasswordHint: 'Mínimo de 8 caracteres, com letra maiúscula, letra minúscula e número',
+    adminPasswordHint: 'Mínimo de 12 caracteres, com letra maiúscula, letra minúscula e número',
   },
   create: {
     adminSection: 'Administrador da empresa',
@@ -191,6 +191,7 @@ export default {
       message: 'São excluídos a empresa, os administradores, os validadores e a configuração dela.',
       detailsTitle: 'Será excluída',
       confirmLabel: 'Excluir empresa',
+      inUse: 'A empresa está em uso: desative-a',
     },
     admin: {
       eyebrow: 'Administrador da empresa',
@@ -247,7 +248,6 @@ export default {
     emptyTitle: 'Sem funcionários',
     emptyDescription: 'Aqui você verá a equipe que a empresa cadastrar.',
     noPhone: 'Sem telefone',
-    noDepartment: 'Sem departamento',
     forget: {
       button: 'Esquecer',
       none: 'Sem aprendizado',

@@ -5,7 +5,7 @@ import { paymentConfirm } from '../../../components/billing/billingConfirms';
 import { CurrencyField } from '../../../components/billing/CurrencyField';
 import { FormField, TextAreaField } from '../../../components/FormField';
 import { FormFooter } from '../../../components/FormFooter';
-import { SelectField } from '../../../components/shifts/formFields';
+import { SelectField } from '../../../components/ui/formFields';
 import { DateField, parseIso } from '../../../components/ui/DateField';
 import { FilePicker } from '../../../components/ui/FilePicker';
 import { NumberField } from '../../../components/ui/NumberField';
@@ -36,8 +36,8 @@ interface PaymentValues {
   currency: CurrencyCode;
 }
 
-/** Errores del comprobante que da el backend (tamaño o tipo). */
-const RECEIPT_CODES = new Set(['RECEIPT_TOO_LARGE', 'RECEIPT_TYPE_NOT_ALLOWED']);
+/** Errores del comprobante que da el backend (tamaño o tipo); `PAYLOAD_TOO_LARGE` es el 413 del gateway por el archivo. */
+const RECEIPT_CODES = new Set(['RECEIPT_TOO_LARGE', 'RECEIPT_TYPE_NOT_ALLOWED', 'PAYLOAD_TOO_LARGE']);
 const saveError = () => t('billing.payment.error');
 
 /** Reglas del pago (UX: el backend las vuelve a validar). */

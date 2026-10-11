@@ -1199,9 +1199,6 @@ img {
   line-height: 1.5;
   color: #475569;
 }
-.page-loader .brand-loader__text {
-  font-size: 0.9rem;
-}
 .brand-mark {
   --brand-mark-size: clamp(88px, 22vmin, 128px);
   position: relative;
@@ -1209,9 +1206,6 @@ img {
   width: var(--brand-mark-size);
   height: var(--brand-mark-size);
   animation: brand-mark-breathe 2.4s ease-in-out infinite;
-}
-.page-loader .brand-mark {
-  --brand-mark-size: 72px;
 }
 .brand-mark__logo {
   display: block;
@@ -3040,6 +3034,37 @@ a.kpi:hover {
   animation: scan 2.2s ease-in-out infinite;
 }
 
+/* Escáner de documento (DocumentScanner): guía con forma de documento (rectángulo redondeado) que la persona encuadra.
+   Estados fijos (decisión del dueño, como el escáner facial): el color del borde cambia con el tono, sin animación ni
+   fundidos; por eso respeta «reducir movimiento» por construcción. `.doc-scan` es su propio contenedor (su tamaño es el
+   del visor), así el lado de la guía sale del visor con unidades de contenedor y la misma parte que mide `docQuality`
+   (`DOC_GUIDE_INSET` ≈ 82 %). La guía es solo visual: la foto es el cuadro completo (sin recorte; recorte/enderezado = v2). */
+.doc-scan {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.doc-scan__frame {
+  width: min(84cqw, calc(70cqh * var(--doc-aspect, 1.4)));
+  aspect-ratio: var(--doc-aspect, 1.4);
+  border: 3px solid var(--doc-color, rgba(255, 255, 255, 0.92));
+  border-radius: 16px;
+  /* Oscurece suavemente fuera de la guía para centrar la atención en el documento. */
+  box-shadow: 0 0 0 100vmax rgba(5, 12, 28, 0.42);
+}
+.doc-scan--warn .doc-scan__frame {
+  --doc-color: #f4b63a;
+}
+.doc-scan--ok .doc-scan__frame {
+  --doc-color: #34d399;
+}
+.doc-scan--busy .doc-scan__frame {
+  --doc-color: #6f9bff;
+}
+
 /* ==========================================================================
    Empleado: menú, flujo facial, estados
    ========================================================================== */
@@ -4046,6 +4071,15 @@ a.kpi:hover {
   align-items: center;
   gap: 4px 8px;
 }
+/*
+ * Texto legal del consentimiento biométrico: se dibuja COMPLETO, tal como lo manda el servidor (regla 22 de la raíz),
+ * con una medida cómoda de lectura y más aire entre líneas. Nunca se recorta, resume ni se esconde tras un enlace.
+ */
+.consent-text {
+  max-width: 68ch;
+  line-height: 1.65;
+}
+
 .inline-note {
   display: flex;
   align-items: flex-start;
@@ -7286,6 +7320,11 @@ button.method-card {
 }
 
 /* ---------- Integraciones (API) ---------- */
+/* Opciones en tarjeta dentro de un ChoiceGroup, una debajo de otra (de dónde sale el par de claves de firma). */
+.choice-group--cards {
+  display: grid;
+  gap: 10px;
+}
 .api-key__prefix {
   justify-self: start;
   padding: 1px 8px;
@@ -11491,6 +11530,90 @@ label.radio-card--sm {
   }
 }
 
+/* ---------- Pasos del registro de identidad: la configuración del ADMIN (EnrollmentStepsSection.tsx) ----------
+   Decisión del dueño del producto (2026-10-08): el ADMIN decide, por empresa, cuáles pasos se piden y en qué orden.
+   Cada fila lleva su lugar en el flujo, su interruptor y los botones para subirla o bajarla (componentes propios, nada
+   de librerías de arrastre; regla 12). Estados fijos, sin animaciones; se acomoda al ancho de su contenedor. */
+.enroll-flow {
+  container-type: inline-size;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.enroll-flow__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.enroll-flow__row.is-on {
+  background: var(--surface);
+}
+.enroll-flow__position {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted);
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.enroll-flow__row.is-on .enroll-flow__position {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.enroll-flow__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.enroll-flow__main .switch-row {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.enroll-flow__locked,
+.enroll-flow__count {
+  margin: 0;
+}
+/* Los botones de orden: en teléfono ocupan su propia fila y miden al menos 44 px (regla de accesibilidad). */
+.enroll-flow__order {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+}
+.enroll-flow__order .btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+.enroll-flow__count {
+  margin-inline-start: auto;
+}
+@container (min-width: 520px) {
+  .enroll-flow__row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .enroll-flow__order {
+    grid-column: auto;
+    flex-wrap: nowrap;
+  }
+  .enroll-flow__count {
+    order: -1;
+    margin-inline-start: 0;
+    white-space: nowrap;
+  }
+}
+
 /* ---------- Verificación por voz y video (VoiceVerificationFlow.tsx) ----------
    La misma tarjeta clara del escáner con la MISMA guía del rostro (decisión del dueño, 2026-10-07: una sola guía en toda
    la app; la persona habla dentro del contorno), la pregunta grande bajo el círculo, el indicador de grabación fijo (un
@@ -11602,3 +11725,161 @@ label.radio-card--sm {
   margin: 0;
   font-style: italic;
 }
+
+/* Aviso de medición de uso (ePrivacy: se pregunta ANTES de medir). Barra discreta abajo, por encima de todo,
+   con el área segura de los teléfonos; a lo ancho y apilada en pantallas angostas. */
+.consent-bar {
+  --consent-gap: 12px;
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--consent-gap);
+  padding: 14px 20px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 24px rgb(15 23 42 / 8%);
+}
+
+.consent-bar__text {
+  display: flex;
+  flex: 1 1 22rem;
+  flex-direction: column;
+  gap: 2px;
+  min-width: min(100%, 22rem);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.consent-bar__text strong {
+  color: var(--text);
+}
+
+.consent-bar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+@media (width <= 480px) {
+  .consent-bar__actions {
+    width: 100%;
+  }
+
+  .consent-bar__actions > * {
+    flex: 1 1 0;
+  }
+}
+
+/* Bitácora de auditoría: el «antes → después» y los datos de un evento, compactos dentro de su celda.
+   Sin transiciones ni animaciones: es evidencia, se lee. */
+.audit-details {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: 0.82rem;
+}
+.audit-details div {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+.audit-details dt {
+  margin: 0;
+  color: var(--muted);
+}
+.audit-details dt code {
+  font-size: 0.78rem;
+}
+.audit-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.audit-details del {
+  color: var(--muted);
+  text-decoration-color: var(--muted);
+}
+.audit-details ins {
+  text-decoration: none;
+  font-weight: 700;
+}
+.audit-details svg {
+  vertical-align: -2px;
+  color: var(--muted);
+}
+
+/* Continuidad del servicio: el estado de cada mecanismo de ensayo. Sin transiciones (es un estado, no un aviso). */
+.drill-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 720px) {
+  .drill-list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.drill {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.drill__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+/* Nunca ensayado o vencido: el borde lo dice sin depender del color del texto. */
+.drill--never,
+.drill--overdue {
+  border-color: var(--danger);
+}
+.drill--failed {
+  border-color: var(--warning);
+}
+
+/* Segundo factor pendiente: el aviso de registrar la llave de acceso, con los días que quedan. Estados fijos. */
+.mfa-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--warning);
+  border-radius: 12px;
+  background: var(--warning-soft);
+  color: var(--text);
+}
+.mfa-notice--banner {
+  margin: 0 0 16px;
+}
+.mfa-notice--expired {
+  border-color: var(--danger);
+}
+.mfa-notice__text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.mfa-notice svg {
+  flex: none;
+}
+
+/* Avisos originales de los componentes entregados al navegador: acceso visible y táctil. */
+.legal-notices { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 16px; font-size: .8125rem; }
+.legal-notices__link { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; text-underline-offset: 3px; }
+.legal-notices__link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 4px; }

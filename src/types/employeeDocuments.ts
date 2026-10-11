@@ -2,17 +2,11 @@
 // sube el comprobante de domicilio y una identificación oficial; el servidor extrae la información (mejor esfuerzo, OCR
 // en el servidor) y la empresa la confirma o corrige en el expediente. El archivo viaja cifrado al bucket de la
 // plataforma; el navegador solo habla con la API. El ADMIN de la plataforma NO ve estos datos (regla 13).
+//
+// Desde el 2026-10-08 (decisión del dueño) cada documento es un PASO del registro de identidad (`OFFICIAL_ID` y
+// `PROOF_OF_ADDRESS` de `enrollment_steps`): qué pide la empresa y qué falta sale de `GET /enrollment/progress`, no de
+// un endpoint de requisitos aparte.
 import type { SoftDeleted } from './trash';
-
-/** Grupo del requisito de un tipo de documento. */
-export type DocumentCategory = 'OFFICIAL_ID' | 'PROOF_OF_ADDRESS';
-
-/** Un tipo de documento del catálogo `employee_document_types` y a qué grupo pertenece. */
-export interface DocumentTypeOption {
-  /** Código del catálogo (su nombre lo envía el backend ya traducido). */
-  code: string;
-  category: DocumentCategory;
-}
 
 /**
  * Datos que el OCR extrajo (o que la empresa confirmó o corrigió): todo texto, todo opcional (lo que no se leyó es
@@ -56,6 +50,8 @@ export interface EmployeeDocument extends SoftDeleted {
   confirmed: boolean;
   confirmed_by: string | null;
   confirmed_at: string | null;
+  /** El servidor dice si se puede mandar a «Eliminados» y restaurar (nunca se deduce en la app). */
+  can_delete: boolean;
   data: EmployeeDocumentData;
 }
 
@@ -65,15 +61,6 @@ export interface EmployeeDocumentFile {
   content_type: string;
   size: number;
   data: string;
-}
-
-/** Lo que el onboarding del empleado necesita: si la empresa los exige, los tipos y qué falta. */
-export interface EmployeeDocumentRequirements {
-  required: boolean;
-  types: DocumentTypeOption[];
-  documents: EmployeeDocument[];
-  needs_official_id: boolean;
-  needs_proof_of_address: boolean;
 }
 
 /** Lo que se envía al subir un documento (multipart: el archivo y su tipo del catálogo). */

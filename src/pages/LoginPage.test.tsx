@@ -30,7 +30,7 @@ describe('LoginPage: todos los mensajes en popup', () => {
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'ana@');
     await userEvent.tab();
     expect(screen.getByLabelText('Correo electrónico')).toHaveAccessibleDescription('Ingresa un correo válido');
-    await userEvent.type(screen.getByLabelText('Contraseña'), 'Clave1234');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Clave1234567');
     expect(button).toBeDisabled();
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'empresa.com');
     expect(button).toBeEnabled();
@@ -42,7 +42,7 @@ describe('LoginPage: todos los mensajes en popup', () => {
     mockFetch(apiFail(401, 'INVALID_CREDENTIALS', 'Correo o contraseña incorrectos'));
     const { container } = renderWithProviders(<LoginPage />, { auth: true });
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'ana@empresa.com');
-    await userEvent.type(screen.getByLabelText('Contraseña'), 'Mala1234');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Mala12345678');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
     const popup = await screen.findByRole('alertdialog', { name: 'No se pudo iniciar sesión' });
     expect(popup).toHaveTextContent('Correo o contraseña incorrectos');
@@ -53,7 +53,7 @@ describe('LoginPage: todos los mensajes en popup', () => {
     const { container } = renderWithProviders(<LoginPage />, { auth: true });
     expect(container.querySelector('.auth__brand')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
-    expect(screen.getByText(/Todos los derechos reservados\./)).toHaveTextContent(`© ${new Date().getFullYear()} Employee Time Clock.`);
+    expect(screen.getByText(/Todos los derechos reservados\./)).toHaveTextContent(`© ${new Date().getFullYear()} Identity Verification Platform.`);
   });
 });
 
@@ -73,7 +73,7 @@ describe('LoginPage: Recordar mi cuenta (dato en la BD)', () => {
     const remember = screen.getByRole('checkbox', { name: /Recordar mi cuenta/ });
     expect(remember).not.toBeChecked();
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'ana@empresa.com');
-    await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234');
+    await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234567');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
     await waitFor(() => expect(loginBody(calls)).toMatchObject({ remember: false }));
     expect(localStorage.length + sessionStorage.length).toBe(0); // nada en el navegador
@@ -84,10 +84,10 @@ describe('LoginPage: Recordar mi cuenta (dato en la BD)', () => {
     renderWithProviders(<LoginPage />, { auth: true });
     await userEvent.click(screen.getByRole('checkbox', { name: /Recordar mi cuenta/ }));
     await userEvent.type(screen.getByLabelText('Correo electrónico'), ' Ana@Empresa.com');
-    await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234');
+    await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234567');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
     await waitFor(() => expect(loginBody(calls)).toMatchObject({ remember: true }));
-    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toMatch(/Clave1234|ana@empresa/i);
+    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toMatch(/Clave1234567|ana@empresa/i);
   });
 
   it('cuenta recordada en el dispositivo: correo escrito, casilla marcada, foco en la contraseña y "Usar otra cuenta"', async () => {
@@ -109,7 +109,7 @@ describe('LoginPage: vista corporativa', () => {
   it('solo marca, tarjeta de acceso y derechos reservados (sin ayuda, recuperación ni enlaces extra)', () => {
     mockFetch(apiOk(null));
     renderWithProviders(<LoginPage />, { auth: true });
-    expect(screen.getByRole('banner')).toHaveTextContent('Employee Time Clock');
+    expect(screen.getByRole('banner')).toHaveTextContent('Identity Verification Platform');
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Todos los derechos reservados');
     expect(screen.getByRole('checkbox', { name: 'Recordar mi cuenta' })).toBeInTheDocument();
     for (const name of ['¿Necesitas ayuda?', '¿Olvidaste tu contraseña?', 'Ayuda']) {
@@ -131,7 +131,7 @@ describe('LoginPage: validador que solo opera en su lugar (requiere ubicación)'
   async function submit() {
     renderWithProviders(<LoginPage />, { auth: true });
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'recepcion@empresa.com');
-    await userEvent.type(screen.getByLabelText('Contraseña'), 'Valida1234');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Valida123456');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
   }
   const loginServer = (...answers: Response[]) =>
@@ -178,7 +178,7 @@ describe('LoginPage: validador en un dispositivo autorizado por su empresa', () 
   async function submit() {
     renderWithProviders(<LoginPage />, { auth: true });
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'recepcion@empresa.com');
-    await userEvent.type(screen.getByLabelText('Contraseña'), 'Valida1234');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Valida123456');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
   }
   const loginServer = (...answers: Response[]) =>
@@ -231,7 +231,7 @@ describe('LoginPage: al llegar y al enviar', () => {
     });
   async function signIn() {
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'rh@empresa.com');
-    await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234');
+    await userEvent.type(screen.getByLabelText('Contraseña', { selector: 'input' }), 'Clave1234567');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
   }
   /** Login al que se llegó desde una pantalla protegida (`state.from`), con las rutas de destino. */
@@ -322,11 +322,11 @@ describe('LoginPage en inglés (en-US) y cambio de idioma en caliente', () => {
     await setLocale('en-US');
     renderWithProviders(<LoginPage />, { auth: true });
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.getByRole('banner')).toHaveTextContent('Attendance and work-hours tracking.');
+    expect(screen.getByRole('banner')).toHaveTextContent('Digital and biometric identity verification platform');
     expect(screen.getByLabelText('Email')).toHaveAttribute('placeholder', 'you@company.com');
     expect(screen.getByRole('checkbox', { name: 'Remember my account' })).toHaveAccessibleDescription(/Do not use it on shared computers/);
     expect(screen.getByRole('button', { name: 'Sign in' })).toHaveAttribute('title', 'Enter your email and password');
-    expect(screen.getByRole('contentinfo')).toHaveTextContent(`© ${new Date().getFullYear()} Employee Time Clock. All rights reserved.`);
+    expect(screen.getByRole('contentinfo')).toHaveTextContent(`© ${new Date().getFullYear()} Identity Verification Platform. All rights reserved.`);
     fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form') as HTMLFormElement);
     expect(await screen.findByRole('alertdialog', { name: 'Check the details' })).toHaveTextContent('Password is required');
   });
@@ -369,7 +369,7 @@ describe('LoginPage en inglés (en-US) y cambio de idioma en caliente', () => {
     mockFetch((call) => (call.url.endsWith('/auth/login') ? (answers.shift() ?? apiOk(tokenResponse(companyUser))) : jsonResponse({})));
     renderWithProviders(<LoginPage />, { auth: true });
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'recepcion@empresa.com');
-    await userEvent.type(screen.getByLabelText('Contraseña'), 'Valida1234');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Valida123456');
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
     await screen.findByRole('dialog', { name: 'Dispositivo por autorizar' });
     await act(() => setLocale('en-US'));

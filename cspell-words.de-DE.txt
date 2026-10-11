@@ -26,6 +26,7 @@ Strg
 Tabletcomputer
 Tabletcomputern
 Tabletcomputers
+Verifizierungsstandorte
 Verifizierungsvideo
 Ålandinseln
 # Documentos de identidad del empleado (onboarding con OCR, 2026-10-07): compuestos que el diccionario alemán no trae

@@ -15,7 +15,12 @@ export const RFC_LENGTH = 13;
 const RFC_EXAMPLE = 'PEGJ900515AB1';
 const CURP_EXAMPLE = 'HEGG560427MVZRRL04';
 export const MIN_EMPLOYEE_AGE = config.minEmployeeAge;
-const PASSWORD_MIN = 8;
+/**
+ * Largo mínimo de la contraseña en la validación del cliente (solo UX: el servidor la vuelve a validar con su
+ * `PASSWORD_MIN_LENGTH` y puede exigir más). Subió de 8 a 12 con la migración 0096 del backend: doce caracteres
+ * son lo que piden hoy los controles de acceso que se auditan (SOC 2 CC6.1, ISO A.5.17, Cyber Essentials).
+ */
+const PASSWORD_MIN = 12;
 const PASSWORD_MAX = 128;
 const NAME_MAX = 100;
 const COMPANY_NAME_MAX = 200;
@@ -39,6 +44,22 @@ export function validatePassword(value: string): string | undefined {
   if (!/[A-Z]/.test(value)) return t('forms.validation.password.uppercase');
   if (!/\d/.test(value)) return t('forms.validation.password.digit');
   return undefined;
+}
+
+/**
+ * Códigos con que el servidor rechaza una contraseña (migración 0096: largo, filtradas y reciclada) llevados al
+ * CAMPO de la contraseña, no solo al popup: lo que hay que corregir es ese campo. Es UNA definición que usan
+ * todos los formularios que asignan o cambian una contraseña (`field` es el nombre del campo en cada uno).
+ */
+export function passwordErrorFields<T>(field: keyof T): Partial<Record<string, keyof T>> {
+  return {
+    PASSWORD_TOO_SHORT: field,
+    PASSWORD_BREACHED: field,
+    PASSWORD_REUSED: field,
+    PASSWORD_REQUIRED: field,
+    new_password: field,
+    password: field,
+  };
 }
 
 /** Repetir la contraseña (toda contraseña que se asigna se confirma: evita errores de dedo). */

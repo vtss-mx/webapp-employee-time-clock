@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { resolveLazy, t } from '../i18n';
-import { fieldErrorsFrom } from '../services/apiClient';
+import { ApiError, fieldErrorsFrom } from '../services/apiClient';
 import { validatorService } from '../services/validatorService';
 import type { Address, Validator, ValidatorMode, ValidatorSettings } from '../types';
 import type { ConfirmSource } from '../types/confirm';
@@ -99,6 +99,9 @@ export function useValidatorForm(original: Validator | null) {
   const [point, setPoint] = useState<GeoPoint | null>(pointOf(original?.address));
   const [locationRequired, setLocationRequired] = useState(original?.location_required ?? false);
   const [submitted, setSubmitted] = useState(false);
+  // El backend exigió el punto (LOCATION_POINT_REQUIRED): su mensaje se muestra bajo el mapa (como el error del punto),
+  // no en un campo que no existe. Se limpia al marcar un punto nuevo. Se lee `.message` al dibujar (sigue al idioma).
+  const [serverPoint, setServerPoint] = useState<ApiError | null>(null);
   const { values } = form;
   // El domicilio del mapa llega después de una consulta: se aplica sobre lo escrito hasta entonces.
   const latest = useRef(values);
@@ -118,10 +121,17 @@ export function useValidatorForm(original: Validator | null) {
     radius: locationRequired || values.radius.trim() ? validateRadius(values.radius) : undefined,
   });
   const clientErrors = validate();
-  const pointError = locationRequired && !point ? pointMissing() : undefined;
-  const invalid = Object.values(clientErrors).some(Boolean) || Boolean(pointError);
+  const clientPointError = locationRequired && !point ? pointMissing() : undefined;
+  // Error del punto: el del cliente (falta marcarlo) o, tras enviar, el del servidor (LOCATION_POINT_REQUIRED).
+  const pointError = clientPointError ?? (serverPoint ? serverPoint.message : undefined);
+  const invalid = Object.values(clientErrors).some(Boolean) || Boolean(clientPointError);
 
   const set = (field: keyof ValidatorFormValues, value: string) => form.setValues({ ...values, [field]: value });
+  /** Marca un punto nuevo (y descarta el error del punto que había devuelto el servidor). */
+  const choosePoint = (next: GeoPoint | null) => {
+    setPoint(next);
+    setServerPoint(null);
+  };
   /** Domicilio que Google encontró para el punto: reemplaza al escrito (y se valida de inmediato). */
   const applyAddress = (found: Partial<AddressValues>) => {
     form.setValues({ ...latest.current, ...addressForPoint(latest.current, found) });
@@ -142,10 +152,17 @@ export function useValidatorForm(original: Validator | null) {
     }
     const settings = settingsFrom(values, mode, point, locationRequired);
     return form.save(async () => {
-      const saved = original
-        ? await validatorService.update(original.id, settings)
-        : await validatorService.create({ ...settings, email: values.email, password: values.password });
-      onSaved(saved);
+      try {
+        const saved = original
+          ? await validatorService.update(original.id, settings)
+          : await validatorService.create({ ...settings, email: values.email, password: values.password });
+        onSaved(saved);
+        setServerPoint(null);
+      } catch (err) {
+        // El punto que exige el servidor se muestra bajo el mapa (no cabe en ningún campo del formulario).
+        if (err instanceof ApiError && err.code === 'LOCATION_POINT_REQUIRED') setServerPoint(err);
+        throw err; // el popup del error (y los demás campos del servidor) lo sigue manejando `form.save`
+      }
     }, creating ? addError : saveError, () => resolveLazy(confirm(settings)));
   };
 
@@ -159,8 +176,8 @@ export function useValidatorForm(original: Validator | null) {
     mode,
     setMode,
     point,
-    setPoint,
-    pointError: submitted ? pointError : undefined,
+    setPoint: choosePoint,
+    pointError: serverPoint ? serverPoint.message : submitted ? pointError : undefined,
     locationRequired,
     setLocationRequired,
     applyAddress,

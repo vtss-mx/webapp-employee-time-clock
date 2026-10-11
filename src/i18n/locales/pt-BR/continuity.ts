@@ -1,0 +1,73 @@
+import type { Translation } from '../../../types/i18n';
+import type es from '../es-MX/continuity';
+
+/** Continuidade do serviço (seção «Continuidade» da tela Desempenho do ADMIN; migração 0097), pt-BR. */
+export default {
+  loadError: 'Não foi possível carregar a continuidade',
+  drillsError: 'Não foi possível carregar o histórico de testes',
+  commitment: 'Compromisso de recuperação',
+  commitmentIntro: 'A que a plataforma se compromete e o que está ativado hoje.',
+  rto: 'Tempo máximo para voltar (RTO)',
+  rpo: 'Perda máxima de dados (RPO)',
+  interval: 'De quanto em quanto tempo testar',
+  backupUpload: 'Cópia do backup para o armazenamento',
+  pitr: 'Recuperação a um ponto no tempo',
+  backupInterval: 'De quanto em quanto tempo se faz o backup',
+  backupRetention: 'Backups mantidos',
+  pitrArchive: 'De quanto em quanto tempo o histórico é arquivado',
+  pitrRetention: 'Arquivo mantido',
+  enabled: 'Ativada',
+  disabled: 'Desativada',
+  days_one: '{count} dia',
+  days_other: '{count} dias',
+  rpoUnreachable: 'O RPO prometido é menor que o intervalo de arquivamento do histórico: não pode ser cumprido.',
+  drills: 'Testes de restauração',
+  drillsIntro: 'Um mecanismo por forma de restaurar. Nunca testado conta como vencido.',
+  kinds: {
+    PITR: 'Ponto no tempo',
+    BUCKET_DUMP: 'Cópia criptografada no armazenamento',
+  },
+  states: {
+    never: 'Nunca testado',
+    overdue: 'Vencido',
+    failed: 'O último falhou',
+    ok: 'Em dia',
+  },
+  neverDrilled: 'Nunca foi testado: já está na hora.',
+  lastSuccess: 'Último teste correto: {date}',
+  dueOn: 'próximo em {date}',
+  dueNow: 'já está na hora',
+  lastFailed: 'A tentativa de {date} falhou.',
+  rtoMeasured: 'Voltou em {value}',
+  rpoMeasured: 'Perdeu {value}',
+  dataset: 'Com {value}',
+  targetsAt: 'Comprometido então: {rto} e {rpo}',
+  notMeasured: 'Sem medir',
+  overdue_one: '{count} mecanismo está vencido ou nunca foi testado.',
+  overdue_other: '{count} mecanismos estão vencidos ou nunca foram testados.',
+  history: 'Histórico de testes',
+  historyIntro: 'Cada teste com sua situação e o que mediu. Os que falharam também.',
+  columns: {
+    kind: 'Mecanismo',
+    when: 'Quando',
+    result: 'Situação',
+    measures: 'O que foi medido',
+  },
+  results: {
+    met: 'Cumpriu',
+    missed: 'Restaurou, fora da meta',
+    failed: 'Falhou',
+  },
+  noun: {
+    one: 'teste',
+    other: 'testes',
+  },
+  empty: {
+    title: 'Sem testes',
+    description: 'Aqui você verá cada restauração com o que mediu.',
+  },
+  noKinds: {
+    title: 'Sem mecanismos',
+    description: 'Aqui você verá a situação de cada forma de restaurar.',
+  },
+} satisfies Translation<typeof es>;

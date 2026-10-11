@@ -103,6 +103,52 @@ export function VoiceVerificationFlow({ challenge, onDone, onRestart, onFatal, o
   const question = challenge.questions[index];
   const current = challenge.answered + index + 1;
 
+  // Qué hacer con una respuesta que el servidor NO aceptó. Vive aparte de `send` para que cada función quede
+  // simple (el lint acota la complejidad): reinicio del paso, una ya aceptada, un rechazo que repite la pregunta
+  // o una falla sin recuperación.
+  const failed = useCallback(
+    (error: unknown) => {
+      if (error instanceof ApiError && RESTART_CODES.has(error.code)) {
+        onRestart(error);
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'ANSWER_ALREADY_ACCEPTED') {
+        // Esta respuesta ya se había aceptado (doble envío o reintento tras una red intermitente): se AVANZA a la
+        // siguiente pregunta —o se termina si era la última— en lugar de abortar todo el paso. El servidor puede
+        // renovar el token en `details`.
+        const details = (error.details ?? {}) as { token?: string };
+        if (details.token) setToken(details.token);
+        setRejection(null);
+        setAttemptsLeft(null);
+        if (index + 1 >= challenge.questions.length) {
+          onDone();
+          return;
+        }
+        setIndex((i) => i + 1);
+        setStatus('ready');
+        return;
+      }
+      // 422 (no pasó) y 413 (clip demasiado grande, `VIDEO_TOO_LARGE` o el 413 del gateway): se repite la MISMA
+      // pregunta con el motivo del servidor, los intentos que quedan y el token renovado.
+      if (error instanceof ApiError && (error.status === 422 || error.status === 413)) {
+        const details = (error.details ?? {}) as { token?: string; attempts_left?: number };
+        if (details.token) setToken(details.token);
+        setAttemptsLeft(typeof details.attempts_left === 'number' ? details.attempts_left : null);
+        setRejection(() => localizeServerText(errorMessage(error)));
+        setStatus('rejected');
+        return;
+      }
+      if (error instanceof ApiError && (error.status >= 500 || TRANSIENT_STATUSES.has(error.status))) {
+        // Pasajero (servicio ocupado, red): se repite la misma pregunta con el aviso del servidor.
+        setRejection(() => localizeServerText(errorMessage(error)));
+        setStatus('rejected');
+        return;
+      }
+      onFatal(error);
+    },
+    [challenge.questions.length, index, onDone, onFatal, onRestart],
+  );
+
   const send = useCallback(
     async (clip: Blob | null) => {
       if (!mounted.current) return;
@@ -126,28 +172,10 @@ export function VoiceVerificationFlow({ challenge, onDone, onRestart, onFatal, o
         setStatus('ready');
       } catch (error) {
         if (!mounted.current) return;
-        if (error instanceof ApiError && RESTART_CODES.has(error.code)) {
-          onRestart(error);
-          return;
-        }
-        if (error instanceof ApiError && error.status === 422) {
-          const details = (error.details ?? {}) as { token?: string; attempts_left?: number };
-          if (details.token) setToken(details.token);
-          setAttemptsLeft(typeof details.attempts_left === 'number' ? details.attempts_left : null);
-          setRejection(() => localizeServerText(errorMessage(error)));
-          setStatus('rejected');
-          return;
-        }
-        if (error instanceof ApiError && (error.status >= 500 || TRANSIENT_STATUSES.has(error.status))) {
-          // Pasajero (servicio ocupado, red): se repite la misma pregunta con el aviso del servidor.
-          setRejection(() => localizeServerText(errorMessage(error)));
-          setStatus('rejected');
-          return;
-        }
-        onFatal(error);
+        failed(error);
       }
     },
-    [mounted, onDone, onFatal, onRestart, question, token],
+    [failed, mounted, onDone, question, token],
   );
 
   const record = useCallback(async () => {

@@ -48,6 +48,8 @@ export function sessionOf(user: User | null): AuthContextValue {
     dismissDeviceBlock: vi.fn(),
     suspension: null,
     dismissSuspension: vi.fn(),
+    mfaEnrollment: null,
+    dismissMfaEnrollment: vi.fn(),
     login: vi.fn(),
     loginWithPasskey: vi.fn(),
     logout: vi.fn(),

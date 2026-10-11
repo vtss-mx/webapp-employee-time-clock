@@ -5,13 +5,13 @@
 export default {
   title: 'Dispositivos',
   intro:
-    'Navegadores y teléfonos desde los que checó o verificó su identidad, cada uno con una llave que no se puede copiar. Según la política, uno sin aprobar pide un paso más o deja sus registros en revisión.',
+    'Navegadores y teléfonos desde los que verificó su identidad, cada uno con una llave que no se puede copiar. Según la política, uno sin aprobar pide un paso más o deja sus registros en revisión.',
   mineTitle: 'Mis dispositivos',
   mineIntro:
-    'Los navegadores o teléfonos desde los que registraste tu asistencia o verificaste tu identidad. Tu empresa puede aprobarlos o revocarlos.',
+    'Los navegadores o teléfonos desde los que verificaste tu identidad. Tu empresa puede aprobarlos o revocarlos.',
   empty: {
     title: 'Sin dispositivos',
-    description: 'Aquí verás los navegadores y teléfonos usados para checar.',
+    description: 'Aquí verás los navegadores y teléfonos usados para verificar la identidad.',
   },
   noun: {
     one: 'dispositivo',

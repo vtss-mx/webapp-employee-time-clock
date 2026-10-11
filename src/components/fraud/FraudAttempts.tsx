@@ -8,10 +8,13 @@ import { formatNumber } from '../../utils/numbers';
 import { cameraName } from '../../utils/cameraDevices';
 
 /**
- * Una señal del intento: "Cámara sin nombre: 0.07 (umbral 0.25) · +20 pts · Obligatoria" y, debajo, qué mide y por
- * qué delata un fraude (la explicación del catálogo, en el idioma de la petición).
+ * Una señal del motor de riesgo: "Cámara sin nombre: 0.07 (umbral 0.25) · +20 pts · Obligatoria" y, debajo, qué
+ * mide y por qué delata un fraude (la explicación del catálogo, en el idioma de la petición).
+ *
+ * La comparten un caso de fraude y el detalle de una verificación (regla 6): las dos dibujan las MISMAS señales,
+ * con su valor, su umbral, su modo y sus puntos.
  */
-function SignalLine({ signal }: { signal: RiskReason }) {
+export function RiskSignalLine({ signal }: { signal: RiskReason }) {
   const t = useT();
   const { nameOf } = useCatalogs();
   const measured =
@@ -29,8 +32,9 @@ function SignalLine({ signal }: { signal: RiskReason }) {
   );
 }
 
-/** La red de la IP del intento (país, sistema autónomo, organización y si es una nube) con su atribución. */
-function NetworkLine({ network }: { network: FraudNetwork }) {
+/** La red de la IP de un intento (país, sistema autónomo, organización y si es una nube) con su atribución
+ * OBLIGATORIA por la licencia de la base local (DB-IP Lite, CC BY 4.0). La comparten el caso y la verificación. */
+export function NetworkLine({ network }: { network: FraudNetwork }) {
   const t = useT();
   const parts = [
     network.country,
@@ -74,7 +78,7 @@ export function FraudAttempts({ attempts }: { attempts: FraudCaseAttempt[] }) {
           {attempt.signals.length > 0 && (
             <ul className="fraud-attempts__signals small">
               {attempt.signals.map((signal) => (
-                <SignalLine key={signal.code} signal={signal} />
+                <RiskSignalLine key={signal.code} signal={signal} />
               ))}
             </ul>
           )}

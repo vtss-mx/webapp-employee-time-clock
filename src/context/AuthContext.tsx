@@ -46,6 +46,12 @@ async function loginWithProofs(attempt: (proofs: LoginProofs) => Promise<AuthTok
 const expiredReason: LazyText = () => t('auth.session.expired');
 /** Separación mínima entre verificaciones de la sesión al volver a la pestaña. */
 const SESSION_CHECK_GAP_MS = 15_000;
+/**
+ * Separación mínima entre refrescos del usuario disparados por una pantalla que dejó de estar disponible (403): varias
+ * peticiones que responden lo mismo no encadenan un refresco tras otro (defensa contra bucles; `refreshUser` pide
+ * `/users/me`, que no trae estos códigos, así que no se realimenta).
+ */
+const SCREEN_REFRESH_GAP_MS = 10_000;
 /** Reintentos al restaurar la sesión si el servidor no responde (espera creciente: ~12 s en total). */
 const RESTORE_RETRIES = 5;
 
@@ -71,6 +77,12 @@ export function deviceBlockFrom(error: Pick<ApiError, 'message'>): DeviceBlock {
  */
 export type CompanySuspension = DeviceBlock;
 
+/**
+ * Segundo factor obligatorio con la gracia VENCIDA (403 `MFA_ENROLLMENT_REQUIRED` en cualquier pantalla): la
+ * cuenta sigue dentro, pero no puede operar hasta registrar su llave de acceso. Lleva el mensaje del servidor.
+ */
+export type MfaEnrollment = DeviceBlock;
+
 export interface AuthContextValue {
   user: User | null;
   status: AuthStatus;
@@ -89,6 +101,10 @@ export interface AuthContextValue {
   suspension: CompanySuspension | null;
   /** Sale de esa pantalla: cierra la sesión local (de mejor esfuerzo en el servidor) sin otro aviso. */
   dismissSuspension: () => Promise<void>;
+  /** Su cuenta necesita una llave de acceso YA (403 MFA_ENROLLMENT_REQUIRED): ninguna pantalla responde. */
+  mfaEnrollment: MfaEnrollment | null;
+  /** Va a registrar la llave: la compuerta deja pasar (si vuelve a faltar, el siguiente 403 la pone de nuevo). */
+  dismissMfaEnrollment: () => void;
   /** `onLocating`: el backend pidió la ubicación del dispositivo y se está obteniendo. */
   login: (email: string, password: string, remember?: boolean, options?: { onLocating?: () => void }) => Promise<User>;
   /** Con una llave de acceso ya firmada (WebAuthn): la misma sesión y las mismas pruebas de un validador. */
@@ -123,9 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [logoutReason, setLogoutReason] = useState<LazyText | null>(null);
   const [deviceBlock, setDeviceBlock] = useState<DeviceBlock | null>(null);
   const [suspension, setSuspension] = useState<CompanySuspension | null>(null);
+  const [mfaEnrollment, setMfaEnrollment] = useState<MfaEnrollment | null>(null);
   const sessionRef = useRef<Session | null>(null);
   /** Renovación en curso (compartida); se resuelve con el error, o null si se renovó. */
   const refreshing = useRef<Promise<unknown> | null>(null);
+  /** Momento del último refresco del usuario por una pantalla no disponible (403), para no encadenarlos. */
+  const lastScreenRefresh = useRef(0);
 
   const apply = useCallback((response: AuthTokenResponse) => {
     const next: Session = {
@@ -146,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setStatus('anonymous');
     clearAvatarCache(); // nada de la persona queda en la página (las fotos descargadas viven en memoria)
+    setMfaEnrollment(null);
     // Una función se guarda tal cual (no se llama: `setState` la tomaría como actualizador).
     setLogoutReason(() => reason ?? null);
   }, []);
@@ -171,20 +191,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [apply, clear]);
 
   const refreshSession = useCallback(async () => (await renew()) === null, [renew]);
-
-  // Se configura durante el primer render (no en un efecto): los efectos de los hijos corren
-  // antes que los del provider y sus primeras peticiones saldrían sin estos hooks.
-  const apiConfigured = useRef(false);
-  if (!apiConfigured.current) {
-    configureApiClient({
-      getToken: () => sessionRef.current?.token ?? null,
-      onUnauthorized: (message) => clear(message),
-      onDeviceNotAllowed: (error) => setDeviceBlock(deviceBlockFrom(error)),
-      onCompanySuspended: (error) => setSuspension(deviceBlockFrom(error)),
-      refreshSession,
-    });
-    apiConfigured.current = true;
-  }
 
   // Restaurar la sesión al cargar la app (cookie HttpOnly). Solo un rechazo del servidor (401: vencida
   // o revocada) o un error que no se arregla reintentando lleva al login; una falla pasajera (sin red,
@@ -258,6 +264,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(() => user);
   }, [setUser]);
 
+  // Se configura durante el primer render (no en un efecto): los efectos de los hijos corren
+  // antes que los del provider y sus primeras peticiones saldrían sin estos hooks. Va después de declarar
+  // `refreshUser` (estable: no depende de nada que cambie) para que el hook de la pantalla no disponible lo use directo.
+  const apiConfigured = useRef(false);
+  if (!apiConfigured.current) {
+    configureApiClient({
+      getToken: () => sessionRef.current?.token ?? null,
+      onUnauthorized: (message) => clear(message),
+      onDeviceNotAllowed: (error) => setDeviceBlock(deviceBlockFrom(error)),
+      onCompanySuspended: (error) => setSuspension(deviceBlockFrom(error)),
+      onMfaEnrollmentRequired: (error) => setMfaEnrollment(deviceBlockFrom(error)),
+      // Una pantalla dejó de estar disponible (403): se vuelve a pedir al usuario (una sola vez cada tanto) para que
+      // el backend recalcule sus pantallas y el menú deje de mostrarla.
+      onScreenUnavailable: () => {
+        const now = Date.now();
+        if (!sessionRef.current || now - lastScreenRefresh.current < SCREEN_REFRESH_GAP_MS) return;
+        lastScreenRefresh.current = now;
+        void refreshUser().catch(() => undefined);
+      },
+      refreshSession,
+    });
+    apiConfigured.current = true;
+  }
+
   // Sesión vencida → login. Temporizador al vencimiento y, como los navegadores pausan los
   // temporizadores de pestañas ocultas, también se revisa al volver a la pestaña. Al volver,
   // además se confirma con el servidor que siga vigente: con una sola sesión por usuario, si
@@ -330,6 +360,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSuspension(null);
   }, [logout, clear]);
 
+  const dismissMfaEnrollment = useCallback(() => setMfaEnrollment(null), []);
+
   const logoutEverywhere = useCallback(async () => {
     await authService.logoutAll();
     // El usuario ya lo confirmó: aquí no se avisa. Los demás dispositivos sí reciben el motivo.
@@ -347,6 +379,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dismissDeviceBlock,
       suspension,
       dismissSuspension,
+      mfaEnrollment,
+      dismissMfaEnrollment,
       login,
       loginWithPasskey,
       logout,
@@ -356,7 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatePreferences,
       updateAvatar,
     }),
-    [session, status, logoutReason, deviceBlock, dismissDeviceBlock, suspension, dismissSuspension, login, loginWithPasskey, logout, logoutEverywhere, refreshUser, selectCompany, updatePreferences, updateAvatar],
+    [session, status, logoutReason, deviceBlock, dismissDeviceBlock, suspension, dismissSuspension, mfaEnrollment, dismissMfaEnrollment, login, loginWithPasskey, logout, logoutEverywhere, refreshUser, selectCompany, updatePreferences, updateAvatar],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

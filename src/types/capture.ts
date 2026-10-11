@@ -75,6 +75,15 @@ export interface FaceChallenge extends ChallengeCapture {
   flash_required: boolean;
   /** Segundos de vida del reto (política de la empresa). */
   expires_in: number | null;
+  /**
+   * Prueba de vida calibrada por el ADMIN por empresa (decisión del dueño, 2026-10-08; el backend es la fuente de
+   * verdad): cuánto hay que SOSTENER cada movimiento antes de capturarlo (ms; la app lo vuelve cuadros estables, ~110 ms
+   * cada uno, para que la foto salga mientras la persona AÚN sostiene el movimiento y el servidor —que lo mide con otro
+   * motor— no lo rechace al final) y cuántos retos más se piden conservando el escaneo antes de reiniciarlo. Null/ausente
+   * (un backend anterior): la app usa su valor de respaldo (550 ms, 3 reintentos).
+   */
+  liveness_hold_ms: number | null;
+  liveness_max_retries: number | null;
   /** Reto de "un paso más" que pidió el motor de riesgo: más movimientos y el destello obligatorio. */
   step_up?: boolean;
   /**

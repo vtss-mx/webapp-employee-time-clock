@@ -5,6 +5,7 @@ import { setLocale } from '../../../i18n/core';
 import { pick, renderPage, settle } from '../../../test/companyPages';
 import { apiFail, apiOk, mockFetch, type MockCall } from '../../../test/http';
 import { functionRow, overview, perfPage, routeRow, slowAlert, statement, vitals, webApiRow } from '../../../test/performance';
+import type { Continuity } from '../../../types/continuity';
 import type { MetricRow } from '../../../types/performance';
 import { PerformancePage } from './PerformancePage';
 
@@ -17,9 +18,10 @@ const urls = (calls: MockCall[], part: string) => calls.filter((c) => c.url.incl
 const ROWS: Record<string, MetricRow> = { HTTP: routeRow, FUNCTION: functionRow, WEB_API: webApiRow };
 
 /** Backend simulado: cada ruta responde lo del contrato salvo lo que la prueba reemplace. */
-function server(overrides: Partial<Record<'overview' | 'metrics' | 'vitals' | 'statements' | 'alerts', Responder>> = {}) {
+function server(overrides: Partial<Record<'overview' | 'metrics' | 'vitals' | 'statements' | 'alerts' | 'continuity', Responder>> = {}) {
   return mockFetch((call) => {
     const url = new URL(call.url, 'http://localhost');
+    if (url.pathname.startsWith('/api/admin/continuity')) return overrides.continuity?.(call) ?? apiOk(continuity);
     const route = url.pathname.replace('/api/admin/performance/', '');
     if (route === 'overview') return overrides.overview?.(call) ?? apiOk({ ...overview, period: url.searchParams.get('period') });
     if (route === 'metrics') {
@@ -31,6 +33,21 @@ function server(overrides: Partial<Record<'overview' | 'metrics' | 'vitals' | 's
     return overrides.alerts?.(call) ?? perfPage([slowAlert], { as_of: '2026-10-04T18:00:00Z' });
   });
 }
+
+/** Continuidad del servicio: lo mínimo que la pestaña dibuja (su detalle se prueba en `continuityTab.test.tsx`). */
+const continuity: Continuity = {
+  rto_minutes: 30,
+  rpo_seconds: 60,
+  drill_interval_days: 90,
+  backup_upload_enabled: true,
+  pitr_enabled: true,
+  backup_interval_hours: 24,
+  backup_retention_days: 30,
+  pitr_archive_timeout_seconds: 60,
+  pitr_retention_days: 14,
+  drills: [],
+  overdue_count: 0,
+};
 
 const TARGETS = { '/admin/performance/metric': 'Detalle de la métrica', '/admin/performance/alerts/:id': 'Detalle de la alerta' };
 const renderPerformance = (route = '/admin/performance') => renderPage('/admin/performance', route, <PerformancePage />, { targets: TARGETS });
@@ -273,11 +290,27 @@ describe('Rendimiento en inglés (en-US)', () => {
     server();
     renderPerformance('/admin/performance?tab=alerts');
     expect(await screen.findByText('Last 24 hours · slow request: over 1 s (face: over 2.5 s)')).toBeInTheDocument();
-    expect(screen.getAllByRole('tab').map((item) => item.textContent?.trim())).toEqual(['Overview', 'Routes', 'Functions', 'Browser', 'SQL', 'Alerts2']);
+    expect(screen.getAllByRole('tab').map((item) => item.textContent?.trim())).toEqual(['Overview', 'Routes', 'Functions', 'Browser', 'SQL', 'Alerts2', 'Continuity']);
     expect(screen.getByRole('group', { name: 'Period' })).toHaveTextContent('1 h6 h24 h7 days30 days90 days');
     expect(await rowOf(slowAlert.route)).toHaveTextContent('Responded 200');
     await tab(/Overview/);
     expect(await screen.findByText('Requests per minute')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Slowest routes (p95)' })).toHaveTextContent('1,200 calls');
+  });
+});
+
+describe('Rendimiento: continuidad del servicio', () => {
+  it('la pestaña «Continuidad» pide el informe y lo dibuja con sus plazos', async () => {
+    const { calls } = server();
+    renderPerformance('/admin/performance?tab=continuity');
+    expect(await screen.findByRole('tab', { name: /Continuidad/ })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(calls.some((call) => call.url.startsWith('/api/admin/continuity'))).toBe(true));
+    expect(await screen.findByText('30 min')).toBeInTheDocument();
+  });
+
+  it('si el informe de continuidad falla, el popup lo dice con su título', async () => {
+    server({ continuity: () => apiFail(503, 'SERVICE_UNAVAILABLE') });
+    renderPerformance('/admin/performance?tab=continuity');
+    expect(await screen.findByRole('alertdialog', { name: 'No se pudo cargar la continuidad' })).toBeInTheDocument();
   });
 });

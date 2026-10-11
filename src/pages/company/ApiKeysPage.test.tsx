@@ -15,11 +15,13 @@ const key = (over: Partial<ApiKey> = {}): ApiKey => ({
   id: 1,
   name: 'Nómina',
   prefix: 'tck_Ab3dE9fG',
-  scopes: ['EMPLOYEES_READ', 'ATTENDANCE_READ'],
+  scopes: ['EMPLOYEES_READ', 'VERIFICATIONS_READ'],
   status: 'ACTIVE',
   created_at: '2026-10-01T12:00:00Z',
   created_by: 'admin@empresa.com',
   expires_at: '2027-10-01T12:00:00Z',
+  days_to_expire: 365,
+  expiring_soon: false,
   last_used_at: new Date(Date.now() - 5 * 60_000).toISOString(),
   last_used_ip: '189.203.10.4',
   revoked_at: null,
@@ -66,6 +68,28 @@ describe('Integraciones (API): llaves de la empresa', () => {
     expect(within(erp).queryByRole('button', { name: 'Rotar' })).toBeNull(); // una revocada ya no tiene acciones
     expect(screen.getByText(`${window.location.origin}/api/integrations/v1`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copiar URL base' })).toBeInTheDocument();
+  });
+
+  it('el aviso de rotar lo decide el SERVIDOR: con `expiring_soon` y los días que él envía', async () => {
+    mockFetch(apiOk(page([key({ expiring_soon: true, days_to_expire: 7 }), key({ id: 2, name: 'Nómina 2', expiring_soon: true, days_to_expire: 0 })])));
+    renderList();
+    expect(await screen.findByText('Vence en 7 días')).toBeInTheDocument();
+    expect(screen.getByText('Vence en 7 días')).toHaveClass('badge--warning');
+    expect(screen.getByText('Vence hoy')).toBeInTheDocument();
+  });
+
+  it('una llave anterior a la caducidad obligatoria no trae los días: el aviso lo dice sin inventarlos', async () => {
+    mockFetch(apiOk(page([key({ expires_at: null, expiring_soon: true, days_to_expire: null })])));
+    renderList();
+    expect(await screen.findByText('Vence pronto')).toBeInTheDocument();
+    expect(screen.getByText(/Sin vencimiento/)).toBeInTheDocument();
+  });
+
+  it('una llave revocada que vencía pronto no insiste con rotarla', async () => {
+    mockFetch(apiOk(page([key({ status: 'REVOKED', revoked_at: '2026-10-02T12:00:00Z', expiring_soon: true, days_to_expire: 3 })])));
+    renderList();
+    expect(await screen.findByText('Revocada')).toBeInTheDocument();
+    expect(screen.queryByText('Vence en 3 días')).toBeNull();
   });
 
   it('sin llaves: estado vacío que invita a crear la primera', async () => {
@@ -171,27 +195,47 @@ describe('Crear llave (pantalla)', () => {
     await userEvent.click(screen.getByRole('switch', { name: 'Empleados' }));
     await userEvent.click(screen.getByRole('switch', { name: 'Identificaciones' }));
     await userEvent.click(screen.getByRole('switch', { name: 'Identificaciones' })); // al final, sin este
+    // Ya no existe «sin vencimiento» (migración 0096 del backend): toda llave caduca.
     await userEvent.click(screen.getByLabelText('Vence en'));
-    await userEvent.click(screen.getByRole('option', { name: /Sin vencimiento/ }));
+    expect(screen.queryByRole('option', { name: /Sin vencimiento/ })).toBeNull();
+    await userEvent.click(screen.getByRole('option', { name: '90 días' }));
     await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
     const dialog = await screen.findByRole('dialog', { name: '¿Crear la llave «Nómina»?' });
     expect(within(within(dialog).getByRole('region', { name: 'Se creará' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'NombreNómina',
       'Permisos (solo lectura)Empleados',
-      'VigenciaSin vencimiento',
+      'Vigencia90 días',
     ]);
     expect(dialog).toHaveTextContent('El secreto no se podrá volver a consultar.');
     await confirmCreate('Nómina');
 
     await waitFor(() => expect(screen.getByText('Integraciones')).toBeInTheDocument());
     expect(await screen.findByText(SECRET)).toBeInTheDocument();
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Nómina', scopes: ['EMPLOYEES_READ'], expires_in_days: null });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Nómina', scopes: ['EMPLOYEES_READ'], expires_in_days: 90 });
+  });
+
+  it('el 422 del tope de vigencia se marca en SU campo, además del popup, y se descarta al cambiarla', async () => {
+    const tooLong = apiFail(422, 'API_KEY_EXPIRY_TOO_LONG', 'La vigencia máxima de una llave es de 365 días.');
+    mockFetch(tooLong);
+    renderForm();
+    await userEvent.type(screen.getByLabelText(/Nombre/), 'Nómina');
+    await userEvent.click(screen.getByRole('switch', { name: 'Empleados' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
+    await confirmCreate('Nómina');
+    const popup = await screen.findByRole('alertdialog');
+    expect(within(popup).getByText('La vigencia máxima de una llave es de 365 días.')).toBeInTheDocument();
+    await userEvent.click(within(popup).getByRole('button', { name: 'Entendido' }));
+    const field = screen.getByLabelText('Vence en');
+    await waitFor(() => expect(field).toHaveAccessibleDescription('La vigencia máxima de una llave es de 365 días.'));
+    await userEvent.click(field);
+    await userEvent.click(screen.getByRole('option', { name: '30 días' }));
+    expect(field).not.toHaveAccessibleDescription('La vigencia máxima de una llave es de 365 días.');
   });
 
   it('un permiso nuevo del catálogo se ofrece (ícono genérico); otro error al crear se explica', async () => {
     const audit = { code: 'AUDIT_READ', name: 'Auditoría', description: null, sort_order: 4, active: true };
     mockFetch(apiFail(503, 'SERVICE_UNAVAILABLE', 'Servicio no disponible'));
-    renderForm(catalogsWith({ api_scopes: [...catalogsFixture.api_scopes, audit as (typeof catalogsFixture.api_scopes)[number]] }));
+    renderForm(catalogsWith({ api_scopes: [...catalogsFixture.api_scopes, audit] }));
     await userEvent.type(screen.getByLabelText(/Nombre/), 'Auditor');
     await userEvent.click(screen.getByRole('switch', { name: 'Auditoría' }));
     await userEvent.click(screen.getByRole('button', { name: 'Crear llave' }));
@@ -276,14 +320,14 @@ describe('Integraciones en inglés (en-US)', () => {
     await userEvent.type(screen.getByLabelText(/Name/), 'Payroll');
     await userEvent.click(screen.getByRole('switch', { name: 'Empleados' })); // los permisos vienen del catálogo
     await userEvent.click(screen.getByLabelText('Expires in'));
-    await userEvent.click(screen.getByRole('option', { name: /No expiration/ }));
+    await userEvent.click(screen.getByRole('option', { name: '6 months' }));
     await userEvent.click(screen.getByRole('button', { name: 'Create key' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Create the key “Payroll”?' });
     expect(within(within(dialog).getByRole('region', { name: 'To be created' })).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'NamePayroll',
       'Permissions (read-only)Empleados',
-      'ExpirationNo expiration',
+      'Expiration6 months',
     ]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create key' }));
 
@@ -296,7 +340,7 @@ describe('Integraciones en inglés (en-US)', () => {
     expect(within(translated).getByText(SECRET)).toBeInTheDocument(); // el mismo popup, en el otro idioma
     await act(() => setLocale('en-US'));
     await userEvent.click(within(screen.getByRole('dialog', { name: 'Copy the key for “Payroll”' })).getByRole('button', { name: "I've saved it" }));
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Payroll', scopes: ['EMPLOYEES_READ'], expires_in_days: null });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ name: 'Payroll', scopes: ['EMPLOYEES_READ'], expires_in_days: 180 });
   });
 
   it('la lista: uso, vigencia, guía de conexión y rotar en inglés', async () => {

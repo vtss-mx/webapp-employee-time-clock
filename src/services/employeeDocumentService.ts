@@ -1,12 +1,5 @@
 import type { Page, PageQuery, Restored } from '../types';
-import type {
-  EmployeeDocument,
-  EmployeeDocumentFile,
-  EmployeeDocumentInput,
-  EmployeeDocumentRequirements,
-  EmployeeDocumentData,
-  EmployeeDocumentUploaded,
-} from '../types/employeeDocuments';
+import type { EmployeeDocument, EmployeeDocumentData, EmployeeDocumentFile, EmployeeDocumentInput, EmployeeDocumentUploaded } from '../types/employeeDocuments';
 import { config } from '../utils/config';
 import { hasKeys, isNothing, isPage } from '../utils/guards';
 import { apiEnvelope, apiRequest } from './apiClient';
@@ -23,10 +16,10 @@ const isDocument = hasKeys<EmployeeDocument>(
   'ocr_processed',
   'mrz_verified',
   'confirmed',
+  'can_delete',
   'data',
 );
 const isDocumentFile = hasKeys<EmployeeDocumentFile>('file_name', 'content_type', 'data');
-const isRequirements = hasKeys<EmployeeDocumentRequirements>('required', 'types', 'documents', 'needs_official_id', 'needs_proof_of_address');
 
 /** Rutas base: los del propio empleado (la empresa sale de la sesión) y el expediente que revisa la empresa. */
 export const employeeDocumentsBase = {
@@ -45,8 +38,6 @@ function documentForm({ file, type }: EmployeeDocumentInput): FormData {
 /** Lo que el EMPLEADO hace con SUS documentos (subir, ver, descargar, eliminar y restaurar). */
 export interface MyDocumentApi {
   readonly base: string;
-  /** Qué documentos pide la empresa y qué falta (el encabezado del onboarding). */
-  requirements(signal?: AbortSignal): Promise<EmployeeDocumentRequirements>;
   /** Página de documentos: los vigentes (el más reciente primero) o «Eliminados» (`deleted`). */
   list(query: PageQuery & { deleted?: boolean }, signal?: AbortSignal): Promise<Page<EmployeeDocument>>;
   /** Sube un documento (el backend lo revisa por su contenido, lo lee con OCR y lo guarda cifrado). */
@@ -61,9 +52,6 @@ export interface MyDocumentApi {
 /** Documentos del PROPIO empleado (`/me/documents`). */
 export const myDocumentService: MyDocumentApi = {
   base: employeeDocumentsBase.mine,
-  requirements(signal) {
-    return apiRequest<EmployeeDocumentRequirements>(`${employeeDocumentsBase.mine}/requirements`, { signal, validate: isRequirements });
-  },
   list(query, signal) {
     return apiRequest<Page<EmployeeDocument>>(employeeDocumentsBase.mine, { query: { ...query }, signal, validate: isPage(isDocument) });
   },

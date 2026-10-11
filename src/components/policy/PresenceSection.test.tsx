@@ -71,7 +71,7 @@ describe('Política: prueba de presencia (antifraude 2b)', () => {
     expect(screen.getByText('Cada identificación lleva la firma del dispositivo con que el validador inició sesión.')).toBeInTheDocument();
     expect(screen.getByText('Los validadores que requieren ubicación la envían en cada identificación.')).toBeInTheDocument();
     expect(screen.getByText('Cada verificación facial (empleado, validador y la API) envía dónde se hizo; la empresa la ve en el mapa.')).toBeInTheDocument();
-    expect(screen.getByText('En los sitios que lo activen, la entrada y la salida llevan el código del kiosco.')).toBeInTheDocument();
+    expect(screen.getByText('En los sitios que lo activen, cada verificación lleva el código del kiosco.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Firma por petición/ }));
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Apagada', 'Solo medir', 'Obligatoria']);
   });
@@ -98,7 +98,7 @@ describe('Política: prueba de presencia (antifraude 2b)', () => {
     expect(confirm).toHaveTextContent('Antes, instala un kiosco en cada sitio que lo active');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Guardar ajuste' }));
     const notice = await screen.findByRole('dialog', { name: 'Código de sitio: Obligatoria' });
-    expect(notice).toHaveTextContent('la entrada y la salida llevan el código del kiosco');
+    expect(notice).toHaveTextContent('cada verificación lleva el código del kiosco');
     expect(calls.filter((c) => c.init.method === 'PUT').map(body)).toEqual([{ site_codes: 'ENFORCE' }]);
     await userEvent.click(within(notice).getByRole('button', { name: 'Entendido' }));
 
@@ -134,7 +134,7 @@ describe('Política: prueba de presencia (antifraude 2b)', () => {
     serve();
     renderPage();
     expect(await screen.findByRole('heading', { name: 'Proof of presence' })).toBeInTheDocument();
-    expect(screen.getByText('At sites that turn it on, check-in and check-out include the kiosk code.')).toBeInTheDocument();
+    expect(screen.getByText('At sites that turn it on, every verification includes the kiosk code.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Per-request signature/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Location on each identification/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Verification location/ })).toBeInTheDocument();

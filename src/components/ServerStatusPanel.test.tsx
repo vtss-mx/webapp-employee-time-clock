@@ -1,6 +1,7 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { LOCALES, setLocale, t } from '../i18n';
 import { apiFail, apiOk, mockFetch } from '../test/http';
 import { renderWithProviders } from '../test/render';
 import { ServerStatusPanel } from './ServerStatusPanel';
@@ -67,6 +68,18 @@ const bucket = {
 };
 
 describe('ServerStatusPanel', () => {
+  it.each(LOCALES)('en %s muestra el esquema incompatible con su estado traducido', async (locale) => {
+    await setLocale(locale);
+    mockFetch(apiOk({ ...status, status: 'unavailable', components: { database: { status: 'ok' }, schema: { status: 'unavailable', error: 'ProgrammingError' }, face_engine: { status: 'unavailable' } } }));
+    renderWithProviders(<ServerStatusPanel />);
+    const label = () => t('systemErrors.server.component', { name: t('systemErrors.server.components.schema'), status: t('systemErrors.server.unavailable') });
+    expect(await screen.findByText(label())).toBeInTheDocument();
+    expect(screen.getByText(t('systemErrors.server.component', { name: t('systemErrors.server.components.faceEngine'), status: t('systemErrors.server.unavailable') }))).toBeInTheDocument();
+    expect(screen.getByText('ProgrammingError')).toBeInTheDocument();
+    await act(() => setLocale(locale === 'en-US' ? 'es-MX' : 'en-US'));
+    expect(screen.getByText(label())).toBeInTheDocument();
+  });
+
   it('componentes y prioridades que la app aún no conoce se muestran con su nombre técnico', async () => {
     mockFetch(apiOk(status));
     renderWithProviders(<ServerStatusPanel />);

@@ -12,6 +12,10 @@ import { routeTemplate } from '../utils/routeTemplate';
  *   de la cuenta; nunca nombres, correos, empresas ni identificadores. La URL real, el título de la
  *   pestaña y el sitio de origen se reemplazan en TODOS los eventos (también los automáticos).
  * - Sin señales de Google ni personalización de anuncios (consentimiento de anuncios negado).
+ * - **No mide nada hasta que la persona lo acepta** (ePrivacy y RGPD: acceder al almacenamiento del navegador para
+ *   medir exige consentimiento previo; Francia y España lo sancionan de forma habitual). El SDK ni siquiera se carga
+ *   mientras la respuesta sea «no» o no haya respuesta: la decisión vive en el dispositivo (IndexedDB) y la pide
+ *   `AnalyticsConsent`. Rechazar no degrada nada de la aplicación.
  * - Se carga bajo demanda (import dinámico) solo si está habilitada y configurada; si el navegador no
  *   la soporta o algo falla, la app sigue igual: es de mejor esfuerzo, nunca lanza ni abre un popup.
  */
@@ -26,10 +30,29 @@ interface Session {
 export { routeTemplate };
 
 let session: Promise<Session | null> | null = null;
+/** Lo que respondió la persona en ESTE dispositivo: null mientras no responda (y entonces no se mide). */
+let consent: AnalyticsConsentChoice | null = null;
+
+/** Lo que puede responder la persona a la medición de uso. */
+export type AnalyticsConsentChoice = 'granted' | 'denied';
+
+/**
+ * Fija la respuesta de la persona. Al rechazar (o al cambiar de opinión) se olvida la sesión: lo que ya se cargó deja
+ * de usarse y no se vuelve a cargar hasta que acepte.
+ */
+export function setAnalyticsConsent(choice: AnalyticsConsentChoice | null): void {
+  consent = choice;
+  if (choice !== 'granted') session = null;
+}
 
 function configured(): boolean {
   const { enabled, firebase } = config.analytics;
   return enabled && Boolean(firebase.apiKey && firebase.appId && firebase.measurementId);
+}
+
+/** ¿Este despliegue mide el uso? Sin configurarla no tiene sentido preguntarle nada a la persona. */
+export function analyticsAvailable(): boolean {
+  return configured();
 }
 
 async function load(): Promise<Session | null> {
@@ -45,7 +68,8 @@ async function load(): Promise<Session | null> {
 
 /** Inicia la analítica una sola vez (si está habilitada y configurada). */
 function current(): Promise<Session | null> | null {
-  if (!configured()) return null;
+  // Sin un «sí» explícito no se carga el SDK ni se toca el almacenamiento del navegador.
+  if (consent !== 'granted' || !configured()) return null;
   // De mejor esfuerzo: si el SDK no carga (red, bloqueador de anuncios), la app sigue sin medir.
   session ??= load().catch(() => null);
   return session;
@@ -79,4 +103,5 @@ export function trackRole(role: string | null): void {
 /** Olvida la sesión de analítica (para las pruebas). */
 export function resetAnalytics(): void {
   session = null;
+  consent = null;
 }

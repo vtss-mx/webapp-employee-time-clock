@@ -5,12 +5,12 @@ import type es from '../es-MX/devices';
 export default {
   title: 'Devices',
   intro:
-    "Browsers and phones they used to check in or verify their identity, each with a key that can't be copied. Depending on the policy, an unapproved one asks for one more step or sends their records to review.",
+    "Browsers and phones they used to verify their identity, each with a key that can't be copied. Depending on the policy, an unapproved one asks for one more step or sends their records to review.",
   mineTitle: 'My devices',
-  mineIntro: 'The browsers or phones you used to check in or verify your identity. Your company can approve or revoke them.',
+  mineIntro: 'The browsers or phones you used to verify your identity. Your company can approve or revoke them.',
   empty: {
     title: 'No devices',
-    description: 'Browsers and phones used to check in will appear here.',
+    description: 'Browsers and phones used to verify identity will appear here.',
   },
   noun: {
     one: 'device',

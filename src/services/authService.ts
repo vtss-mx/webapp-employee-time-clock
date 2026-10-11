@@ -12,6 +12,13 @@ export interface LoginProofs {
 }
 
 const isUser = hasKeys<User>('id', 'email', 'role');
+
+/**
+ * Códigos 401 de "elegir empresa" que NO cierran la sesión (la del empleado sigue viva en el selector): la empresa
+ * está inactiva o su acceso a ella se desactivó. Se muestran como mensaje en el selector, no como cierre de sesión.
+ */
+export const COMPANY_SELECT_SAFE_CODES: ReadonlySet<string> = new Set(['COMPANY_INACTIVE', 'USER_INACTIVE']);
+
 const isTokenResponse = (value: unknown): value is AuthTokenResponse =>
   hasKeys<AuthTokenResponse>('access_token', 'expires_in', 'session_id', 'user')(value) && isUser(value.user);
 const isSessions = isPage<DeviceSessionList>(hasKeys('id', 'created_at', 'current'));
@@ -92,9 +99,18 @@ export const authService = {
     return apiRequest<User>('/users/me', { validate: isUser });
   },
 
-  /** EMPLOYEE en varias empresas: entra a una (queda fijada en su sesión del servidor). */
+  /**
+   * EMPLOYEE en varias empresas: entra a una (queda fijada en su sesión del servidor). Si la empresa está inactiva o su
+   * acceso a ella está desactivado el servidor responde 401 (`COMPANY_INACTIVE`/`USER_INACTIVE`): es un rechazo de ESTA
+   * petición, no una sesión inválida, así que no cierra la sesión (se queda en el selector con el mensaje del servidor).
+   */
   selectCompany(companyId: number): Promise<User> {
-    return apiRequest<User>('/auth/company', { method: 'POST', body: { company_id: companyId }, validate: isUser });
+    return apiRequest<User>('/auth/company', {
+      method: 'POST',
+      body: { company_id: companyId },
+      validate: isUser,
+      sessionSafeCodes: COMPANY_SELECT_SAFE_CODES,
+    });
   },
 
   /** Correo recordado en este dispositivo (vive en la BD; el navegador solo tiene una cookie HttpOnly). */

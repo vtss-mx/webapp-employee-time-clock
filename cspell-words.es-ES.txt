@@ -17,6 +17,7 @@ cancélalo
 configúrala
 configurarlo
 confírmalo
+cópiala
 cópialo
 desactívala
 desactívalo
@@ -38,6 +39,7 @@ rótala
 # Términos válidos que el diccionario no trae (DLE: biométrico, telemetría, paginación; recalcular y reintentar son
 # derivados regulares; autocalibración, compuesto con auto-)
 autocalibración
+biométrica
 biométrico
 biométricos
 paginación
@@ -78,3 +80,5 @@ regístralo
 suspéndela
 confírmalos
 enciéndelo
+verificarte
+trátala

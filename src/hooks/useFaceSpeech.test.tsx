@@ -32,6 +32,10 @@ describe('faceSpeechCue: qué se dice al entrar a cada fase', () => {
     expect(move).toMatchObject({ key: 'move:1:Gira la cabeza' });
     expect(move?.text()).toBe('Gira la cabeza');
     expect(faceSpeechCue({ phase: 'challenge', step: 0, instruction: null })).toBeNull();
+    // Al llegar (y sostener) el movimiento, un «sostén» corto en lugar de la instrucción.
+    const hold = faceSpeechCue({ phase: 'challenge', step: 1, instruction: 'Gira la cabeza', holding: true });
+    expect(hold).toMatchObject({ key: 'hold:1' });
+    expect(hold?.text()).toBe('Sostén así.');
     expect(faceSpeechCue({ phase: 'recenter', step: 2 })).toMatchObject({ key: 'recenter:2' });
     expect(faceSpeechCue({ phase: 'submitting', step: 0 })).toMatchObject({ key: 'done' });
     expect(faceSpeechCue({ phase: 'checking', step: 0 })).toBeNull();
@@ -45,6 +49,9 @@ describe('useFaceSpeech', () => {
     await waitFor(() => expect(spokenTexts()).toContain('Coloca tu rostro dentro de la guía y mira al frente.'));
     rerender({ ...base, phase: 'challenge', challenge: challengeWith(['Gira la cabeza a tu derecha']) });
     await waitFor(() => expect(spokenTexts()).toContain('Gira la cabeza a tu derecha'));
+    // Al sostener el movimiento se dice el «sostén» corto (mismo paso, otro código estable).
+    rerender({ ...base, phase: 'challenge', challenge: challengeWith(['Gira la cabeza a tu derecha']), holding: true });
+    await waitFor(() => expect(spokenTexts()).toContain('Sostén así.'));
     rerender({ ...base, phase: 'recenter', step: 1 });
     await waitFor(() => expect(spokenTexts()).toContain('Vuelve a mirar al frente.'));
     rerender({ ...base, phase: 'submitting' });

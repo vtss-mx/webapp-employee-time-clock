@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { settingsService } from '../services/settingsService';
 import type { VerificationPolicy, VerificationRules } from '../types';
+import { DEFAULT_ENROLLMENT_STEPS } from '../utils/enrollmentStepRules';
 
 /**
  * Valores seguros mientras carga o si no hay red: se asume lo más estricto. Sin umbrales de
@@ -35,6 +36,9 @@ export const STRICT_RULES: VerificationRules = {
   // apagada (no se dicta nada hasta conocer la política real de la empresa). El perfil por omisión del contrato.
   voice_guidance_enabled: false,
   voice_profile: 'FEMALE_WARM',
+  // Pasos del registro de identidad (decisión del dueño, 2026-10-08): mientras carga se asume el flujo por omisión del
+  // backend (`DEFAULT_ENROLLMENT_STEPS`), el mismo que pedía el registro antes de volverse configurable.
+  enrollment_steps: [...DEFAULT_ENROLLMENT_STEPS],
   // Ubicación de la verificación: a diferencia de los candados no se puede "asumir estricta" (ENFORCE) mientras carga,
   // porque eso abriría el aviso nativo de ubicación antes de conocer el modo real de la empresa. Se asume OFF (no se
   // pide) hasta que llega la política; una vez cargada rige el modo real y el servidor es quien exige en ENFORCE.

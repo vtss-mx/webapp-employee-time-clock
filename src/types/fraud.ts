@@ -1,6 +1,6 @@
 // Antifraude de identidad: motor de riesgo, casos de fraude (los revisa el ADMIN) y gobierno de la política.
 import type { WithAvatar } from './avatar';
-import type { EmployeeRef } from './shifts';
+import type { EmployeeRef } from './people';
 import type { CatalogItem, Page, PageQuery, StatusItem } from './index';
 
 /** Una señal del motor de riesgo en un intento: lo medido, su umbral, sus puntos y su modo (solo la ve el ADMIN). */
@@ -135,7 +135,7 @@ export interface SimilarEmployee extends WithAvatar {
 
 /**
  * Catálogos del antifraude: tipos de fraude, modos de una señal, motivos de una revisión (lo que ve la empresa),
- * niveles y acciones de riesgo, estados de un registro en revisión, modos del dispositivo del empleado, niveles
+ * niveles y acciones de riesgo, modos del dispositivo del empleado, niveles
  * predefinidos de la política y estados de un cambio y de un caso (las señales del motor no viajan aquí).
  */
 export interface AntifraudCatalogs {
@@ -144,7 +144,8 @@ export interface AntifraudCatalogs {
   review_reasons: CatalogItem[];
   risk_tiers: StatusItem[];
   risk_actions: CatalogItem[];
-  attendance_review_statuses: StatusItem[];
+  risk_fallback_actions: CatalogItem[];
+  verification_statuses: CatalogItem[];
   employee_device_modes: CatalogItem[];
   policy_presets: CatalogItem[];
   policy_change_statuses: StatusItem[];

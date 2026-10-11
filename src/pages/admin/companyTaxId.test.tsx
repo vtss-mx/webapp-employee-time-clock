@@ -51,8 +51,8 @@ async function fillTheRest() {
   await userEvent.type(screen.getByLabelText('Razón social'), 'Northwind Traders LLC');
   await userEvent.type(screen.getByLabelText('Teléfono'), '6621234567');
   await userEvent.type(screen.getByLabelText('Correo del administrador'), 'admin@northwind.com');
-  await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Empresa1234');
-  await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa1234');
+  await userEvent.type(screen.getByLabelText('Contraseña inicial'), 'Empresa123456');
+  await userEvent.type(screen.getByLabelText(/Confirmar contraseña/), 'Empresa123456');
   await userEvent.type(screen.getByLabelText('Precio por empleado activo'), '120');
 }
 

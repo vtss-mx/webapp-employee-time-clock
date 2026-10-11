@@ -74,6 +74,52 @@ export function businessHour(now: Date = new Date()): number {
   return Number(machineHour().format(now));
 }
 
+/** Año, mes, día, hora y minuto de un instante en la zona del negocio (formato de máquina). */
+const machineStamp = () =>
+  cachedDateFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: businessZone });
+
+/**
+ * Lo que hay que SUMAR al instante para leer su hora de pared en la zona del negocio (en milisegundos).
+ *
+ * La hora de pared se lee con precisión de MINUTO, así que se compara contra el instante truncado al minuto: si no,
+ * los segundos y los milisegundos del instante se colarían en el desfase (el fin del día, 23:59:59.999, se corría
+ * casi un minuto).
+ */
+function businessOffsetMs(at: Date): number {
+  const parts = machineStamp().formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((item) => item.type === type)?.value);
+  const minute = Math.floor(at.getTime() / 60_000) * 60_000;
+  return Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute')) - minute;
+}
+
+/**
+ * El instante (ISO con zona) de una hora de pared de la zona del NEGOCIO: lo que necesita un filtro de periodo
+ * para que el día que la persona elige sea el día de la empresa, no el del dispositivo ni UTC.
+ *
+ * Dos pasadas: la primera estima el desfase con la hora pedida leída como UTC y la segunda lo corrige con el
+ * instante estimado, que es el que de verdad decide si hay horario de verano. Un día inválido devuelve null (el
+ * filtro simplemente no se envía).
+ */
+function businessInstant(day: string, hour: number, minute: number, second: number, ms: number): string | null {
+  const [year, month, date] = day.split('-').map(Number);
+  if (!year || !month || !date) return null;
+  const wanted = Date.UTC(year, month - 1, date, hour, minute, second, ms);
+  // Un año fuera de lo que JavaScript puede representar da NaN: el filtro simplemente no se envía.
+  if (Number.isNaN(wanted)) return null;
+  const once = wanted - businessOffsetMs(new Date(wanted));
+  return new Date(wanted - businessOffsetMs(new Date(once))).toISOString();
+}
+
+/** Inicio ("YYYY-MM-DD" a las 00:00 del negocio) de un día de calendario, como instante ISO con zona. */
+export function businessDayStart(day: string): string | null {
+  return businessInstant(day, 0, 0, 0, 0);
+}
+
+/** Fin del día (23:59:59.999 del negocio), para que un periodo incluya el día elegido completo. */
+export function businessDayEnd(day: string): string | null {
+  return businessInstant(day, 23, 59, 59, 999);
+}
+
 /** Hora de un registro: "07:55" (reloj de 24 horas) en todos los idiomas salvo en-US ("7:55 AM"). */
 const TWENTY_FOUR_HOURS: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
 const TWELVE_HOURS: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hourCycle: 'h12' };
@@ -105,13 +151,6 @@ export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—';
   const date = parsed(value);
   return date ? localeDateFormat({ dateStyle: 'medium', timeStyle: 'short', timeZone: businessZone }).format(date) : value;
-}
-
-/** Hora de un instante en la zona del negocio ("07:55" en es-MX, "7:55 AM" en en-US). */
-export function formatTime(value: string | null | undefined): string {
-  if (!value) return '—';
-  const date = parsed(value);
-  return date ? localeDateFormat({ ...timeStyle(), timeZone: businessZone }).format(date) : value;
 }
 
 /** Duración legible: "45 min", "8 h", "7 h 20 min". */

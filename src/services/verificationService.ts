@@ -4,7 +4,12 @@ import { locationFormFields, type LocationTake } from '../utils/locationPayload'
 import { apiRequest } from './apiClient';
 import { postFaceCaptures, type FaceCaptures } from './http/faceUpload';
 
-export const isVerificationResult = hasKeys<VerificationResult>('verified', 'method', 'message');
+const hasResult = hasKeys<VerificationResult>('verified', 'method', 'message');
+/** Valida tipos del resultado; estados nuevos son datos, nunca una aprobación implícita. */
+export const isVerificationResult = (value: unknown): value is VerificationResult =>
+  hasResult(value) && typeof value.verified === 'boolean' && typeof value.method === 'string' && typeof value.message === 'string' &&
+  (value.review == null || typeof value.review === 'boolean') &&
+  (value.verification_status == null || typeof value.verification_status === 'string');
 const isResult = isVerificationResult;
 /** El reto trae sus movimientos y los colores del destello (vacío si la empresa no lo usa). */
 const isChallenge = hasKeys<FaceChallenge>('liveness_required', 'actions', 'flash');

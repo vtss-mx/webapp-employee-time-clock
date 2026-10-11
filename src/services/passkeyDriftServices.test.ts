@@ -5,7 +5,10 @@ import { driftService } from './driftService';
 import { passkeyService } from './passkeyService';
 
 const passkey = { id: 1, name: 'Mi teléfono', created_at: '2026-10-01T10:00:00Z', last_used_at: null, transports: ['internal'], backed_up: true };
+/** Opciones mínimas de ENTRAR con una llave: basta el reto sellado y el `challenge`. */
 const options = { token: 'sellado-123', options: { challenge: 'cmV0bw' } };
+/** Opciones de REGISTRAR: además el `user` y los `pubKeyCredParams` que `createPasskey` necesita. */
+const registrationData = { token: 'sellado-123', options: { challenge: 'cmV0bw', user: { id: 'dXNlcg', name: 'a@e.com', displayName: 'Ana' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }] } };
 const credential = { id: 'Y3JlZA', rawId: 'Y3JlZA', type: 'public-key' as const, response: { clientDataJSON: 'AQ', attestationObject: 'Ag', transports: [] }, authenticatorAttachment: null, clientExtensionResults: {} };
 const assertion = { ...credential, response: { clientDataJSON: 'AQ', authenticatorData: 'Ag', signature: 'Aw', userHandle: null } };
 const token = { access_token: 'tok', token_type: 'Bearer', expires_in: 3600, expires_at: 'x', session_id: 'sid', user: { id: 1, email: 'a@e.com', role: 'COMPANY' } };
@@ -16,7 +19,7 @@ const company = { id: 1, week_start: '2026-09-28', company_id: 1, company_name: 
 /** Llaves de acceso y deriva: cada servicio llama al endpoint y método correctos y valida la forma de la respuesta. */
 describe('servicios de llaves de acceso y deriva', () => {
   it.each([
-    ['passkeys.registrationOptions', () => passkeyService.registrationOptions(), options, 'POST', '/api/auth/passkeys/options'],
+    ['passkeys.registrationOptions', () => passkeyService.registrationOptions(), registrationData, 'POST', '/api/auth/passkeys/options'],
     ['passkeys.register', () => passkeyService.register({ token: 'sellado-123', name: 'Mi teléfono', credential }), passkey, 'POST', '/api/auth/passkeys'],
     ['passkeys.list', () => passkeyService.list({ page: 1, size: 10 }), { items: [passkey], total: 1, page: 1, size: 10 }, 'GET', '/api/auth/passkeys?page=1&size=10'],
     ['passkeys.rename', () => passkeyService.rename(1, 'Laptop'), passkey, 'PATCH', '/api/auth/passkeys/1'],
@@ -47,5 +50,14 @@ describe('servicios de llaves de acceso y deriva', () => {
     await expect(passkeyService.list({ page: 1, size: 10 })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
     mockFetch(apiOk({ weeks: [] }));
     await expect(driftService.summary()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
+
+  it('las opciones de registrar exigen `user` y `pubKeyCredParams` (un despliegue gradual con otra forma da INVALID_RESPONSE, no un TypeError)', async () => {
+    // El `challenge` solo (la forma que basta para entrar) NO sirve para registrar: `createPasskey` leería `user.id`.
+    mockFetch(apiOk(options));
+    await expect(passkeyService.registrationOptions()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+    // Esa misma forma mínima SÍ sirve para entrar (su guardián se queda ligero).
+    mockFetch(apiOk(options));
+    await expect(passkeyService.loginOptions()).resolves.toEqual(options);
   });
 });

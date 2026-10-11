@@ -3,6 +3,15 @@ import type es from '../es-MX/face';
 
 /** Textos de cámara, registro y verificación facial, prueba de vida y destello en portugués de Brasil (pt-BR): las mismas llaves que es-MX. */
 export default {
+  session: {
+    cancelTitle: 'Cancelar esta captura?',
+    cancelMessage: 'A captura ativa será interrompida. Uma verificação já concluída manterá seu resultado.',
+    cancelConfirm: 'Cancelar captura',
+    continue: 'Continuar captura',
+    capture: 'Captura',
+    noLongerActive: 'Esta captura expirou ou foi cancelada. Inicie uma nova captura.',
+    alreadyStarted: 'Esta captura já está em processamento ou terminou. Ela não pode ser enviada novamente.',
+  },
   camera: {
     name: 'Câmera',
     kinds: {
@@ -158,7 +167,7 @@ export default {
     counter: 'Etapa {current} de {total}',
   },
   flow: {
-    holdPosition: 'Mantenha a posição',
+    holdPose: 'Segure assim',
     almost: 'Só mais um pouco',
     photo: 'Foto {current} de {total}',
     analyzing: 'Analisando…',
@@ -231,6 +240,7 @@ export default {
   speak: {
     position: 'Coloque o rosto dentro da guia e olhe para a frente.',
     recenter: 'Olhe para a frente de novo.',
+    hold: 'Segure assim.',
     done: 'Pronto. Processando.',
     mute: 'Silenciar a orientação por voz',
     unmute: 'Ativar a orientação por voz',

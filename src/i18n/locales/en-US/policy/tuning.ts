@@ -31,6 +31,18 @@ export default {
     saved: 'Liveness check time updated',
     savedText: 'Each challenge will expire after {time}.',
   },
+  hold: {
+    label: 'Time to hold each move',
+    description: 'How long each move must be held before capturing; a bit longer avoids rejection at the end.',
+    saved: 'Hold time updated',
+    savedText: 'Each move is held {time} before capturing.',
+  },
+  retries: {
+    label: 'Challenge retries',
+    description: 'How many times a new challenge is requested, without repeating the scan, before restarting it.',
+    saved: 'Challenge retries updated',
+    savedText: 'Retries allowed before restarting: {count}.',
+  },
   flash: {
     label: 'Color flash',
     retired: 'Turned off by product decision (2026-10-06): the screen no longer flashes colors. The movements, the burst, and the voice check cover the liveness test.',
